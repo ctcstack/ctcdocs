@@ -1,0 +1,18 @@
+.astro/
+.claude/settings.local.json
+.wrangler/
+coverage/
+dist/
+node_modules/
+pnpm-lock.yaml
+LICENSE
+
+# Byte-sensitive converter fixtures are compared against golden output and are
+# never reformatted.
+packages/sync/fixtures/markdown/
+
+# The fixture project's corpus is written by the pipeline, not by hand.
+fixtures/project/src/content/docs/_generated/
+fixtures/project/src/assets/generated/
+fixtures/project/src/generated/
+fixtures/project/data/

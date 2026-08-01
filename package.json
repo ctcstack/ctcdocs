@@ -1,0 +1,41 @@
+{
+  "name": "ctcdocs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=22.12.0 <23",
+    "pnpm": ">=11.9.0 <12"
+  },
+  "scripts": {
+    "build": "pnpm --filter @ctcstack/ctcdocs-core build && pnpm --filter @ctcstack/ctcdocs-sync build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "typecheck": "pnpm --recursive typecheck",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "knip": "knip",
+    "prepare": "husky",
+    "verify:staged": "lint-staged",
+    "verify": "pnpm format:check && pnpm lint && pnpm build && pnpm typecheck && pnpm test:coverage"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.20.1",
+    "@vitest/coverage-v8": "4.1.10",
+    "eslint": "10.8.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-astro": "3.0.1",
+    "globals": "17.8.0",
+    "husky": "9.1.7",
+    "knip": "6.29.0",
+    "lint-staged": "16.4.0",
+    "prettier": "3.9.6",
+    "prettier-plugin-astro": "0.14.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.65.0",
+    "vitest": "4.1.10"
+  }
+}

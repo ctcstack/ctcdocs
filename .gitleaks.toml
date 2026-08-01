@@ -1,0 +1,38 @@
+# Gitleaks configuration for the CTCDocs platform repository.
+#
+# CI scans committed history with `gitleaks git`. Contributors also scan the
+# working directory with `gitleaks dir`, which reads every file on disk,
+# including paths Git ignores. Without this allowlist that scan reports findings
+# in vendored browser binaries and in intentionally local `.env` files, which
+# trains reviewers to ignore a red result.
+#
+# Only paths that Git never tracks are allowlisted here. Nothing that can reach
+# a commit is exempt, and `ctcdocs-sync validate` enforces that in every project
+# that uses this platform.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Dependencies and vendored test browsers are not repository content"
+paths = [
+  '''(^|/)node_modules/''',
+  '''^\.playwright-browsers/''',
+  '''^\.wrangler/''',
+  '''^\.astro/''',
+  '''^\.tmp/''',
+  '''^coverage/''',
+  '''(^|/)dist/''',
+  '''^test-results/''',
+  '''^playwright-report/''',
+  '''^blob-report/''',
+]
+
+[[allowlists]]
+description = "Git-ignored local credential material that must never be committed"
+paths = [
+  '''^\.env$''',
+  '''^\.env\.local$''',
+  '''^\.env\..*\.local$''',
+  '''^gha-creds-.*\.json$''',
+]
