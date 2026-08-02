@@ -103,20 +103,25 @@ test('documentation page is accessible and responsive on mobile', async ({
   // A table fills its frame and scrolls inside it. The scroller is the wrapper
   // rather than the table, because a block-level table scrolls but leaves its
   // cells short of the frame it is drawn in.
-  const tableLayout = await page.locator('table').evaluate((table) => {
-    const wrapper = table.parentElement;
-    return {
-      display: getComputedStyle(table).display,
-      wrapperClass: wrapper?.className,
-      wrapperOverflowX: wrapper ? getComputedStyle(wrapper).overflowX : null,
-      fillsWrapper: wrapper
-        ? Math.abs(
-            table.getBoundingClientRect().width -
-              wrapper.getBoundingClientRect().width,
-          ) <= 2
-        : false,
-    };
-  });
+  // The first table on the page: a document may carry several, and the
+  // assertion is about how the wrapper treats one of them.
+  const tableLayout = await page
+    .locator('table')
+    .first()
+    .evaluate((table) => {
+      const wrapper = table.parentElement;
+      return {
+        display: getComputedStyle(table).display,
+        wrapperClass: wrapper?.className,
+        wrapperOverflowX: wrapper ? getComputedStyle(wrapper).overflowX : null,
+        fillsWrapper: wrapper
+          ? Math.abs(
+              table.getBoundingClientRect().width -
+                wrapper.getBoundingClientRect().width,
+            ) <= 2
+          : false,
+      };
+    });
   expect(tableLayout).toEqual({
     display: 'table',
     wrapperClass: 'kb-table',
