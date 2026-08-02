@@ -61,6 +61,30 @@ jobs:
           node-version-file: .node-version
           registry-url: https://registry.npmjs.org
 
+      # Two ways in, and the run says which one it took. The first release of a
+      # package name cannot use trusted publishing, because the trusted
+      # publisher is configured on a package that does not exist yet; every
+      # release after it should, and then the token can be revoked.
+      #
+      # This runs before anything installs, because `setup-node` writes an
+      # npmrc referring to a token that is only set for the publish step, and
+      # every pnpm command in between otherwise reports failing to expand it.
+      - name: Choose how this run authenticates
+        shell: bash
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [[ -n "${NPM_TOKEN}" ]]; then
+            echo "::notice::Publishing with the npm token from this environment."
+          else
+            # Left in place with nothing to fill it, that npmrc fails the
+            # request before trusted publishing is ever attempted.
+            rm -f "${NPM_CONFIG_USERCONFIG:-${HOME}/.npmrc}"
+            echo "::notice::No npm token in this environment; publishing through trusted publishing."
+          fi
+
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
 
@@ -102,27 +126,6 @@ jobs:
           fi
 
           echo "Releasing ${expected}."
-
-      # Two ways in, and the run says which one it took. The first release of a
-      # package name cannot use trusted publishing, because the trusted
-      # publisher is configured on a package that does not exist yet; every
-      # release after it should, and then the token can be revoked.
-      - name: Choose how this run authenticates
-        shell: bash
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          if [[ -n "${NPM_TOKEN}" ]]; then
-            echo "::notice::Publishing with the npm token from this environment."
-          else
-            # `setup-node` wrote an npmrc that expects a token. Left in place
-            # with nothing to fill it, it fails the request before trusted
-            # publishing is ever attempted.
-            rm -f "${NPM_CONFIG_USERCONFIG:-${HOME}/.npmrc}"
-            echo "::notice::No npm token in this environment; publishing through trusted publishing."
-          fi
 
       # Order matters: the site package and the pipeline both depend on core,
       # and pnpm replaces the workspace protocol with the version it finds in
