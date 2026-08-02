@@ -2,12 +2,26 @@
   "name": "@ctcstack/ctcdocs-core",
   "version": "0.1.1",
   "description": "Configuration schema, project layout, and generated-path allowlist shared by the CTCDocs platform packages.",
+  "keywords": [
+    "ctcdocs",
+    "configuration",
+    "documentation",
+    "astro",
+    "starlight"
+  ],
   "license": "Apache-2.0",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ctcstack/ctcdocs.git",
     "directory": "packages/core"
+  },
+  "homepage": "https://github.com/ctcstack/ctcdocs/tree/main/packages/core#readme",
+  "bugs": {
+    "url": "https://github.com/ctcstack/ctcdocs/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "exports": {
     ".": {

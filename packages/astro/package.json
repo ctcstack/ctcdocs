@@ -2,12 +2,29 @@
   "name": "@ctcstack/ctcdocs",
   "version": "0.1.1",
   "description": "The CTCDocs site: an Astro/Starlight preset, component overrides, injected routes, styles, and the browser suite a project runs.",
+  "keywords": [
+    "astro",
+    "starlight",
+    "documentation",
+    "docs-as-code",
+    "google-docs",
+    "static-site",
+    "cloudflare-workers",
+    "pagefind"
+  ],
   "license": "Apache-2.0",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ctcstack/ctcdocs.git",
     "directory": "packages/astro"
+  },
+  "homepage": "https://github.com/ctcstack/ctcdocs/tree/main/packages/astro#readme",
+  "bugs": {
+    "url": "https://github.com/ctcstack/ctcdocs/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "exports": {
     "./config": "./config.ts",

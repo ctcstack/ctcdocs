@@ -33,5 +33,9 @@ Two properties are worth knowing about:
 [Configuration reference](https://github.com/ctcstack/ctcdocs/blob/main/docs/CONFIGURATION.md)
 · [Architecture decisions](https://github.com/ctcstack/ctcdocs/tree/main/docs/ADR)
 
-Apache-2.0. `0.x`: internal in practice, and the API may move between minor
-versions.
+All three CTCDocs packages share a version and are released together.
+What changed is in the
+[changelog](https://github.com/ctcstack/ctcdocs/blob/main/CHANGELOG.md).
+
+Apache-2.0. Internal in practice: `@ctcstack/ctcdocs` and
+`@ctcstack/ctcdocs-sync` are what a project installs.

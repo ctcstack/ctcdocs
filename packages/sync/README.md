@@ -50,4 +50,11 @@ so a failed run leaves the last known-good output untouched.
 · [Google Workspace setup](https://github.com/ctcstack/ctcdocs/blob/main/docs/GOOGLE_WORKSPACE_SETUP.md)
 · [Security policy](https://github.com/ctcstack/ctcdocs/blob/main/SECURITY.md)
 
-Apache-2.0. `0.x`: the API may still move between minor versions.
+The site half of CTCDocs is `@ctcstack/ctcdocs`: it turns the corpus this
+produces into the deployed documentation site.
+
+All three CTCDocs packages share a version and are released together.
+What changed is in the
+[changelog](https://github.com/ctcstack/ctcdocs/blob/main/CHANGELOG.md).
+
+Apache-2.0.

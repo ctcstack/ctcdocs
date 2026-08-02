@@ -80,4 +80,12 @@ audience it declares.
 · [Architecture decisions](https://github.com/ctcstack/ctcdocs/tree/main/docs/ADR)
 · [Security policy](https://github.com/ctcstack/ctcdocs/blob/main/SECURITY.md)
 
-Apache-2.0. `0.x`: the API may still move between minor versions.
+Two other packages complete the set: `@ctcstack/ctcdocs-sync` runs the
+pipeline, and `@ctcstack/ctcdocs-core` carries the configuration schema both
+read.
+
+All three CTCDocs packages share a version and are released together.
+What changed is in the
+[changelog](https://github.com/ctcstack/ctcdocs/blob/main/CHANGELOG.md).
+
+Apache-2.0.

@@ -159,3 +159,45 @@ jobs:
               --tag "${DIST_TAG}" \
               --no-git-checks
           done
+
+  # A separate job because it needs `contents: write`, which has no business
+  # anywhere near the step that publishes. It runs after publishing, so a tag
+  # that failed to reach the registry does not announce itself as released.
+  release-notes:
+    name: Publish the GitHub release
+    needs: publish
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # The tag already matched the manifests and the changelog before anything
+      # was published, so the section is known to exist; this only lifts it out.
+      - name: Publish the release from its changelog section
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "::notice::${RELEASE_TAG} already has a release; leaving it alone."
+            exit 0
+          fi
+
+          awk -v section="## ${RELEASE_TAG#v}" '
+            $0 == section { collecting = 1; next }
+            collecting && /^## / { exit }
+            collecting { print }
+          ' CHANGELOG.md |
+            gh release create "${RELEASE_TAG}" \
+              --title "${RELEASE_TAG}" \
+              --notes-file -

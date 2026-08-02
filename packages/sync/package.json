@@ -2,12 +2,28 @@
   "name": "@ctcstack/ctcdocs-sync",
   "version": "0.1.1",
   "description": "One-way Google Drive to Markdown synchronization for CTCDocs projects, with the ctcdocs-sync command line.",
+  "keywords": [
+    "google-drive",
+    "google-docs",
+    "markdown",
+    "documentation",
+    "docs-as-code",
+    "static-site",
+    "sync"
+  ],
   "license": "Apache-2.0",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ctcstack/ctcdocs.git",
     "directory": "packages/sync"
+  },
+  "homepage": "https://github.com/ctcstack/ctcdocs/tree/main/packages/sync#readme",
+  "bugs": {
+    "url": "https://github.com/ctcstack/ctcdocs/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "bin": {
     "ctcdocs-sync": "./bin/ctcdocs-sync.mjs"
