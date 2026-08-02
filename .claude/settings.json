@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/format-edited-file.mjs\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(actionlint:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh workflow list:*)",
+      "Bash(git branch:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git stash list:*)",
+      "Bash(git status:*)",
+      "Bash(gitleaks:*)",
+      "Bash(lychee:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm deploy:dry-run:*)",
+      "Bash(pnpm fixtures:*)",
+      "Bash(pnpm format:check:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm knip:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm test:coverage:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm verify:*)",
+      "Bash(zizmor:*)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh workflow run:*)",
+      "Bash(pnpm sync:*)"
+    ],
+    "deny": [
+      "Read(./apps/wiki/.env)",
+      "Read(./.env)",
+      "Read(./**/*.local)",
+      "Read(./gha-creds-*.json)",
+      "Bash(pnpm deploy:development)",
+      "Bash(pnpm deploy:production)",
+      "Bash(wrangler deploy:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Edit(./apps/wiki/src/content/docs/_generated/**)",
+      "Write(./apps/wiki/src/content/docs/_generated/**)",
+      "Edit(./apps/wiki/src/assets/generated/**)",
+      "Write(./apps/wiki/src/assets/generated/**)",
+      "Edit(./apps/wiki/src/generated/**)",
+      "Write(./apps/wiki/src/generated/**)",
+      "Edit(./data/sync-manifest.json)",
+      "Write(./data/sync-manifest.json)",
+      "Edit(./data/docs-index.json)",
+      "Write(./data/docs-index.json)",
+      "Edit(./data/latest-sync-report.json)",
+      "Write(./data/latest-sync-report.json)"
+    ]
+  }
+}
