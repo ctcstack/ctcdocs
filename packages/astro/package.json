@@ -25,8 +25,6 @@
     "ctcdocs-verify-search": "./bin/verify-search.mjs"
   },
   "files": [
-    "!**/*.test.mjs",
-    "!**/*.test.ts",
     "bin",
     "components",
     "config.ts",
@@ -40,7 +38,9 @@
     "routes",
     "scripts",
     "styles.css",
-    "tests"
+    "tests",
+    "!**/*.test.ts",
+    "!**/*.test.mjs"
   ],
   "engines": {
     "node": ">=22.12.0"

@@ -67,10 +67,57 @@ jobs:
       - name: Run the canonical verification gate
         run: pnpm verify
 
+      # A tag says which version is being released; the manifests say which
+      # version exists. When they disagree the tag is wrong, and finding that
+      # out after publishing is not a recoverable mistake.
+      - name: Require the tag to match the packages
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          expected="${RELEASE_TAG#v}"
+          for package in packages/core packages/sync packages/astro
+          do
+            version="$(jq -er '.version' "${package}/package.json")"
+            if [[ "${version}" != "${expected}" ]]; then
+              echo "::error::${package} is at ${version}, but the tag says ${expected}."
+              exit 1
+            fi
+          done
+          echo "Releasing ${expected}."
+
+      # Two ways in, and the run says which one it took. The first release of a
+      # package name cannot use trusted publishing, because the trusted
+      # publisher is configured on a package that does not exist yet; every
+      # release after it should, and then the token can be revoked.
+      - name: Choose how this run authenticates
+        shell: bash
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [[ -n "${NPM_TOKEN}" ]]; then
+            echo "::notice::Publishing with the npm token from this environment."
+          else
+            # `setup-node` wrote an npmrc that expects a token. Left in place
+            # with nothing to fill it, it fails the request before trusted
+            # publishing is ever attempted.
+            rm -f "${NPM_CONFIG_USERCONFIG:-${HOME}/.npmrc}"
+            echo "::notice::No npm token in this environment; publishing through trusted publishing."
+          fi
+
+      # Order matters: the site package and the pipeline both depend on core,
+      # and pnpm replaces the workspace protocol with the version it finds in
+      # the registry at pack time.
       - name: Publish
         shell: bash
         env:
           DIST_TAG: ${{ inputs.dist_tag || 'latest' }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
 
@@ -78,6 +125,7 @@ jobs:
           do
             pnpm --dir "${package}" publish \
               --access public \
+              --provenance \
               --tag "${DIST_TAG}" \
               --no-git-checks
           done
