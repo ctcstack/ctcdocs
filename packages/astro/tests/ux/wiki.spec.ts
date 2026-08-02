@@ -82,11 +82,11 @@ test('documentation page is accessible and responsive on mobile', async ({
    * behaves in a narrow frame. Which document has one is a property of the
    * corpus, so it is looked up rather than named.
    */
-  const document = documentWithTable();
-  test.skip(!document, 'The corpus has no document containing a table.');
+  const tableDocument = documentWithTable();
+  test.skip(!tableDocument, 'The corpus has no document containing a table.');
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`/${document?.slug}/`);
+  await page.goto(`/${tableDocument?.slug}/`);
 
   const menuButton = page.getByRole('button', { name: 'Menu' });
   await expect(menuButton).toBeVisible();

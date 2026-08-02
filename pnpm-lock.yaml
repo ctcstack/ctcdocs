@@ -14,9 +14,6 @@ importers:
       '@ctcstack/ctcdocs-sync':
         specifier: workspace:*
         version: link:packages/sync
-      '@eslint/js':
-        specifier: 10.0.1
-        version: 10.0.1(eslint@10.8.0(jiti@2.7.0))
       '@types/node':
         specifier: 22.20.1
         version: 22.20.1
@@ -26,15 +23,6 @@ importers:
       eslint:
         specifier: 10.8.0
         version: 10.8.0(jiti@2.7.0)
-      eslint-config-prettier:
-        specifier: 10.1.8
-        version: 10.1.8(eslint@10.8.0(jiti@2.7.0))
-      eslint-plugin-astro:
-        specifier: 3.0.1
-        version: 3.0.1(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@typescript-eslint/parser@8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.8.0(jiti@2.7.0))
-      globals:
-        specifier: 17.8.0
-        version: 17.8.0
       husky:
         specifier: 9.1.7
         version: 9.1.7
@@ -47,15 +35,9 @@ importers:
       prettier:
         specifier: 3.9.6
         version: 3.9.6
-      prettier-plugin-astro:
-        specifier: 0.14.1
-        version: 0.14.1
       typescript:
         specifier: 6.0.3
         version: 6.0.3
-      typescript-eslint:
-        specifier: 8.65.0
-        version: 8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3)
       vitest:
         specifier: 4.1.10
         version: 4.1.10(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(vite@8.2.0(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))
@@ -141,6 +123,9 @@ importers:
       remark-stringify:
         specifier: 11.0.0
         version: 11.0.0
+      sharp:
+        specifier: ^0.35.0
+        version: 0.35.3(@types/node@22.20.1)
       typescript-eslint:
         specifier: 8.65.0
         version: 8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3)
@@ -166,9 +151,6 @@ importers:
       linkedom:
         specifier: 0.18.12
         version: 0.18.12
-      sharp:
-        specifier: 0.35.3
-        version: 0.35.3(@types/node@22.20.1)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -4233,14 +4215,6 @@ snapshots:
   '@astrojs/compiler-binding-linux-x64-musl@0.3.2':
     optional: true
 
-  '@astrojs/compiler-binding-wasm32-wasi@0.3.2(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)':
-    dependencies:
-      '@napi-rs/wasm-runtime': 1.2.2(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)
-    transitivePeerDependencies:
-      - '@emnapi/core'
-      - '@emnapi/runtime'
-    optional: true
-
   '@astrojs/compiler-binding-wasm32-wasi@0.3.2(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)':
     dependencies:
       '@napi-rs/wasm-runtime': 1.2.2(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)
@@ -4255,21 +4229,6 @@ snapshots:
   '@astrojs/compiler-binding-win32-x64-msvc@0.3.2':
     optional: true
 
-  '@astrojs/compiler-binding@0.3.2(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)':
-    optionalDependencies:
-      '@astrojs/compiler-binding-darwin-arm64': 0.3.2
-      '@astrojs/compiler-binding-darwin-x64': 0.3.2
-      '@astrojs/compiler-binding-linux-arm64-gnu': 0.3.2
-      '@astrojs/compiler-binding-linux-arm64-musl': 0.3.2
-      '@astrojs/compiler-binding-linux-x64-gnu': 0.3.2
-      '@astrojs/compiler-binding-linux-x64-musl': 0.3.2
-      '@astrojs/compiler-binding-wasm32-wasi': 0.3.2(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)
-      '@astrojs/compiler-binding-win32-arm64-msvc': 0.3.2
-      '@astrojs/compiler-binding-win32-x64-msvc': 0.3.2
-    transitivePeerDependencies:
-      - '@emnapi/core'
-      - '@emnapi/runtime'
-
   '@astrojs/compiler-binding@0.3.2(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)':
     optionalDependencies:
       '@astrojs/compiler-binding-darwin-arm64': 0.3.2
@@ -4281,13 +4240,6 @@ snapshots:
       '@astrojs/compiler-binding-wasm32-wasi': 0.3.2(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)
       '@astrojs/compiler-binding-win32-arm64-msvc': 0.3.2
       '@astrojs/compiler-binding-win32-x64-msvc': 0.3.2
-    transitivePeerDependencies:
-      - '@emnapi/core'
-      - '@emnapi/runtime'
-
-  '@astrojs/compiler-rs@0.3.2(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)':
-    dependencies:
-      '@astrojs/compiler-binding': 0.3.2(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)
     transitivePeerDependencies:
       - '@emnapi/core'
       - '@emnapi/runtime'
@@ -5844,22 +5796,6 @@ snapshots:
 
   astring@1.9.0: {}
 
-  astro-eslint-parser@3.0.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2):
-    dependencies:
-      '@astrojs/compiler-rs': 0.3.2(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)
-      '@typescript-eslint/scope-manager': 8.65.0
-      '@typescript-eslint/types': 8.65.0
-      debug: 4.4.3
-      eslint-scope: 9.1.2
-      eslint-visitor-keys: 5.0.1
-      espree: 11.2.0
-      semver: 7.8.5
-      tinyglobby: 0.2.17
-    transitivePeerDependencies:
-      - '@emnapi/core'
-      - '@emnapi/runtime'
-      - supports-color
-
   astro-eslint-parser@3.0.0(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3):
     dependencies:
       '@astrojs/compiler-rs': 0.3.2(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)
@@ -6552,24 +6488,6 @@ snapshots:
   eslint-config-prettier@10.1.8(eslint@10.8.0(jiti@2.7.0)):
     dependencies:
       eslint: 10.8.0(jiti@2.7.0)
-
-  eslint-plugin-astro@3.0.1(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@typescript-eslint/parser@8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.8.0(jiti@2.7.0)):
-    dependencies:
-      '@eslint-community/eslint-utils': 4.10.1(eslint@10.8.0(jiti@2.7.0))
-      '@jridgewell/sourcemap-codec': 1.5.5
-      '@typescript-eslint/types': 8.65.0
-      astro-eslint-parser: 3.0.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)
-      eslint: 10.8.0(jiti@2.7.0)
-      espree: 11.2.0
-      globals: 17.8.0
-      postcss: 8.5.25
-      postcss-selector-parser: 7.1.4
-    optionalDependencies:
-      '@typescript-eslint/parser': 8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3)
-    transitivePeerDependencies:
-      - '@emnapi/core'
-      - '@emnapi/runtime'
-      - supports-color
 
   eslint-plugin-astro@3.0.1(@emnapi/core@2.0.0-alpha.3)(@emnapi/runtime@2.0.0-alpha.3)(@typescript-eslint/parser@8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.8.0(jiti@2.7.0)):
     dependencies:

@@ -42,5 +42,3 @@ export const ctcdocsEslintConfig = [
   },
   eslintConfigPrettier,
 ];
-
-export default ctcdocsEslintConfig;

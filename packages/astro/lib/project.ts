@@ -17,9 +17,7 @@ import {
   loadSiteConfiguration,
 } from '@ctcstack/ctcdocs-core';
 
-export const projectRoot = findProjectRoot();
-
-export const siteConfiguration = loadSiteConfiguration(projectRoot);
+export const siteConfiguration = loadSiteConfiguration(findProjectRoot());
 
 /** Ownership marker of generated Markdown, stripped from the published form. */
 export const markdownOwnershipHeader =

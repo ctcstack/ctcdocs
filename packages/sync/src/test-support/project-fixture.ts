@@ -6,19 +6,14 @@
  * deliberately fictional: a test that asserted a real deployment's title would
  * be describing one company's site rather than the pipeline's behavior.
  */
-import { mkdtemp, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
 import {
   parseSiteConfiguration,
-  PROJECT_LAYOUT,
   type SiteConfiguration,
 } from '@ctcstack/ctcdocs-core';
 
 import { createSyncContext, type SyncContext } from '../project-context.js';
 
-export const TEST_SITE_CONFIGURATION_INPUT = {
+const TEST_SITE_CONFIGURATION_INPUT = {
   brand: {
     name: 'Example',
     siteTitle: 'Example [DOCS]',
@@ -56,14 +51,3 @@ export function testSyncContext(repositoryRoot: string): SyncContext {
 export const TEST_MARKDOWN_HEADER = testSyncContext('/').markdownHeader;
 
 export const TEST_SOURCE_HEADER = testSyncContext('/').sourceHeader;
-
-/** A temporary directory holding the configuration, and its context. */
-export async function createProjectFixture(): Promise<SyncContext> {
-  const root = await mkdtemp(join(tmpdir(), 'ctcdocs-project-'));
-  await writeFile(
-    join(root, PROJECT_LAYOUT.configurationFile),
-    `${JSON.stringify(TEST_SITE_CONFIGURATION_INPUT, null, 2)}\n`,
-    'utf8',
-  );
-  return testSyncContext(root);
-}
