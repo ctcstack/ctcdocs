@@ -15,7 +15,7 @@
     "./styles.css": "./styles.css",
     "./components/*": "./components/*",
     "./routes/*": "./routes/*",
-    "./playwright": "./playwright.ts",
+    "./playwright": "./dist-node/playwright.js",
     "./eslint": "./eslint.js",
     "./prettier": "./prettier.js",
     "./package.json": "./package.json"
@@ -25,26 +25,29 @@
     "ctcdocs-verify-search": "./bin/verify-search.mjs"
   },
   "files": [
+    "!**/*.test.mjs",
+    "!**/*.test.ts",
     "bin",
     "components",
-    "lib",
-    "routes",
-    "scripts",
-    "tests",
     "config.ts",
     "content.ts",
+    "dist-node",
     "eslint.js",
+    "lib",
     "playwright.ts",
     "prettier.js",
     "route-injection.ts",
+    "routes",
+    "scripts",
     "styles.css",
-    "!**/*.test.ts",
-    "!**/*.test.mjs"
+    "tests"
   ],
   "engines": {
     "node": ">=22.12.0"
   },
   "scripts": {
+    "build": "tsc --project tsconfig.node.json",
+    "prepare": "pnpm build",
     "typecheck": "tsc --project tsconfig.json",
     "test": "vitest run --root ../.. && node --test bin/*.test.mjs"
   },

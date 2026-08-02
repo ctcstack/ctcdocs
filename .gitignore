@@ -40,3 +40,6 @@ gha-creds-*.json
 
 # Local state written by the "impeccable" design tooling
 .impeccable/
+
+# Compiled Node entrypoints of the site package
+dist-node/

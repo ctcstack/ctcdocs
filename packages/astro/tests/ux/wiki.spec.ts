@@ -1,14 +1,14 @@
-import AxeBuilder from '@axe-core/playwright';
+import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
-import { folderAnchorId, folderTrail } from '../../lib/folder-anchor';
+import { folderAnchorId, folderTrail } from '../../lib/folder-anchor.js';
 import { siteConfiguration } from '../../lib/project.js';
 import {
   anyDocument,
   documentInFolder,
   documentWithAsset,
   documentWithTable,
-} from '../support/corpus-fixtures';
+} from '../support/corpus-fixtures.js';
 
 async function expectNoAccessibilityViolations(page: Page): Promise<void> {
   const results = await new AxeBuilder({ page }).analyze();

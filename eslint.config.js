@@ -12,6 +12,7 @@ export default [
       '**/.wrangler/**',
       '**/coverage/**',
       '**/dist/**',
+      '**/dist-node/**',
       '**/node_modules/**',
       // Pipeline-owned output in the fixture project.
       'fixtures/project/src/content/docs/_generated/**',

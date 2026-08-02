@@ -1,5 +1,9 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignore": [".github/workflows/project-*.yml"],
+  "ignore": [
+    ".claude/**",
+    ".github/workflows/project-*.yml",
+    "packages/astro/playwright.ts"
+  ],
   "ignoreDependencies": ["prettier-plugin-astro"]
 }

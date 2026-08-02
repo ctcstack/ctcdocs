@@ -3,6 +3,7 @@
 .wrangler/
 coverage/
 dist/
+dist-node/
 node_modules/
 pnpm-lock.yaml
 LICENSE

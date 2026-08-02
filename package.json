@@ -9,7 +9,7 @@
     "pnpm": ">=11.9.0 <12"
   },
   "scripts": {
-    "build": "pnpm --filter @ctcstack/ctcdocs-core build && pnpm --filter @ctcstack/ctcdocs-sync build",
+    "build": "pnpm --filter @ctcstack/ctcdocs-core build && pnpm --filter @ctcstack/ctcdocs-sync build && pnpm --filter @ctcstack/ctcdocs build",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",

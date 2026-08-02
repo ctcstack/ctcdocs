@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  /*
+   * The part of this package Node loads directly rather than through a
+   * bundler: the Playwright factory, the suites it points at, and what they
+   * import. Node refuses to strip types from a `.ts` file inside
+   * `node_modules`, so these are compiled, while everything Vite handles keeps
+   * shipping as source.
+   */
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist-node",
+    "rootDir": ".",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext"
+  },
+  "include": [
+    "playwright.ts",
+    "lib/folder-anchor.ts",
+    "lib/project.ts",
+    "tests/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist-node", "**/*.test.ts"]
+}
