@@ -2,27 +2,29 @@
 /**
  * What changed across the whole corpus, most recent first.
  *
- * This answers a different question from the index below it. The index is
- * grouped by folder and answers "what exists here"; this answers "what has
+ * This answers a different question from the folder views around it. They are
+ * grouped by folder and answer "what exists here"; this answers "what has
  * moved since I last looked", which no folder view can show.
+ *
+ * How far back the band reaches is the project's decision rather than this
+ * component's, because it follows the corpus: the same six rows are a fortnight
+ * on one deployment and an afternoon on another.
  */
 import { formatDate, type CorpusDocument } from '../../lib/corpus';
 
-type Props = { documents: CorpusDocument[] };
+type Props = { documents: CorpusDocument[]; limit: number };
 
 /** A document that carries a source modification time. */
 type DatedDocument = CorpusDocument & { modified: Date };
 
-const LIMIT = 6;
-
-const { documents } = Astro.props;
+const { documents, limit } = Astro.props;
 
 // Undated documents are omitted here rather than shown without an age: this
 // band exists to answer "what moved recently", which they cannot answer. They
-// remain listed in the full index below.
+// remain listed in the full index, and in their folder either way.
 const recent = documents
   .filter((doc): doc is DatedDocument => doc.modified !== undefined)
-  .slice(0, LIMIT);
+  .slice(0, limit);
 ---
 
 {

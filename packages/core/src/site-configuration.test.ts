@@ -237,6 +237,52 @@ describe('parseSiteConfiguration', () => {
     );
   });
 
+  it('composes the home page the way it did before these options existed', () => {
+    expect(parseSiteConfiguration(validConfiguration()).home).toEqual({
+      lede: 'Every document here is published from Google Docs and is read-only.',
+      recentLimit: 6,
+      corpusIndex: true,
+    });
+  });
+
+  it('lets a project decide how far the recent band reaches', () => {
+    const raw = validConfiguration();
+    (raw.home as Record<string, unknown>).recentLimit = 10;
+
+    expect(parseSiteConfiguration(raw).home.recentLimit).toBe(10);
+  });
+
+  it.each<[unknown, string]>([
+    [0, 'a band that would show nothing'],
+    [-1, 'a negative count'],
+    [2.5, 'a fraction'],
+    ['10', 'a numeral written as text'],
+  ])('rejects %s as a recent limit (%s)', (value) => {
+    const raw = validConfiguration();
+    (raw.home as Record<string, unknown>).recentLimit = value;
+
+    expect(() => parseSiteConfiguration(raw)).toThrow(
+      /home\.recentLimit must be a whole number of at least 1/u,
+    );
+  });
+
+  it('lets a project whose folders have pages of their own drop the index', () => {
+    const raw = validConfiguration();
+    (raw.home as Record<string, unknown>).corpusIndex = false;
+
+    expect(parseSiteConfiguration(raw).home.corpusIndex).toBe(false);
+  });
+
+  it('refuses to drop the index the folder links resolve into', () => {
+    const raw = validConfiguration();
+    (raw.home as Record<string, unknown>).corpusIndex = false;
+    (raw.navigation as Record<string, unknown>).sectionIndexPages = false;
+
+    expect(() => parseSiteConfiguration(raw)).toThrow(
+      /home\.corpusIndex must stay true while navigation\.sectionIndexPages is false/u,
+    );
+  });
+
   it('rejects a generated-by marker that would close its own HTML comment', () => {
     const raw = validConfiguration();
     (raw.sync as Record<string, unknown>).generatedBy = 'EXAMPLE --> SYNC';

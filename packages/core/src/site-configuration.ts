@@ -36,6 +36,20 @@ export interface HomeConfiguration {
    * saying, what a newcomer needs first.
    */
   readonly lede: string;
+  /**
+   * How many documents the "recently updated" band lists. The band answers
+   * "what moved since I last looked", and how far back that reaches is a
+   * property of the corpus: a wiki synchronizing a handful of documents a week
+   * needs a shorter list than one where a dozen change a day. Defaults to 6.
+   */
+  readonly recentLimit: number;
+  /**
+   * Whether the home page ends with the full index of every document, grouped
+   * by folder. Defaults to `true`. A deployment whose folders each have a page
+   * of their own may prefer the page to stop at the folder cards and the
+   * recent band, and leave browsing to those pages and to search.
+   */
+  readonly corpusIndex: boolean;
 }
 
 /**
@@ -218,6 +232,36 @@ function flag(
   return value;
 }
 
+function optionalFlag(
+  source: Record<string, unknown>,
+  key: string,
+  path: string,
+  fallback: boolean,
+): boolean {
+  return source[key] === undefined ? fallback : flag(source, key, path);
+}
+
+/**
+ * A count of things shown on a page. Zero is rejected along with fractions and
+ * negatives: a block configured to show nothing is hidden by the switch that
+ * hides it, not by a limit that leaves an empty heading behind.
+ */
+function optionalCount(
+  source: Record<string, unknown>,
+  key: string,
+  path: string,
+  fallback: number,
+): number {
+  const value = source[key];
+  if (value === undefined) {
+    return fallback;
+  }
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
+    fail(path, 'must be a whole number of at least 1');
+  }
+  return value;
+}
+
 function optionalVisibility(
   source: Record<string, unknown>,
   path: string,
@@ -317,7 +361,32 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
   }
 
   const navigationSource = record(root.navigation, 'navigation');
+  const sectionIndexPages = flag(
+    navigationSource,
+    'sectionIndexPages',
+    'navigation.sectionIndexPages',
+  );
+
   const homeSource = record(root.home, 'home');
+  const corpusIndex = optionalFlag(
+    homeSource,
+    'corpusIndex',
+    'home.corpusIndex',
+    true,
+  );
+  /*
+   * Without pages of their own, folders are presented by their heading in that
+   * index: a folder card and a breadcrumb segment both link to `/#<folder>`.
+   * Turning the index off while those pages are not generated would leave
+   * every one of those links pointing at an anchor no page carries, so the
+   * combination is refused here rather than shipped as a page of dead links.
+   */
+  if (!corpusIndex && !sectionIndexPages) {
+    fail(
+      'home.corpusIndex',
+      'must stay true while navigation.sectionIndexPages is false, because folder links resolve to headings in that index',
+    );
+  }
 
   return {
     brand,
@@ -325,18 +394,23 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
       environments: environments(deploymentSource),
       workerName,
     },
-    home: { lede: text(homeSource, 'lede', 'home.lede') },
+    home: {
+      corpusIndex,
+      lede: text(homeSource, 'lede', 'home.lede'),
+      recentLimit: optionalCount(
+        homeSource,
+        'recentLimit',
+        'home.recentLimit',
+        6,
+      ),
+    },
     navigation: {
       landingDocumentTitles: titleList(
         navigationSource,
         'landingDocumentTitles',
         'navigation.landingDocumentTitles',
       ),
-      sectionIndexPages: flag(
-        navigationSource,
-        'sectionIndexPages',
-        'navigation.sectionIndexPages',
-      ),
+      sectionIndexPages,
     },
     sync: {
       commitBotName: text(syncSource, 'commitBotName', 'sync.commitBotName'),
