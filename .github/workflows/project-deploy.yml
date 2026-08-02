@@ -41,8 +41,40 @@ permissions:
   contents: read
 
 jobs:
+  # A project has no corpus until its first sync, and deploying an empty site
+  # over a live one is worse than not deploying at all. This reports the state
+  # and stops rather than failing.
+  corpus:
+    name: Require content to deploy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      present: ${{ steps.check.outputs.present }}
+
+    steps:
+      - name: Checkout candidate without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.candidate_sha || github.sha }}
+          persist-credentials: false
+
+      - name: Detect a synchronized corpus
+        id: check
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -f data/sync-manifest.json ]]; then
+            echo "present=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "present=false" >> "${GITHUB_OUTPUT}"
+            echo "::notice::No generated corpus yet; nothing is deployed until the first sync."
+          fi
+
   verify:
     name: Verify the deployment candidate
+    needs: corpus
+    if: needs.corpus.outputs.present == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
 
@@ -244,8 +276,9 @@ jobs:
 
   deployment-gate:
     name: Require a completed deployment
-    if: always()
+    if: always() && needs.corpus.outputs.present == 'true'
     needs:
+      - corpus
       - deploy
       - smoke
     runs-on: ubuntu-24.04
