@@ -1,12 +1,18 @@
 name: Publish packages
 
-# Publishing is off until the npm scope exists. Projects consume the packages as
-# Git dependencies pinned to a commit until then (see README), so this workflow
-# is written, reviewed and inert rather than absent: turning it on is setting
-# the NPM_PUBLISHING repository variable to `true` and pushing a tag.
+# A release is a tag whose name matches the version in every package manifest,
+# pushed while the NPM_PUBLISHING repository variable is `true`.
 #
-# It publishes with provenance through npm Trusted Publishing, so no long-lived
-# publish token is stored anywhere.
+# Every package is published with provenance, so a consumer can check which
+# commit and which workflow run produced the tarball they installed.
+#
+# Authentication has two modes, and a run says which one it took. Trusted
+# publishing is the intended one and stores no credential anywhere, but it
+# cannot perform the first release of a name: the trusted publisher is
+# configured on a package, and the package does not exist yet. That release
+# needs an npm token with `Bypass two-factor authentication` enabled — a
+# runner cannot answer a one-time-password prompt — and the token should be
+# revoked once trusted publishing is configured on all three packages.
 
 on:
   push:
@@ -113,6 +119,11 @@ jobs:
       # Order matters: the site package and the pipeline both depend on core,
       # and pnpm replaces the workspace protocol with the version it finds in
       # the registry at pack time.
+      #
+      # Three publishes are three chances to fail halfway, and a version cannot
+      # be published twice. Skipping what the registry already has makes the
+      # step restartable, so a failure on the last package is retried rather
+      # than worked around by hand.
       - name: Publish
         shell: bash
         env:
@@ -123,6 +134,14 @@ jobs:
 
           for package in packages/core packages/sync packages/astro
           do
+            name="$(jq -er '.name' "${package}/package.json")"
+            version="$(jq -er '.version' "${package}/package.json")"
+
+            if npm view "${name}@${version}" version >/dev/null 2>&1; then
+              echo "::notice::${name}@${version} is already published; skipping it."
+              continue
+            fi
+
             pnpm --dir "${package}" publish \
               --access public \
               --provenance \
