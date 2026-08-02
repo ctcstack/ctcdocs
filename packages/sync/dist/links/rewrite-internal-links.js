@@ -3,6 +3,7 @@ import remarkGfm from 'remark-gfm';
 import remarkParse from 'remark-parse';
 import remarkStringify from 'remark-stringify';
 import { unified } from 'unified';
+import { unwrapGoogleRedirect } from '../conversion/url-policy.js';
 const GOOGLE_FILE_ID = /^[A-Za-z0-9_-]+$/u;
 const READABLE_ANCHOR = /^[\p{L}\p{N}][\p{L}\p{N}_.:-]*$/u;
 const GOOGLE_SPECIFIC_ANCHOR = /^(?:bookmark=id\.|heading=h\.)/u;
@@ -57,19 +58,28 @@ function safeFragment(fragment) {
         : { fragment: '', removed: true };
 }
 function rewriteUrl(value, stableSlugs) {
-    const googleLink = parseGoogleDocumentLink(value);
-    if (!googleLink) {
-        return undefined;
+    /*
+     * A Google redirect is unwrapped before anything else is decided about the
+     * link. It is what makes a wrapped link between two documents in this corpus
+     * recognizable as one, and what keeps an unchanged document from producing a
+     * diff on every full export.
+     */
+    const unwrapped = unwrapGoogleRedirect(value);
+    const target = unwrapped ?? value;
+    const googleLink = parseGoogleDocumentLink(target);
+    const stableSlug = googleLink
+        ? stableSlugs.get(googleLink.fileId)
+        : undefined;
+    if (googleLink && stableSlug) {
+        const fragment = safeFragment(googleLink.fragment);
+        return {
+            url: `/${stableSlug}/${fragment.fragment}`,
+            removedFragment: fragment.removed,
+        };
     }
-    const stableSlug = stableSlugs.get(googleLink.fileId);
-    if (!stableSlug) {
-        return undefined;
-    }
-    const fragment = safeFragment(googleLink.fragment);
-    return {
-        url: `/${stableSlug}/${fragment.fragment}`,
-        removedFragment: fragment.removed,
-    };
+    // Everything else keeps pointing where it pointed — at the real address
+    // rather than through Google.
+    return unwrapped ? { url: unwrapped, removedFragment: false } : undefined;
 }
 function walk(node, visit) {
     if (node.type !== 'root') {

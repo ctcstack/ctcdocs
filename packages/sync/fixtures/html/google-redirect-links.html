@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Google redirect link fixture</title>
+  </head>
+  <body>
+    <p>
+      Google's HTML export wraps every link in its own redirect, carrying an
+      export timestamp and a signature that change on every export.
+    </p>
+    <p>
+      An external target:
+      <a
+        href="https://www.google.com/url?q=https://example.invalid/status&amp;sa=D&amp;source=editors&amp;ust=1785672326246866&amp;usg=AOvVaw0QCl5E0Hz3hnK4fpFNABUi"
+        >status page</a
+      >
+    </p>
+    <p>
+      Another document in the same corpus:
+      <a
+        href="https://www.google.com/url?q=https://docs.google.com/document/d/doc-one/edit&amp;sa=D&amp;source=editors&amp;ust=1785672326251648&amp;usg=AOvVaw2f78DId6vaoPYUibGTHDyR"
+        >the architecture note</a
+      >
+    </p>
+    <p>
+      A document outside the corpus:
+      <a
+        href="https://www.google.com/url?q=https://docs.google.com/document/d/outside/edit&amp;sa=D&amp;source=editors&amp;ust=1785672326251999&amp;usg=AOvVaw3T1Tt1D-TNmLdjzVLEtXjX"
+        >an unmanaged document</a
+      >
+    </p>
+    <p>
+      A wrapper whose target is not a link at all:
+      <a
+        href="https://www.google.com/url?q=javascript:alert(1)&amp;sa=D&amp;source=editors&amp;ust=1785672326252111&amp;usg=AOvVaw1oK7RaMC-B6UXSW83prZK8"
+        >hostile target</a
+      >
+    </p>
+    <p>
+      A link Google left alone:
+      <a href="https://example.invalid/plain">a plain link</a>
+    </p>
+  </body>
+</html>

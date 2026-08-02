@@ -311,6 +311,22 @@ const htmlArchives = new Map<string, Uint8Array>([
             '</table>',
             '<p>The pipeline is invoked the same way in every project:</p>',
             '<pre><code>pnpm sync --full</code></pre>',
+            /*
+             * Google routes every exported link through its own redirector,
+             * with a timestamp and a signature it regenerates on each export.
+             * The corpus carries one of each so the conversion is exercised:
+             * a link to another document in this corpus, which has to become a
+             * site link, and an external one, which has to reach its target
+             * rather than Google.
+             */
+            '<p>See also the ',
+            '<a href="https://www.google.com/url?q=https://docs.google.com/',
+            'document/d/doc-overview/edit&amp;sa=D&amp;source=editors',
+            '&amp;ust=1785672326251648&amp;usg=AOvVaw2f78DId6vaoPYUibGTHDyR">',
+            'handbook overview</a> and the ',
+            '<a href="https://www.google.com/url?q=https://example.invalid/',
+            'status&amp;sa=D&amp;source=editors&amp;ust=1785672326246866',
+            '&amp;usg=AOvVaw0QCl5E0Hz3hnK4fpFNABUi">status page</a>.</p>',
             '<p>A published page carries the same body as its Markdown',
             ' projection, so an agent reading the projection sees this table',
             ' too.</p>',

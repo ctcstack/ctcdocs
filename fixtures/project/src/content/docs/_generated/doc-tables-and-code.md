@@ -7,7 +7,7 @@
 "googleFileId": "doc-tables-and-code"
 "googleModifiedTime": "2026-02-06T16:45:00.000Z"
 "syncedAt": "2026-02-10T06:00:00.000Z"
-"contentHash": "sha256:0331e96a8baccfd40e51ede2ca122b1d27ba6e2e012258c717cb82b4ce62a22c"
+"contentHash": "sha256:5655c1345792344c63fd191a80a79c638367326669e3dac0e8a0c571acb7af6b"
 "folderPath":
   - "Handbook"
 "pagefind": true
@@ -26,5 +26,7 @@ The pipeline is invoked the same way in every project:
 ```
 pnpm sync --full
 ```
+
+See also the [handbook overview](/handbook/overview/) and the [status page](https://example.invalid/status).
 
 A published page carries the same body as its Markdown projection, so an agent reading the projection sees this table too.

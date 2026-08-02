@@ -152,4 +152,29 @@ describe('HTML archive conversion', () => {
       ),
     ).toThrow(HtmlArchiveConversionError);
   });
+
+  it('carries Google redirect wrappers through for the link rewriter', async () => {
+    const conversion = convertHtmlArchive(
+      await fixtureEntries('google-redirect-links.html'),
+      {
+        documentId: 'doc-links',
+        documentTitle: 'Google redirect link fixture',
+      },
+    );
+
+    /*
+     * The archive converter keeps the href Google wrote; unwrapping belongs to
+     * the link rewriter, which is the one place that also knows which document
+     * identifiers belong to this corpus. What matters here is that the wrapper
+     * survives sanitization intact, signature and all, so the rewriter has
+     * something to unwrap.
+     */
+    expect(conversion.body).toContain(
+      'https://www.google.com/url?q=https://example.invalid/status',
+    );
+    expect(conversion.body).toContain(
+      'https://www.google.com/url?q=https://docs.google.com/document/d/doc-one/edit',
+    );
+    expect(conversion.body).toContain('https://example.invalid/plain');
+  });
 });

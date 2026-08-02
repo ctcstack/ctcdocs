@@ -4,6 +4,7 @@ import {
   isAllowedLinkUrl,
   isAllowedSvgReference,
   resolveArchiveAssetPath,
+  unwrapGoogleRedirect,
 } from './url-policy.js';
 
 describe('HTML and SVG URL policy', () => {
@@ -59,5 +60,51 @@ describe('HTML and SVG URL policy', () => {
       isAllowedSvgReference('https://example.invalid/a.svg#gradient'),
     ).toBe(false);
     expect(isAllowedSvgReference('javascript:alert(1)')).toBe(false);
+  });
+});
+
+describe('Google redirect wrappers', () => {
+  it('reads the address a wrapper leads to', () => {
+    expect(
+      unwrapGoogleRedirect(
+        'https://www.google.com/url?q=https://example.invalid/status&sa=D&source=editors&ust=1785672326246866&usg=AOvVaw0Q',
+      ),
+    ).toBe('https://example.invalid/status');
+  });
+
+  it('reads a wrapper without the www host and with the alternate parameter', () => {
+    expect(
+      unwrapGoogleRedirect(
+        'https://google.com/url?url=https://example.invalid/',
+      ),
+    ).toBe('https://example.invalid/');
+  });
+
+  it.each([
+    ['https://redirect.invalid/url?q=https://example.invalid/', 'another host'],
+    [
+      'https://www.google.com/search?q=https://example.invalid/',
+      'another path',
+    ],
+    ['https://www.google.com/url?sa=D&usg=AOvVaw0Q', 'no target'],
+    ['https://example.invalid/plain', 'a plain link'],
+    ['not a url at all', 'unparsable input'],
+  ])('leaves %s alone (%s)', (value) => {
+    expect(unwrapGoogleRedirect(value)).toBeUndefined();
+  });
+
+  it.each([
+    ['javascript:alert(1)', 'an executable scheme'],
+    [
+      '/relative/path',
+      'a relative target that would resolve against this site',
+    ],
+    ['data:text/html,<script>', 'an inline document'],
+  ])('refuses to unwrap to %s (%s)', (target) => {
+    expect(
+      unwrapGoogleRedirect(
+        `https://www.google.com/url?q=${encodeURIComponent(target)}&sa=D`,
+      ),
+    ).toBeUndefined();
   });
 });
