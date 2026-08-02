@@ -12,7 +12,8 @@
     }
   },
   "home": {
-    "lede": "Every document here is published from Google Docs in the Example Shared Drive and is read-only. Each entry shows when its source was last edited."
+    "lede": "Every document here is published from Google Docs in the Example Shared Drive and is read-only. Each entry shows when its source was last edited.",
+    "recentLimit": 3
   },
   "navigation": {
     "landingDocumentTitles": ["Overview", "README", "About"],

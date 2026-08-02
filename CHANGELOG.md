@@ -2,6 +2,19 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Added
+
+- `home.recentLimit` and `home.corpusIndex` in `site.config.json`. The first
+  sets how many documents the "recently updated" band lists; the second decides
+  whether the home page ends with the full index of every document. Both are
+  optional and default to what the page did before — six rows and an index — so
+  an existing configuration keeps its home page unchanged.
+  `home.corpusIndex: false` is refused while `navigation.sectionIndexPages` is
+  `false`, because folder cards and breadcrumbs resolve to headings inside that
+  index when folders have no pages of their own.
+
 ## 0.1.1
 
 ### Changed

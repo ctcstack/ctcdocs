@@ -26,7 +26,9 @@ name of its own; they read this file. The rationale is recorded in
     }
   },
   "home": {
-    "lede": "Every document here is published from Google Docs in the Example Shared Drive and is read-only. Each entry shows when its source was last edited."
+    "lede": "Every document here is published from Google Docs in the Example Shared Drive and is read-only. Each entry shows when its source was last edited.",
+    "recentLimit": 6,
+    "corpusIndex": true
   },
   "navigation": {
     "landingDocumentTitles": ["Overview", "README", "About"],
@@ -50,6 +52,8 @@ name of its own; they read this file. The rationale is recorded in
 | `deployment.environments.*`            | Canonical site URL, Wrangler custom domains, deployment summaries, smoke-test defaults.                                     |
 | `deployment.environments.*.visibility` | Who may read that environment: `private` (default) or `public`. See below.                                                  |
 | `home.lede`                            | The paragraph under the home page heading, in full: where documents come from and what a reader may do with them.           |
+| `home.recentLimit`                     | How many documents the "recently updated" band lists. A whole number of at least 1; defaults to 6.                          |
+| `home.corpusIndex`                     | Whether the home page ends with the full index of every document. Defaults to `true`. See below.                            |
 | `navigation.landingDocumentTitles`     | Titles that open the folder they sit in, most preferred first. Also picks the description the home page shows for a folder. |
 | `navigation.sectionIndexPages`         | Whether each folder gets a generated page listing its contents at `/<folder-slug>/`.                                        |
 | `sync.generatedBy`                     | The ownership marker stamped into every generated Markdown and TypeScript file.                                             |
@@ -121,6 +125,33 @@ This one is not cosmetic. The marker is written into every generated file, so
 changing it rewrites the whole generated corpus. Do it deliberately, in its own
 commit, by running a full sync (`ctcdocs-sync sync --full`) rather than by
 editing generated files.
+
+## What the home page shows
+
+The page is composed of four blocks in a fixed order — the opening with search,
+the folder cards, the recently updated band, and the full index — and two of
+them are the project's to size.
+
+`home.recentLimit` is how many rows the recent band lists. Six is a fortnight on
+a slow corpus and an afternoon on a busy one, so the number belongs to the
+deployment rather than to the platform. Documents with no recorded source
+modification time are not in the band at all; they are still listed everywhere
+else.
+
+`home.corpusIndex` decides whether the page ends with every document, grouped by
+folder. Keeping it is right for a corpus a reader can take in at a glance;
+dropping it suits a deployment where each folder has a page of its own and the
+home page is meant to be an entrance rather than a table of contents.
+
+The two settings are coupled to `navigation.sectionIndexPages`. Where folder
+pages are not generated, a folder card and a breadcrumb segment both link to
+that folder's heading **inside** the index, so a configuration that drops the
+index while `navigation.sectionIndexPages` is `false` is refused by
+`ctcdocs-sync validate` and by the build. Turn folder pages on first.
+
+One case ignores the switch: a project that has never synchronized still gets
+the index, because it is the only block that explains an empty site instead of
+hiding itself.
 
 ## What is not in the configuration file
 

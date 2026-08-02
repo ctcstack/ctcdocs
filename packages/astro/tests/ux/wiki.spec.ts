@@ -29,11 +29,22 @@ test('home page is accessible and search is keyboard operable', async ({
   // The home page opens on folder cards, then what changed, then the full
   // index. Asserted structurally so it does not break when the corpus changes.
   await expect(page.locator('.category-card').first()).toBeVisible();
-  await expect(page.locator('.recent-list li').first()).toBeVisible();
-  await expect(page.locator('.corpus-group').first()).toBeVisible();
-  const firstEntry = page.locator('.corpus-list li').first();
-  await expect(firstEntry.getByRole('link')).toBeVisible();
-  await expect(firstEntry.locator('time')).toBeVisible();
+  const recentRows = page.locator('.recent-list li');
+  await expect(recentRows.first()).toBeVisible();
+
+  // The band stops where the project asked it to. A corpus smaller than the
+  // limit is the shorter list, which is the limit doing its job too.
+  const { corpusIndex, recentLimit } = siteConfiguration.home;
+  expect(await recentRows.count()).toBeLessThanOrEqual(recentLimit);
+
+  // The index is the project's choice; where it is kept, it lists every
+  // document with the date its source was last edited.
+  if (corpusIndex) {
+    await expect(page.locator('.corpus-group').first()).toBeVisible();
+    const firstEntry = page.locator('.corpus-list li').first();
+    await expect(firstEntry.getByRole('link')).toBeVisible();
+    await expect(firstEntry.locator('time')).toBeVisible();
+  }
   await expect(
     page.getByRole('link', { name: 'About this wiki' }).first(),
   ).toBeVisible();
