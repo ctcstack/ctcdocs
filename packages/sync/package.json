@@ -10,7 +10,7 @@
     "directory": "packages/sync"
   },
   "bin": {
-    "ctcdocs-sync": "./dist/cli.js"
+    "ctcdocs-sync": "./bin/ctcdocs-sync.mjs"
   },
   "exports": {
     ".": {
@@ -19,6 +19,7 @@
     }
   },
   "files": [
+    "bin",
     "dist",
     "src",
     "!src/**/*.test.ts",
