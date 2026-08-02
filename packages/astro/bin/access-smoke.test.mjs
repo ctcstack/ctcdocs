@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   AccessSmokeError,
@@ -206,4 +211,46 @@ test('post-deploy fails once the propagation deadline has passed', async () => {
     requested.filter((path) => path === '/section/guide/index.md').length,
     1,
   );
+});
+
+/*
+ * The check that matters most is that this check runs at all.
+ *
+ * A package manager installs a bin as a symlink, so the entry point comparison
+ * has to survive that. When it did not, the command exited zero without
+ * verifying anything, and a deployment with no Access in front of it reported a
+ * green boundary.
+ */
+test('runs when invoked through a bin symlink, as a project runs it', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'ctcdocs-bin-'));
+  const link = join(directory, 'ctcdocs-access-smoke');
+  symlinkSync(
+    fileURLToPath(new URL('./access-smoke.mjs', import.meta.url)),
+    link,
+  );
+
+  let exitCode = 0;
+  let output = '';
+  try {
+    execFileSync(process.execPath, [link, '--preflight'], {
+      cwd: fileURLToPath(new URL('../../../fixtures/project', import.meta.url)),
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        CF_ACCESS_CLIENT_ID: '',
+        CF_ACCESS_CLIENT_SECRET: '',
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (error) {
+    exitCode = error.status;
+    output = `${error.stdout ?? ''}${error.stderr ?? ''}`;
+  }
+
+  assert.notEqual(
+    exitCode,
+    0,
+    'the command exited zero without verifying anything',
+  );
+  assert.match(output, /service-token credentials are required/u);
 });

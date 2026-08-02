@@ -1,7 +1,8 @@
+import { realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 import {
   findProjectRoot,
@@ -145,6 +146,19 @@ async function readBoundedText(response) {
   return new TextDecoder().decode(bytes);
 }
 
+/**
+ * A probe URL an edge cache cannot answer from a previous state.
+ *
+ * The boundary check asks whether *this* deployment is protected. A cached
+ * response from before it would answer a different question and could report a
+ * boundary that is no longer there.
+ */
+function uncachedProbe(url) {
+  const probe = new URL(url);
+  probe.searchParams.set('access-probe', String(Date.now()));
+  return probe;
+}
+
 async function request(fetchImplementation, url, headers = undefined) {
   return fetchImplementation(url, {
     headers,
@@ -174,6 +188,10 @@ export async function verifyAccessPreflight({
   fetchImplementation = fetch,
 }) {
   const origin = parseWikiBaseUrl(baseUrl);
+  // Before any request: a run without service-token credentials cannot prove
+  // admission, and finding that out after probing hides the real reason behind
+  // a network failure.
+  const authenticatedHeaders = serviceHeaders(clientId, clientSecret);
   const anonymousPaths = [
     '/',
     site.brand.faviconPath,
@@ -183,7 +201,10 @@ export async function verifyAccessPreflight({
   ].filter(Boolean);
 
   for (const path of anonymousPaths) {
-    const response = await request(fetchImplementation, new URL(path, origin));
+    const response = await request(
+      fetchImplementation,
+      uncachedProbe(new URL(path, origin)),
+    );
     if (!isAccessDenied(response)) {
       throw new AccessSmokeError(
         `Anonymous request was not denied by Access: ${path} (${response.status}).`,
@@ -194,8 +215,8 @@ export async function verifyAccessPreflight({
 
   const authenticatedResponse = await request(
     fetchImplementation,
-    origin,
-    serviceHeaders(clientId, clientSecret),
+    uncachedProbe(origin),
+    authenticatedHeaders,
   );
   if (isAccessDenied(authenticatedResponse)) {
     throw new AccessSmokeError(
@@ -248,15 +269,6 @@ export async function verifyPostDeploy({
   propagationTimeoutMs = PROPAGATION_TIMEOUT_MS,
   propagationPollIntervalMs = PROPAGATION_POLL_INTERVAL_MS,
 }) {
-  await verifyAccessPreflight({
-    baseUrl,
-    clientId,
-    clientSecret,
-    markdownPath,
-    site,
-    fetchImplementation,
-  });
-
   const origin = parseWikiBaseUrl(baseUrl);
   const headers = serviceHeaders(clientId, clientSecret);
   const checks = [
@@ -341,6 +353,24 @@ export async function verifyPostDeploy({
     });
     console.log(`Post-deploy check passed: ${check.path} (${status}).`);
   }
+
+  /*
+   * The boundary is asserted last, on purpose.
+   *
+   * Binding a hostname to a Worker and protecting it with Access are separate
+   * acts, and a hostname that is not serving this deployment yet can deny
+   * anonymous traffic for reasons that have nothing to do with Access. Proving
+   * the deployment is live first makes the denial below a statement about what
+   * readers can actually reach.
+   */
+  await verifyAccessPreflight({
+    baseUrl,
+    clientId,
+    clientSecret,
+    markdownPath,
+    site,
+    fetchImplementation,
+  });
 }
 
 async function main() {
@@ -378,10 +408,28 @@ async function main() {
   );
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
-) {
+/**
+ * Whether this module is the program being run.
+ *
+ * The comparison goes through `realpath` because a package manager installs a
+ * bin as a symlink: `process.argv[1]` is then the link in `node_modules/.bin`
+ * while `import.meta.url` is the file it points at. Comparing them directly
+ * made this check silently do nothing when it was run the way a project runs
+ * it — which is how an unprotected deployment passed the boundary check.
+ */
+function invokedDirectly() {
+  const entry = process.argv[1];
+  if (!entry) {
+    return false;
+  }
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (invokedDirectly()) {
   try {
     await main();
   } catch (error) {
