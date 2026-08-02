@@ -1,8 +1,15 @@
 # Node tooling
 node_modules/
 .astro/
-dist/
 coverage/
+
+# Build output is ignored everywhere except in the packages, where it is
+# committed: projects install them from Git until the npm scope exists, and a
+# Git dependency that has to run a build script needs an allowlist entry keyed
+# by its exact commit — which no automated bump can keep current. CI rebuilds
+# and fails on any diff.
+dist/
+!packages/*/dist/
 
 # Versioned Git hook definitions (Husky runtime files remain ignored)
 !.husky/
@@ -41,5 +48,6 @@ gha-creds-*.json
 # Local state written by the "impeccable" design tooling
 .impeccable/
 
-# Compiled Node entrypoints of the site package
+# Compiled Node entrypoints of the site package, committed for the same reason
 dist-node/
+!packages/astro/dist-node/

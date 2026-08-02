@@ -29,7 +29,6 @@
   },
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
-    "prepare": "pnpm build",
     "typecheck": "tsc --project tsconfig.json",
     "test": "vitest run --root ../.."
   },

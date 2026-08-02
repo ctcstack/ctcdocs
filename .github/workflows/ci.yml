@@ -51,6 +51,20 @@ jobs:
       - name: Run the canonical verification gate
         run: pnpm verify
 
+      # The packages' build output is committed because projects install them
+      # from Git. `pnpm verify` rebuilds it; anything left over means the commit
+      # carried stale artifacts.
+      - name: Reject stale build output
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! git diff --quiet -- packages; then
+            echo "::error::Committed build output is stale. Run pnpm build and commit the result."
+            git diff --name-only -- packages
+            exit 1
+          fi
+
   workflow-security:
     name: Workflow and secret scanning
     runs-on: ubuntu-24.04

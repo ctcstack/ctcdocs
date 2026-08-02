@@ -47,7 +47,6 @@
   },
   "scripts": {
     "build": "tsc --project tsconfig.node.json",
-    "prepare": "pnpm build",
     "typecheck": "tsc --project tsconfig.json",
     "test": "vitest run --root ../.. && node --test bin/*.test.mjs"
   },

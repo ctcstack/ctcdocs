@@ -8,6 +8,7 @@
    * shipping as source.
    */
   "compilerOptions": {
+    "declarationMap": false,
     "noEmit": false,
     "outDir": "dist-node",
     "rootDir": ".",
