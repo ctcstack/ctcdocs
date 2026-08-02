@@ -1,9 +1,17 @@
 # ADR-008: Automatic development promotion is optional
 
-- Status: Accepted
+- Status: Superseded by [ADR-015](015-platform-extraction.md)
 - Date: 2026-07-31
 - Owners: CTCDocs maintainers
 - Supersedes: the mandatory development promotion in ADR-007
+
+> The mechanism below belonged to a repository that held both the platform and
+> one deployment, and it is gone: no workflow reads
+> `ENABLE_DEVELOPMENT_DEPLOYMENT`. A project now calls `project-deploy.yml` once
+> per environment and decides for itself whether production `needs:` the
+> development job. The reasoning is preserved because the question it answers —
+> whether an unused environment should gate every release — is one each project
+> still has to answer.
 
 ## Context
 

@@ -30,7 +30,7 @@ Rejected
 - ADR-005: stable slug strategy.
 - ADR-006: manifest v2 and redirects.
 - ADR-007: separate Cloudflare development and production environments.
-- ADR-008: optional automatic development promotion.
+- ADR-008: optional automatic development promotion. Superseded by ADR-015.
 - ADR-009: twice-daily scheduled synchronization.
 - ADR-010: static Markdown web projection.
 - ADR-011: documentation design language for the reader interface.
