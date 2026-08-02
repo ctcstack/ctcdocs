@@ -56,32 +56,34 @@ Use `fast-check` property tests — already a dev dependency — for:
 ## 4. Verify
 
 ```bash
-pnpm test:unit
-pnpm validate:content
-pnpm verify:quick
+pnpm test
+pnpm fixtures:check
+pnpm verify
 ```
 
-Determinism check — two consecutive runs against unchanged input must produce a
-zero diff:
-
-```bash
-pnpm sync:dry-run
-```
+`pnpm fixtures:check` regenerates the fixture corpus by driving the real
+pipeline and fails if a single byte moved. A converter change that is meant to
+change output makes it fail; regenerate with `pnpm fixtures:generate` and read
+the diff, which is the review.
 
 ## 5. Keep the commits separate
 
-Converter logic and regenerated content go in different commits, and generated
+Converter logic and a regenerated corpus go in different commits, and generated
 content is never hand-edited. If the output looks wrong, fix the exporter or the
-normalizer and run a controlled full sync.
+normalizer and regenerate.
 
-Generated paths owned by the pipeline (writes are blocked in
-`.claude/settings.json`):
+Generated paths owned by the pipeline, declared in
+`packages/core/src/project-layout.ts` and blocked for writing in
+`.claude/settings.json`:
 
 ```text
-apps/wiki/src/content/docs/_generated/
-apps/wiki/src/assets/generated/
-apps/wiki/src/generated/
+src/content/docs/_generated/
+src/assets/generated/
+src/generated/
 data/sync-manifest.json
 data/docs-index.json
 data/latest-sync-report.json
 ```
+
+They are relative to a project root. In this repository the only such root is
+`fixtures/project/`.

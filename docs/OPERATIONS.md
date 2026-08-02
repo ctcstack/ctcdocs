@@ -18,10 +18,9 @@ never reads Google Drive. A failed sync, verification, Access preflight,
 build, deployment, or post-deploy smoke leaves the previous generated commit
 or Worker version available for recovery.
 
-Automatic promotion through development is disabled by default. Set the
-repository Actions variable `ENABLE_DEVELOPMENT_DEPLOYMENT=true` to restore it
-as a production gate. The standalone development workflow remains available
-for manual runs from `main`.
+Promotion through a development environment is a project's choice: it calls
+the deployment workflow once per environment, and makes production `needs:` the
+development job when development should gate it.
 
 ## GitHub environments
 
@@ -125,10 +124,12 @@ wiki application. It does not need Cloudflare API access.
 
 ## Scheduled and manual sync
 
-`.github/workflows/sync.yml` runs twice daily at 06:17 and 18:17 UTC and
-supports a manual `workflow_dispatch`. The offset from the start of the hour
-reduces exposure to peak GitHub Actions scheduling load. Scheduled execution
-is best-effort; use the manual workflow when a content update is time-sensitive.
+`project-sync.yml` carries no schedule of its own — the project's calling
+workflow decides when it runs, and should also offer `workflow_dispatch`. Twice
+daily is a reasonable default; offsetting from the start of the hour reduces
+exposure to peak GitHub Actions scheduling load. Scheduled execution is
+best-effort in any case, so use the manual run when a content update is
+time-sensitive.
 
 Normal manual sync:
 
@@ -268,8 +269,8 @@ Use the protected test Shared Drive corpus.
 Every push to `main` starts `.github/workflows/deploy.yml`:
 
 1. run the canonical verification gate;
-2. optionally deploy and verify the exact commit on the protected development
-   Worker when `ENABLE_DEVELOPMENT_DEPLOYMENT=true`;
+2. deploy and verify the same commit on a development environment first, if
+   the project declares one and gates on it;
 3. prove that production anonymous requests are denied and its separate smoke
    service token passes Access;
 4. rebuild from the exact commit without transferring build artifacts;

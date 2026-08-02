@@ -54,27 +54,20 @@
       "Bash(pnpm sync:*)"
     ],
     "deny": [
-      "Read(./apps/wiki/.env)",
       "Read(./.env)",
       "Read(./**/*.local)",
       "Read(./gha-creds-*.json)",
-      "Bash(pnpm deploy:development)",
-      "Bash(pnpm deploy:production)",
       "Bash(wrangler deploy:*)",
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
-      "Edit(./apps/wiki/src/content/docs/_generated/**)",
-      "Write(./apps/wiki/src/content/docs/_generated/**)",
-      "Edit(./apps/wiki/src/assets/generated/**)",
-      "Write(./apps/wiki/src/assets/generated/**)",
-      "Edit(./apps/wiki/src/generated/**)",
-      "Write(./apps/wiki/src/generated/**)",
-      "Edit(./data/sync-manifest.json)",
-      "Write(./data/sync-manifest.json)",
-      "Edit(./data/docs-index.json)",
-      "Write(./data/docs-index.json)",
-      "Edit(./data/latest-sync-report.json)",
-      "Write(./data/latest-sync-report.json)"
+      "Edit(./fixtures/project/src/content/docs/_generated/**)",
+      "Write(./fixtures/project/src/content/docs/_generated/**)",
+      "Edit(./fixtures/project/src/assets/generated/**)",
+      "Write(./fixtures/project/src/assets/generated/**)",
+      "Edit(./fixtures/project/src/generated/**)",
+      "Write(./fixtures/project/src/generated/**)",
+      "Edit(./fixtures/project/data/**)",
+      "Write(./fixtures/project/data/**)"
     ]
   }
 }

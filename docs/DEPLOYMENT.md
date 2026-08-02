@@ -8,7 +8,7 @@ development and production releases, verification, and rollback.
 
 | Environment | Worker                     | Protected hostname             | Deployment trigger                                      |
 | ----------- | -------------------------- | ------------------------------ | ------------------------------------------------------- |
-| Development | `example-docs-development` | `https://docs-dev.example.com` | Manual; optional automatic promotion from `main`        |
+| Development | `example-docs-development` | `https://docs-dev.example.com` | Whatever the project's workflow calls it with           |
 | Production  | `example-docs-production`  | `https://docs.example.com`     | Push to `main`, changed sync output, or manual dispatch |
 
 The Worker name and both hostnames are declared once in
@@ -73,10 +73,10 @@ binding.
 
    ```text
    Action: Allow
-   Include: Login Methods = CTCStack Google Workspace
+   Include: Login Methods = <your identity provider>
    ```
 
-5. Accept only the configured CTCStack Google Workspace identity provider.
+5. Accept only the identity provider you configured.
 6. Do not add `Everyone`, One-time PIN, email-domain matching, or a `Bypass
 Everyone` policy.
 7. Save the application.
@@ -90,8 +90,7 @@ For each environment:
 
 1. Open **Zero Trust → Access controls → Service credentials → Service
    Tokens**.
-2. Create a token named `CTCStack Wiki Development Smoke` or `CTCStack Wiki
-Production Smoke`.
+2. Create one token per environment, named for the environment it probes.
 3. Copy its Client ID and Client Secret once into the appropriate password
    manager entry.
 4. Return to the matching Access application and add:
@@ -136,8 +135,8 @@ content:
 2. Check out the reviewed repository revision and confirm the generated
    content is synthetic or otherwise approved for the bootstrap.
 3. Add the development Cloudflare account ID and deploy token to the ignored
-   `apps/wiki/.env`, which Wrangler loads from its package directory. Do not
-   use the production token.
+   `.env` beside `wrangler.jsonc`, which is where Wrangler loads it from. Do
+   not use the production token.
 4. Run:
 
    ```bash
@@ -271,56 +270,49 @@ Optional environment secret:
 SYNC_FAILURE_WEBHOOK_URL
 ```
 
-Do not copy the test Shared Drive IDs into `production-sync`. The protected
-`test-drive` environment remains dedicated to integration testing.
+Never point a test Shared Drive and a production one at the same environment.
+Separate identities, separate environments.
 
-## Optional automatic development promotion
+## Environments are a project's choice
 
-Automatic development promotion in the production workflow is disabled by
-default to avoid spending runner time while no release task depends on it. The
-standalone **Development deployment** workflow remains available for an
-explicit manual run from `main`.
+`project-deploy.yml` deploys one environment per call, and takes the three names
+it needs as inputs:
 
-To restore development as an automatic production gate, create this repository
-Actions variable:
-
-```text
-ENABLE_DEVELOPMENT_DEPLOYMENT=true
+```yaml
+jobs:
+  production:
+    uses: ctcstack/ctcdocs/.github/workflows/project-deploy.yml@<commit sha>
+    with:
+      wrangler_environment: production
+      deploy_environment: production-deploy
+      smoke_environment: production-smoke
+    secrets: inherit
 ```
 
-Delete the variable or set it to any value other than the exact lowercase
-string `true` to disable the gate again. When enabled, a failed development
-verification, deployment, or protected smoke test blocks production.
+A project that publishes production only calls it once. A project that promotes
+through a development host calls it twice and makes the second job `needs:` the
+first, which is what turns development into a gate: a failed development
+deployment or a failed protected smoke test then blocks production.
 
-## Deploy to development
+The platform has no opinion about how many environments there are, beyond
+requiring `production` to exist. Whatever `site.config.json` declares,
+`wrangler.jsonc` must match, and `ctcdocs-sync validate` fails when they
+disagree.
 
-The development workflow deploys the exact current `main` commit. It cannot be
-run from a feature branch.
+## Deploy to a development environment
 
-1. Ensure the intended change has been reviewed and merged to `main`.
-2. Open **GitHub → Actions → Development deployment**.
-3. Select **Run workflow**.
-4. Choose branch `main`.
-5. Select **Run workflow**.
-6. Confirm all jobs pass:
+The workflow deploys an exact commit, defaulting to the one that triggered it.
 
-   ```text
-   Verify development candidate
-   Verify development Access before deployment
-   Deploy immutable development assets
-   Verify protected development
-   ```
-
-7. Open `https://docs-dev.example.com` in an incognito window and sign in
-   through the CTCStack Google Workspace provider.
-8. Check navigation, search, images, tables, one missing route, and any changed
+1. Ensure the change has been reviewed and merged.
+2. Open **GitHub → Actions**, choose the workflow that calls
+   `project-deploy.yml` for development, and run it.
+3. Confirm every job passes: the corpus guard, the candidate verification, the
+   anonymous-boundary check, the deployment, and the post-deploy check.
+4. Open the development hostname in a private window and confirm the access
+   boundary behaves as the environment's `visibility` declares.
+5. Check navigation, search, images, tables, one missing route, and any changed
    pages.
-9. Review the workflow summary and confirm the deployed commit SHA.
-
-This workflow is useful for an explicit re-deployment or a development-only
-validation. The production workflow calls it automatically only when
-`ENABLE_DEVELOPMENT_DEPLOYMENT=true` and then waits for its protected smoke
-test before production can proceed.
+6. Review the workflow summary and confirm the deployed commit SHA.
 
 ## Deploy to production
 
@@ -361,7 +353,7 @@ For a manual re-deployment of the current `main` revision:
 After either path:
 
 1. Open `https://docs.example.com` in an incognito window.
-2. Confirm the only login option is the CTCStack Google Workspace provider.
+2. Confirm the only login option is the identity provider you configured.
 3. Verify the home page, navigation, Pagefind search, images, tables, and a
    missing route.
 4. Confirm an anonymous request to the home page and a Pagefind asset does not
@@ -392,9 +384,9 @@ pnpm test:access:post-deploy
 ```
 
 For a direct local operation, Wrangler reads deploy credentials from the
-ignored `apps/wiki/.env`, while the smoke scripts read the target and Access
-credentials from the ignored repository-root `.env`. Both files must describe
-the same environment. Never paste tokens directly into shell commands.
+ignored `.env` beside `wrangler.jsonc`, while the smoke test reads the target
+and Access credentials from the project root `.env`. Both must describe the
+same environment. Never paste tokens directly into shell commands.
 
 ## Rollback production
 
@@ -445,8 +437,8 @@ Typical log:
 Missing production-sync variable: GCP_PROJECT_ID
 ```
 
-Populate all required `production-sync` environment variables. Local `.env`
-and `test-drive` variables do not flow into `production-sync`.
+Populate all required `production-sync` environment variables. A local `.env`
+and any test-corpus environment do not flow into it.
 
 ### Custom domain already belongs to another Worker
 

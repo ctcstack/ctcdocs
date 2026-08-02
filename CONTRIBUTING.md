@@ -7,12 +7,28 @@ boring in production, so most of what follows is about keeping it that way.
 
 ```bash
 pnpm install
+pnpm --filter ctcdocs-fixture-project exec playwright install --with-deps chromium
 pnpm verify
 ```
 
-You need Node 22 (see `.node-version`) and pnpm 11. `pnpm verify` is the gate CI
-runs: formatting, lint, types, unit and fixture tests, the fixture project's
-build, its browser and search checks, and a Wrangler dry run.
+You need Node 22 (see `.node-version`) and pnpm 11. The browser is a separate
+step because the gate ends in browser checks and nothing else installs it.
+
+`pnpm verify` is the gate CI runs: formatting, lint, types, unit and fixture
+tests, the fixture project's build, its browser and search checks, and a
+Wrangler dry run. It builds the packages first — compiled output is not
+committed, so a fresh clone has none.
+
+## What belongs here
+
+This is a narrow tool, and the constraints in [AGENTS.md](AGENTS.md) are
+decisions rather than gaps: no database, no server-side rendering, no semantic
+search, no editing surface, no second content source. A change that widens the
+scope needs an ADR arguing the case before it needs an implementation.
+
+Read [AGENTS.md](AGENTS.md) before a substantial change. It is written for
+coding agents, and it is the shortest accurate statement of the invariants this
+repository is held to.
 
 ## The shape of a change
 
@@ -52,3 +68,16 @@ a change alters architecture, and the runbooks when it alters operations.
 
 `docs/ADR/` holds the decision record. If your change contradicts one, add an
 ADR that supersedes it rather than quietly diverging.
+
+## Releasing
+
+All three packages share a version and are released together; what changed is
+in [CHANGELOG.md](CHANGELOG.md).
+
+A release is a `v*` tag whose name matches the version in all three manifests
+and has a section in the changelog. The workflow refuses a tag that disagrees
+with either, runs the gate, and publishes core, then sync, then the site
+package — the order their dependencies need — through npm trusted publishing,
+so no publish credential is stored anywhere.
+
+Compiled output is built by `prepack` and exists only in the published tarball.
