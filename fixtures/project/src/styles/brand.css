@@ -1,0 +1,33 @@
+/*
+ * Brand layer of the fixture project.
+ *
+ * Everything here is specific to one deployment; the interface it sits under
+ * ships in @ctcstack/ctcdocs. Adapting the platform to another project means
+ * replacing the two accent triads in this file and the mark at
+ * public/favicon.svg, and nothing else in the stylesheet.
+ *
+ * The accent has two values because one cannot clear the accessibility gate.
+ * Measured against this system's grounds: #4d9bf5 reaches 6.5:1 on the dark
+ * background but only 1.9:1 on the light one, so the light theme uses a
+ * darkened tone of the same hue at 6.2:1.
+ *
+ * A replacement palette has to clear the same bar: the browser suite runs axe
+ * against both themes and fails on a contrast regression. Measure a new accent
+ * against #141414 (dark) and #fcfcfc (light) before committing it.
+ */
+
+:root,
+::backdrop {
+  /* 6.5:1 on #141414. */
+  --sl-color-accent-low: #0e2439;
+  --sl-color-accent: #4d9bf5;
+  --sl-color-accent-high: #a5cbfa;
+}
+
+:root[data-theme='light'],
+[data-theme='light'] ::backdrop {
+  /* Darkened tone of the same hue: 6.2:1 on #fcfcfc. */
+  --sl-color-accent-low: #e7f0fb;
+  --sl-color-accent: #1a5fb4;
+  --sl-color-accent-high: #12457f;
+}

@@ -1,0 +1,24 @@
+# Secret scanning for this project. Only paths Git never tracks are exempt, and
+# `ctcdocs-sync validate` fails if one of them is ever added to the index.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Build output and dependencies are not repository content"
+paths = [
+  '''(^|/)node_modules/''',
+  '''^\.astro/''',
+  '''^\.wrangler/''',
+  '''(^|/)dist/''',
+  '''^test-results/''',
+  '''^playwright-report/''',
+]
+
+[[allowlists]]
+description = "Git-ignored local credential material that must never be committed"
+paths = [
+  '''^\.env$''',
+  '''^\.env\.local$''',
+  '''^\.env\..*\.local$''',
+]

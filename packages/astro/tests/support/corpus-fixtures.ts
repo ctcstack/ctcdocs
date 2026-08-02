@@ -67,6 +67,34 @@ export function documentInFolder(): CorpusFixture | undefined {
   return documents.find((document) => (document.folderPath?.length ?? 0) > 0);
 }
 
+/**
+ * A document whose body carries a Markdown table.
+ *
+ * Which document that is depends on the corpus, so it is found by reading the
+ * generated Markdown rather than named here. The delimiter row is the reliable
+ * marker: a table cannot exist without one, and no other construct has one.
+ */
+export function documentWithTable(): CorpusFixture | undefined {
+  return documents.find((document) => {
+    let body: string;
+    try {
+      body = readFileSync(
+        resolve(
+          repositoryRoot,
+          PROJECT_LAYOUT.generatedDocumentsDirectory,
+          `${document.id}.md`,
+        ),
+        'utf8',
+      );
+    } catch {
+      return false;
+    }
+    return body
+      .split('\n')
+      .some((line) => /^\s*\|?[\s:|-]*-[\s:|-]*\|[\s:|-]*$/u.test(line));
+  });
+}
+
 /** A document with a generated image, and the published path of that image. */
 export function documentWithAsset():
   { document: CorpusFixture; assetPath: string } | undefined {

@@ -1,0 +1,83 @@
+# Keep protected HTML briefly in the user's browser to avoid repeated requests
+# during back-and-forth navigation. Document routes use trailing slashes.
+/
+  Cache-Control: private, max-age=60, must-revalidate
+
+/:page/
+  Cache-Control: private, max-age=60, must-revalidate
+
+/:section/*/
+  Cache-Control: private, max-age=60, must-revalidate
+
+# Raw Markdown and source images contain the same protected document content.
+# A static build discards the Content-Type an Astro endpoint sets, so the charset
+# has to be declared here. Without it the asset server derives the type from the
+# .md extension alone and browsers fall back to a legacy single-byte encoding,
+# which corrupts every non-ASCII character in a document.
+/*.md
+  Cache-Control: private, max-age=60, must-revalidate
+  Content-Type: text/markdown; charset=utf-8
+  X-Content-Type-Options: nosniff
+  X-Robots-Tag: noindex, noarchive
+
+/assets/generated/*
+  Cache-Control: private, max-age=60, must-revalidate
+  X-Content-Type-Options: nosniff
+  X-Robots-Tag: noindex, noarchive
+
+# Astro rewrites document images into fingerprinted files under /_astro/, so
+# they need the same private, short-lived policy as their /assets/generated/
+# originals instead of the executable-asset lifetime below.
+/_astro/*.webp
+  Cache-Control: private, max-age=60, must-revalidate
+  X-Content-Type-Options: nosniff
+  X-Robots-Tag: noindex, noarchive
+
+/_astro/*.avif
+  Cache-Control: private, max-age=60, must-revalidate
+  X-Content-Type-Options: nosniff
+  X-Robots-Tag: noindex, noarchive
+
+/_astro/*.png
+  Cache-Control: private, max-age=60, must-revalidate
+  X-Content-Type-Options: nosniff
+  X-Robots-Tag: noindex, noarchive
+
+/_astro/*.jpg
+  Cache-Control: private, max-age=60, must-revalidate
+  X-Content-Type-Options: nosniff
+  X-Robots-Tag: noindex, noarchive
+
+/_astro/*.jpeg
+  Cache-Control: private, max-age=60, must-revalidate
+  X-Content-Type-Options: nosniff
+  X-Robots-Tag: noindex, noarchive
+
+/_astro/*.gif
+  Cache-Control: private, max-age=60, must-revalidate
+  X-Content-Type-Options: nosniff
+  X-Robots-Tag: noindex, noarchive
+
+/_astro/*.svg
+  Cache-Control: private, max-age=60, must-revalidate
+  X-Content-Type-Options: nosniff
+  X-Robots-Tag: noindex, noarchive
+
+# The site icon is brand artwork rather than wiki content, and every document
+# page requests it. Cache it for a day so navigation does not revalidate it.
+/favicon.svg
+  Cache-Control: public, max-age=86400
+
+# Astro fingerprints executable and presentation assets in their filenames.
+# Do not extend these rules to images or Pagefind data containing wiki content.
+/_astro/*.js
+  Cache-Control: public, max-age=31556952, immutable
+
+/_astro/*.css
+  Cache-Control: public, max-age=31556952, immutable
+
+/_astro/*.woff
+  Cache-Control: public, max-age=31556952, immutable
+
+/_astro/*.woff2
+  Cache-Control: public, max-age=31556952, immutable

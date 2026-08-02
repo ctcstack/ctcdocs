@@ -19,9 +19,18 @@
     "knip": "knip",
     "prepare": "husky",
     "verify:staged": "lint-staged",
-    "verify": "pnpm format:check && pnpm lint && pnpm build && pnpm typecheck && pnpm test:coverage"
+    "verify": "pnpm format:check && pnpm lint && pnpm build && pnpm typecheck && pnpm test:coverage && pnpm fixtures:check && pnpm fixtures:build && pnpm fixtures:validate && pnpm fixtures:deploy-dry-run && pnpm fixtures:search && pnpm fixtures:ux && pnpm knip",
+    "fixtures:generate": "node fixtures/generate-corpus.ts",
+    "fixtures:check": "node fixtures/verify-corpus.mjs",
+    "fixtures:build": "pnpm --filter ctcdocs-fixture-project build",
+    "fixtures:validate": "pnpm --filter ctcdocs-fixture-project validate",
+    "fixtures:search": "pnpm --filter ctcdocs-fixture-project test:search",
+    "fixtures:ux": "pnpm --filter ctcdocs-fixture-project test:ux",
+    "fixtures:deploy-dry-run": "pnpm --filter ctcdocs-fixture-project deploy:dry-run"
   },
   "devDependencies": {
+    "@ctcstack/ctcdocs-core": "workspace:*",
+    "@ctcstack/ctcdocs-sync": "workspace:*",
     "@eslint/js": "10.0.1",
     "@types/node": "22.20.1",
     "@vitest/coverage-v8": "4.1.10",

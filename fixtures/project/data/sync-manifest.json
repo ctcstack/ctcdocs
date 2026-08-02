@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 3,
+  "converterVersion": "hybrid-v2",
+  "normalizerVersion": "remark-html-v2",
+  "driveId": "fixture-drive",
+  "rootFolderId": "folder-root",
+  "generatedAt": "2026-02-10T06:00:00.000Z",
+  "documents": {
+    "doc-cyrillic": {
+      "googleFileId": "doc-cyrillic",
+      "googleParentId": "folder-root",
+      "googleName": "Рабочие заметки",
+      "displayTitle": "Рабочие заметки",
+      "description": "Этот документ существует для того, чтобы поиск и подстановка шрифтов проверялись на кириллице, а не только на латинице.",
+      "googleModifiedTime": "2026-02-09T07:40:00.000Z",
+      "googleCreatedTime": "2026-01-05T09:00:00.000Z",
+      "sourceUrl": "https://docs.google.com/document/d/doc-cyrillic/edit",
+      "stableSlug": "рабочие-заметки",
+      "generatedMarkdownPath": "src/content/docs/_generated/doc-cyrillic.md",
+      "generatedAssetsDirectory": "src/assets/generated/doc-cyrillic",
+      "contentHash": "sha256:1b9bc321c938fb8d7fa4bd3bfca72f30efa50b1a292a2122d3bd94e9f4d66ebd",
+      "outputHash": "sha256:975e2b41697457cb3cb239189ac0371a59c8e6bddeb655ff0bc2897944add045",
+      "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
+      "exportMode": "markdown",
+      "warnings": []
+    },
+    "doc-diagrams": {
+      "googleFileId": "doc-diagrams",
+      "googleParentId": "folder-reference",
+      "googleName": "Diagrams",
+      "displayTitle": "Diagrams",
+      "description": "A mermaid fence has to be claimed before the code-frame renderer sees it, or the diagram publishes as a listing of its own source.",
+      "googleModifiedTime": "2026-02-07T10:05:00.000Z",
+      "googleCreatedTime": "2026-01-05T09:00:00.000Z",
+      "sourceUrl": "https://docs.google.com/document/d/doc-diagrams/edit",
+      "stableSlug": "reference/diagrams",
+      "generatedMarkdownPath": "src/content/docs/_generated/doc-diagrams.md",
+      "generatedAssetsDirectory": "src/assets/generated/doc-diagrams",
+      "contentHash": "sha256:c47cf18d16d9c8b605f26a1058fe125e70632f8bb19b9f972c459806aedec9fb",
+      "outputHash": "sha256:6dd8da2d1601e8006c2ad2f0908a68eb1c4644e25694a920fe5c89feccffed42",
+      "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
+      "exportMode": "markdown",
+      "warnings": []
+    },
+    "doc-getting-started": {
+      "googleFileId": "doc-getting-started",
+      "googleParentId": "folder-root",
+      "googleName": "Start here",
+      "displayTitle": "Start here",
+      "description": "This corpus is synthetic. It exists so the platform can prove that a documentation site builds, navigates, searches and passes accessibility checks without any real content being involved.",
+      "googleModifiedTime": "2026-02-02T11:30:00.000Z",
+      "googleCreatedTime": "2026-01-05T09:00:00.000Z",
+      "sourceUrl": "https://docs.google.com/document/d/doc-getting-started/edit",
+      "stableSlug": "start-here",
+      "generatedMarkdownPath": "src/content/docs/_generated/doc-getting-started.md",
+      "generatedAssetsDirectory": "src/assets/generated/doc-getting-started",
+      "contentHash": "sha256:eba01666478b766805effec9cfc3bfa865adefa31ef92f63e0c18237aafe638a",
+      "outputHash": "sha256:cf3c4609176aa8d9cf84c49478ca142ce6614a5632d11365938f49092d879821",
+      "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
+      "exportMode": "markdown",
+      "warnings": []
+    },
+    "doc-overview": {
+      "googleFileId": "doc-overview",
+      "googleParentId": "folder-handbook",
+      "googleName": "Overview",
+      "displayTitle": "Overview",
+      "description": "The handbook collects the working agreements a new joiner needs in their first week: how documents are published, where drafts live, and which sections are maintained by which team.",
+      "googleModifiedTime": "2026-02-05T08:15:00.000Z",
+      "googleCreatedTime": "2026-01-05T09:00:00.000Z",
+      "sourceUrl": "https://docs.google.com/document/d/doc-overview/edit",
+      "stableSlug": "handbook/overview",
+      "generatedMarkdownPath": "src/content/docs/_generated/doc-overview.md",
+      "generatedAssetsDirectory": "src/assets/generated/doc-overview",
+      "contentHash": "sha256:915987bb1a69f662bb889c1c207fa823901962fdcfcdfdbe0b40a54cbc27c178",
+      "outputHash": "sha256:4fe46db295a4cac5e013a0422149e055047dbc5b295aae67004ceb8cc52d854d",
+      "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
+      "exportMode": "markdown",
+      "warnings": []
+    },
+    "doc-screenshots": {
+      "googleFileId": "doc-screenshots",
+      "googleParentId": "folder-reference",
+      "googleName": "Screenshots",
+      "displayTitle": "Screenshots",
+      "description": "A document whose media forces the HTML archive path, so the asset route and the image pipeline are exercised by the corpus.",
+      "googleModifiedTime": "2026-02-08T12:20:00.000Z",
+      "googleCreatedTime": "2026-01-05T09:00:00.000Z",
+      "sourceUrl": "https://docs.google.com/document/d/doc-screenshots/edit",
+      "stableSlug": "reference/screenshots",
+      "generatedMarkdownPath": "src/content/docs/_generated/doc-screenshots.md",
+      "generatedAssetsDirectory": "src/assets/generated/doc-screenshots",
+      "contentHash": "sha256:5da73f5114704897dac879e0bd090c8b2f9c455e5141854ad08e305ea2d3ecae",
+      "outputHash": "sha256:5a029f27dcce1dd33a145f2ed00be248d1f2bb72ae15b15955876dd85a47e17a",
+      "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
+      "exportMode": "hybrid",
+      "warnings": [
+        "fallback:image",
+        "fallback:media_object"
+      ]
+    },
+    "doc-tables-and-code": {
+      "googleFileId": "doc-tables-and-code",
+      "googleParentId": "folder-handbook",
+      "googleName": "01 - Tables and code",
+      "displayTitle": "Tables and code",
+      "description": "Two things a documentation platform gets wrong quietly: wide tables that push a phone layout sideways, and code blocks that lose their language.",
+      "googleModifiedTime": "2026-02-06T16:45:00.000Z",
+      "googleCreatedTime": "2026-01-05T09:00:00.000Z",
+      "sourceUrl": "https://docs.google.com/document/d/doc-tables-and-code/edit",
+      "stableSlug": "handbook/tables-and-code",
+      "generatedMarkdownPath": "src/content/docs/_generated/doc-tables-and-code.md",
+      "generatedAssetsDirectory": "src/assets/generated/doc-tables-and-code",
+      "contentHash": "sha256:0331e96a8baccfd40e51ede2ca122b1d27ba6e2e012258c717cb82b4ce62a22c",
+      "outputHash": "sha256:97c7663777e12d6f6c6f5373aef5b9d0990bb1610e79acb24d8187b9917e35d8",
+      "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
+      "exportMode": "hybrid",
+      "warnings": [
+        "fallback:table"
+      ]
+    }
+  },
+  "folders": {
+    "folder-handbook": {
+      "googleFolderId": "folder-handbook",
+      "googleParentId": "folder-root",
+      "googleName": "01 - Handbook",
+      "displayLabel": "Handbook",
+      "sortOrder": 1,
+      "stableSlug": "handbook",
+      "generatedMarkdownPath": "src/content/docs/_generated/section-folder-handbook.md"
+    },
+    "folder-reference": {
+      "googleFolderId": "folder-reference",
+      "googleParentId": "folder-root",
+      "googleName": "02 - Reference",
+      "displayLabel": "Reference",
+      "sortOrder": 2,
+      "stableSlug": "reference",
+      "generatedMarkdownPath": "src/content/docs/_generated/section-folder-reference.md"
+    },
+    "folder-root": {
+      "googleFolderId": "folder-root",
+      "googleParentId": null,
+      "googleName": "Published",
+      "displayLabel": "Published",
+      "sortOrder": null
+    }
+  },
+  "redirects": {
+    "getting-started": {
+      "googleFileId": "doc-getting-started",
+      "targetSlug": "start-here",
+      "createdAt": "2026-02-10T06:00:00.000Z"
+    }
+  }
+}

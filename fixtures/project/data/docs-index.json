@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-02-10T06:00:00.000Z",
+  "documents": [
+    {
+      "id": "doc-overview",
+      "title": "Overview",
+      "slug": "handbook/overview",
+      "markdownPath": "src/content/docs/_generated/doc-overview.md",
+      "sourceUrl": "https://docs.google.com/document/d/doc-overview/edit",
+      "googleModifiedTime": "2026-02-05T08:15:00.000Z",
+      "syncedAt": "2026-02-10T06:00:00.000Z",
+      "contentHash": "sha256:915987bb1a69f662bb889c1c207fa823901962fdcfcdfdbe0b40a54cbc27c178",
+      "folderPath": [
+        "Handbook"
+      ],
+      "language": "en"
+    },
+    {
+      "id": "doc-tables-and-code",
+      "title": "Tables and code",
+      "slug": "handbook/tables-and-code",
+      "markdownPath": "src/content/docs/_generated/doc-tables-and-code.md",
+      "sourceUrl": "https://docs.google.com/document/d/doc-tables-and-code/edit",
+      "googleModifiedTime": "2026-02-06T16:45:00.000Z",
+      "syncedAt": "2026-02-10T06:00:00.000Z",
+      "contentHash": "sha256:0331e96a8baccfd40e51ede2ca122b1d27ba6e2e012258c717cb82b4ce62a22c",
+      "folderPath": [
+        "Handbook"
+      ],
+      "language": "en"
+    },
+    {
+      "id": "doc-diagrams",
+      "title": "Diagrams",
+      "slug": "reference/diagrams",
+      "markdownPath": "src/content/docs/_generated/doc-diagrams.md",
+      "sourceUrl": "https://docs.google.com/document/d/doc-diagrams/edit",
+      "googleModifiedTime": "2026-02-07T10:05:00.000Z",
+      "syncedAt": "2026-02-10T06:00:00.000Z",
+      "contentHash": "sha256:c47cf18d16d9c8b605f26a1058fe125e70632f8bb19b9f972c459806aedec9fb",
+      "folderPath": [
+        "Reference"
+      ],
+      "language": "en"
+    },
+    {
+      "id": "doc-screenshots",
+      "title": "Screenshots",
+      "slug": "reference/screenshots",
+      "markdownPath": "src/content/docs/_generated/doc-screenshots.md",
+      "sourceUrl": "https://docs.google.com/document/d/doc-screenshots/edit",
+      "googleModifiedTime": "2026-02-08T12:20:00.000Z",
+      "syncedAt": "2026-02-10T06:00:00.000Z",
+      "contentHash": "sha256:5da73f5114704897dac879e0bd090c8b2f9c455e5141854ad08e305ea2d3ecae",
+      "folderPath": [
+        "Reference"
+      ],
+      "language": "en"
+    },
+    {
+      "id": "doc-getting-started",
+      "title": "Start here",
+      "slug": "start-here",
+      "markdownPath": "src/content/docs/_generated/doc-getting-started.md",
+      "sourceUrl": "https://docs.google.com/document/d/doc-getting-started/edit",
+      "googleModifiedTime": "2026-02-02T11:30:00.000Z",
+      "syncedAt": "2026-02-10T06:00:00.000Z",
+      "contentHash": "sha256:eba01666478b766805effec9cfc3bfa865adefa31ef92f63e0c18237aafe638a",
+      "folderPath": [],
+      "language": "en"
+    },
+    {
+      "id": "doc-cyrillic",
+      "title": "Рабочие заметки",
+      "slug": "рабочие-заметки",
+      "markdownPath": "src/content/docs/_generated/doc-cyrillic.md",
+      "sourceUrl": "https://docs.google.com/document/d/doc-cyrillic/edit",
+      "googleModifiedTime": "2026-02-09T07:40:00.000Z",
+      "syncedAt": "2026-02-10T06:00:00.000Z",
+      "contentHash": "sha256:1b9bc321c938fb8d7fa4bd3bfca72f30efa50b1a292a2122d3bd94e9f4d66ebd",
+      "folderPath": [],
+      "language": "en"
+    }
+  ]
+}

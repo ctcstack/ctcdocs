@@ -1,0 +1,26 @@
+{
+  "brand": {
+    "name": "Example Corp",
+    "siteTitle": "Example [DOCS]",
+    "siteDescription": "Synthetic documentation used to test the CTCDocs platform",
+    "faviconPath": "/favicon.svg"
+  },
+  "deployment": {
+    "workerName": "example-docs",
+    "environments": {
+      "production": { "url": "https://docs.example.com" }
+    }
+  },
+  "home": {
+    "lede": "Every document here is published from Google Docs in the Example Shared Drive and is read-only. Each entry shows when its source was last edited."
+  },
+  "navigation": {
+    "landingDocumentTitles": ["Overview", "README", "About"],
+    "sectionIndexPages": true
+  },
+  "sync": {
+    "generatedBy": "CTCDOCS SYNC",
+    "commitBotName": "ctcdocs-sync[bot]",
+    "defaultLocale": "en"
+  }
+}

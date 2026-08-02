@@ -7,6 +7,7 @@ import {
   anyDocument,
   documentInFolder,
   documentWithAsset,
+  documentWithTable,
 } from '../support/corpus-fixtures';
 
 async function expectNoAccessibilityViolations(page: Page): Promise<void> {
@@ -76,8 +77,16 @@ test('home page is accessible and search is keyboard operable', async ({
 test('documentation page is accessible and responsive on mobile', async ({
   page,
 }) => {
+  /*
+   * A page with a table, because the assertion below is about how a table
+   * behaves in a narrow frame. Which document has one is a property of the
+   * corpus, so it is looked up rather than named.
+   */
+  const document = documentWithTable();
+  test.skip(!document, 'The corpus has no document containing a table.');
+
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/about-wiki/');
+  await page.goto(`/${document?.slug}/`);
 
   const menuButton = page.getByRole('button', { name: 'Menu' });
   await expect(menuButton).toBeVisible();
