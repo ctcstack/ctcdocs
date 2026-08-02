@@ -1,8 +1,15 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { extname, resolve, sep } from 'node:path';
+import { dirname, extname, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { findProjectRoot, PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
@@ -38,18 +45,29 @@ async function startStaticServer(root) {
         response.writeHead(403).end();
         return;
       }
-      const fileStat = await stat(filePath);
-      if (!fileStat.isFile()) {
+      const fileStat = await stat(filePath).catch(() => null);
+      if (!fileStat?.isFile()) {
         response.writeHead(404).end();
         return;
       }
+      /*
+       * The body is read before the status line goes out. Answering 200 first
+       * and failing the read afterwards would send an empty body under a
+       * success code, which the search runtime reports as unparseable JSON
+       * rather than as the read failure it is.
+       */
+      const body = await readFile(filePath);
       response.writeHead(200, {
         'content-type':
           contentTypes.get(extname(filePath)) ?? 'application/octet-stream',
       });
-      response.end(await readFile(filePath));
-    } catch {
-      response.writeHead(404).end();
+      response.end(body);
+    } catch (error) {
+      console.error(`Failed to serve ${request.url}:`, error);
+      if (!response.headersSent) {
+        response.writeHead(500);
+      }
+      response.end();
     }
   });
   await new Promise((resolveListen, rejectListen) => {
@@ -67,7 +85,43 @@ async function startStaticServer(root) {
   };
 }
 
+async function assertNonEmptyBundleFile(bundleRoot, name) {
+  const fileStat = await stat(resolve(bundleRoot, name)).catch(() => null);
+  assert(
+    fileStat?.isFile() && fileStat.size > 0,
+    `Pagefind bundle file ${name} is missing or empty; the index was not written completely.`,
+  );
+}
+
+/**
+ * A bundle is servable once every file the search runtime reads while starting
+ * up is on disk in full: the module itself, the manifest, and the metadata and
+ * WebAssembly the manifest names for each language. Checking that here turns a
+ * half-written bundle into a statement about the bundle, instead of the
+ * "Unexpected end of JSON input" the runtime reports several layers down.
+ */
+async function assertBundleIsComplete(bundleRoot) {
+  await assertNonEmptyBundleFile(bundleRoot, 'pagefind.js');
+  await assertNonEmptyBundleFile(bundleRoot, 'pagefind-entry.json');
+  const entry = JSON.parse(
+    await readFile(resolve(bundleRoot, 'pagefind-entry.json'), 'utf8'),
+  );
+  const languages = Object.values(entry.languages ?? {});
+  assert(languages.length > 0, 'The Pagefind bundle names no language index.');
+  for (const language of languages) {
+    await assertNonEmptyBundleFile(
+      bundleRoot,
+      `pagefind.${language.hash}.pf_meta`,
+    );
+    await assertNonEmptyBundleFile(
+      bundleRoot,
+      `wasm.${language.wasm ?? 'unknown'}.pagefind`,
+    );
+  }
+}
+
 async function withSearchIndex(bundleRoot, run) {
+  await assertBundleIsComplete(bundleRoot);
   const server = await startStaticServer(bundleRoot);
   const moduleUrl = pathToFileURL(resolve(bundleRoot, 'pagefind.js'));
   moduleUrl.searchParams.set('test-run', crypto.randomUUID());
@@ -168,6 +222,33 @@ async function verifyBuiltIndex() {
   return cases.length;
 }
 
+/**
+ * Pagefind's `writeFiles` reports a write before the bytes reach the disk: the
+ * backend writes through Tokio's buffered file handles and drops them without
+ * flushing, so the call resolves while the writes are still queued on a
+ * background thread. Serving a bundle at that moment can hand out a file that
+ * is still empty. The API offers no completion signal to wait for, so the
+ * bundle is taken as bytes instead and written here, where Node's own write is
+ * the signal.
+ */
+async function writeBundle(index, bundleRoot) {
+  const { errors, files } = await index.getFiles();
+  assert.deepEqual(errors, []);
+  assert(files.length > 0, 'Pagefind produced an empty bundle.');
+  await Promise.all(
+    files.map(async (file) => {
+      // Paths arrive relative to the bundle root, in the backend's separator.
+      const filePath = resolve(bundleRoot, ...file.path.split(/[\\/]/u));
+      assert(
+        filePath.startsWith(`${bundleRoot}${sep}`),
+        `Pagefind named a bundle file outside the bundle: ${file.path}`,
+      );
+      await mkdir(dirname(filePath), { recursive: true });
+      await writeFile(filePath, file.content);
+    }),
+  );
+}
+
 async function verifyMultilingualSearch() {
   const temporaryRoot = await mkdtemp(resolve(tmpdir(), 'pagefind-verify-'));
   try {
@@ -188,12 +269,10 @@ async function verifyMultilingualSearch() {
       ].join(''),
     });
     assert.deepEqual(added.errors, []);
-    const outputPath = resolve(temporaryRoot, 'pagefind');
-    const written = await created.index.writeFiles({ outputPath });
-    assert.deepEqual(written.errors, []);
-    await close();
+    const bundleRoot = resolve(temporaryRoot, 'pagefind');
+    await writeBundle(created.index, bundleRoot);
 
-    await withSearchIndex(outputPath, async (pagefind) => {
+    await withSearchIndex(bundleRoot, async (pagefind) => {
       await expectResult(pagefind, 'Синхронизация', '/multilingual/');
       await expectResult(pagefind, 'discoverable', '/multilingual/');
     });

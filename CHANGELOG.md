@@ -30,6 +30,15 @@ All three packages share a version and are released together.
 - The default `sidebarPrefix` links "All documents" beside "Home". A project
   that passes its own prefix links the page itself.
 
+### Fixed
+
+- `ctcdocs-verify-search` no longer fails on a search index it has just built.
+  Pagefind's `writeFiles` resolves while the backend's buffered writes are
+  still in flight, so the check could serve an empty `pagefind-entry.json` and
+  report it as unparseable JSON — a failure with nothing behind it. The check
+  now writes the bundle itself, and serves no bundle before every file the
+  search runtime starts from is on disk and non-empty.
+
 ## 0.1.1
 
 ### Changed
