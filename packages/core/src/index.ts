@@ -1,7 +1,10 @@
 export {
   GENERATED_DIRECTORY_ALLOWLIST,
   GENERATED_FILE_ALLOWLIST,
+  PLATFORM_ROUTE_HREFS,
+  PLATFORM_ROUTES,
   PROJECT_LAYOUT,
+  RESERVED_SLUGS,
 } from './project-layout.js';
 export {
   assertGeneratedPathAllowed,

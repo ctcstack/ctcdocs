@@ -15,6 +15,7 @@ export default defineConfig(
         label: 'Documentation',
         items: [
           { label: 'Home', link: '/' },
+          { label: 'All documents', link: '/documents/' },
           { label: 'About this site', slug: 'about' },
         ],
       },

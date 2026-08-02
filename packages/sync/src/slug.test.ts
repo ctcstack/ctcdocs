@@ -1,3 +1,4 @@
+import { RESERVED_SLUGS } from '@ctcstack/ctcdocs-core';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
@@ -122,6 +123,61 @@ describe('folder slug allocation', () => {
     expect(allocation.folders.get('team')).toBe('team');
     expect(allocation.documents.get('file-a')).toMatch(/^team--/u);
   });
+});
+
+describe('platform addresses', () => {
+  it.each(RESERVED_SLUGS)(
+    'keeps a new folder and a new document off /%s/',
+    (reserved) => {
+      const allocation = allocateStableSlugs(
+        [
+          folder('root', ['Published']),
+          folder('shelf', ['Published', reserved]),
+        ],
+        [document('file-a', ['Published', reserved])],
+        createEmptyManifest('drive', 'root', timestamp),
+      );
+
+      expect(allocation.folders.get('shelf')).toMatch(
+        new RegExp(`^${reserved}--`, 'u'),
+      );
+      expect(allocation.documents.get('file-a')).toMatch(
+        new RegExp(`^${reserved}--`, 'u'),
+      );
+    },
+  );
+
+  it.each(RESERVED_SLUGS)('keeps a reseeded document off /%s/', (reserved) => {
+    const manifest = createEmptyManifest('drive', 'root', timestamp);
+    manifest.documents['file-a'] = documentRecord('file-a', 'old/location');
+
+    expect(
+      allocateReseededSlug(
+        document('file-a', ['Published', reserved]),
+        manifest,
+      ),
+    ).toMatch(new RegExp(`^${reserved}--`, 'u'));
+  });
+
+  /*
+   * An address the corpus already owns is a URL somebody has saved, so the
+   * allocator leaves it alone and validation is what reports the clash.
+   */
+  it.each(RESERVED_SLUGS)(
+    'leaves an address the corpus already owns',
+    (reserved) => {
+      const manifest = createEmptyManifest('drive', 'root', timestamp);
+      manifest.documents['file-a'] = documentRecord('file-a', reserved);
+
+      const allocation = allocateStableSlugs(
+        [folder('root', ['Published'])],
+        [document('file-a', ['Published', reserved])],
+        manifest,
+      );
+
+      expect(allocation.documents.get('file-a')).toBe(reserved);
+    },
+  );
 });
 
 describe('stable slug allocation', () => {

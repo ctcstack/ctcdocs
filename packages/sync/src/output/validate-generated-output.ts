@@ -1,7 +1,7 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { posix, relative, resolve } from 'node:path';
 
-import { PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
+import { PROJECT_LAYOUT, RESERVED_SLUGS } from '@ctcstack/ctcdocs-core';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 
@@ -171,6 +171,15 @@ async function validateGeneratedOutputInternal(
 
   const slugs = new Set<string>();
   /*
+   * A slug that matches a page the platform serves would be shadowed by that
+   * route, so the document would still be built and committed while quietly
+   * disappearing from the site. New allocations never take one; an address
+   * claimed before the route existed is reported here, and renaming the source
+   * in Drive moves it.
+   */
+  const claimsPlatformAddress = (slug: string): boolean =>
+    RESERVED_SLUGS.includes(slug);
+  /*
    * Folders share the document namespace — `/company/` and a document called
    * "Company" are one URL — so their addresses are reserved here before any
    * document claims one, and the root is the only folder without an address.
@@ -185,6 +194,11 @@ async function validateGeneratedOutputInternal(
     if (slugs.has(folder.stableSlug)) {
       throw new Error('Generated output contains duplicate stable slugs.');
     }
+    if (claimsPlatformAddress(folder.stableSlug)) {
+      throw new Error(
+        `A folder claims /${folder.stableSlug}/, which the platform serves itself. Rename the folder in Drive.`,
+      );
+    }
     slugs.add(folder.stableSlug);
   }
   const assetRoot = resolve(
@@ -197,6 +211,11 @@ async function validateGeneratedOutputInternal(
   for (const record of Object.values(manifest.documents)) {
     if (slugs.has(record.stableSlug)) {
       throw new Error('Generated output contains duplicate stable slugs.');
+    }
+    if (claimsPlatformAddress(record.stableSlug)) {
+      throw new Error(
+        `A document claims /${record.stableSlug}/, which the platform serves itself. Rename the document in Drive.`,
+      );
     }
     slugs.add(record.stableSlug);
 

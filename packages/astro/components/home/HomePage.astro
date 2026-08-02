@@ -11,15 +11,18 @@
  * machine-readable surface.
  *
  * How long the recent band runs, and whether the index is on this page at all,
- * come from the project configuration: a deployment that gives every folder a
- * page of its own may leave browsing to those pages. See
- * docs/ADR/012-project-configuration-layer.md.
+ * come from the project configuration. The index is published either way, at
+ * its own address; a home page that gives it up links to it instead, so the
+ * page still ends on the whole corpus rather than on a subset. See
+ * docs/ADR/012-project-configuration-layer.md and
+ * docs/ADR/017-full-index-page.md.
  */
 import { loadCorpus } from '../../lib/corpus';
 import { siteConfiguration } from '../../lib/project';
 import CorpusIndex from '../CorpusIndex.astro';
 import AgentAccess from './AgentAccess.astro';
 import CategoryCards from './CategoryCards.astro';
+import FullIndexLink from './FullIndexLink.astro';
 import HomeHero from './HomeHero.astro';
 import RecentUpdates from './RecentUpdates.astro';
 
@@ -32,14 +35,10 @@ const { home } = siteConfiguration;
   <CategoryCards groups={corpus.groups} />
   <RecentUpdates documents={corpus.recent} limit={home.recentLimit} />
   {
-    /*
-     * The index is also what speaks for an empty corpus: every other block
-     * hides itself when there is nothing to list, so a project that has never
-     * synchronized would otherwise open on a page that says nothing about why
-     * it is bare.
-     */
-    (home.corpusIndex || corpus.documentCount === 0) && (
+    home.corpusIndex ? (
       <CorpusIndex groups={corpus.groups} />
+    ) : (
+      <FullIndexLink documentCount={corpus.documentCount} />
     )
   }
   <AgentAccess documents={corpus.recent} />

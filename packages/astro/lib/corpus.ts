@@ -12,7 +12,7 @@
 import { siteConfiguration } from './project.js';
 import { getCollection } from 'astro:content';
 
-import { folderAnchorId, folderTrail } from './folder-anchor';
+import { folderAnchorHref, folderAnchorId, folderTrail } from './folder-anchor';
 import { loadSectionHrefs, sectionHref } from './sections';
 
 /** Documents at the Drive root are grouped under this heading. */
@@ -133,12 +133,13 @@ export async function loadCorpus(): Promise<Corpus> {
       label,
       /*
        * Documents at the Drive root are grouped under a heading that is not a
-       * folder, so that group never has a page — it points at itself in the
-       * index below.
+       * folder, so that group never has a page of its own — it points at its
+       * heading in the full index, which is served whether or not the home
+       * page carries a copy of that index.
        */
       href:
         (trail.length > 0 ? sectionHref(sections, [label]) : undefined) ??
-        `#${anchor}`,
+        folderAnchorHref(label),
     };
     group.documents.push(entry);
     groups.set(label, group);

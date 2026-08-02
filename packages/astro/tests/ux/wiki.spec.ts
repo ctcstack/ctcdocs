@@ -37,13 +37,22 @@ test('home page is accessible and search is keyboard operable', async ({
   const { corpusIndex, recentLimit } = siteConfiguration.home;
   expect(await recentRows.count()).toBeLessThanOrEqual(recentLimit);
 
-  // The index is the project's choice; where it is kept, it lists every
-  // document with the date its source was last edited.
+  /*
+   * Whether the index is on this page is the project's choice, and the page
+   * ends on the whole corpus either way: it carries the index, or it links to
+   * the page that does.
+   */
   if (corpusIndex) {
     await expect(page.locator('.corpus-group').first()).toBeVisible();
     const firstEntry = page.locator('.corpus-list li').first();
     await expect(firstEntry.getByRole('link')).toBeVisible();
     await expect(firstEntry.locator('time')).toBeVisible();
+  } else {
+    await expect(page.locator('.corpus-group')).toHaveCount(0);
+    await expect(page.locator('.full-index').getByRole('link')).toHaveAttribute(
+      'href',
+      '/documents/',
+    );
   }
   await expect(
     page.getByRole('link', { name: 'About this wiki' }).first(),
@@ -83,6 +92,38 @@ test('home page is accessible and search is keyboard operable', async ({
   await expect(page.getByPlaceholder('Search')).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).not.toBeVisible();
+});
+
+test('the full index is a page of its own, whatever the home page shows', async ({
+  page,
+}) => {
+  await page.goto('/documents/');
+
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'All documents' }),
+  ).toBeVisible();
+
+  // Every folder is a heading a link can address, and every row is a document
+  // with the date its source was last edited.
+  const folder = folderTrail(documentInFolder()?.folderPath)[0];
+  if (folder) {
+    await expect(
+      page.locator(`[id="${folderAnchorId(folder)}"]`),
+    ).toBeVisible();
+  }
+  const firstEntry = page.locator('.corpus-list li').first();
+  await expect(firstEntry.getByRole('link')).toBeVisible();
+  await expect(firstEntry.locator('time')).toBeVisible();
+
+  /*
+   * The page lists every title in the corpus, so indexing it would return it
+   * alongside every real result.
+   */
+  await expect(page.locator('[data-pagefind-ignore] .corpus-list')).toHaveCount(
+    await page.locator('.corpus-list').count(),
+  );
+
+  await expectNoAccessibilityViolations(page);
 });
 
 test('documentation page is accessible and responsive on mobile', async ({
@@ -184,15 +225,15 @@ test('a synchronized document leads with its position and provenance', async ({
   /*
    * The folder segment leads somewhere that presents that folder, and the
    * corpus decides which: its own page where section index pages are
-   * generated, and the folder's heading in the home index where they are not.
-   * The link is followed rather than compared to one expected address, because
-   * a test that pins one arrangement fails the day the corpus is built with
-   * the other — which is exactly how this assertion broke.
+   * generated, and its heading in the full index where they are not. The link
+   * is followed rather than compared to one expected address, because a test
+   * that pins one arrangement fails the day the corpus is built with the
+   * other — which is exactly how this assertion broke.
    */
   const folderHref = (await folderLink.getAttribute('href')) ?? '';
   await folderLink.click();
-  if (folderHref.startsWith('/#')) {
-    expect(folderHref).toBe(`/#${folderAnchorId(folder)}`);
+  if (folderHref.includes('#')) {
+    expect(folderHref).toBe(`/documents/#${folderAnchorId(folder)}`);
     // Percent-encoded, so it cannot go in a bare CSS identifier selector.
     await expect(
       page.locator(`[id="${folderAnchorId(folder)}"]`),

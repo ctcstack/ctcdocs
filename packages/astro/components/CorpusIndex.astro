@@ -4,25 +4,50 @@
  *
  * Every row carries the date its source document was last edited, so a reader
  * can judge whether an instruction is still current before opening it. This is
- * the complete corpus: at the expected size of twenty to eighty documents the
- * index and the recency view are the same artifact, so there is no separate
- * browse page. Recorded in docs/ADR/011-documentation-design-language.md.
+ * the complete corpus, and it is published at its own address; the home page
+ * may carry a copy of it or link to it. See
+ * docs/ADR/011-documentation-design-language.md for the record it descends
+ * from and docs/ADR/017-full-index-page.md for the page it now has.
+ *
+ * On its own page the title is the page's, so the block drops its heading and
+ * names itself instead — the group headings below stay the same either way,
+ * which is what keeps `/documents/#<folder>` a stable address for a folder.
  */
 import { formatDate, type CorpusGroup } from '../lib/corpus';
 
-type Props = { groups: CorpusGroup[] };
+type Props = { groups: CorpusGroup[]; heading?: boolean };
 
-const { groups } = Astro.props;
+const { groups, heading = true } = Astro.props;
+
+const TITLE = 'All documents';
+
+/*
+ * A folder heading sits one level under whatever titles the index: the block's
+ * own heading on the home page, the page title on its own page. The class
+ * carries the appearance, so both levels look identical and only the outline
+ * changes — which is the thing a screen reader navigates by.
+ */
+const GroupHeading = heading ? 'h3' : 'h2';
 ---
 
 {
   /*
   Excluded from the search index: this section lists every document title, so
-  indexing it would return the home page alongside every real result.
+  indexing it would return the page it sits on alongside every real result.
 */
 }
-<section aria-labelledby="home-index" class="corpus" data-pagefind-ignore>
-  <h2 class="section-title" id="home-index">All documents</h2>
+<section
+  class="corpus"
+  data-pagefind-ignore
+  {...heading ? { 'aria-labelledby': 'home-index' } : { 'aria-label': TITLE }}
+>
+  {
+    heading && (
+      <h2 class="section-title" id="home-index">
+        {TITLE}
+      </h2>
+    )
+  }
 
   {
     groups.length === 0 ? (
@@ -33,9 +58,9 @@ const { groups } = Astro.props;
     ) : (
       groups.map((group) => (
         <section aria-labelledby={group.id} class="corpus-group">
-          <h3 class="corpus-group-title" id={group.id}>
+          <GroupHeading class="corpus-group-title" id={group.id}>
             {group.label}
-          </h3>
+          </GroupHeading>
           <ul class="corpus-list">
             {group.documents.map((entry) => (
               <li>
@@ -105,6 +130,19 @@ const { groups } = Astro.props;
   @layer starlight.components {
     .corpus {
       margin-top: 3rem;
+    }
+
+    /*
+     * The space above belongs between this block and the one before it. On its
+     * own page there is no block before it, and the page title already sets
+     * the distance.
+     */
+    .corpus:first-child {
+      margin-top: 0;
+    }
+
+    .corpus:first-child .corpus-group:first-of-type {
+      margin-top: 0;
     }
 
     .corpus-group {

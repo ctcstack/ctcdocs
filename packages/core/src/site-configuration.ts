@@ -45,9 +45,10 @@ export interface HomeConfiguration {
   readonly recentLimit: number;
   /**
    * Whether the home page ends with the full index of every document, grouped
-   * by folder. Defaults to `true`. A deployment whose folders each have a page
-   * of their own may prefer the page to stop at the folder cards and the
-   * recent band, and leave browsing to those pages and to search.
+   * by folder. Defaults to `true`. The index is published either way, at the
+   * address in `PLATFORM_ROUTES.fullIndex`; this decides only whether the home
+   * page carries a copy of it or links to it. A deployment whose corpus has
+   * outgrown one page may prefer the home page to stay an entrance.
    */
   readonly corpusIndex: boolean;
 }
@@ -361,32 +362,7 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
   }
 
   const navigationSource = record(root.navigation, 'navigation');
-  const sectionIndexPages = flag(
-    navigationSource,
-    'sectionIndexPages',
-    'navigation.sectionIndexPages',
-  );
-
   const homeSource = record(root.home, 'home');
-  const corpusIndex = optionalFlag(
-    homeSource,
-    'corpusIndex',
-    'home.corpusIndex',
-    true,
-  );
-  /*
-   * Without pages of their own, folders are presented by their heading in that
-   * index: a folder card and a breadcrumb segment both link to `/#<folder>`.
-   * Turning the index off while those pages are not generated would leave
-   * every one of those links pointing at an anchor no page carries, so the
-   * combination is refused here rather than shipped as a page of dead links.
-   */
-  if (!corpusIndex && !sectionIndexPages) {
-    fail(
-      'home.corpusIndex',
-      'must stay true while navigation.sectionIndexPages is false, because folder links resolve to headings in that index',
-    );
-  }
 
   return {
     brand,
@@ -395,7 +371,12 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
       workerName,
     },
     home: {
-      corpusIndex,
+      corpusIndex: optionalFlag(
+        homeSource,
+        'corpusIndex',
+        'home.corpusIndex',
+        true,
+      ),
       lede: text(homeSource, 'lede', 'home.lede'),
       recentLimit: optionalCount(
         homeSource,
@@ -410,7 +391,11 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
         'landingDocumentTitles',
         'navigation.landingDocumentTitles',
       ),
-      sectionIndexPages,
+      sectionIndexPages: flag(
+        navigationSource,
+        'sectionIndexPages',
+        'navigation.sectionIndexPages',
+      ),
     },
     sync: {
       commitBotName: text(syncSource, 'commitBotName', 'sync.commitBotName'),

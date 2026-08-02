@@ -1,0 +1,75 @@
+---
+/**
+ * Where the home page sends a reader who wants the whole list.
+ *
+ * Shown in place of the index when the home page does not carry one, so the
+ * page still names its own completion: the folder cards above are a way in,
+ * and this is the way to everything. The count is the same number the opening
+ * band reports, and it is here because "all 47 documents" tells a reader
+ * whether the list is worth opening in a way "all documents" does not.
+ */
+import { PLATFORM_ROUTE_HREFS } from '@ctcstack/ctcdocs-core';
+
+type Props = { documentCount: number };
+
+const { documentCount } = Astro.props;
+
+// Composed here rather than in the markup: adjacent expressions in a template
+// are emitted without the whitespace between them, which ran the count into
+// the noun.
+const label = `Browse all ${documentCount} ${
+  documentCount === 1 ? 'document' : 'documents'
+}`;
+---
+
+<p class="full-index">
+  <a href={PLATFORM_ROUTE_HREFS.fullIndex}>
+    {label}
+    <svg
+      aria-hidden="true"
+      class="full-index-caret"
+      fill="none"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="1.5"
+      viewBox="0 0 16 16"
+    >
+      <path d="m6 3.5 5 4.5-5 4.5"></path>
+    </svg>
+  </a>
+</p>
+
+<style>
+  @layer starlight.components {
+    .full-index {
+      border-top: 1px solid var(--sl-color-hairline);
+      margin: 3rem 0 0;
+      padding-top: 1.25rem;
+    }
+
+    .full-index a {
+      color: var(--sl-color-white);
+      font-size: var(--sl-text-sm);
+      text-decoration: none;
+    }
+
+    .full-index a:hover {
+      color: var(--sl-color-text-accent);
+    }
+
+    .full-index a:focus-visible {
+      border-radius: 0.25rem;
+      outline: 2px solid var(--sl-color-text-accent);
+      outline-offset: 2px;
+    }
+
+    /* The theme sets `svg { display: block }`, which would break the line. */
+    .full-index-caret {
+      display: inline-block;
+      height: 0.875rem;
+      vertical-align: -0.0625em;
+      width: 0.875rem;
+    }
+  }
+</style>
