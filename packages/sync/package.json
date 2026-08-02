@@ -1,6 +1,6 @@
 {
   "name": "@ctcstack/ctcdocs-sync",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "One-way Google Drive to Markdown synchronization for CTCDocs projects, with the ctcdocs-sync command line.",
   "keywords": [
     "google-drive",
