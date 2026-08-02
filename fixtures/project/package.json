@@ -9,6 +9,8 @@
     "build": "astro check && astro build",
     "preview": "astro preview",
     "typecheck": "astro check",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
     "validate": "ctcdocs-sync validate",
     "test:search": "ctcdocs-verify-search",
     "test:ux": "playwright test --config playwright.ux.config.ts",

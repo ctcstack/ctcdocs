@@ -1,0 +1,11 @@
+.astro/
+dist/
+playwright-report/
+test-results/
+
+# Pipeline-owned. The sync writes these; formatting them would change bytes it
+# is responsible for and break the zero-diff property of a repeated run.
+src/content/docs/_generated/
+src/assets/generated/
+src/generated/
+data/

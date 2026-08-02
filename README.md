@@ -122,6 +122,7 @@ In the order a new deployment needs them:
 
 | Document                                                 | What it answers                                                                |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [Starting a new project](docs/NEW_PROJECT.md)            | The ordered path from an empty repository to a deployed site                   |
 | [Configuration](docs/CONFIGURATION.md)                   | Every key of `site.config.json`, and what is deliberately not in it            |
 | [Google Workspace setup](docs/GOOGLE_WORKSPACE_SETUP.md) | The read-only identity the pipeline synchronizes with                          |
 | [Cloudflare setup](docs/CLOUDFLARE_SETUP.md)             | Worker, custom domains, and the Access application in front of them            |

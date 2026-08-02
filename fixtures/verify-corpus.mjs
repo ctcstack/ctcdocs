@@ -18,18 +18,30 @@ execFileSync(
 );
 
 /*
+ * Only the paths the pipeline writes. The fixture project is a project: it also
+ * holds hand-authored files, and asking about the whole directory made every
+ * one of those look like output the generator had just produced.
+ */
+const generated = [
+  'fixtures/project/src/content/docs/_generated',
+  'fixtures/project/src/assets/generated',
+  'fixtures/project/src/generated',
+  'fixtures/project/data',
+];
+
+/*
  * Two questions, because one command answers neither on its own: did
  * regeneration change a file Git already knows about, and did it produce one
  * Git has never seen? A staged-but-unchanged file is neither.
  */
 const changed = execFileSync(
   'git',
-  ['diff', '--name-only', 'HEAD', '--', 'fixtures/project'],
+  ['diff', '--name-only', 'HEAD', '--', ...generated],
   { cwd: repositoryRoot, encoding: 'utf8' },
 );
 const untracked = execFileSync(
   'git',
-  ['ls-files', '--others', '--exclude-standard', '--', 'fixtures/project'],
+  ['ls-files', '--others', '--exclude-standard', '--', ...generated],
   { cwd: repositoryRoot, encoding: 'utf8' },
 );
 const status = `${changed}${untracked}`;
