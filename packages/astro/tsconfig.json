@@ -1,0 +1,27 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // The interface ships browser modules as well as build-time ones: the
+    // mermaid entry and the relative-date element run in the page.
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"]
+  },
+  /*
+   * Everything except the modules that consume Astro's virtual `astro:content`
+   * module. Those types are generated inside a project by `astro sync`, so they
+   * do not exist in a package that has no project of its own: the fixture
+   * project's `astro check` is what type-checks them, against the real
+   * generated types rather than a shim maintained here. `config.ts` is
+   * excluded for the same reason: importing Starlight pulls its own sources
+   * into the program, and they expect that generated environment too.
+   */
+  "include": ["**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "config.ts",
+    "content.ts",
+    "lib/corpus.ts",
+    "lib/sections.ts",
+    "routes/**"
+  ]
+}

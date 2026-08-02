@@ -1,0 +1,87 @@
+{
+  "name": "@ctcstack/ctcdocs",
+  "version": "0.1.0",
+  "description": "The CTCDocs site: an Astro/Starlight preset, component overrides, injected routes, styles, and the browser suite a project runs.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ctcstack/ctcdocs.git",
+    "directory": "packages/astro"
+  },
+  "exports": {
+    "./config": "./config.ts",
+    "./content": "./content.ts",
+    "./styles.css": "./styles.css",
+    "./components/*": "./components/*",
+    "./routes/*": "./routes/*",
+    "./playwright": "./playwright.ts",
+    "./eslint": "./eslint.js",
+    "./prettier": "./prettier.js",
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "ctcdocs-access-smoke": "./bin/access-smoke.mjs",
+    "ctcdocs-verify-search": "./bin/verify-search.mjs"
+  },
+  "files": [
+    "bin",
+    "components",
+    "lib",
+    "routes",
+    "scripts",
+    "tests",
+    "config.ts",
+    "content.ts",
+    "eslint.js",
+    "playwright.ts",
+    "prettier.js",
+    "route-injection.ts",
+    "styles.css",
+    "!**/*.test.ts",
+    "!**/*.test.mjs"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json",
+    "test": "vitest run --root ../.. && node --test bin/*.test.mjs"
+  },
+  "dependencies": {
+    "@astrojs/markdown-remark": "7.2.2",
+    "@axe-core/playwright": "4.12.1",
+    "@ctcstack/ctcdocs-core": "workspace:^",
+    "@eslint/js": "10.0.1",
+    "@fontsource-variable/inter": "5.3.0",
+    "@fontsource-variable/jetbrains-mono": "5.3.0",
+    "cheerio": "1.2.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-astro": "3.0.1",
+    "globals": "17.8.0",
+    "mermaid": "11.16.0",
+    "pagefind": "1.5.2",
+    "prettier-plugin-astro": "0.14.1",
+    "remark-gfm": "4.0.1",
+    "remark-parse": "11.0.0",
+    "remark-stringify": "11.0.0",
+    "sharp": "0.35.3",
+    "typescript-eslint": "8.65.0",
+    "unified": "11.0.5"
+  },
+  "peerDependencies": {
+    "@astrojs/starlight": "^0.41.5",
+    "@playwright/test": "^1.62.0",
+    "astro": "^7.1.6"
+  },
+  "devDependencies": {
+    "@astrojs/starlight": "0.41.5",
+    "@playwright/test": "1.62.1",
+    "@types/mdast": "4.0.4",
+    "@types/node": "22.20.1",
+    "astro": "7.1.6",
+    "linkedom": "0.18.12",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}

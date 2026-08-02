@@ -1,0 +1,665 @@
+/*
+ * Documentation interface theme.
+ *
+ * Design language recorded in docs/ADR/011-documentation-design-language.md.
+ * The system is a neutral gray ramp at zero chroma so that a single chromatic
+ * accent carries meaning wherever it appears. Surfaces are flat and separated
+ * by one-pixel hairlines rather than fills and shadows.
+ *
+ * The accent itself is the one project-specific part of the palette and lives
+ * in brand.css, which Starlight loads before this file. Nothing here names a
+ * brand color directly; every use goes through --sl-color-accent.
+ *
+ * Fonts are self-hosted and imported from src/components/Head.astro, where the
+ * dependency stays traceable to the build. Per-subset unicode-range means an
+ * English page never downloads Cyrillic, and a document without code never
+ * downloads the mono.
+ */
+
+/* ---------------------------------------------------------------- tokens */
+
+:root,
+::backdrop {
+  /*
+   * Neutral ramp, dark. gray-1 lightest to gray-6 darkest.
+   * Zero chroma in both themes: the reference tints its dark ink warm, but a
+   * ramp that is neutral in one theme and warm in the other is two systems.
+   * The accent is the only place color appears.
+   */
+  --sl-color-white: #f5f5f5;
+  --sl-color-gray-1: #ededed;
+  --sl-color-gray-2: #ededed;
+  --sl-color-gray-3: #a1a1a1;
+  --sl-color-gray-4: #6f6f6f;
+  --sl-color-gray-5: #3d3d3d;
+  --sl-color-gray-6: #333333;
+  --sl-color-black: #141414;
+
+  /* The accent triad for this theme is set in brand.css. */
+  --sl-color-text: var(--sl-color-gray-2);
+  --sl-color-text-accent: var(--sl-color-accent);
+  --sl-color-text-invert: #141414;
+
+  /* Flat shell: header and sidebar share the page ground. */
+  --sl-color-bg: var(--sl-color-black);
+  --sl-color-bg-nav: var(--sl-color-black);
+  --sl-color-bg-sidebar: var(--sl-color-black);
+  --sl-color-bg-inline-code: #232323;
+  --sl-color-bg-accent: var(--sl-color-accent);
+
+  /*
+   * A hairline is the only structural device in this system, so it is set
+   * above the reference's own value: at #2a2a2a it sits at 1.29:1 on the dark
+   * ground, which is the threshold of visibility rather than a rule.
+   */
+  --sl-color-hairline: #333333;
+  --sl-color-hairline-light: #333333;
+  --sl-color-hairline-shade: #333333;
+
+  /* Local roles the Starlight ramp has no name for. */
+  --kb-surface-sunken: #0f0f0f;
+  --kb-border-strong: #4a4a4a;
+  --kb-nav-bg-translucent: rgb(20 20 20 / 80%);
+
+  /* Documentation type scale: a tight hierarchy, not a marketing one. */
+  --sl-text-h1: 1.75rem;
+  --sl-text-h2: 1.3rem;
+  --sl-text-h3: 1.1rem;
+  --sl-text-h4: 1rem;
+  --sl-text-h5: 0.9375rem;
+  --sl-line-height-headings: 1.25;
+  --sl-line-height-table: 1.5;
+
+  --sl-font: 'Inter Variable';
+  --sl-font-mono: 'JetBrains Mono Variable';
+
+  /* Holds the prose measure at roughly 67 characters. */
+  --sl-content-width: 52rem;
+
+  /* The index carries a date column, so it runs wider than prose. */
+  --kb-index-width: 52rem;
+
+  /* Matches the reference's own contents rail. */
+  --kb-toc-width: 18rem;
+}
+
+:root[data-theme='light'],
+[data-theme='light'] ::backdrop {
+  /* Neutral ramp, light. Starlight inverts the naming: white is the ink. */
+  --sl-color-white: #171717;
+  --sl-color-gray-1: #181818;
+  --sl-color-gray-2: #181818;
+  --sl-color-gray-3: #6b6b6b;
+  --sl-color-gray-4: #a3a3a3;
+  --sl-color-gray-5: #d6d6d6;
+  --sl-color-gray-6: #e4e4e4;
+  --sl-color-gray-7: #f7f7f7;
+  --sl-color-black: #fcfcfc;
+
+  --sl-color-text-accent: var(--sl-color-accent);
+  --sl-color-text-invert: #ffffff;
+
+  --sl-color-bg-nav: var(--sl-color-black);
+  --sl-color-bg-sidebar: var(--sl-color-black);
+  --sl-color-bg-inline-code: #f0f0f0;
+  --sl-color-bg-accent: var(--sl-color-accent);
+
+  --sl-color-hairline: #e4e4e4;
+  --sl-color-hairline-light: #e4e4e4;
+  --sl-color-hairline-shade: #e4e4e4;
+
+  --kb-surface-sunken: #f7f7f7;
+  --kb-border-strong: #d6d6d6;
+  --kb-nav-bg-translucent: rgb(252 252 252 / 80%);
+}
+
+/*
+ * Starlight enlarges headings on wide viewports. The documentation scale is
+ * fixed instead: the hierarchy comes from weight and tracking, not from size.
+ */
+@media (min-width: 50em) {
+  :root {
+    --sl-nav-height: 3.5rem;
+    --sl-text-h1: 2.1875rem;
+    --sl-text-h2: 1.3rem;
+    --sl-text-h3: 1.1rem;
+    --sl-text-h4: 1rem;
+  }
+}
+
+/* ------------------------------------------------------------ typography */
+
+.sl-markdown-content :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+.sl-markdown-content h2 {
+  letter-spacing: -0.015em;
+}
+
+.sl-markdown-content h3 {
+  letter-spacing: -0.01em;
+}
+
+/* Headings own the space above them, not below. */
+.sl-markdown-content :is(h2, h3, h4) {
+  margin-top: 2.5rem;
+}
+
+.sl-markdown-content :is(h2, h3, h4) + * {
+  margin-top: 0.75rem;
+}
+
+.sl-markdown-content a {
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+
+/* ---------------------------------------------------------------- shell */
+
+/*
+ * Sticky translucent header, separated by a hairline rather than a fill.
+ * Scoped to the element: Expressive Code emits `figcaption.header` inside every
+ * code frame, which a bare `.header` selector would fill and blur.
+ */
+header.header {
+  backdrop-filter: blur(16px);
+  background: var(--kb-nav-bg-translucent);
+  border-bottom: 1px solid var(--sl-color-hairline);
+}
+
+/* The wordmark is text; the accent belongs to the mark beside it. */
+.site-title {
+  color: var(--sl-color-white);
+}
+
+/*
+ * On a phone the header cannot hold the full name at reading size. A wordmark
+ * set small is still the product's name; a truncated one is not, so the size
+ * gives way before the string does.
+ */
+@media (max-width: 30rem) {
+  .site-title {
+    font-size: 0.75rem;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* The sidebar reads as the same sheet, divided by one rule. */
+#starlight__sidebar {
+  border-inline-end: 1px solid var(--sl-color-hairline);
+}
+
+.sidebar-pane {
+  background: var(--sl-color-bg-sidebar);
+  border-inline-end: 0;
+}
+
+/*
+ * The expand/collapse carets sit below their group label rather than sharing
+ * its weight: the label is what a reader scans, the caret only reports state.
+ * They return to the label's color on hover and focus, so a control that is
+ * quiet at rest still answers when reached for.
+ */
+#starlight__sidebar summary .caret {
+  color: var(--sl-color-gray-4);
+}
+
+#starlight__sidebar summary:hover .caret,
+#starlight__sidebar summary:focus-visible .caret {
+  color: var(--sl-color-white);
+}
+
+/*
+ * Navigation is set below the prose it leads to. Starlight colors these links
+ * gray-2, which this ramp defines as the text color itself, so a page of
+ * document titles carried the same weight as the document. They take gray-3
+ * instead — the tone the contents rail already uses — and return to the ink
+ * color on hover and focus. Both rails then behave alike: quiet while you
+ * read, present when you reach for them.
+ */
+#starlight__sidebar a {
+  color: var(--sl-color-gray-3);
+}
+
+#starlight__sidebar a:hover,
+#starlight__sidebar a:focus {
+  color: var(--sl-color-white);
+}
+
+/*
+ * Rows answer the pointer: hovering or focusing one fills it with the same
+ * surface the current page carries, so the navigation reads as something you
+ * can act on rather than as a printed list. Group headers are rows too — they
+ * toggle — so they take the same treatment and the same corner as the links
+ * above and below them.
+ */
+#starlight__sidebar summary {
+  border-radius: 0.25rem;
+}
+
+#starlight__sidebar a:hover,
+#starlight__sidebar a:focus-visible,
+#starlight__sidebar summary:hover,
+#starlight__sidebar summary:focus-visible {
+  background-color: var(--kb-surface-sunken);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  #starlight__sidebar :is(a, summary) {
+    transition: background-color 150ms ease;
+  }
+}
+
+/*
+ * The current page is marked by a quiet surface and accent text. A saturated
+ * fill would make navigation the loudest thing on a page meant for reading.
+ */
+#starlight__sidebar a[aria-current='page'],
+#starlight__sidebar a[aria-current='page']:hover,
+#starlight__sidebar a[aria-current='page']:focus {
+  background-color: var(--kb-surface-sunken);
+  color: var(--sl-color-text-accent);
+  font-weight: 600;
+}
+
+/*
+ * The title and the body are one continuous sheet. Starlight rules a line
+ * between its content panels; the reading arrangement here does not.
+ */
+.content-panel + .content-panel {
+  border-top: 0;
+  padding-top: 0;
+}
+
+/*
+ * The splash layout — the home index — runs full width and has no sidebar.
+ * Its title shares the index's measure so the two align on one left edge.
+ * Where `:has()` is unsupported the index keeps its own cap and only the
+ * title runs wide.
+ */
+.page:not(:has(#starlight__sidebar)) .sl-container {
+  margin-inline: auto;
+  max-width: var(--kb-index-width);
+}
+
+/*
+ * Starlight hides the header's theme control below `md` and offers the mobile
+ * one from the sidebar's menu footer. The splash layout renders no sidebar, so
+ * on a phone the entry page of a light/dark wiki would have no way to switch.
+ */
+.page:not(:has(#starlight__sidebar)) .right-group {
+  display: flex;
+}
+
+/*
+ * Restoring that control cost the wordmark: at 375px the select's own label
+ * text pushed the site title into an ellipsis on the one page that introduces
+ * the product. On narrow viewports the control keeps its icon and
+ * caret and drops the text; its accessible name is a visually hidden label, so
+ * nothing is lost to a screen reader, and the options stay legible when open.
+ */
+@media (max-width: 30rem) {
+  /* Starlight sets this width in an inline style attribute, so overriding it
+     from a stylesheet needs the extra weight. */
+  .page:not(:has(#starlight__sidebar)) starlight-theme-select label {
+    --sl-select-width: 3.25em !important;
+  }
+
+  .page:not(:has(#starlight__sidebar)) starlight-theme-select select {
+    color: transparent;
+  }
+
+  .page:not(:has(#starlight__sidebar)) starlight-theme-select option {
+    color: var(--sl-color-white);
+  }
+}
+
+/* ------------------------------------------------- table of contents rail */
+
+/*
+ * Starlight sizes the contents rail to swallow every pixel left over after the
+ * content column, then caps the list inside it at a quarter of that width and
+ * leaves it against the rail's inner edge — its own source calls the 0.25 a
+ * magic number. The result is a list glued to the text with a band of dead
+ * space between it and the window.
+ *
+ * The rail is given a fixed width at the window's edge instead, the content
+ * column takes the space that frees and centres in it, and the list fills the
+ * rail it was given.
+ */
+@media (min-width: 72rem) {
+  [data-has-sidebar][data-has-toc] .right-sidebar-container {
+    width: var(--kb-toc-width);
+  }
+
+  /*
+   * The rail itself is `position: fixed`, so its `width: 100%` resolves
+   * against the viewport rather than against the column it sits in. It has to
+   * be told the same width as its container.
+   *
+   * No dividing rule: the rail is separated by the space around it, as in the
+   * reference. The contents list carries the only vertical line here.
+   */
+  [data-has-sidebar][data-has-toc] .right-sidebar {
+    border-inline-start: 0;
+    width: var(--kb-toc-width);
+  }
+
+  [data-has-sidebar][data-has-toc] .main-pane {
+    --sl-content-margin-inline: auto;
+
+    width: calc(100% - var(--kb-toc-width));
+  }
+
+  .right-sidebar-panel .sl-container {
+    max-width: none;
+    width: 100%;
+  }
+
+  /* The list keeps its distance from the window edge. */
+  .right-sidebar-panel {
+    padding-inline: 1.25rem 1.75rem;
+  }
+}
+
+/*
+ * The track is each entry's own border rather than a line on the list, as in
+ * the reference: every item carries the same 2px rule and the active one
+ * colors it. A separate line on the list would sit beside the marker instead
+ * of behind it and read as a seam.
+ *
+ * Nested headings are not indented here, so every border lands on the same
+ * axis and the track reads as one continuous line.
+ */
+starlight-toc nav ul {
+  border-inline-start: 0;
+}
+
+starlight-toc nav ul li a {
+  border-inline-start: 2px solid var(--sl-color-hairline);
+  border-radius: 0;
+  line-height: 1.375;
+  padding-block: 0.4375rem;
+  padding-inline-start: 1.25rem;
+}
+
+/*
+ * The one place in the rail where color appears. Square, and the same weight
+ * as the track it replaces, so the list does not shift when the active entry
+ * changes.
+ */
+starlight-toc nav ul li a[aria-current='true'] {
+  border-inline-start-color: var(--sl-color-accent);
+  color: var(--sl-color-text-accent);
+  font-weight: 600;
+}
+
+/* The mobile collapsed rail keeps the flat treatment. */
+mobile-starlight-toc nav {
+  background: var(--sl-color-bg);
+}
+
+/*
+ * Google Docs exports frequently carry no headings, leaving a rail whose only
+ * entry is "Overview". A desktop column and a full-width mobile bar spent on
+ * one word is worse than no rail, so a single-entry contents list is dropped.
+ */
+/*
+ * The whole rail is removed, not just its contents: hiding the panel alone
+ * left its grid column standing, so a heading-less document rendered with a
+ * band of dead space at the right and its text off-centre.
+ */
+aside.right-sidebar-container:has(starlight-toc nav > ul > li:only-child),
+div:has(> mobile-starlight-toc details > div > ul > li:only-child) {
+  display: none;
+}
+
+/* ------------------------------------------------------------- content */
+
+/*
+ * The frame and the scroller sit on the wrapper that remark-table-scroll adds,
+ * so a wide table scrolls inside its own box and the page never does. The
+ * table itself is left to fill that box, which a block-level table could not
+ * do: it scrolls but does not stretch its cells. The border is `separate`
+ * because a collapsed border cannot be rounded.
+ */
+.kb-table {
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 0.5rem;
+  margin-block: 1rem;
+  overflow-x: auto;
+}
+
+/* Starlight makes tables block-level scrollers themselves; the wrapper is the
+ * only scroller here, so that is undone. */
+.sl-markdown-content .kb-table table {
+  border-spacing: 0;
+  display: table;
+  margin: 0;
+  overflow: visible;
+  width: 100%;
+}
+
+.sl-markdown-content :is(th, td) {
+  border: 0;
+  border-bottom: 1px solid var(--sl-color-hairline);
+  padding: 0.625rem 0.75rem;
+  text-align: start;
+  vertical-align: top;
+}
+
+/*
+ * The header is the one raised surface in the table. Everything below it sits
+ * on the page ground, separated by hairlines alone.
+ */
+.sl-markdown-content th {
+  background: var(--kb-surface-sunken);
+  color: var(--sl-color-white);
+  font-size: var(--sl-text-sm);
+  font-weight: 600;
+  line-height: var(--sl-line-height-headings);
+}
+
+.sl-markdown-content td {
+  font-size: 0.9rem;
+  line-height: var(--sl-line-height-table);
+}
+
+/*
+ * The frame already closes the table, so the last row drops its rule rather
+ * than doubling it. The last row of the last section, not of every section:
+ * scoped to `tr:last-child` alone this would also erase the line under the
+ * header.
+ */
+.sl-markdown-content table > :last-child > tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+
+.sl-markdown-content img,
+.kb-mermaid svg {
+  height: auto;
+  max-width: 100%;
+}
+
+.sl-markdown-content kbd {
+  background: var(--kb-surface-sunken);
+  border: 1px solid var(--kb-border-strong);
+  border-radius: 0.25rem;
+  color: var(--sl-color-white);
+  font-family: var(--__sl-font-mono);
+  font-size: 0.85em;
+  font-weight: 500;
+  padding: 0.1em 0.4em;
+}
+
+.sl-markdown-content :not(pre) > code {
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 0.25rem;
+}
+
+/*
+ * Frame geometry comes from the Expressive Code style overrides in
+ * astro.config.mjs. What is left here is what those overrides have no name
+ * for: the title bar's own hairline, and a four-column tab so that indented
+ * code sourced from a Google Doc keeps the shape its author gave it.
+ */
+.expressive-code .frame.has-title .header {
+  backdrop-filter: none;
+  background: transparent;
+  border-bottom: 1px solid var(--sl-color-hairline);
+}
+
+.expressive-code pre {
+  tab-size: 4;
+}
+
+/* Blockquotes carry the accent as a single hairline, never a slab. */
+.sl-markdown-content blockquote {
+  border-inline-start: 1px solid var(--kb-border-strong);
+  color: var(--sl-color-gray-3);
+}
+
+/* ------------------------------------------------------------ pagination */
+
+/*
+ * Starlight ships these as large bordered cards, which is more furniture than
+ * two links deserve at the end of a document. They are set as plain text
+ * instead — a small label over a title — beneath the one hairline that closes
+ * the page. The pair keeps the measure's own edges: previous at the start,
+ * next at the end, so the direction is read from the position before the word
+ * is read at all.
+ *
+ * The block is arranged here rather than half here and half in the component:
+ * src/components/Pagination.astro replaces Starlight's, whose scoped layout
+ * went with it. On a narrow viewport the two links fall onto separate rows and
+ * keep the edges they had side by side.
+ */
+.pagination-links {
+  display: grid;
+  gap: 1.5rem 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
+}
+
+/*
+ * The home page is linked into the sidebar rather than being an entry in it,
+ * so Starlight renders the block there with nothing in it. The rule and the
+ * space above it belong to the links, not to the container that may hold none.
+ */
+.pagination-links:has(a) {
+  border-top: 1px solid var(--sl-color-hairline);
+  padding-top: 1.5rem;
+}
+
+/* Each link is only as wide as its own two lines, so the pointer lands on the
+ * text and not on the empty half of a column. */
+.pagination-links a {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+  justify-self: start;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.pagination-links a[rel='next'] {
+  flex-direction: row-reverse;
+  justify-self: end;
+  text-align: end;
+}
+
+/*
+ * The caret is drawn well above the text size, so that it reads as the edge of
+ * the pair from across the page, and well below it in tone, so that the size
+ * costs the label nothing. It comes up to the ink color with the title on
+ * hover, so the label, the title and the mark answer as one control.
+ */
+.pagination-links svg {
+  color: var(--sl-color-gray-4);
+  flex-shrink: 0;
+  font-size: 1.75rem;
+}
+
+.pagination-links a > span {
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-sm);
+}
+
+.pagination-links .link-title {
+  color: var(--sl-color-white);
+  font-size: var(--sl-text-body);
+  font-weight: 500;
+}
+
+/* No box is left to change on hover, so the text carries it: the title takes
+ * the underline prose links use. */
+.pagination-links a:hover .link-title,
+.pagination-links a:focus-visible .link-title {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.pagination-links a:hover svg,
+.pagination-links a:focus-visible svg {
+  color: var(--sl-color-white);
+}
+
+/* --------------------------------------------------------- mermaid blocks */
+
+/*
+ * A diagram is framed exactly like a code block, because it is one: it reaches
+ * the page from the same fence. The card is present before the renderer runs,
+ * so the swap from source to drawing changes the contents and not the chrome.
+ */
+.kb-mermaid {
+  background: var(--kb-surface-sunken);
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 0.5rem;
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  padding: 1rem;
+}
+
+/* Before JavaScript runs, the fallback source fills the card rather than
+ * sitting inside a second box. */
+.kb-mermaid pre {
+  background: transparent;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+/*
+ * A broken diagram is a content defect for its author to fix, not an incident.
+ * It is marked by the accent hairline the rest of the system uses, and the
+ * source stays one disclosure away.
+ */
+.kb-mermaid-error {
+  border: 1px solid var(--sl-color-hairline);
+  border-inline-start: 2px solid var(--sl-color-accent);
+  border-radius: 0.5rem;
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-sm);
+  padding: 1rem;
+}
+
+.kb-mermaid-error strong {
+  color: var(--sl-color-white);
+  display: block;
+  font-weight: 600;
+}
+
+.kb-mermaid-error details {
+  color: var(--sl-color-text);
+  margin-top: 0.75rem;
+}
+
+.kb-mermaid-error summary {
+  cursor: pointer;
+}
+
+.hero-lede {
+  max-width: 100%;
+}

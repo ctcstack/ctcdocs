@@ -1,0 +1,97 @@
+---
+/**
+ * Where machines read this wiki.
+ *
+ * The product record treats AI agents as an equal class of consumer, but until
+ * now nothing on the site told anyone the machine-readable surface existed.
+ * Everything named here is served today and sits behind the same Cloudflare
+ * Access boundary as the pages: the Markdown projection at `/<slug>/index.md`
+ * and the clipboard action on every document.
+ *
+ * `data/docs-index.json` is deliberately not mentioned. It lives in the Git
+ * repository and is not published, and naming an endpoint the site does not
+ * serve would send agents to a 404.
+ */
+import type { CorpusDocument } from '../../lib/corpus';
+
+type Props = { documents: CorpusDocument[] };
+
+const { documents } = Astro.props;
+const example = documents[0];
+---
+
+<section aria-labelledby="home-agents" class="agents">
+  <h2 class="section-title" id="home-agents">For AI agents</h2>
+
+  <div class="agents-body">
+    <p>
+      Every document is served as clean Markdown at its own address plus
+      <code>index.md</code>. The projection is generated from the same
+      normalized source as the page, not scraped back out of the HTML, and it is
+      protected by the same access boundary.
+    </p>
+
+    <p class="agents-pattern">
+      <code>/&lt;document&gt;/index.md</code>
+      {
+        example && (
+          <>
+            {' — for example '}
+            <a href={`${example.href}index.md`}>{example.href}index.md</a>
+          </>
+        )
+      }
+    </p>
+
+    <p>
+      Each page also carries <strong>Copy as Markdown</strong> beside its title, which
+      puts the same text on the clipboard for pasting into a prompt.
+    </p>
+  </div>
+</section>
+
+<style>
+  @layer starlight.components {
+    .agents {
+      margin-top: 3rem;
+    }
+
+    .agents-body {
+      border: 1px solid var(--sl-color-hairline);
+      border-radius: 0.5rem;
+      margin-top: 1.25rem;
+      padding: 1.25rem;
+    }
+
+    .agents-body p {
+      color: var(--sl-color-gray-3);
+      margin: 0;
+      max-width: 62ch;
+      text-wrap: pretty;
+    }
+
+    .agents-body p + p {
+      margin-top: 0.875rem;
+    }
+
+    .agents-body strong {
+      color: var(--sl-color-white);
+      font-weight: 600;
+    }
+
+    .agents-body code {
+      background: var(--kb-surface-sunken);
+      border: 1px solid var(--sl-color-hairline);
+      border-radius: 0.25rem;
+      color: var(--sl-color-white);
+      font-family: var(--__sl-font-mono);
+      font-size: 0.85em;
+      padding: 0.1em 0.4em;
+    }
+
+    .agents-pattern a {
+      color: var(--sl-color-text-accent);
+      overflow-wrap: anywhere;
+    }
+  }
+</style>

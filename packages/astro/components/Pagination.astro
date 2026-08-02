@@ -1,0 +1,47 @@
+---
+/**
+ * Overrides Starlight's `Pagination`.
+ *
+ * The only change to the markup is the mark beside each link: Starlight draws
+ * a long arrow, which is a shape that carries motion. These two links only
+ * point at what is on either side of the document, so they take a caret — the
+ * same glyph the sidebar uses to report direction, and the lighter of the two.
+ *
+ * Starlight's own component ships the layout in a scoped style block, which is
+ * lost when the component is replaced. It is not reproduced here: the whole
+ * arrangement of this block now lives in one place, under `pagination` in
+ * src/styles/custom.css.
+ */
+import { Icon } from '@astrojs/starlight/components';
+
+const { dir, pagination } = Astro.locals.starlightRoute;
+const { prev, next } = pagination;
+const isRtl = dir === 'rtl';
+---
+
+<div class="pagination-links print:hidden" dir={dir}>
+  {
+    prev && (
+      <a href={prev.href} rel="prev">
+        <Icon name={isRtl ? 'right-caret' : 'left-caret'} />
+        <span>
+          {Astro.locals.t('page.previousLink')}
+          <br />
+          <span class="link-title">{prev.label}</span>
+        </span>
+      </a>
+    )
+  }
+  {
+    next && (
+      <a href={next.href} rel="next">
+        <Icon name={isRtl ? 'left-caret' : 'right-caret'} />
+        <span>
+          {Astro.locals.t('page.nextLink')}
+          <br />
+          <span class="link-title">{next.label}</span>
+        </span>
+      </a>
+    )
+  }
+</div>

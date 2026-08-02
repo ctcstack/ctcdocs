@@ -1,0 +1,40 @@
+---
+/**
+ * The home page.
+ *
+ * It is a route rather than an entry in the docs collection so that its title
+ * and description come from the project configuration. Renaming the site is
+ * then one edit in config/site.config.json instead of that edit plus a second
+ * one in page frontmatter, which is exactly the kind of duplication this
+ * platform is meant not to have. See
+ * docs/ADR/012-project-configuration-layer.md.
+ */
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { siteConfiguration } from '../lib/project';
+
+import HomePage from '../components/home/HomePage.astro';
+
+const { brand } = siteConfiguration;
+---
+
+<StarlightPage
+  frontmatter={{
+    title: brand.siteTitle,
+    description: brand.siteDescription,
+    template: 'splash',
+    tableOfContents: false,
+    /*
+     * An index is a destination, not a step in a sequence. Its "next" link
+     * duplicated the entry pinned at the top of the page.
+     */
+    prev: false,
+    next: false,
+    /*
+     * Starlight composes "<page title> | <site title>", which on this page is
+     * the site's name twice. The tab is given the name once.
+     */
+    head: [{ tag: 'title', content: brand.siteTitle }],
+  }}
+>
+  <HomePage />
+</StarlightPage>

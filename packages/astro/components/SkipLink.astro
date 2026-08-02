@@ -1,0 +1,27 @@
+---
+/**
+ * Overrides Starlight's `SkipLink`, the first element inside `<body>`.
+ *
+ * It carries the design direction contract into the emitted markup so the
+ * decision is auditable in the built output rather than only in this
+ * repository's history. The skip link itself is reproduced unchanged.
+ */
+import Default from '@astrojs/starlight/components/SkipLink.astro';
+---
+
+<!--
+THESIS: This wiki proves its own freshness. It refuses the section-card landing
+that claims knowledge exists without showing any of it.
+OWN-WORLD: Zero-chroma neutral ramp; one orange accent (#ed6b2d dark, #b23c00
+light); flat surfaces divided by 1px hairlines; Inter and JetBrains Mono; a
+tight documentation type scale, no marketing scale.
+STORY: A reader sees the whole corpus and when each document was last edited at
+source, then reads one with its provenance above the text.
+FIRST VIEWPORT: The home page opens on the corpus index grouped by Drive folder
+and ordered by source modification date, with the onboarding entry pinned above.
+FORM: Provenance-led index; candidate 4 of 7 on the grounded list; seed key
+4b4e7644.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the
+finish review, the verdict, and DESIGN.md
+-->
+<Default />

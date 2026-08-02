@@ -1,0 +1,194 @@
+---
+/**
+ * The home page's opening: what this wiki is, and the fastest way in.
+ *
+ * The dominant use is an employee arriving with a specific question, so search
+ * is given the width rather than being left as an icon in the header. The
+ * control is a button that opens the site's existing search dialog; it is not
+ * a second search implementation.
+ *
+ * The opening paragraph is editorial prose about one deployment, so it is read
+ * whole from the project configuration rather than assembled here around a
+ * configured name. See docs/ADR/012-project-configuration-layer.md.
+ */
+import { siteConfiguration } from '../../lib/project';
+
+import { formatDate, type Corpus } from '../../lib/corpus';
+
+type Props = { corpus: Corpus };
+
+const { corpus } = Astro.props;
+---
+
+<div class="hero">
+  <p class="hero-lede">{siteConfiguration.home.lede}</p>
+
+  <kb-search-launcher>
+    <button class="hero-search" type="button">
+      <svg
+        aria-hidden="true"
+        class="hero-search-icon"
+        fill="none"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+        viewBox="0 0 16 16"
+      >
+        <circle cx="7" cy="7" r="4.5"></circle>
+        <path d="m10.5 10.5 3 3"></path>
+      </svg>
+      <span class="hero-search-label">Search all documents</span>
+      <kbd class="hero-search-key"
+        ><span class="hero-search-mod">Ctrl</span> K</kbd
+      >
+    </button>
+  </kb-search-launcher>
+
+  <div class="hero-band">
+    <p class="hero-stat">
+      <strong>{corpus.documentCount}</strong>
+      {corpus.documentCount === 1 ? ' document' : ' documents'}
+      {
+        corpus.latestChange && (
+          <> · latest source edit {formatDate(corpus.latestChange)}</>
+        )
+      }
+    </p>
+    <p class="hero-onboarding">
+      New here? Start with <a href="/about-wiki/">About this wiki</a>.
+    </p>
+  </div>
+</div>
+
+<script>
+  /**
+   * Opens the site's search dialog from the home page.
+   *
+   * The dialog belongs to the header's search component; this forwards to it
+   * rather than mounting a second one, so there is only ever one search
+   * implementation and one set of results. If the header control is absent the
+   * button removes itself instead of pretending to work.
+   */
+  class SearchLauncher extends HTMLElement {
+    connectedCallback() {
+      /*
+       * Listening on the host and resolving the header control at click time,
+       * rather than binding to children during upgrade: element upgrade can
+       * run before this component's children or the header's search have been
+       * parsed, and a listener bound then silently never fires.
+       */
+      this.addEventListener('click', (event) => {
+        const trigger = (event.target as HTMLElement | null)?.closest('button');
+        if (!trigger || !this.contains(trigger)) return;
+
+        /*
+         * Deferred by a task: forwarding inline opens the dialog while this
+         * click is still propagating, and the dialog's own dismiss-on-outside-
+         * click handler then sees that same event and closes it again.
+         */
+        setTimeout(() => {
+          document
+            .querySelector<HTMLButtonElement>('header [data-open-modal]')
+            ?.click();
+        }, 0);
+      });
+    }
+  }
+
+  customElements.define('kb-search-launcher', SearchLauncher);
+
+  // macOS reads ⌘ rather than Ctrl; the markup ships the portable label.
+  if (navigator.platform.toLowerCase().includes('mac')) {
+    for (const mod of document.querySelectorAll('.hero-search-mod')) {
+      mod.textContent = '⌘';
+    }
+  }
+</script>
+
+<style>
+  @layer starlight.components {
+    .hero-lede {
+      color: var(--sl-color-gray-3);
+      margin-top: 0.5rem;
+      max-width: 52ch;
+    }
+
+    /*
+     * A search field in everything but implementation: the page's primary
+     * action, at the width the primary action deserves.
+     */
+    .hero-search {
+      align-items: center;
+      background: var(--sl-color-bg);
+      border: 1px solid var(--kb-border-strong);
+      border-radius: 0.5rem;
+      color: var(--sl-color-gray-3);
+      cursor: pointer;
+      display: flex;
+      font: inherit;
+      gap: 0.625rem;
+      margin-top: 1.5rem;
+      padding: 0.75rem 0.875rem;
+      text-align: start;
+      width: 100%;
+    }
+
+    .hero-search:hover {
+      background: var(--kb-surface-sunken);
+      border-color: var(--sl-color-accent);
+    }
+
+    .hero-search:focus-visible {
+      outline: 2px solid var(--sl-color-text-accent);
+      outline-offset: 2px;
+    }
+
+    .hero-search-icon {
+      color: var(--sl-color-gray-3);
+      flex-shrink: 0;
+      height: 1.125em;
+      width: 1.125em;
+    }
+
+    .hero-search-label {
+      flex: 1;
+    }
+
+    .hero-search-key {
+      background: var(--kb-surface-sunken);
+      border: 1px solid var(--kb-border-strong);
+      border-radius: 0.25rem;
+      color: var(--sl-color-gray-3);
+      flex-shrink: 0;
+      font-family: var(--__sl-font-mono);
+      font-size: var(--sl-text-xs);
+      padding: 0.15em 0.45em;
+    }
+
+    .hero-band {
+      align-items: baseline;
+      column-gap: 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      margin-top: 1rem;
+      row-gap: 0.25rem;
+    }
+
+    .hero-band p {
+      color: var(--sl-color-gray-3);
+      font-size: var(--sl-text-sm);
+      font-variant-numeric: tabular-nums;
+      margin: 0;
+    }
+
+    .hero-stat strong {
+      color: var(--sl-color-white);
+    }
+
+    .hero-onboarding a {
+      color: var(--sl-color-text-accent);
+    }
+  }
+</style>

@@ -1,0 +1,48 @@
+---
+/**
+ * The home page, composed.
+ *
+ * The corpus is read once here and passed down, so the cards, the recent band,
+ * and the full index can never disagree about what exists or how fresh it is.
+ *
+ * The order answers the four audiences in turn: someone with a question gets
+ * search first, someone browsing gets the folders, someone returning gets what
+ * changed, someone who wants everything gets the index, and an agent gets the
+ * machine-readable surface.
+ */
+import { loadCorpus } from '../../lib/corpus';
+import CorpusIndex from '../CorpusIndex.astro';
+import AgentAccess from './AgentAccess.astro';
+import CategoryCards from './CategoryCards.astro';
+import HomeHero from './HomeHero.astro';
+import RecentUpdates from './RecentUpdates.astro';
+
+const corpus = await loadCorpus();
+---
+
+<div class="home-page">
+  <HomeHero corpus={corpus} />
+  <CategoryCards groups={corpus.groups} />
+  <RecentUpdates documents={corpus.recent} />
+  <CorpusIndex groups={corpus.groups} />
+  <AgentAccess documents={corpus.recent} />
+</div>
+
+<style is:global>
+  @layer starlight.components {
+    /*
+     * One heading treatment across every block on this page. The blocks are
+     * separate components, so this rule is global rather than scoped.
+     */
+    .home-page .section-title {
+      border: 0;
+      color: var(--sl-color-white);
+      font-size: var(--sl-text-h3);
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      line-height: var(--sl-line-height-headings);
+      margin: 0;
+      padding: 0;
+    }
+  }
+</style>

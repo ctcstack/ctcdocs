@@ -1,0 +1,364 @@
+---
+/**
+ * The Drive folders, as the page's first structure.
+ *
+ * Built on the reference's own mechanism rather than an approximation of it:
+ * the container is filled with the hairline colour and the tiles are filled
+ * with the page ground, so the one-pixel gaps between them *are* the grid
+ * lines. That gives one continuous ruled block instead of a scatter of
+ * floating boxes, and it is the same flat, hairline-divided language the rest
+ * of this interface uses. Equal height comes from the grid; the description
+ * takes the free space so every card's footer sits on one line.
+ *
+ * Each card is a single link to that folder — its own page where one is
+ * generated, and otherwise that folder's heading in the index below — so the
+ * whole tile is the target. The titles inside are a peek at the contents,
+ * not separate controls — nested links inside a link are invalid, and the
+ * index below already links every document directly. They are marked with a
+ * document glyph and set below prose size for that reason: a card shows either
+ * a description or a list of names, and without a difference in treatment the
+ * reader could not tell which of the two they were looking at.
+ *
+ * A folder describes itself by containing a document named README, About or
+ * Overview, or one named after the folder. Its description becomes the card's,
+ * so this copy is maintained in Google Docs alongside the content rather than
+ * in this repository, where it would quietly go stale.
+ */
+import { formatDate, type CorpusGroup } from '../../lib/corpus';
+
+type Props = { groups: CorpusGroup[] };
+
+const { groups } = Astro.props;
+
+/** Shown only when the folder has not described itself. */
+const PREVIEW_COUNT = 3;
+---
+
+{
+  groups.length > 0 && (
+    <section aria-labelledby="home-categories" class="categories">
+      <h2 class="section-title" id="home-categories">
+        Browse by folder
+      </h2>
+
+      <ul class="category-grid">
+        {groups.map((group) => (
+          <li class="category-cell">
+            <a class="category-card" href={group.href}>
+              <div class="category-head">
+                <span class="category-scale">
+                  {group.documents.length}
+                  {group.documents.length === 1 ? ' document' : ' documents'}
+                </span>
+                {group.documents[0]?.modified && (
+                  <relative-date class="category-age">
+                    <time datetime={group.documents[0].modified.toISOString()}>
+                      {formatDate(group.documents[0].modified)}
+                    </time>
+                  </relative-date>
+                )}
+              </div>
+
+              <h3 class="category-name">{group.label}</h3>
+
+              <div class="category-body">
+                {group.description ? (
+                  <p class="category-description">{group.description}</p>
+                ) : (
+                  <ul class="category-preview">
+                    {group.documents.slice(0, PREVIEW_COUNT).map((doc) => (
+                      <li>
+                        <svg
+                          aria-hidden="true"
+                          class="category-preview-icon"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="1.5"
+                          viewBox="0 0 16 16"
+                        >
+                          <path d="M9 2H4.5A1.5 1.5 0 0 0 3 3.5v9A1.5 1.5 0 0 0 4.5 14h7a1.5 1.5 0 0 0 1.5-1.5V6z" />
+                          <path d="M9 2v4h4" />
+                        </svg>
+                        <span class="category-preview-title">{doc.title}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <span class="category-foot">
+                {group.documents.length === 1
+                  ? 'Open this folder'
+                  : `All ${group.documents.length} documents`}
+                <svg
+                  aria-hidden="true"
+                  class="category-arrow"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.5"
+                  viewBox="0 0 16 16"
+                >
+                  <path d="M3 8h10" />
+                  <path d="m9 4 4 4-4 4" />
+                </svg>
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+<style>
+  /*
+   * Unlayered on purpose. The home page renders inside Starlight's markdown
+   * container, whose `li + li` rule adds a top margin to every list item after
+   * the first. In a grid that margin offsets the tiles against each other and
+   * opens a band of the container's rule colour above them, so the reset has
+   * to outrank a layered stylesheet.
+   */
+  .category-grid > li,
+  .category-preview > li {
+    margin: 0;
+  }
+
+  .category-preview > li + li {
+    margin-top: 0.4375rem;
+  }
+
+  /*
+   * Same reason, plus one more: Astro scopes component styles with `:where()`,
+   * which carries no specificity, so `.category-name` alone weighs less than
+   * the theme's `.sl-markdown-content :is(h2, h3, h4)`. That rule gives
+   * headings 2.5rem of air above them — right for a document, wrong inside a
+   * tile, where it pushed the name 40px off the line it belongs to. Qualifying
+   * by the card outweighs it without reaching for `!important`.
+   */
+  .category-card .category-name {
+    margin: 0 0 0.625rem;
+  }
+
+  .category-card .category-body {
+    margin-top: 0;
+  }
+
+  @layer starlight.components {
+    .categories {
+      margin-top: 3rem;
+    }
+
+    /*
+     * The container carries the rule colour and the tiles cover it, so the
+     * 1px gaps read as the grid's own lines. Square corners: a radius here
+     * would break the continuous ruling.
+     */
+    .category-grid {
+      background: var(--sl-color-hairline);
+      border: 1px solid var(--sl-color-hairline);
+      display: grid;
+      gap: 1px;
+      grid-template-columns: 1fr;
+      list-style: none;
+      margin: 1.25rem 0 0;
+      padding: 0;
+    }
+
+    @media (min-width: 34rem) {
+      .category-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      /*
+       * An odd folder count used to leave the trailing cell empty, and an empty
+       * cell in this construction is not blank space — it is the container's
+       * rule colour, drawn as a filled grey block inside the frame. The last
+       * card takes the whole row instead, so the grid always closes on a card.
+       */
+      .category-cell:last-child:nth-child(odd) {
+        grid-column: 1 / -1;
+      }
+    }
+
+    /*
+     * `min-width: 0` twice, because a grid item and a flex item both take an
+     * automatic minimum size from their content. A preview title is set
+     * `nowrap` so that it ends in an ellipsis, and that unbreakable line was
+     * propagating up as the cell's minimum: on a narrow phone the single
+     * column could not shrink to the viewport and the whole page scrolled
+     * sideways by the overhang. Cleared here, the title truncates instead.
+     */
+    .category-cell {
+      display: flex;
+      min-width: 0;
+    }
+
+    .category-card {
+      background: var(--sl-color-bg);
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      min-width: 0;
+      padding: 1.5rem;
+      text-decoration: none;
+    }
+
+    .category-card:hover {
+      background: var(--kb-surface-sunken);
+    }
+
+    .category-card:focus-visible {
+      outline: 2px solid var(--sl-color-text-accent);
+      outline-offset: -2px;
+    }
+
+    .category-head {
+      align-items: baseline;
+      color: var(--sl-color-gray-3);
+      display: flex;
+      font-size: var(--sl-text-xs);
+      font-variant-numeric: tabular-nums;
+      gap: 1rem;
+      justify-content: space-between;
+      margin-bottom: 0.875rem;
+    }
+
+    /*
+     * Freshness carries the same rank here as in the index below: a folder
+     * touched this week reads at ink, one that has settled recedes. Across the
+     * grid that turns four tiles into a map of where the work is happening,
+     * which is the claim this whole page makes.
+     */
+    .category-age[data-age='fresh'] {
+      color: var(--sl-color-white);
+      font-weight: 500;
+    }
+
+    .category-age[data-age='recent'] {
+      color: var(--sl-color-gray-2);
+    }
+
+    /*
+     * The card's peak. The previous version set this one step above the body,
+     * which left every line on the tile within a few pixels of every other and
+     * read as a paragraph in a box.
+     */
+    .category-name {
+      color: var(--sl-color-white);
+      font-size: 1.125rem;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      line-height: var(--sl-line-height-headings);
+      margin: 0 0 0.625rem;
+    }
+
+    .category-card:hover .category-name {
+      color: var(--sl-color-text-accent);
+    }
+
+    /*
+     * Takes the slack, so every card's footer lands on the same line. The
+     * measure is capped for the card that runs the full width of the grid —
+     * wider than a two-column cell ever is, so it never bites on the others.
+     */
+    .category-body {
+      flex: 1;
+      margin-bottom: 1.5rem;
+      max-width: 46ch;
+    }
+
+    /*
+     * Prose about the folder, set at reading size. These lines are the only
+     * evidence a described card offers of what the folder holds; shrunk to 13px
+     * grey they were decoration around a heading.
+     */
+    .category-description {
+      color: var(--sl-color-gray-3);
+      font-size: var(--sl-text-body);
+      line-height: 1.55;
+      margin: 0;
+      text-wrap: pretty;
+    }
+
+    /*
+     * Named documents, not prose — so they are set as a record rather than as a
+     * paragraph. At the same size and tone as a description the two read as one
+     * treatment and a card gave no clue which of the two it was showing. The
+     * step down in scale carries the difference and the glyph names the kind:
+     * these are files inside the folder. Tone moves the other way, up to ink,
+     * so the list loses size without losing presence — the earlier caption-grey
+     * version is the one this page already rejected.
+     */
+    .category-preview {
+      font-size: var(--sl-text-sm);
+      line-height: 1.5;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .category-preview li {
+      align-items: center;
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    /*
+     * Held one tone off the title, so the column reads as structure rather
+     * than as part of the name. A step further down the ramp put a 1.5px
+     * stroke at the edge of visible in both themes.
+     */
+    .category-preview-icon {
+      color: var(--sl-color-gray-3);
+      flex: none;
+      height: 0.875rem;
+      width: 0.875rem;
+    }
+
+    /* One line each: a truncated title still identifies the document. */
+    .category-preview-title {
+      color: var(--sl-color-gray-2);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /*
+     * The tile's one point of colour. The accent means "this is the thing you
+     * act on" everywhere else in the interface; leaving the only action on the
+     * card grey was the tile opting out of the system's own strongest signal.
+     */
+    .category-foot {
+      align-items: center;
+      color: var(--sl-color-text-accent);
+      display: inline-flex;
+      font-size: var(--sl-text-sm);
+      font-weight: 500;
+      gap: 0.5rem;
+      width: fit-content;
+    }
+
+    .category-arrow {
+      height: 1em;
+      width: 1em;
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .category-arrow {
+        transition: transform 150ms ease;
+      }
+
+      .category-card:hover .category-arrow {
+        transform: translateX(0.15rem);
+      }
+    }
+  }
+</style>
+
+<script>
+  import '../../scripts/relative-date';
+</script>

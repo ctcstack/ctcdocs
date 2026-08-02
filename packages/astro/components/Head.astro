@@ -1,0 +1,20 @@
+---
+/*
+ * Self-hosted typefaces. Each package declares one @font-face per Unicode
+ * subset, so a browser fetches only the ranges a page actually uses: an
+ * English document never downloads Cyrillic, and a document without code
+ * never downloads the monospace family.
+ *
+ * They are imported here rather than from custom.css so the dependency is a
+ * traceable module edge. See docs/ADR/011-documentation-design-language.md.
+ */
+import '@fontsource-variable/inter/wght.css';
+import '@fontsource-variable/jetbrains-mono/wght.css';
+
+import Default from '@astrojs/starlight/components/Head.astro';
+---
+
+<Default />
+<script>
+  import '../scripts/mermaid-entry';
+</script>

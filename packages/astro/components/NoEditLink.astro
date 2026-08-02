@@ -1,0 +1,12 @@
+---
+/**
+ * Overrides Starlight's `EditLink` with nothing.
+ *
+ * Source provenance and the link to the original Google Doc now sit under the
+ * document title, in `DocumentHeader`. Leaving the default footer link in place
+ * would repeat "Open in Google Docs" at the bottom of every page.
+ *
+ * The override is kept rather than removed because `editUrl` is still present
+ * in generated frontmatter; without it Starlight would render its own link.
+ */
+---

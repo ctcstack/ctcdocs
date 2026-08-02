@@ -1,0 +1,128 @@
+---
+/**
+ * Overrides Starlight's `PageTitle`.
+ *
+ * The document opens with its position, its name, and its provenance, in that
+ * order — the reference arrangement recorded in
+ * docs/ADR/011-documentation-design-language.md.
+ *
+ * A breadcrumb segment links to that folder's own page. Where a folder has
+ * none — the section pages are switched off — the top segment falls back to
+ * that folder's group on the home index, which lists the whole corpus, and
+ * deeper segments stay as context.
+ */
+import DocumentMetadata from './DocumentMetadata.astro';
+import { folderAnchorHref, folderTrail } from '../lib/folder-anchor';
+import { loadSectionHrefs, sectionHref } from '../lib/sections';
+
+// Starlight's PAGE_TITLE_ID. It is the skip link's target and is not exported.
+const PAGE_TITLE_ID = '_top';
+
+const { entry } = Astro.locals.starlightRoute;
+const { folderPath, title } = entry.data;
+
+const trail = folderTrail(folderPath);
+const sections = await loadSectionHrefs();
+const segments = trail.map((folder, index) => ({
+  folder,
+  href:
+    sectionHref(sections, trail.slice(0, index + 1)) ??
+    (index === 0 ? folderAnchorHref(folder) : undefined),
+}));
+
+/*
+ * Every document page gets a trail, including documents at the Drive root:
+ * they have no folder segments but still need the way back. The splash layout
+ * is the home index itself, which is where the trail leads.
+ */
+const showBreadcrumb = entry.data.template !== 'splash';
+---
+
+{
+  showBreadcrumb && (
+    <nav aria-label="Breadcrumb" class="doc-breadcrumb" data-pagefind-ignore>
+      <ol>
+        <li>
+          <a href="/">Home</a>
+        </li>
+        {segments.map((segment) => (
+          <li>
+            {segment.href ? (
+              <a href={segment.href}>{segment.folder}</a>
+            ) : (
+              <span>{segment.folder}</span>
+            )}
+          </li>
+        ))}
+        {/* No leaf segment: the heading directly below is the current page,
+            and repeating it here says the same thing twice. */}
+      </ol>
+    </nav>
+  )
+}
+
+<h1 id={PAGE_TITLE_ID}>{title}</h1>
+
+<DocumentMetadata />
+
+<style>
+  @layer starlight.core {
+    h1 {
+      color: var(--sl-color-white);
+      font-size: var(--sl-text-h1);
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      line-height: var(--sl-line-height-headings);
+      margin-top: 0.5rem;
+      text-wrap: balance;
+    }
+
+    .doc-breadcrumb {
+      font-size: var(--sl-text-sm);
+    }
+
+    .doc-breadcrumb ol {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem 0.5rem;
+      list-style: none;
+      padding: 0;
+    }
+
+    /*
+     * The separator is decorative and generated, so it is never selected,
+     * announced, or copied along with the trail. It shares the trail's tone
+     * rather than a fainter one: at this size a lighter gray fell below the
+     * contrast floor in the light theme.
+     */
+    .doc-breadcrumb li + li::before {
+      color: var(--sl-color-gray-3);
+      content: '/';
+      margin-inline-end: 0.5rem;
+    }
+
+    /*
+     * The whole trail sits at one muted tone. The leaf repeats the heading
+     * directly below it, so nothing here competes with the title for weight.
+     */
+    .doc-breadcrumb a,
+    .doc-breadcrumb span {
+      color: var(--sl-color-gray-3);
+      text-decoration: none;
+    }
+
+    .doc-breadcrumb a:hover {
+      color: var(--sl-color-text-accent);
+      text-decoration: underline;
+      text-underline-offset: 0.2em;
+    }
+  }
+
+  /* Starlight spaces siblings inside the content panel; the header is one unit. */
+  @layer starlight.core {
+    h1,
+    .doc-breadcrumb {
+      margin-bottom: 0;
+    }
+  }
+</style>
