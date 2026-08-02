@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <script>alert("fixture")</script>
+  <foreignObject>
+    <div xmlns="http://www.w3.org/1999/xhtml">Unsafe foreign content</div>
+  </foreignObject>
+  <a href="javascript:alert('fixture')">
+    <rect width="20" height="20" onclick="alert('fixture')"/>
+  </a>
+  <use href="https://untrusted.invalid/external.svg#shape"/>
+  <path id="safe-shape" d="M0 0L10 10"/>
+  <use href="#safe-shape"/>
+</svg>

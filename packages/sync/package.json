@@ -1,0 +1,58 @@
+{
+  "name": "@ctcstack/ctcdocs-sync",
+  "version": "0.1.0",
+  "description": "One-way Google Drive to Markdown synchronization for CTCDocs projects, with the ctcdocs-sync command line.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ctcstack/ctcdocs.git",
+    "directory": "packages/sync"
+  },
+  "bin": {
+    "ctcdocs-sync": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "!src/**/*.test.ts",
+    "!src/test-support"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "prepare": "pnpm build",
+    "typecheck": "tsc --project tsconfig.json",
+    "test": "vitest run --root ../.."
+  },
+  "dependencies": {
+    "@ctcstack/ctcdocs-core": "workspace:^",
+    "cheerio": "1.2.0",
+    "domhandler": "5.0.3",
+    "jsonc-parser": "3.3.1",
+    "remark-gfm": "4.0.1",
+    "remark-parse": "11.0.0",
+    "remark-stringify": "11.0.0",
+    "smol-toml": "1.5.2",
+    "turndown": "7.2.4",
+    "unified": "11.0.5",
+    "yaml": "2.9.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/mdast": "4.0.4",
+    "@types/node": "22.20.1",
+    "@types/turndown": "5.0.6",
+    "fast-check": "4.9.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}

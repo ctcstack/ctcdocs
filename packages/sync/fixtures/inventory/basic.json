@@ -1,0 +1,95 @@
+[
+  {
+    "id": "drive-root",
+    "name": "Test Shared Drive",
+    "mimeType": "application/vnd.google-apps.folder",
+    "parents": [],
+    "modifiedTime": "2026-01-01T00:00:00.000Z",
+    "createdTime": "2026-01-01T00:00:00.000Z",
+    "trashed": false
+  },
+  {
+    "id": "published",
+    "name": "Published",
+    "mimeType": "application/vnd.google-apps.folder",
+    "parents": ["drive-root"],
+    "modifiedTime": "2026-01-02T00:00:00.000Z",
+    "createdTime": "2026-01-02T00:00:00.000Z",
+    "trashed": false
+  },
+  {
+    "id": "engineering",
+    "name": "01 - Engineering",
+    "mimeType": "application/vnd.google-apps.folder",
+    "parents": ["published"],
+    "modifiedTime": "2026-01-03T00:00:00.000Z",
+    "createdTime": "2026-01-03T00:00:00.000Z",
+    "trashed": false
+  },
+  {
+    "id": "root-document",
+    "name": "Welcome",
+    "mimeType": "application/vnd.google-apps.document",
+    "parents": ["published"],
+    "modifiedTime": "2026-01-04T00:00:00.000Z",
+    "createdTime": "2026-01-04T00:00:00.000Z",
+    "trashed": false,
+    "webViewLink": "https://docs.google.com/document/d/root-document/edit"
+  },
+  {
+    "id": "engineering-document",
+    "name": "Architecture",
+    "mimeType": "application/vnd.google-apps.document",
+    "parents": ["engineering"],
+    "modifiedTime": "2026-01-05T00:00:00.000Z",
+    "createdTime": "2026-01-05T00:00:00.000Z",
+    "trashed": false,
+    "webViewLink": "https://docs.google.com/document/d/engineering-document/edit"
+  },
+  {
+    "id": "unsupported-docx",
+    "name": "Imported document.docx",
+    "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "parents": ["engineering"],
+    "modifiedTime": "2026-01-06T00:00:00.000Z",
+    "createdTime": "2026-01-06T00:00:00.000Z",
+    "trashed": false,
+    "size": "2048"
+  },
+  {
+    "id": "archive",
+    "name": "90 - Archive",
+    "mimeType": "application/vnd.google-apps.folder",
+    "parents": ["published"],
+    "modifiedTime": "2026-01-07T00:00:00.000Z",
+    "createdTime": "2026-01-07T00:00:00.000Z",
+    "trashed": false
+  },
+  {
+    "id": "archived-document",
+    "name": "Archived",
+    "mimeType": "application/vnd.google-apps.document",
+    "parents": ["archive"],
+    "modifiedTime": "2026-01-08T00:00:00.000Z",
+    "createdTime": "2026-01-08T00:00:00.000Z",
+    "trashed": false
+  },
+  {
+    "id": "outside-folder",
+    "name": "Outside Published",
+    "mimeType": "application/vnd.google-apps.folder",
+    "parents": ["drive-root"],
+    "modifiedTime": "2026-01-09T00:00:00.000Z",
+    "createdTime": "2026-01-09T00:00:00.000Z",
+    "trashed": false
+  },
+  {
+    "id": "outside-document",
+    "name": "Not published",
+    "mimeType": "application/vnd.google-apps.document",
+    "parents": ["outside-folder"],
+    "modifiedTime": "2026-01-10T00:00:00.000Z",
+    "createdTime": "2026-01-10T00:00:00.000Z",
+    "trashed": false
+  }
+]

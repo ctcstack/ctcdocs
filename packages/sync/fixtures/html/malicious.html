@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Malicious HTML fixture</title>
+    <style>
+      body {
+        background: url("javascript:alert('fixture')");
+      }
+    </style>
+  </head>
+  <body onload="alert('fixture')">
+    <script>
+      alert('fixture');
+    </script>
+    <iframe src="https://untrusted.invalid/frame"></iframe>
+    <object data="https://untrusted.invalid/object"></object>
+    <form action="https://untrusted.invalid/collect">
+      <input name="secret" />
+    </form>
+    <img
+      src="https://temporary.invalid/image.png"
+      onerror="alert('fixture')"
+      data-google-tracking-id="synthetic"
+      alt="Synthetic fixture"
+    />
+    <a href="javascript:alert('fixture')">Unsafe JavaScript link</a>
+    <a href="data:text/html;base64,PHNjcmlwdD4=">Unsafe data link</a>
+    <a href="https://example.invalid/safe">Safe HTTPS link</a>
+  </body>
+</html>
