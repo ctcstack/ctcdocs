@@ -1,0 +1,209 @@
+name: CTCDocs project rollback
+
+# Restores a known-good Cloudflare Worker version. The caller exposes it as a
+# manual workflow and passes the version to restore:
+#
+#     jobs:
+#       rollback:
+#         uses: ctcstack/ctcdocs/.github/workflows/project-rollback.yml@<commit sha>
+#         with:
+#           version_id: ${{ inputs.version_id }}
+#           confirmation: ${{ inputs.confirmation }}
+#           wrangler_environment: production
+#           deploy_environment: production-deploy
+#           smoke_environment: production-smoke
+#         secrets: inherit
+
+on:
+  workflow_call:
+    inputs:
+      version_id:
+        description: Cloudflare Worker version ID to restore
+        required: true
+        type: string
+      confirmation:
+        description: Must be the literal ROLLBACK
+        required: true
+        type: string
+      wrangler_environment:
+        required: true
+        type: string
+      deploy_environment:
+        required: true
+        type: string
+      smoke_environment:
+        required: true
+        type: string
+      branch:
+        description: Branch holding the tooling the rollback runs from
+        required: false
+        type: string
+        default: main
+      pnpm_version:
+        required: false
+        type: string
+        default: 11.9.0
+
+permissions:
+  contents: read
+
+jobs:
+  access-preflight:
+    name: Verify Access before rollback
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: ${{ inputs.smoke_environment }}
+
+    steps:
+      - name: Checkout tooling without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.branch }}
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: ${{ inputs.pnpm_version }}
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify anonymous denial and service-token admission
+        env:
+          CTCDOCS_BASE_URL: ${{ vars.CTCDOCS_BASE_URL }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: pnpm exec ctcdocs-access-smoke --preflight
+
+  rollback:
+    name: Restore a known-good Worker version
+    needs: access-preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: ${{ inputs.deploy_environment }}
+      url: ${{ steps.target.outputs.url }}
+
+    steps:
+      # A rollback is typed by a human under pressure. Both the confirmation and
+      # the shape of the version identifier are checked before anything runs.
+      - name: Validate rollback confirmation
+        shell: bash
+        env:
+          VERSION_ID: ${{ inputs.version_id }}
+          ROLLBACK_CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${ROLLBACK_CONFIRMATION}" != "ROLLBACK" ]]; then
+            echo "::error::Rollback confirmation did not match ROLLBACK."
+            exit 1
+          fi
+          if [[ ! "${VERSION_ID}" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+            echo "::error::Cloudflare Worker version ID is invalid."
+            exit 1
+          fi
+
+      - name: Checkout tooling without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.branch }}
+          persist-credentials: false
+
+      - name: Resolve the configured deployment target
+        id: target
+        shell: bash
+        env:
+          WRANGLER_ENVIRONMENT: ${{ inputs.wrangler_environment }}
+        run: |
+          set -euo pipefail
+
+          {
+            echo "worker=$(jq -er '.deployment.workerName' site.config.json)"
+            echo "url=$(jq -er --arg env "${WRANGLER_ENVIRONMENT}" '.deployment.environments[$env].url' site.config.json)"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: ${{ inputs.pnpm_version }}
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Roll back to the approved version
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          VERSION_ID: ${{ inputs.version_id }}
+          WRANGLER_ENVIRONMENT: ${{ inputs.wrangler_environment }}
+        run: >-
+          pnpm exec wrangler rollback "${VERSION_ID}"
+          --env "${WRANGLER_ENVIRONMENT}" --yes
+          --message "GitHub Actions rollback run ${GITHUB_RUN_ID}"
+
+      - name: Record rollback metadata
+        env:
+          VERSION_ID: ${{ inputs.version_id }}
+          SITE_URL: ${{ steps.target.outputs.url }}
+          WORKER_NAME: ${{ steps.target.outputs.worker }}
+          WRANGLER_ENVIRONMENT: ${{ inputs.wrangler_environment }}
+        run: |
+          {
+            echo "## Rollback"
+            echo
+            echo "- Worker: \`${WORKER_NAME}-${WRANGLER_ENVIRONMENT}\`"
+            echo "- Restored Worker version: \`${VERSION_ID}\`"
+            echo "- Hostname: ${SITE_URL}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  smoke:
+    name: Verify the protected surface after rollback
+    needs: rollback
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: ${{ inputs.smoke_environment }}
+
+    steps:
+      - name: Checkout tooling without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.branch }}
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: ${{ inputs.pnpm_version }}
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify the protected surface
+        env:
+          CTCDOCS_BASE_URL: ${{ vars.CTCDOCS_BASE_URL }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: pnpm exec ctcdocs-access-smoke --post-deploy

@@ -1,0 +1,168 @@
+name: CTCDocs project verification
+
+# The gate every CTCDocs project runs. A project's own workflow is a caller:
+#
+#     jobs:
+#       verify:
+#         uses: ctcstack/ctcdocs/.github/workflows/project-ci.yml@<commit sha>
+#
+# Reference it by full commit SHA, never by tag: this repository is public and
+# these steps run inside private CI.
+
+on:
+  workflow_call:
+    inputs:
+      pnpm_version:
+        description: pnpm release the project is locked to
+        required: false
+        type: string
+        default: 11.9.0
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Quality and production build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: ${{ inputs.pnpm_version }}
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Deployment configuration, crawler denial, response headers and the
+      # secret-scanner exemptions. It passes on a project that has never
+      # synchronized and says so, which is the state a new repository is in.
+      - name: Validate project configuration and generated output
+        run: pnpm exec ctcdocs-sync validate
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      # Everything below needs a corpus. A repository waiting for its first sync
+      # has none, and that is reported rather than silently skipped.
+      - name: Detect a synchronized corpus
+        id: corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -f data/sync-manifest.json ]]; then
+            echo "present=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "present=false" >> "${GITHUB_OUTPUT}"
+            echo "::notice::No generated corpus yet; the build, search and browser checks are waiting for the first sync."
+          fi
+
+      - name: Install Chromium for the browser suite
+        if: steps.corpus.outputs.present == 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Type-check and build the site
+        if: steps.corpus.outputs.present == 'true'
+        run: pnpm build
+
+      - name: Verify search
+        if: steps.corpus.outputs.present == 'true'
+        run: pnpm test:search
+
+      - name: Verify accessibility and interface behavior
+        if: steps.corpus.outputs.present == 'true'
+        run: pnpm test:ux
+
+      - name: Verify the deployment configuration Wrangler will read
+        if: steps.corpus.outputs.present == 'true'
+        run: pnpm deploy:dry-run
+
+  workflow-security:
+    name: Workflow and secret scanning
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout complete history without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install checksummed security tools
+        shell: bash
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          set -euo pipefail
+
+          curl --fail --silent --show-error --location \
+            --output "${RUNNER_TEMP}/actionlint.tar.gz" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  ${RUNNER_TEMP}/actionlint.tar.gz" | sha256sum --check
+          tar --extract --gzip --file "${RUNNER_TEMP}/actionlint.tar.gz" --directory "${RUNNER_TEMP}" actionlint
+
+          curl --fail --silent --show-error --location \
+            --output "${RUNNER_TEMP}/gitleaks.tar.gz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  ${RUNNER_TEMP}/gitleaks.tar.gz" | sha256sum --check
+          tar --extract --gzip --file "${RUNNER_TEMP}/gitleaks.tar.gz" --directory "${RUNNER_TEMP}" gitleaks
+
+      - name: Lint the project's own workflows
+        run: |
+          "${RUNNER_TEMP}/actionlint"
+
+      - name: Scan complete Git history for secrets
+        run: |
+          "${RUNNER_TEMP}/gitleaks" git --no-banner .
+
+      - name: Scan the working directory for secrets
+        run: |
+          "${RUNNER_TEMP}/gitleaks" dir --no-banner .
+
+  dependency-security:
+    name: Dependency vulnerability audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout lockfile without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: ${{ inputs.pnpm_version }}
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Fail on high or critical dependency vulnerabilities
+        run: pnpm audit --audit-level high

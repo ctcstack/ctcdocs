@@ -3,10 +3,15 @@
 import { resolve } from 'node:path';
 import { loadEnvFile } from 'node:process';
 
+import {
+  GENERATED_DIRECTORY_ALLOWLIST,
+  GENERATED_FILE_ALLOWLIST,
+} from '@ctcstack/ctcdocs-core';
 import { ZodError } from 'zod';
 
 import { UnsafeZipError } from './archive/safe-zip.js';
 import { GeneratedDiffValidationError } from './automation/generated-diff.js';
+import { notifySyncFailure } from './automation/notify-failure.js';
 import { validateGeneratedDiff } from './automation/validate-generated-diff.js';
 import {
   SyncSummaryError,
@@ -116,6 +121,26 @@ async function main(): Promise<void> {
 
   if (options.command === 'write:sync-summary') {
     await writeSyncSummary(repositoryRoot);
+    return;
+  }
+
+  if (options.command === 'notify:failure') {
+    await notifySyncFailure(process.env);
+    return;
+  }
+
+  /*
+   * The workflow stages exactly what a sync run may write, and asks the
+   * pipeline what that is rather than repeating the list in YAML where it would
+   * drift from the allowlist the run itself enforces.
+   */
+  if (options.command === 'generated-paths') {
+    for (const generatedPath of [
+      ...GENERATED_DIRECTORY_ALLOWLIST,
+      ...GENERATED_FILE_ALLOWLIST,
+    ]) {
+      console.log(generatedPath);
+    }
     return;
   }
 

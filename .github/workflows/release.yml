@@ -1,0 +1,81 @@
+name: Publish packages
+
+# Publishing is off until the npm scope exists. Projects consume the packages as
+# Git dependencies pinned to a commit until then (see README), so this workflow
+# is written, reviewed and inert rather than absent: turning it on is setting
+# the NPM_PUBLISHING repository variable to `true` and pushing a tag.
+#
+# It publishes with provenance through npm Trusted Publishing, so no long-lived
+# publish token is stored anywhere.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      dist_tag:
+        description: npm dist-tag to publish under
+        required: false
+        type: string
+        default: latest
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to npm
+    if: vars.NPM_PUBLISHING == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 11.9.0
+          run_install: false
+
+      # No dependency cache is restored here, so there is nothing another
+      # workflow could have poisoned; dependencies come from the frozen
+      # lockfile and the gate runs before anything is published.
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0 # zizmor: ignore[cache-poisoning]
+        with:
+          node-version-file: .node-version
+          registry-url: https://registry.npmjs.org
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium for the browser suite
+        run: pnpm exec playwright install --with-deps chromium
+
+      # Nothing is published that the gate has not passed.
+      - name: Run the canonical verification gate
+        run: pnpm verify
+
+      - name: Publish
+        shell: bash
+        env:
+          DIST_TAG: ${{ inputs.dist_tag || 'latest' }}
+        run: |
+          set -euo pipefail
+
+          for package in packages/core packages/sync packages/astro
+          do
+            pnpm --dir "${package}" publish \
+              --access public \
+              --tag "${DIST_TAG}" \
+              --no-git-checks
+          done

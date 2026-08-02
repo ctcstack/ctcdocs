@@ -16,6 +16,15 @@ interface SyncSummaryCliOptions {
   command: 'write:sync-summary';
 }
 
+interface NotifyFailureCliOptions {
+  command: 'notify:failure';
+}
+
+/** Prints the paths a sync run may write, which is what the workflow stages. */
+interface GeneratedPathsCliOptions {
+  command: 'generated-paths';
+}
+
 interface SyncCliOptions {
   command: 'sync';
   dryRun: boolean;
@@ -28,6 +37,8 @@ interface SyncCliOptions {
 
 export type CliOptions =
   | GeneratedDiffCliOptions
+  | GeneratedPathsCliOptions
+  | NotifyFailureCliOptions
   | SyncSummaryCliOptions
   | ValidateCliOptions
   | SyncCliOptions;
@@ -48,7 +59,9 @@ export function parseCliOptions(arguments_: readonly string[]): CliOptions {
 
   if (
     command === 'validate:generated-diff' ||
-    command === 'write:sync-summary'
+    command === 'write:sync-summary' ||
+    command === 'notify:failure' ||
+    command === 'generated-paths'
   ) {
     if (flags.length > 0) {
       throw new CliUsageError(
@@ -131,6 +144,6 @@ export function parseCliOptions(arguments_: readonly string[]): CliOptions {
   }
 
   throw new CliUsageError(
-    'Usage: ctcdocs-sync <sync [--dry-run] [--inventory-only] [--full] [--file <id>] [--reseed-slug <id>] [--json] | validate | validate:generated-diff | write:sync-summary>',
+    'Usage: ctcdocs-sync <sync [--dry-run] [--inventory-only] [--full] [--file <id>] [--reseed-slug <id>] [--json] | validate | validate:generated-diff | write:sync-summary | notify:failure | generated-paths>',
   );
 }

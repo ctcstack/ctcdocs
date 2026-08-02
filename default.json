@@ -1,0 +1,57 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Renovate preset for CTCDocs projects. A project's renovate.json is one line: { \"extends\": [\"github>ctcstack/ctcdocs\"] }.",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":maintainLockFilesWeekly",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "timezone": "Etc/UTC",
+  "schedule": ["before 6am on monday"],
+  "prConcurrentLimit": 5,
+  "labels": ["dependencies"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true
+  },
+  "packageRules": [
+    {
+      "description": "Platform packages move together, and a green project gate is enough to take a patch or minor.",
+      "matchPackageNames": ["@ctcstack/ctcdocs{/,}**"],
+      "groupName": "CTCDocs platform",
+      "matchUpdateTypes": ["patch", "minor"],
+      "automerge": true
+    },
+    {
+      "description": "A platform major can move a project's own configuration; a human reads it.",
+      "matchPackageNames": ["@ctcstack/ctcdocs{/,}**"],
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "addLabels": ["breaking"]
+    },
+    {
+      "description": "Astro, Starlight and Wrangler decide what a deployment renders and where it lands.",
+      "matchPackageNames": ["astro", "@astrojs/**", "wrangler", "sharp"],
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "addLabels": ["breaking"]
+    },
+    {
+      "description": "Reusable workflows execute inside private CI holding deployment credentials, so their references are pinned to commits like any other third-party action.",
+      "matchManagers": ["github-actions"],
+      "pinDigests": true
+    },
+    {
+      "description": "Development tooling can move on its own once the gate is green.",
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["patch", "minor"],
+      "automerge": true
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "automerge": true,
+    "schedule": ["at any time"]
+  }
+}

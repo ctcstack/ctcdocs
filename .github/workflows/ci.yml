@@ -1,0 +1,149 @@
+name: Platform verification
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Packages and fixture project
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 11.9.0
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium for the browser suite
+        run: pnpm exec playwright install --with-deps chromium
+
+      # Formatting, lint, types, unit and fixture tests, then the whole gate a
+      # project runs — corpus regeneration, build, content validation, Wrangler
+      # dry run, search and accessibility — against fixtures/project.
+      - name: Run the canonical verification gate
+        run: pnpm verify
+
+  workflow-security:
+    name: Workflow and secret scanning
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout complete history without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install checksummed security tools
+        shell: bash
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+          ZIZMOR_VERSION: 1.28.0
+          ZIZMOR_SHA256: e87b67160194884e375a46a12c57ccc904f762b53845f254fab7f17d98809c09
+        run: |
+          set -euo pipefail
+
+          curl --fail --silent --show-error --location \
+            --output "${RUNNER_TEMP}/actionlint.tar.gz" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  ${RUNNER_TEMP}/actionlint.tar.gz" | sha256sum --check
+          tar --extract --gzip --file "${RUNNER_TEMP}/actionlint.tar.gz" --directory "${RUNNER_TEMP}" actionlint
+
+          curl --fail --silent --show-error --location \
+            --output "${RUNNER_TEMP}/gitleaks.tar.gz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  ${RUNNER_TEMP}/gitleaks.tar.gz" | sha256sum --check
+          tar --extract --gzip --file "${RUNNER_TEMP}/gitleaks.tar.gz" --directory "${RUNNER_TEMP}" gitleaks
+
+          curl --fail --silent --show-error --location \
+            --output "${RUNNER_TEMP}/zizmor.tar.gz" \
+            "https://github.com/woodruffw/zizmor/releases/download/v${ZIZMOR_VERSION}/zizmor-x86_64-unknown-linux-gnu.tar.gz"
+          echo "${ZIZMOR_SHA256}  ${RUNNER_TEMP}/zizmor.tar.gz" | sha256sum --check
+          tar --extract --gzip --file "${RUNNER_TEMP}/zizmor.tar.gz" --directory "${RUNNER_TEMP}" zizmor
+
+      - name: Lint GitHub Actions
+        run: |
+          "${RUNNER_TEMP}/actionlint"
+
+      - name: Audit GitHub Actions
+        run: |
+          "${RUNNER_TEMP}/zizmor" .github/workflows
+
+      # The secret scanner's path exemptions cover only files Git never tracks.
+      # `ctcdocs-sync validate` enforces that inside a project; this repository
+      # is not a project, so it checks its own.
+      - name: Reject tracked local credential files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tracked="$(git ls-files -- '.env' '.env.local' '.env.*.local' 'gha-creds-*.json')"
+          if [[ -n "${tracked}" ]]; then
+            echo "::error::Local credential files must never be tracked by Git:"
+            echo "${tracked}"
+            exit 1
+          fi
+
+      - name: Scan complete Git history for secrets
+        run: |
+          "${RUNNER_TEMP}/gitleaks" git --no-banner .
+
+      - name: Scan the working directory for secrets
+        run: |
+          "${RUNNER_TEMP}/gitleaks" dir --no-banner .
+
+  dependency-security:
+    name: Dependency vulnerability audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout lockfile without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 11.9.0
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Fail on high or critical dependency vulnerabilities
+        run: pnpm audit --audit-level high

@@ -1,0 +1,245 @@
+name: CTCDocs project synchronization
+
+# Exports the project's Google Drive into generated Markdown and commits the
+# result. The caller schedules it and supplies the environment holding the
+# Google identity:
+#
+#     jobs:
+#       sync:
+#         uses: ctcstack/ctcdocs/.github/workflows/project-sync.yml@<commit sha>
+#         with:
+#           environment: production-sync
+#         secrets: inherit
+#         permissions:
+#           contents: write
+#           id-token: write
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: Protected GitHub environment holding the Google identity
+        required: false
+        type: string
+        default: production-sync
+      full:
+        description: Export every managed document rather than the changed ones
+        required: false
+        type: boolean
+        default: false
+      branch:
+        description: Branch the run reads and commits to
+        required: false
+        type: string
+        default: main
+      pnpm_version:
+        required: false
+        type: string
+        default: 11.9.0
+    outputs:
+      changed:
+        description: Whether the run produced new generated output
+        value: ${{ jobs.sync.outputs.changed }}
+      candidate_sha:
+        description: Commit holding the new generated output
+        value: ${{ jobs.sync.outputs.candidate_sha }}
+
+permissions: {}
+
+jobs:
+  sync:
+    name: Synchronize generated content
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: write
+      id-token: write
+    outputs:
+      changed: ${{ steps.changes.outputs.changed }}
+      candidate_sha: ${{ steps.commit.outputs.candidate_sha }}
+
+    steps:
+      - name: Validate protected environment configuration
+        id: configuration
+        shell: bash
+        env:
+          ENVIRONMENT_NAME: ${{ inputs.environment }}
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          GCP_WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+          GCP_SYNC_SERVICE_ACCOUNT: ${{ vars.GCP_SYNC_SERVICE_ACCOUNT }}
+          GOOGLE_DRIVE_ID: ${{ vars.GOOGLE_DRIVE_ID }}
+          GOOGLE_ROOT_FOLDER_ID: ${{ vars.GOOGLE_ROOT_FOLDER_ID }}
+        run: |
+          set -euo pipefail
+
+          for variable_name in \
+            GCP_PROJECT_ID \
+            GCP_WIF_PROVIDER \
+            GCP_SYNC_SERVICE_ACCOUNT \
+            GOOGLE_DRIVE_ID \
+            GOOGLE_ROOT_FOLDER_ID
+          do
+            if [[ -z "${!variable_name}" ]]; then
+              echo "::error::Missing ${ENVIRONMENT_NAME} variable: ${variable_name}"
+              exit 1
+            fi
+          done
+
+      - name: Checkout the target branch without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.branch }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: ${{ inputs.pnpm_version }}
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Read-only, short-lived, and federated: no service account key exists.
+      - name: Authenticate to Google Cloud
+        id: authentication
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SYNC_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/drive.readonly
+          create_credentials_file: false
+          export_environment_variables: false
+
+      - name: Synchronize Google Drive
+        id: synchronize
+        shell: bash
+        env:
+          GOOGLE_ACCESS_TOKEN: ${{ steps.authentication.outputs.access_token }}
+          GOOGLE_DRIVE_ID: ${{ vars.GOOGLE_DRIVE_ID }}
+          GOOGLE_ROOT_FOLDER_ID: ${{ vars.GOOGLE_ROOT_FOLDER_ID }}
+          GOOGLE_IGNORED_FOLDER_IDS: ${{ vars.GOOGLE_IGNORED_FOLDER_IDS }}
+          SYNC_FULL: ${{ inputs.full }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${SYNC_FULL}" == "true" ]]; then
+            pnpm exec ctcdocs-sync sync --full
+          else
+            pnpm exec ctcdocs-sync sync
+          fi
+
+      - name: Detect generated output changes
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet --exit-code && \
+            [[ -z "$(git ls-files --others --exclude-standard)" ]]
+          then
+            echo "changed=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "changed=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Validate generated diff allowlist
+        id: generated_validation
+        run: pnpm exec ctcdocs-sync validate:generated-diff
+
+      - name: Install Chromium for verification
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Verify the site the new content produces
+        id: build
+        run: pnpm verify
+
+      - name: Revalidate the generated diff after verification
+        id: final_validation
+        run: pnpm exec ctcdocs-sync validate:generated-diff
+
+      - name: Write safe sync summary
+        env:
+          SYNC_OUTPUT_CHANGED: ${{ steps.changes.outputs.changed }}
+        run: pnpm exec ctcdocs-sync write:sync-summary
+
+      # Only the paths a sync run may write are staged, and the pipeline itself
+      # is asked what those are so the list cannot drift from the allowlist it
+      # enforces.
+      - name: Commit allowlisted generated output
+        id: commit
+        if: steps.changes.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t generated_paths < <(pnpm exec ctcdocs-sync generated-paths)
+          git add -A -- "${generated_paths[@]}"
+
+          if git diff --cached --quiet --exit-code; then
+            echo "::error::Sync reported changes but no generated files were staged."
+            exit 1
+          fi
+
+          bot_name="$(jq -er '.sync.commitBotName' site.config.json)"
+          git config user.name "${bot_name}"
+          git config user.email "${bot_name}@users.noreply.github.com"
+          git commit -m "chore(content): sync Google Drive content"
+          echo "candidate_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
+
+      - name: Push generated content
+        id: push
+        if: steps.changes.outputs.changed == 'true'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: ${{ inputs.branch }}
+        run: |
+          set -euo pipefail
+
+          basic_auth="$(
+            node -e \
+              "process.stdout.write(Buffer.from('x-access-token:' + process.env.GITHUB_TOKEN).toString('base64'))"
+          )"
+
+          for attempt in 1 2 3
+          do
+            if git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${basic_auth}" \
+              push origin "HEAD:${TARGET_BRANCH}"
+            then
+              exit 0
+            fi
+
+            if [[ "${attempt}" == "3" ]]; then
+              echo "::error::Failed to push generated content after ${attempt} attempts."
+              exit 1
+            fi
+
+            echo "::warning::Generated content push attempt ${attempt} failed; retrying."
+            sleep $((attempt * 2))
+          done
+
+      - name: Send optional failure notification
+        if: failure()
+        continue-on-error: true
+        env:
+          SYNC_FAILURE_WEBHOOK_URL: ${{ secrets.SYNC_FAILURE_WEBHOOK_URL }}
+          SYNC_STAGE_CONFIGURATION: ${{ steps.configuration.outcome }}
+          SYNC_STAGE_AUTHENTICATION: ${{ steps.authentication.outcome }}
+          SYNC_STAGE_SYNC: ${{ steps.synchronize.outcome }}
+          SYNC_STAGE_VALIDATION: ${{ steps.generated_validation.outcome }}
+          SYNC_STAGE_BUILD: ${{ steps.build.outcome }}
+          SYNC_STAGE_FINAL_VALIDATION: ${{ steps.final_validation.outcome }}
+          SYNC_STAGE_COMMIT: ${{ steps.commit.outcome }}
+          SYNC_STAGE_PUSH: ${{ steps.push.outcome }}
+        run: pnpm exec ctcdocs-sync notify:failure

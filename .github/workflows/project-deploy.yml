@@ -1,0 +1,264 @@
+name: CTCDocs project deployment
+
+# Verifies a commit, proves Cloudflare Access denies anonymous traffic, deploys,
+# and proves the deployed surface is still protected. One environment per call,
+# so a project that promotes through development calls it twice:
+#
+#     jobs:
+#       production:
+#         uses: ctcstack/ctcdocs/.github/workflows/project-deploy.yml@<commit sha>
+#         with:
+#           wrangler_environment: production
+#           deploy_environment: production-deploy
+#           smoke_environment: production-smoke
+#         secrets: inherit
+
+on:
+  workflow_call:
+    inputs:
+      wrangler_environment:
+        description: Wrangler environment name in wrangler.jsonc
+        required: true
+        type: string
+      deploy_environment:
+        description: GitHub environment holding the Cloudflare credentials
+        required: true
+        type: string
+      smoke_environment:
+        description: GitHub environment holding the Access service token
+        required: true
+        type: string
+      candidate_sha:
+        description: Exact commit to verify and deploy
+        required: false
+        type: string
+      pnpm_version:
+        required: false
+        type: string
+        default: 11.9.0
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify the deployment candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout candidate without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.candidate_sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: ${{ inputs.pnpm_version }}
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium for verification
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run the project gate
+        run: pnpm verify
+
+  access-preflight:
+    name: Verify Access before deployment
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: ${{ inputs.smoke_environment }}
+
+    steps:
+      - name: Checkout candidate without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.candidate_sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: ${{ inputs.pnpm_version }}
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Anonymous requests must be denied before anything is published, and the
+      # service token must still be admitted. A green preflight is what makes
+      # the deployment step safe to run at all.
+      - name: Verify anonymous denial and service-token admission
+        env:
+          CTCDOCS_BASE_URL: ${{ vars.CTCDOCS_BASE_URL }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: pnpm exec ctcdocs-access-smoke --preflight
+
+  deploy:
+    name: Deploy immutable static assets
+    needs: access-preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: ${{ inputs.deploy_environment }}
+      url: ${{ steps.target.outputs.url }}
+
+    steps:
+      - name: Checkout verified candidate without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.candidate_sha || github.sha }}
+          persist-credentials: false
+
+      - name: Resolve the configured deployment target
+        id: target
+        shell: bash
+        env:
+          WRANGLER_ENVIRONMENT: ${{ inputs.wrangler_environment }}
+        run: |
+          set -euo pipefail
+
+          {
+            echo "worker=$(jq -er '.deployment.workerName' site.config.json)"
+            echo "url=$(jq -er --arg env "${WRANGLER_ENVIRONMENT}" '.deployment.environments[$env].url' site.config.json)"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: ${{ inputs.pnpm_version }}
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build static assets from the verified commit
+        run: pnpm build
+
+      - name: Deploy with Wrangler
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DEPLOY_COMMIT: ${{ inputs.candidate_sha || github.sha }}
+          WRANGLER_ENVIRONMENT: ${{ inputs.wrangler_environment }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for attempt in 1 2 3
+          do
+            if pnpm exec wrangler deploy \
+              --env "${WRANGLER_ENVIRONMENT}" \
+              --message "GitHub commit ${DEPLOY_COMMIT}"
+            then
+              exit 0
+            fi
+
+            if [[ "${attempt}" == "3" ]]; then
+              echo "::error::Deployment failed after ${attempt} attempts."
+              exit 1
+            fi
+
+            delay=$((attempt * 15))
+            echo "::warning::Deployment attempt ${attempt} failed; retrying in ${delay}s."
+            sleep "${delay}"
+          done
+
+      - name: Record deployment metadata
+        env:
+          DEPLOY_COMMIT: ${{ inputs.candidate_sha || github.sha }}
+          SITE_URL: ${{ steps.target.outputs.url }}
+          WORKER_NAME: ${{ steps.target.outputs.worker }}
+          WRANGLER_ENVIRONMENT: ${{ inputs.wrangler_environment }}
+        run: |
+          {
+            echo "## Deployment"
+            echo
+            echo "- Worker: \`${WORKER_NAME}-${WRANGLER_ENVIRONMENT}\`"
+            echo "- Hostname: ${SITE_URL}"
+            echo "- Commit: \`${DEPLOY_COMMIT}\`"
+            echo "- Public workers.dev hostname: disabled"
+            echo "- Version preview URLs: disabled"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  smoke:
+    name: Verify the protected deployment
+    needs: deploy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: ${{ inputs.smoke_environment }}
+
+    steps:
+      - name: Checkout deployed commit without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.candidate_sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: ${{ inputs.pnpm_version }}
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify the protected surface
+        env:
+          CTCDOCS_BASE_URL: ${{ vars.CTCDOCS_BASE_URL }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: pnpm exec ctcdocs-access-smoke --post-deploy
+
+  deployment-gate:
+    name: Require a completed deployment
+    if: always()
+    needs:
+      - deploy
+      - smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+
+    steps:
+      - name: Reject skipped or failed deployment stages
+        env:
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          SMOKE_RESULT: ${{ needs.smoke.result }}
+        shell: bash
+        run: |
+          if [[ "${DEPLOY_RESULT}" != "success" || "${SMOKE_RESULT}" != "success" ]]; then
+            echo "::error::Deployment did not complete: deploy=${DEPLOY_RESULT}, smoke=${SMOKE_RESULT}."
+            exit 1
+          fi
