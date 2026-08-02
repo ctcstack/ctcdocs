@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 
+import { RESERVED_SLUGS } from '@ctcstack/ctcdocs-core';
+
 import type { SelectedInventoryItem } from './inventory/inventory-graph.js';
 import type { SyncManifest } from './manifest.js';
 import { parseOrderedLabel } from './ordered-label.js';
@@ -116,6 +118,11 @@ function allocateRemaining(
  *
  * The publication root allocates nothing: its relative path is empty, and `/`
  * is the home page. See docs/ADR/014-section-index-pages.md.
+ *
+ * The addresses the platform serves itself are reserved alongside them, after
+ * the manifest's own addresses are carried forward: a new folder or document
+ * whose name yields one takes a suffixed slug instead, rather than being
+ * published at an address a platform route would shadow.
  */
 export function allocateStableSlugs(
   folders: readonly SelectedInventoryItem[],
@@ -142,6 +149,15 @@ export function allocateStableSlugs(
     allocatedSlugs,
     allocatedFolders,
   );
+  /*
+   * Reserved after the carry-forward rather than before it, because an address
+   * the corpus already owns is a published URL: a deployment that predates a
+   * platform route keeps its address and validation reports the clash, which
+   * is a decision for an operator rather than a silent move.
+   */
+  for (const slug of RESERVED_SLUGS) {
+    allocatedSlugs.add(slug);
+  }
   allocateRemaining(folders, allocatedSlugs, allocatedFolders);
   allocateRemaining(documents, allocatedSlugs, allocatedDocuments);
 
@@ -154,6 +170,7 @@ export function allocateReseededSlug(
 ): string {
   const allocatedSlugs = new Set([
     ...Object.keys(existingManifest.redirects),
+    ...RESERVED_SLUGS,
     ...Object.values(existingManifest.documents)
       .filter((record) => record.googleFileId !== document.item.id)
       .map((record) => record.stableSlug),

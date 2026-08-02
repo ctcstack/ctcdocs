@@ -266,22 +266,35 @@ describe('parseSiteConfiguration', () => {
     );
   });
 
-  it('lets a project whose folders have pages of their own drop the index', () => {
+  it('lets a project keep the index off its home page', () => {
     const raw = validConfiguration();
     (raw.home as Record<string, unknown>).corpusIndex = false;
 
     expect(parseSiteConfiguration(raw).home.corpusIndex).toBe(false);
   });
 
-  it('refuses to drop the index the folder links resolve into', () => {
+  it('takes the index off the home page of a corpus without folder pages', () => {
     const raw = validConfiguration();
     (raw.home as Record<string, unknown>).corpusIndex = false;
     (raw.navigation as Record<string, unknown>).sectionIndexPages = false;
 
-    expect(() => parseSiteConfiguration(raw)).toThrow(
-      /home\.corpusIndex must stay true while navigation\.sectionIndexPages is false/u,
-    );
+    const parsed = parseSiteConfiguration(raw);
+
+    expect(parsed.home.corpusIndex).toBe(false);
+    expect(parsed.navigation.sectionIndexPages).toBe(false);
   });
+
+  it.each<[unknown]>([['false'], [0], [null]])(
+    'rejects %s as the home index switch',
+    (value) => {
+      const raw = validConfiguration();
+      (raw.home as Record<string, unknown>).corpusIndex = value;
+
+      expect(() => parseSiteConfiguration(raw)).toThrow(
+        /home\.corpusIndex must be true or false/u,
+      );
+    },
+  );
 
   it('rejects a generated-by marker that would close its own HTML comment', () => {
     const raw = validConfiguration();

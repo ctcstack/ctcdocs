@@ -1,0 +1,39 @@
+---
+/**
+ * The whole corpus on one page, grouped by Drive folder.
+ *
+ * This is the address a folder heading has: `/documents/#<folder>` is where a
+ * folder card and a breadcrumb segment land when the folder has no page of its
+ * own, and it resolves whether or not the home page carries a copy of the same
+ * index. That is the reason the page exists at a fixed address rather than
+ * appearing only when the home page gives the index up — a link that comes and
+ * goes with a setting is not an address. See
+ * docs/ADR/017-full-index-page.md.
+ *
+ * The title is the platform's rather than the project's: it names the page's
+ * function, not the deployment, so it carries no project identity to configure.
+ */
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+
+import CorpusIndex from '../../components/CorpusIndex.astro';
+import { loadCorpus } from '../../lib/corpus';
+
+const corpus = await loadCorpus();
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'All documents',
+    description:
+      'Every document published to this site, grouped by the folder it comes from.',
+    tableOfContents: false,
+    /*
+     * An index is a destination rather than a step in a sequence, the way the
+     * home page is.
+     */
+    prev: false,
+    next: false,
+  }}
+>
+  <CorpusIndex groups={corpus.groups} heading={false} />
+</StarlightPage>

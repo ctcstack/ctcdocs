@@ -6,10 +6,15 @@
  * private to the preset — projects never name it — and exists only so those
  * files can live in the package while still being part of the project's build.
  */
+import { PLATFORM_ROUTES } from '@ctcstack/ctcdocs-core';
 import type { AstroIntegration } from 'astro';
 
 const ROUTES = [
   { entrypoint: '@ctcstack/ctcdocs/routes/index.astro', pattern: '/' },
+  {
+    entrypoint: '@ctcstack/ctcdocs/routes/documents/index.astro',
+    pattern: `/${PLATFORM_ROUTES.fullIndex}`,
+  },
   {
     entrypoint: '@ctcstack/ctcdocs/routes/[...slug]/index.md.ts',
     pattern: '/[...slug]/index.md',

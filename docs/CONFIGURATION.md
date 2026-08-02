@@ -53,7 +53,7 @@ name of its own; they read this file. The rationale is recorded in
 | `deployment.environments.*.visibility` | Who may read that environment: `private` (default) or `public`. See below.                                                  |
 | `home.lede`                            | The paragraph under the home page heading, in full: where documents come from and what a reader may do with them.           |
 | `home.recentLimit`                     | How many documents the "recently updated" band lists. A whole number of at least 1; defaults to 6.                          |
-| `home.corpusIndex`                     | Whether the home page ends with the full index of every document. Defaults to `true`. See below.                            |
+| `home.corpusIndex`                     | Whether the home page carries the full index, which is published at `/documents/` either way. Defaults to `true`.           |
 | `navigation.landingDocumentTitles`     | Titles that open the folder they sit in, most preferred first. Also picks the description the home page shows for a folder. |
 | `navigation.sectionIndexPages`         | Whether each folder gets a generated page listing its contents at `/<folder-slug>/`.                                        |
 | `sync.generatedBy`                     | The ownership marker stamped into every generated Markdown and TypeScript file.                                             |
@@ -138,20 +138,26 @@ deployment rather than to the platform. Documents with no recorded source
 modification time are not in the band at all; they are still listed everywhere
 else.
 
-`home.corpusIndex` decides whether the page ends with every document, grouped by
-folder. Keeping it is right for a corpus a reader can take in at a glance;
-dropping it suits a deployment where each folder has a page of its own and the
-home page is meant to be an entrance rather than a table of contents.
+`home.corpusIndex` decides whether the home page ends with every document,
+grouped by folder. Keeping it is right for a corpus a reader can take in at a
+glance; dropping it suits a deployment where the home page is meant to be an
+entrance rather than a table of contents.
 
-The two settings are coupled to `navigation.sectionIndexPages`. Where folder
-pages are not generated, a folder card and a breadcrumb segment both link to
-that folder's heading **inside** the index, so a configuration that drops the
-index while `navigation.sectionIndexPages` is `false` is refused by
-`ctcdocs-sync validate` and by the build. Turn folder pages on first.
+**The index is published either way.** It has a page of its own at
+`/documents/`, served on every deployment, and the home page either carries a
+copy of it or links to it. Folder headings are addressable there —
+`/documents/#<folder>` — which is where a folder card and a breadcrumb segment
+land when that folder has no page of its own. See
+[ADR-017](ADR/017-full-index-page.md).
 
-One case ignores the switch: a project that has never synchronized still gets
-the index, because it is the only block that explains an empty site instead of
-hiding itself.
+Two consequences worth knowing:
+
+- `documents` is a reserved address. A new Drive folder or document named
+  "Documents" is allocated a suffixed slug instead, and a corpus that claimed
+  the address before this page existed fails `ctcdocs-sync validate` until the
+  source is renamed in Drive.
+- A project that passes its own `sidebarPrefix` to `ctcdocsConfig` links the
+  page itself. The platform default links it under "Documentation".
 
 ## What is not in the configuration file
 

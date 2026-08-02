@@ -6,14 +6,29 @@ All three packages share a version and are released together.
 
 ### Added
 
+- The full index of the corpus is published at `/documents/` on every
+  deployment, as a route the platform injects. It is the address a folder
+  heading has (`/documents/#<folder>`), which is where a folder card or a
+  breadcrumb segment lands when that folder has no page of its own. See
+  [ADR-017](docs/ADR/017-full-index-page.md).
 - `home.recentLimit` and `home.corpusIndex` in `site.config.json`. The first
   sets how many documents the "recently updated" band lists; the second decides
-  whether the home page ends with the full index of every document. Both are
-  optional and default to what the page did before — six rows and an index — so
-  an existing configuration keeps its home page unchanged.
-  `home.corpusIndex: false` is refused while `navigation.sectionIndexPages` is
-  `false`, because folder cards and breadcrumbs resolve to headings inside that
-  index when folders have no pages of their own.
+  whether the home page carries a copy of the full index or links to the page.
+  Both are optional and default to what the home page did before — six rows and
+  an index — so an existing configuration keeps its home page unchanged.
+
+### Changed
+
+- `documents` is a reserved slug. A new Drive folder or document whose name
+  yields it is allocated a suffixed address instead of one the new route would
+  shadow. A corpus that already publishes `/documents/` keeps its address and
+  `ctcdocs-sync validate` reports the clash, which is fixed by renaming the
+  source in Drive.
+- Folder anchors address `/documents/` rather than the home page. Where the
+  home page keeps the index, a folder card without a folder page now opens that
+  page instead of scrolling within the home page; the content is the same.
+- The default `sidebarPrefix` links "All documents" beside "Home". A project
+  that passes its own prefix links the page itself.
 
 ## 0.1.1
 

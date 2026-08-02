@@ -1,7 +1,7 @@
 /**
  * Anchor identifiers for Drive folder groups.
  *
- * The home page lists the corpus grouped by Drive folder, so a group heading is
+ * The full index lists the corpus grouped by Drive folder, so a group heading is
  * a destination in its own right. It is also where a folder link lands when the
  * folder has no page of its own — see `sections.ts` for the page, and
  * docs/ADR/014-section-index-pages.md for why both routes exist.
@@ -11,13 +11,14 @@
  * non-Latin characters would collapse distinct Cyrillic folders onto the same
  * anchor.
  */
+import { PLATFORM_ROUTE_HREFS } from '@ctcstack/ctcdocs-core';
 
 /** Removes the trailing slashes Drive folder paths carry. */
 export function normalizeFolderName(folder: string): string {
   return folder.replace(/\/+$/, '').trim();
 }
 
-/** Returns the element id for a folder group on the home index. */
+/** Returns the element id for a folder group in the full index. */
 export function folderAnchorId(folder: string): string {
   const normalized = normalizeFolderName(folder)
     .toLowerCase()
@@ -25,9 +26,14 @@ export function folderAnchorId(folder: string): string {
   return `section-${encodeURIComponent(normalized)}`;
 }
 
-/** Returns the home-page href that scrolls to a folder group. */
+/**
+ * Returns the href that scrolls to a folder group in the full index.
+ *
+ * It addresses the index's own page rather than the home page's copy of it,
+ * because that page is served whatever the home page is configured to show.
+ */
 export function folderAnchorHref(folder: string): string {
-  return `/#${folderAnchorId(folder)}`;
+  return `${PLATFORM_ROUTE_HREFS.fullIndex}#${folderAnchorId(folder)}`;
 }
 
 /**

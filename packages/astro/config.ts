@@ -15,7 +15,10 @@
 import { unified } from '@astrojs/markdown-remark';
 import starlight from '@astrojs/starlight';
 import type { StarlightUserConfig } from '@astrojs/starlight/types';
-import { parseSiteConfiguration } from '@ctcstack/ctcdocs-core';
+import {
+  PLATFORM_ROUTE_HREFS,
+  parseSiteConfiguration,
+} from '@ctcstack/ctcdocs-core';
 import type { AstroUserConfig } from 'astro';
 
 import { normalizeFolderName } from './lib/folder-anchor.js';
@@ -34,8 +37,9 @@ export interface CtcdocsConfigOptions {
   redirects: Record<string, string>;
   /**
    * Rendered above the generated tree: where a project links the pages it
-   * writes by hand. Defaults to a "Documentation" group holding only the home
-   * link, because the home page is a route rather than a collection entry.
+   * writes by hand. Defaults to a "Documentation" group holding the two pages
+   * the platform serves, because both are routes rather than collection
+   * entries. A project that replaces this list owns linking them.
    */
   sidebarPrefix?: SidebarConfiguration;
   /** Merged over the generated Starlight configuration. Use sparingly. */
@@ -73,7 +77,10 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
       // A navigation section, not the product: the wordmark in the header
       // already names the site, so this label stays generic.
       label: 'Documentation',
-      items: [{ label: 'Home', link: '/' }],
+      items: [
+        { label: 'Home', link: '/' },
+        { label: 'All documents', link: PLATFORM_ROUTE_HREFS.fullIndex },
+      ],
     },
   ];
 

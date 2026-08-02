@@ -37,5 +37,8 @@ Rejected
 - ADR-012: project identity in a single configuration layer.
 - ADR-013: editorial navigation order from Drive names.
 - ADR-014: an address for every Drive folder.
+- ADR-015: the platform in its own repository and packages.
+- ADR-016: who may read a deployment is configuration.
+- ADR-017: the full index becomes a page.
 
 Create a new ADR by copying `000-template.md`.
