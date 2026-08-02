@@ -58,8 +58,10 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
 
+      # Playwright belongs to the fixture project, the way it belongs to a real
+      # one, so the browser is installed from there rather than from the root.
       - name: Install Chromium for the browser suite
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm --filter ctcdocs-fixture-project exec playwright install --with-deps chromium
 
       # Nothing is published that the gate has not passed.
       - name: Run the canonical verification gate

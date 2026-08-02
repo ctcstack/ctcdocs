@@ -40,8 +40,10 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
 
+      # Playwright belongs to the fixture project, the way it belongs to a real
+      # one, so the browser is installed from there rather than from the root.
       - name: Install Chromium for the browser suite
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm --filter ctcdocs-fixture-project exec playwright install --with-deps chromium
 
       # Formatting, lint, types, unit and fixture tests, then the whole gate a
       # project runs — corpus regeneration, build, content validation, Wrangler

@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-08-02
-- Owners: CTCStack
+- Owners: CTCDocs maintainers
 - Supersedes: none
 
 ## Context
