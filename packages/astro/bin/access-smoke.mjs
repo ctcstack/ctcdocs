@@ -179,6 +179,23 @@ function serviceHeaders(clientId, clientSecret) {
   };
 }
 
+/**
+ * Who the deployment at `baseUrl` is for.
+ *
+ * A project can publish one environment to the world and keep another behind an
+ * identity boundary, so the posture comes from the environment whose hostname
+ * is being probed rather than from a single site-wide answer. An address the
+ * configuration does not know is treated as private: the stricter reading of an
+ * unknown target is the safe one.
+ */
+export function visibilityOf(site, origin) {
+  const environments = Object.values(site.deployment?.environments ?? {});
+  const match = environments.find(
+    (environment) => environment.hostname === origin.host,
+  );
+  return match?.visibility ?? 'private';
+}
+
 export async function verifyAccessPreflight({
   baseUrl,
   clientId,
@@ -188,10 +205,14 @@ export async function verifyAccessPreflight({
   fetchImplementation = fetch,
 }) {
   const origin = parseWikiBaseUrl(baseUrl);
-  // Before any request: a run without service-token credentials cannot prove
-  // admission, and finding that out after probing hides the real reason behind
-  // a network failure.
-  const authenticatedHeaders = serviceHeaders(clientId, clientSecret);
+  const visibility = visibilityOf(site, origin);
+  // Before any request: a private run without service-token credentials cannot
+  // prove admission, and finding that out after probing hides the real reason
+  // behind a network failure.
+  const authenticatedHeaders =
+    visibility === 'private'
+      ? serviceHeaders(clientId, clientSecret)
+      : undefined;
   const anonymousPaths = [
     '/',
     site.brand.faviconPath,
@@ -205,12 +226,30 @@ export async function verifyAccessPreflight({
       fetchImplementation,
       uncachedProbe(new URL(path, origin)),
     );
+    if (visibility === 'public') {
+      /*
+       * The probe path is expected to be missing, so a portal answering 404 is
+       * answering correctly. What must not happen is an identity boundary in
+       * front of a site that is meant to be open.
+       */
+      if (isAccessDenied(response)) {
+        throw new AccessSmokeError(
+          `A public deployment refused an anonymous reader: ${path} (${response.status}).`,
+        );
+      }
+      console.log(`Public access confirmed: ${path} (${response.status}).`);
+      continue;
+    }
     if (!isAccessDenied(response)) {
       throw new AccessSmokeError(
         `Anonymous request was not denied by Access: ${path} (${response.status}).`,
       );
     }
     console.log(`Anonymous boundary passed: ${path} (${response.status}).`);
+  }
+
+  if (visibility === 'public') {
+    return;
   }
 
   const authenticatedResponse = await request(

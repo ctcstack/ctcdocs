@@ -7,6 +7,7 @@ import {
   GENERATED_DIRECTORY_ALLOWLIST,
   isGeneratedPathAllowed,
   PROJECT_LAYOUT,
+  type DeploymentVisibility,
   type SiteConfiguration,
 } from '@ctcstack/ctcdocs-core';
 import { parse as parseJsonWithComments } from 'jsonc-parser';
@@ -64,20 +65,17 @@ function wranglerConfigurationSchema(site: SiteConfiguration) {
 }
 
 /**
- * Response headers a protected deployment cannot go without.
+ * The two surfaces that serve document content outside an HTML page: the
+ * Markdown projection and the original images. Neither is covered by the meta
+ * tag on a rendered page, so whatever a deployment claims about who may read it
+ * has to be true of these as well.
  *
- * The rules matter most for the two surfaces that serve document content
- * outside an HTML page: the Markdown projection and the original images. Both
- * must be privately cached and kept out of indexes, and neither is covered by
- * the `noindex` meta tag that protects a rendered page.
+ * On a private deployment they must be cached privately and kept out of
+ * indexes. On a public one the same rules would be a defect — a portal nobody
+ * can index is a portal nobody finds — so the check inverts rather than
+ * disappearing.
  */
-const REQUIRED_HEADER_RULES = [
-  { directives: ['cache-control: private', 'x-robots-tag'], pattern: '/*.md' },
-  {
-    directives: ['cache-control: private', 'x-robots-tag'],
-    pattern: '/assets/generated/*',
-  },
-] as const;
+const CONTENT_SURFACES = ['/*.md', '/assets/generated/*'] as const;
 
 export interface ValidationResult {
   errors: string[];
@@ -143,7 +141,10 @@ function parseHeaderRules(content: string): Map<string, string[]> {
   return rules;
 }
 
-async function validateHeaders(repositoryRoot: string): Promise<string[]> {
+async function validateHeaders(
+  repositoryRoot: string,
+  visibility: DeploymentVisibility,
+): Promise<string[]> {
   const errors: string[] = [];
   const content = await readFile(
     resolve(repositoryRoot, PROJECT_LAYOUT.headersFile),
@@ -151,18 +152,26 @@ async function validateHeaders(repositoryRoot: string): Promise<string[]> {
   );
   const rules = parseHeaderRules(content);
 
-  for (const required of REQUIRED_HEADER_RULES) {
-    const headers = rules.get(required.pattern);
+  for (const pattern of CONTENT_SURFACES) {
+    const headers = rules.get(pattern);
+    if (visibility === 'public') {
+      if (headers?.some((header) => header.includes('noindex'))) {
+        errors.push(
+          `${PROJECT_LAYOUT.headersFile} rule ${pattern} keeps a public deployment out of search indexes`,
+        );
+      }
+      continue;
+    }
     if (!headers) {
       errors.push(
-        `${PROJECT_LAYOUT.headersFile} must carry a rule for ${required.pattern}`,
+        `${PROJECT_LAYOUT.headersFile} must carry a rule for ${pattern}`,
       );
       continue;
     }
-    for (const directive of required.directives) {
+    for (const directive of ['cache-control: private', 'x-robots-tag']) {
       if (!headers.some((header) => header.startsWith(directive))) {
         errors.push(
-          `${PROJECT_LAYOUT.headersFile} rule ${required.pattern} must set ${directive}`,
+          `${PROJECT_LAYOUT.headersFile} rule ${pattern} must set ${directive}`,
         );
       }
     }
@@ -254,16 +263,30 @@ export async function validateRepositoryContent(
   const errors: string[] = [];
   let checkedFiles = 0;
 
+  /*
+   * The built site is one artifact deployed to every environment, so the two
+   * files that describe it to crawlers follow the production environment. The
+   * per-environment setting still decides what the smoke test asserts about
+   * each hostname.
+   */
+  const visibility = site.deployment.environments.production.visibility;
+
   const robotsContent = await readFile(
     resolve(repositoryRoot, PROJECT_LAYOUT.robotsFile),
     'utf8',
   );
   checkedFiles += 1;
-  if (!robotsContent.includes('Disallow: /')) {
+  const disallowsEverything = /^\s*Disallow:\s*\/\s*$/mu.test(robotsContent);
+  if (visibility === 'private' && !disallowsEverything) {
     errors.push('robots.txt must disallow all crawlers');
   }
+  if (visibility === 'public' && disallowsEverything) {
+    errors.push(
+      'robots.txt disallows every crawler, which hides a public deployment',
+    );
+  }
 
-  errors.push(...(await validateHeaders(repositoryRoot)));
+  errors.push(...(await validateHeaders(repositoryRoot, visibility)));
   checkedFiles += 1;
 
   const wranglerContent = await readFile(

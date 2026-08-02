@@ -3,4 +3,4 @@ export { assertGeneratedPathAllowed, isGeneratedPathAllowed, normalizeRepository
 export { generatedMarkdownHeader, generatedSourceHeader, } from './ownership-markers.js';
 export { findProjectRoot, ProjectRootError } from './project-root.js';
 export { loadSiteConfiguration, parseSiteConfiguration, SiteConfigurationError, } from './site-configuration.js';
-export type { BrandConfiguration, DeploymentConfiguration, DeploymentEnvironmentConfiguration, DeploymentEnvironmentConfigurations, HomeConfiguration, NavigationConfiguration, SiteConfiguration, SyncConfigurationDefaults, } from './site-configuration.js';
+export type { BrandConfiguration, DeploymentConfiguration, DeploymentEnvironmentConfiguration, DeploymentEnvironmentConfigurations, DeploymentVisibility, HomeConfiguration, NavigationConfiguration, SiteConfiguration, SyncConfigurationDefaults, } from './site-configuration.js';

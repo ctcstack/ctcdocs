@@ -86,6 +86,16 @@ function flag(source, key, path) {
     }
     return value;
 }
+function optionalVisibility(source, path) {
+    const value = source.visibility;
+    if (value === undefined) {
+        return 'private';
+    }
+    if (value !== 'private' && value !== 'public') {
+        fail(`${path}.visibility`, 'must be "private" or "public"');
+    }
+    return value;
+}
 /**
  * Environment names become Wrangler environment keys and appear in Worker
  * names as `<worker>-<environment>`, so they are held to the same shape as the
@@ -104,13 +114,15 @@ function environments(source) {
         if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/u.test(name)) {
             fail(path, 'must be named with lowercase letters, digits, and hyphens');
         }
-        const url = origin(record(raw[name], path), 'url', `${path}.url`);
+        const environmentSource = record(raw[name], path);
+        const url = origin(environmentSource, 'url', `${path}.url`);
+        const visibility = optionalVisibility(environmentSource, path);
         const previous = hostnames.get(url.host);
         if (previous !== undefined) {
             fail(path, `must not reuse the hostname already bound by the ${previous} environment`);
         }
         hostnames.set(url.host, name);
-        parsed[name] = { hostname: url.host, url: url.origin };
+        parsed[name] = { hostname: url.host, url: url.origin, visibility };
     }
     return Object.freeze(parsed);
 }

@@ -18,11 +18,28 @@ export interface HomeConfiguration {
      */
     readonly lede: string;
 }
+/**
+ * Who a deployment is for.
+ *
+ * `private` is a documentation site behind an identity boundary: crawlers are
+ * refused, pages ask not to be indexed, responses are cached privately, and the
+ * smoke test proves anonymous traffic is denied before anything is published.
+ * `public` is a documentation portal anyone may read, and the same checks run
+ * with their assertions inverted — a public site that has quietly become
+ * unreachable is as much a defect as a private one that has quietly become
+ * readable.
+ *
+ * It defaults to `private` because a wrong guess in that direction is
+ * recoverable and a wrong guess in the other one is a disclosure.
+ */
+export type DeploymentVisibility = 'private' | 'public';
 export interface DeploymentEnvironmentConfiguration {
     /** Origin the environment is served from, without a trailing path. */
     readonly url: string;
     /** Host of `url`, which is what a Wrangler custom-domain route binds. */
     readonly hostname: string;
+    /** Who may read this environment. Defaults to `private`. */
+    readonly visibility: DeploymentVisibility;
 }
 /**
  * Deployment environments, keyed by Wrangler environment name.

@@ -38,11 +38,29 @@ export interface HomeConfiguration {
   readonly lede: string;
 }
 
+/**
+ * Who a deployment is for.
+ *
+ * `private` is a documentation site behind an identity boundary: crawlers are
+ * refused, pages ask not to be indexed, responses are cached privately, and the
+ * smoke test proves anonymous traffic is denied before anything is published.
+ * `public` is a documentation portal anyone may read, and the same checks run
+ * with their assertions inverted — a public site that has quietly become
+ * unreachable is as much a defect as a private one that has quietly become
+ * readable.
+ *
+ * It defaults to `private` because a wrong guess in that direction is
+ * recoverable and a wrong guess in the other one is a disclosure.
+ */
+export type DeploymentVisibility = 'private' | 'public';
+
 export interface DeploymentEnvironmentConfiguration {
   /** Origin the environment is served from, without a trailing path. */
   readonly url: string;
   /** Host of `url`, which is what a Wrangler custom-domain route binds. */
   readonly hostname: string;
+  /** Who may read this environment. Defaults to `private`. */
+  readonly visibility: DeploymentVisibility;
 }
 
 /**
@@ -200,6 +218,20 @@ function flag(
   return value;
 }
 
+function optionalVisibility(
+  source: Record<string, unknown>,
+  path: string,
+): DeploymentVisibility {
+  const value = source.visibility;
+  if (value === undefined) {
+    return 'private';
+  }
+  if (value !== 'private' && value !== 'public') {
+    fail(`${path}.visibility`, 'must be "private" or "public"');
+  }
+  return value;
+}
+
 /**
  * Environment names become Wrangler environment keys and appear in Worker
  * names as `<worker>-<environment>`, so they are held to the same shape as the
@@ -222,7 +254,9 @@ function environments(
     if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/u.test(name)) {
       fail(path, 'must be named with lowercase letters, digits, and hyphens');
     }
-    const url = origin(record(raw[name], path), 'url', `${path}.url`);
+    const environmentSource = record(raw[name], path);
+    const url = origin(environmentSource, 'url', `${path}.url`);
+    const visibility = optionalVisibility(environmentSource, path);
     const previous = hostnames.get(url.host);
     if (previous !== undefined) {
       fail(
@@ -231,7 +265,7 @@ function environments(
       );
     }
     hostnames.set(url.host, name);
-    parsed[name] = { hostname: url.host, url: url.origin };
+    parsed[name] = { hostname: url.host, url: url.origin, visibility };
   }
 
   return Object.freeze(parsed) as DeploymentEnvironmentConfigurations;

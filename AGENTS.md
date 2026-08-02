@@ -47,8 +47,10 @@ way Starlight does, because the consuming project's Astro build compiles them.
   truth: the generated Markdown, assets, manifest, sidebar and index committed
   to the project repository.
 - Synchronization is one way: Drive → Markdown → static site.
-- The target is Astro + Starlight + Pagefind on Cloudflare Workers Static Assets
-  behind Cloudflare Access.
+- The target is Astro + Starlight + Pagefind on Cloudflare Workers Static
+  Assets. A deployment is private behind Cloudflare Access or public, declared
+  per environment by `visibility` in the project configuration; the checks
+  follow the declaration rather than assuming one. See ADR-016.
 - Do not add a database, server-side rendering, semantic search, vector storage,
   an LLM content transformation, or an authentication system of our own.
 - Do not broaden scope to Sheets, Slides, comments, suggestions, per-section
@@ -126,7 +128,8 @@ gitleaks dir --no-banner .
 
 Flag, and do not merge:
 
-- a change that could publish content without Cloudflare Access protection;
+- a change that could publish a private deployment's content without its
+  identity boundary, or make a public one unreachable;
 - a workflow exposing credentials to a pull request or taking permissions
   broader than its job needs;
 - a deployment value written into source, tests, workflows or documentation

@@ -23,6 +23,7 @@ export type {
   DeploymentConfiguration,
   DeploymentEnvironmentConfiguration,
   DeploymentEnvironmentConfigurations,
+  DeploymentVisibility,
   HomeConfiguration,
   NavigationConfiguration,
   SiteConfiguration,

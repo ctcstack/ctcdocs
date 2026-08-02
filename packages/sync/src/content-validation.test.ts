@@ -8,7 +8,9 @@ import { PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { validateRepositoryContent } from './content-validation.js';
+import { createSyncContext, type SyncContext } from './project-context.js';
 import {
+  publicSiteConfiguration,
   TEST_MARKDOWN_HEADER,
   testSiteConfiguration,
   testSyncContext,
@@ -17,6 +19,13 @@ import {
 const runCommand = promisify(execFile);
 const { deployment } = testSiteConfiguration;
 const temporaryDirectories: string[] = [];
+
+const PUBLIC_HEADERS = `/*.md
+  Cache-Control: public, max-age=300
+
+/assets/generated/*
+  Cache-Control: public, max-age=300
+`;
 
 const PROTECTED_HEADERS = `/*.md
   Cache-Control: private, max-age=60, must-revalidate
@@ -39,6 +48,7 @@ paths = [
 
 interface FixtureOptions {
   robots?: string;
+  visibility?: 'private' | 'public';
   headers?: string;
   gitleaks?: string;
   generatedName?: string;
@@ -56,11 +66,15 @@ async function createProject(options: FixtureOptions = {}): Promise<string> {
   await mkdir(join(root, PROJECT_LAYOUT.publicDirectory), { recursive: true });
   await writeFile(
     join(root, PROJECT_LAYOUT.robotsFile),
-    options.robots ?? 'User-agent: *\nDisallow: /\n',
+    options.robots ??
+      (options.visibility === 'public'
+        ? 'User-agent: *\nAllow: /\n'
+        : 'User-agent: *\nDisallow: /\n'),
   );
   await writeFile(
     join(root, PROJECT_LAYOUT.headersFile),
-    options.headers ?? PROTECTED_HEADERS,
+    options.headers ??
+      (options.visibility === 'public' ? PUBLIC_HEADERS : PROTECTED_HEADERS),
   );
   await writeFile(
     join(root, PROJECT_LAYOUT.gitleaksConfigurationFile),
@@ -117,10 +131,15 @@ async function createProject(options: FixtureOptions = {}): Promise<string> {
   return root;
 }
 
+function contextFor(root: string, options: FixtureOptions): SyncContext {
+  return options.visibility === 'public'
+    ? createSyncContext(root, publicSiteConfiguration)
+    : testSyncContext(root);
+}
+
 async function validate(options: FixtureOptions = {}) {
-  return validateRepositoryContent(
-    testSyncContext(await createProject(options)),
-  );
+  const root = await createProject(options);
+  return validateRepositoryContent(contextFor(root, options));
 }
 
 afterEach(async () => {
@@ -218,6 +237,44 @@ describe('repository content validation', () => {
 
     expect(result.errors).toEqual([
       expect.stringContaining('secret scanning has no configuration'),
+    ]);
+  });
+});
+
+describe('a deployment anyone may read', () => {
+  it('accepts a portal that invites crawlers and caches publicly', async () => {
+    const result = await validate({ visibility: 'public' });
+
+    expect(result.errors).toEqual([]);
+  });
+
+  it('rejects a portal hidden from every crawler', async () => {
+    const result = await validate({
+      visibility: 'public',
+      robots: 'User-agent: *\nDisallow: /\n',
+    });
+
+    expect(result.errors).toEqual([
+      expect.stringContaining('hides a public deployment'),
+    ]);
+  });
+
+  it('rejects response headers that keep a portal out of search indexes', async () => {
+    const result = await validate({
+      visibility: 'public',
+      headers: `/*.md
+  Cache-Control: public, max-age=300
+  X-Robots-Tag: noindex
+
+/assets/generated/*
+  Cache-Control: public, max-age=300
+`,
+    });
+
+    expect(result.errors).toEqual([
+      expect.stringContaining(
+        'keeps a public deployment out of search indexes',
+      ),
     ]);
   });
 });

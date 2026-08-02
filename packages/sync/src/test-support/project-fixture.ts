@@ -44,6 +44,21 @@ export const testSiteConfiguration: SiteConfiguration = parseSiteConfiguration(
   TEST_SITE_CONFIGURATION_INPUT,
 );
 
+/** The same project, published to anyone rather than to an audience. */
+export const publicSiteConfiguration: SiteConfiguration =
+  parseSiteConfiguration({
+    ...TEST_SITE_CONFIGURATION_INPUT,
+    deployment: {
+      ...TEST_SITE_CONFIGURATION_INPUT.deployment,
+      environments: {
+        production: {
+          ...TEST_SITE_CONFIGURATION_INPUT.deployment.environments.production,
+          visibility: 'public',
+        },
+      },
+    },
+  });
+
 export function testSyncContext(repositoryRoot: string): SyncContext {
   return createSyncContext(repositoryRoot, testSiteConfiguration);
 }

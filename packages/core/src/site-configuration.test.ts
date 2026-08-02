@@ -58,8 +58,57 @@ describe('parseSiteConfiguration', () => {
     expect(parsed.deployment.environments.production).toEqual({
       hostname: 'docs.example.com',
       url: 'https://docs.example.com',
+      visibility: 'private',
     });
   });
+
+  it('reads a portal anyone may open', () => {
+    const raw = validConfiguration();
+    environmentsOf(raw).production = {
+      url: 'https://docs.example.com',
+      visibility: 'public',
+    };
+
+    expect(
+      parseSiteConfiguration(raw).deployment.environments.production,
+    ).toEqual({
+      hostname: 'docs.example.com',
+      url: 'https://docs.example.com',
+      visibility: 'public',
+    });
+  });
+
+  it('lets environments differ in who may read them', () => {
+    const raw = validConfiguration();
+    environmentsOf(raw).development = {
+      url: 'https://docs-dev.example.com',
+      visibility: 'private',
+    };
+    environmentsOf(raw).production = {
+      url: 'https://docs.example.com',
+      visibility: 'public',
+    };
+
+    const { environments } = parseSiteConfiguration(raw).deployment;
+
+    expect(environments.development?.visibility).toBe('private');
+    expect(environments.production.visibility).toBe('public');
+  });
+
+  it.each([['internal'], [true], [null]])(
+    'rejects %s as a visibility',
+    (visibility) => {
+      const raw = validConfiguration();
+      environmentsOf(raw).production = {
+        url: 'https://docs.example.com',
+        visibility,
+      };
+
+      expect(() => parseSiteConfiguration(raw)).toThrow(
+        /visibility must be "private" or "public"/u,
+      );
+    },
+  );
 
   it('trims surrounding whitespace out of every value', () => {
     const raw = validConfiguration();

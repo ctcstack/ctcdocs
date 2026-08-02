@@ -19,7 +19,10 @@ name of its own; they read this file. The rationale is recorded in
     "workerName": "example-docs",
     "environments": {
       "development": { "url": "https://docs-dev.example.com" },
-      "production": { "url": "https://docs.example.com" }
+      "production": {
+        "url": "https://docs.example.com",
+        "visibility": "private"
+      }
     }
   },
   "home": {
@@ -37,24 +40,53 @@ name of its own; they read this file. The rationale is recorded in
 }
 ```
 
-| Value                              | Where it shows up                                                                                                           |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `brand.name`                       | Reserved for prose that names the organization rather than the site.                                                        |
-| `brand.siteTitle`                  | Browser tab, header wordmark, home page heading, and both browser test suites.                                              |
-| `brand.siteDescription`            | Site-wide meta description and the home page's own description.                                                             |
-| `brand.faviconPath`                | The `<link rel="icon">` target and the asset the Access smoke test probes.                                                  |
-| `deployment.workerName`            | The Worker `wrangler.jsonc` must declare; environments deploy as `<name>-<environment>`.                                    |
-| `deployment.environments.*`        | Canonical site URL, Wrangler custom domains, deployment summaries, smoke-test defaults.                                     |
-| `home.lede`                        | The paragraph under the home page heading, in full: where documents come from and what a reader may do with them.           |
-| `navigation.landingDocumentTitles` | Titles that open the folder they sit in, most preferred first. Also picks the description the home page shows for a folder. |
-| `navigation.sectionIndexPages`     | Whether each folder gets a generated page listing its contents at `/<folder-slug>/`.                                        |
-| `sync.generatedBy`                 | The ownership marker stamped into every generated Markdown and TypeScript file.                                             |
-| `sync.commitBotName`               | Git author the sync workflow commits generated output as.                                                                   |
-| `sync.defaultLocale`               | Fallback locale for documents whose language cannot be determined.                                                          |
+| Value                                  | Where it shows up                                                                                                           |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `brand.name`                           | Reserved for prose that names the organization rather than the site.                                                        |
+| `brand.siteTitle`                      | Browser tab, header wordmark, home page heading, and both browser test suites.                                              |
+| `brand.siteDescription`                | Site-wide meta description and the home page's own description.                                                             |
+| `brand.faviconPath`                    | The `<link rel="icon">` target and the asset the Access smoke test probes.                                                  |
+| `deployment.workerName`                | The Worker `wrangler.jsonc` must declare; environments deploy as `<name>-<environment>`.                                    |
+| `deployment.environments.*`            | Canonical site URL, Wrangler custom domains, deployment summaries, smoke-test defaults.                                     |
+| `deployment.environments.*.visibility` | Who may read that environment: `private` (default) or `public`. See below.                                                  |
+| `home.lede`                            | The paragraph under the home page heading, in full: where documents come from and what a reader may do with them.           |
+| `navigation.landingDocumentTitles`     | Titles that open the folder they sit in, most preferred first. Also picks the description the home page shows for a folder. |
+| `navigation.sectionIndexPages`         | Whether each folder gets a generated page listing its contents at `/<folder-slug>/`.                                        |
+| `sync.generatedBy`                     | The ownership marker stamped into every generated Markdown and TypeScript file.                                             |
+| `sync.commitBotName`                   | Git author the sync workflow commits generated output as.                                                                   |
+| `sync.defaultLocale`                   | Fallback locale for documents whose language cannot be determined.                                                          |
+
+## Who may read the deployment
+
+`visibility` decides what the platform asserts about an environment, and it
+defaults to `private` — an omission fails in the recoverable direction.
+
+|                                                        | `private`                                                             | `public`                                                 |
+| ------------------------------------------------------ | --------------------------------------------------------------------- | -------------------------------------------------------- |
+| `public/robots.txt`                                    | must disallow every crawler                                           | must not disallow every crawler                          |
+| `public/_headers` on `/*.md` and `/assets/generated/*` | `Cache-Control: private` and an `X-Robots-Tag`                        | must not carry `noindex`                                 |
+| every page                                             | carries `<meta name="robots" content="noindex, nofollow, noarchive">` | carries no robots meta                                   |
+| `ctcdocs-access-smoke`                                 | anonymous requests must be denied and a service token admitted        | anonymous requests must succeed; no service token needed |
+
+Two scoping rules:
+
+- **The built site follows the production environment.** `robots.txt`, the
+  response headers and the meta tag are one artifact deployed everywhere, so
+  they take the posture of the environment an unauthenticated reader can reach.
+- **A smoke run follows the environment it probes**, matched by hostname. An
+  address the configuration does not know is treated as private.
+
+What visibility does not change: `workers.dev` and preview URLs stay disabled,
+an environment binds exactly one custom domain, and `wrangler.jsonc` is still
+checked against this file. A public portal wants one predictable address as much
+as a private wiki does.
+
+See [ADR-016](ADR/016-deployment-visibility.md).
 
 The file is validated when it is imported, so a mistake fails the build rather
 than reaching a deployment:
 
+- `visibility`, where present, must be `private` or `public`;
 - both environment URLs must be bare HTTPS origins — no credentials, path, or
   query — and must differ from each other;
 - `deployment.workerName` must be a name Cloudflare accepts;

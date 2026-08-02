@@ -136,15 +136,24 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
     lastUpdated: false,
     pagination: true,
     sidebar: [...sidebarPrefix, ...normalizeSidebarLabels(options.sidebar)],
-    head: [
-      {
-        tag: 'meta',
-        attrs: {
-          name: 'robots',
-          content: 'noindex, nofollow, noarchive',
-        },
-      },
-    ],
+    /*
+     * A private deployment asks not to be indexed; a public one must not.
+     * The built site is one artifact deployed to every environment, so the tag
+     * follows the production environment — the one an unauthenticated reader
+     * can reach.
+     */
+    head:
+      deployment.environments.production.visibility === 'private'
+        ? [
+            {
+              tag: 'meta',
+              attrs: {
+                name: 'robots',
+                content: 'noindex, nofollow, noarchive',
+              },
+            },
+          ]
+        : [],
     ...options.starlight,
   };
 

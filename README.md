@@ -22,7 +22,8 @@ choice:
 - **Writers keep Google Docs.** Comments, suggestions, sharing, and the editing
   habits a team already has.
 - **Readers get a static site.** Fast, searchable with Pagefind, keyboard- and
-  screen-reader-accessible, and private behind Cloudflare Access.
+  screen-reader-accessible, and either private behind Cloudflare Access or open
+  to the world — one setting, and the checks follow it.
 - **Machines get plain Markdown.** Every page is also served as `.md`, and the
   corpus ships with a generated index, so an internal agent can read the
   documentation without scraping HTML.
@@ -47,7 +48,7 @@ A CTCDocs project is a private repository that holds its own identity, brand and
 content, and nothing else:
 
 ```text
-site.config.json          product name, hostnames, Worker name, sync markers
+site.config.json          product name, hostnames, visibility, Worker, markers
 astro.config.mjs          ~10 lines: a call to the preset
 wrangler.jsonc            deployment target
 public/favicon.svg        the brand mark

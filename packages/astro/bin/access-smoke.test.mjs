@@ -23,6 +23,20 @@ const siteConfig = {
     faviconPath: '/favicon.svg',
     siteTitle: 'Example [DOCS]',
   },
+  deployment: {
+    environments: {
+      production: { hostname: 'docs.example.com', visibility: 'private' },
+    },
+  },
+};
+
+const publicSiteConfig = {
+  ...siteConfig,
+  deployment: {
+    environments: {
+      production: { hostname: 'docs.example.com', visibility: 'public' },
+    },
+  },
 };
 
 const accessRedirect = () =>
@@ -253,4 +267,48 @@ test('runs when invoked through a bin symlink, as a project runs it', () => {
     'the command exited zero without verifying anything',
   );
   assert.match(output, /service-token credentials are required/u);
+});
+
+test('a public portal must answer anonymous readers', async () => {
+  const requested = [];
+  await verifyAccessPreflight({
+    baseUrl: 'https://docs.example.com',
+    markdownPath: '/section/guide/index.md',
+    site: publicSiteConfig,
+    fetchImplementation: async (url) => {
+      requested.push(new URL(url).pathname);
+      return new URL(url).pathname === '/missing-access-boundary-probe'
+        ? notFound()
+        : new Response('<h1>Example [DOCS]</h1>', {
+            headers: { 'content-type': 'text/html' },
+          });
+    },
+  });
+
+  // No service token is asked for, and none is needed: there is no boundary.
+  assert.equal(requested.length, 5);
+});
+
+test('a public portal behind an identity boundary is a defect', async () => {
+  await assert.rejects(
+    verifyAccessPreflight({
+      baseUrl: 'https://docs.example.com',
+      markdownPath: '/section/guide/index.md',
+      site: publicSiteConfig,
+      fetchImplementation: async () => accessRedirect(),
+    }),
+    /A public deployment refused an anonymous reader/u,
+  );
+});
+
+test('an address the configuration does not know is treated as private', async () => {
+  await assert.rejects(
+    verifyAccessPreflight({
+      baseUrl: 'https://unknown.example.com',
+      markdownPath: '/section/guide/index.md',
+      site: publicSiteConfig,
+      fetchImplementation: async () => new Response('public', { status: 200 }),
+    }),
+    /service-token credentials are required/u,
+  );
 });
