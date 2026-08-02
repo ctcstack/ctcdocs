@@ -98,6 +98,10 @@ and two projects sharing this package must not share a marker.
 - Until the npm scope exists, projects install the packages as pnpm Git
   dependencies pinned to a full commit SHA, with a `pnpm.overrides` entry for
   the transitive core package. Moving to npm is the removal of that block.
+  **Done**: `0.1.0` is published, `ctcstack-docs` installs from the registry,
+  and compiled output left the repository with it. The arrangement survives in
+  one place by design — the projects' canary job, which installs this
+  repository's unreleased `main` and therefore still packs it itself.
 - Workflow references from project repositories are pinned to full commit SHAs,
   never to a tag: this repository is public and its workflows run inside private
   CI that holds deployment credentials.

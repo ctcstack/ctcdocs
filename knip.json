@@ -3,8 +3,6 @@
   "ignore": [
     ".claude/**",
     ".github/workflows/project-*.yml",
-    "packages/*/dist/**",
-    "packages/astro/dist-node/**",
     "packages/astro/playwright.ts"
   ],
   "ignoreDependencies": ["prettier-plugin-astro"]

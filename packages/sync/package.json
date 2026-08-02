@@ -29,6 +29,7 @@
   },
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
+    "prepack": "pnpm run build",
     "typecheck": "tsc --project tsconfig.json",
     "test": "vitest run --root ../.."
   },

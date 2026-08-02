@@ -79,26 +79,17 @@ export default defineConfig(
 
 ## Installing
 
-The packages are not published to npm yet. Until they are, a project installs
-them from this repository, pinned to a commit:
-
-```json
-{
-  "dependencies": {
-    "@ctcstack/ctcdocs": "github:ctcstack/ctcdocs#<commit>&path:/packages/astro",
-    "@ctcstack/ctcdocs-sync": "github:ctcstack/ctcdocs#<commit>&path:/packages/sync"
-  },
-  "pnpm": {
-    "overrides": {
-      "@ctcstack/ctcdocs-core": "github:ctcstack/ctcdocs#<commit>&path:/packages/core"
-    }
-  }
-}
+```bash
+pnpm add @ctcstack/ctcdocs @ctcstack/ctcdocs-sync
+pnpm add astro @astrojs/starlight sharp @playwright/test
 ```
 
-pnpm 9 or newer is required for the `path:` fragment. `astro`,
-`@astrojs/starlight` and `@playwright/test` are peer dependencies, so the
-project owns their versions.
+`astro`, `@astrojs/starlight`, `sharp` and `@playwright/test` are peer
+dependencies, so the project owns their versions. `@ctcstack/ctcdocs-core`
+arrives as a transitive dependency of both.
+
+Every release is published from CI with provenance, so `npm audit signatures`
+can tell you which commit and which workflow run produced what you installed.
 
 ## Development
 
@@ -118,10 +109,12 @@ in test snapshots, not in issue reports. See [SECURITY.md](SECURITY.md).
 
 [Apache-2.0](LICENSE).
 
-## Repository status
+## Releasing
 
-The packages are consumed from Git while the npm scope is being set up, so the
-compiled output of `packages/core`, `packages/sync` and `packages/astro` is
-committed: an install then runs no build script, which is what keeps automated
-version bumps green. CI rebuilds and fails if a committed artifact is stale.
-Publishing to npm removes the arrangement.
+A release is a `v*` tag whose name matches the version in all three manifests.
+The workflow refuses a tag that disagrees with them, runs the gate above, and
+publishes core, then sync, then the site package — the order their dependencies
+need — through npm trusted publishing, so no publish credential is stored
+anywhere.
+
+Compiled output is built by `prepack` and exists only in the published tarball.
