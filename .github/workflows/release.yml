@@ -93,6 +93,14 @@ jobs:
               exit 1
             fi
           done
+
+          # A version nobody described is a version nobody can decide whether to
+          # take, and this is the last moment the omission is cheap to fix.
+          if ! grep -qxF "## ${expected}" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## ${expected}' section."
+            exit 1
+          fi
+
           echo "Releasing ${expected}."
 
       # Two ways in, and the run says which one it took. The first release of a

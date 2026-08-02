@@ -111,6 +111,9 @@ in test snapshots, not in issue reports. See [SECURITY.md](SECURITY.md).
 
 ## Releasing
 
+All three packages share a version and are released together; what changed is in
+[CHANGELOG.md](CHANGELOG.md).
+
 A release is a `v*` tag whose name matches the version in all three manifests.
 The workflow refuses a tag that disagrees with them, runs the gate above, and
 publishes core, then sync, then the site package — the order their dependencies
