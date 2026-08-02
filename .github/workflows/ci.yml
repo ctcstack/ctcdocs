@@ -60,8 +60,8 @@ jobs:
           set -euo pipefail
 
           if ! git diff --quiet -- packages; then
-            echo "::error::Committed build output is stale. Run pnpm build and commit the result."
-            git diff --name-only -- packages
+            echo "::error::Committed build output is stale, or a new binary is missing its executable bit. Run pnpm build, chmod +x any new bin, and commit the result."
+            git diff --stat -- packages
             exit 1
           fi
 
