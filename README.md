@@ -116,3 +116,11 @@ in test snapshots, not in issue reports. See [SECURITY.md](SECURITY.md).
 ## License
 
 [Apache-2.0](LICENSE).
+
+## Repository status
+
+The packages are consumed from Git while the npm scope is being set up, so the
+compiled output of `packages/core`, `packages/sync` and `packages/astro` is
+committed: an install then runs no build script, which is what keeps automated
+version bumps green. CI rebuilds and fails if a committed artifact is stale.
+Publishing to npm removes the arrangement.
