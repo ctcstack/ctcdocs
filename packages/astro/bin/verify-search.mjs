@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { realpathSync } from 'node:fs';
 import {
   mkdir,
   mkdtemp,
@@ -10,12 +11,11 @@ import {
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, extname, resolve, sep } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { findProjectRoot, PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
 import { close, createIndex } from 'pagefind';
 
-const projectRoot = findProjectRoot();
 const contentTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
   ['.html', 'text/html; charset=utf-8'],
@@ -151,6 +151,37 @@ async function expectResult(pagefind, query, expectedPath) {
 }
 
 /**
+ * The search terms a document's own title yields.
+ *
+ * A title is split on everything that is not a letter, a number or a hyphen,
+ * because that is how the words reach the index: Pagefind separates
+ * `Team_Roles_2026` into terms of its own. Deleting those characters instead
+ * joined what they separate, and asked the index for `TeamRoles2026` — a term
+ * no index holds. The document was then reported as unfindable while the
+ * search interface returned it first for the same title.
+ *
+ * Words shorter than four characters, and the ordering prefixes editors put in
+ * Drive names, are not evidence that indexing works: they match too much or
+ * nothing at all.
+ */
+export function buildSearchCases(documents) {
+  const cases = [];
+  for (const document of documents) {
+    const words = String(document.title ?? '')
+      .split(/[^\p{Letter}\p{Number}-]+/u)
+      .filter((word) => word.length >= 4 && !/^\d+$/u.test(word));
+    if (words.length === 0 || typeof document.slug !== 'string') {
+      continue;
+    }
+    cases.push([words.join(' '), `/${document.slug}/`]);
+    if (cases.length === 5) {
+      break;
+    }
+  }
+  return cases;
+}
+
+/**
  * Search terms drawn from the corpus the project actually has.
  *
  * Naming documents here would tie the check to one deployment's content and
@@ -158,6 +189,7 @@ async function expectResult(pagefind, query, expectedPath) {
  * generated index instead: a document's own title has to find that document.
  */
 async function searchCases() {
+  const projectRoot = findProjectRoot();
   const index = JSON.parse(
     await readFile(
       resolve(projectRoot, PROJECT_LAYOUT.documentIndexFile),
@@ -170,25 +202,7 @@ async function searchCases() {
     `${PROJECT_LAYOUT.documentIndexFile} lists no documents; run a sync before verifying search.`,
   );
 
-  /*
-   * Words shorter than four characters, and the ordering prefixes editors put
-   * in Drive names, are not evidence that indexing works: they match too much
-   * or nothing at all.
-   */
-  const cases = [];
-  for (const document of documents) {
-    const words = String(document.title ?? '')
-      .split(/\s+/u)
-      .map((word) => word.replace(/[^\p{Letter}\p{Number}-]/gu, ''))
-      .filter((word) => word.length >= 4 && !/^\d+$/u.test(word));
-    if (words.length === 0 || typeof document.slug !== 'string') {
-      continue;
-    }
-    cases.push([words.join(' '), `/${document.slug}/`]);
-    if (cases.length === 5) {
-      break;
-    }
-  }
+  const cases = buildSearchCases(documents);
   assert(
     cases.length > 0,
     'No document in the corpus has a title long enough to search for.',
@@ -197,7 +211,7 @@ async function searchCases() {
 }
 
 async function verifyBuiltIndex() {
-  const bundleRoot = resolve(projectRoot, 'dist/pagefind');
+  const bundleRoot = resolve(findProjectRoot(), 'dist/pagefind');
   const cases = await searchCases();
   await withSearchIndex(bundleRoot, async (pagefind) => {
     for (const [query, expectedPath] of cases) {
@@ -282,8 +296,29 @@ async function verifyMultilingualSearch() {
   }
 }
 
-const corpusCases = await verifyBuiltIndex();
-await verifyMultilingualSearch();
-console.log(
-  `Pagefind regression passed (${corpusCases + 3} acceptance cases).`,
-);
+/**
+ * Whether this module is the program being run.
+ *
+ * The comparison goes through `realpath` because a package manager installs a
+ * bin as a symlink: `process.argv[1]` is then the link in `node_modules/.bin`
+ * while `import.meta.url` is the file it points at.
+ */
+function invokedDirectly() {
+  const entry = process.argv[1];
+  if (!entry) {
+    return false;
+  }
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (invokedDirectly()) {
+  const corpusCases = await verifyBuiltIndex();
+  await verifyMultilingualSearch();
+  console.log(
+    `Pagefind regression passed (${corpusCases + 3} acceptance cases).`,
+  );
+}

@@ -2,6 +2,17 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Fixed
+
+- `ctcdocs-verify-search` splits a document title into search terms on
+  punctuation rather than deleting it. A title an editor is free to write, such
+  as `Team_Roles_2026 Handbook`, became the single term `TeamRoles2026`, which
+  no index holds: the check reported the document as unfindable while the
+  search interface returned it first for the same words. A corpus whose titles
+  carry underscores, ampersands or dots no longer fails synchronization.
+
 ## 0.2.0
 
 ### Added
