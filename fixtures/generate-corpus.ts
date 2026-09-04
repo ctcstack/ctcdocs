@@ -137,10 +137,16 @@ const markdownExports = new Map<string, string>([
       'Two things a documentation platform gets wrong quietly: wide tables that',
       'push a phone layout sideways, and code blocks that lose their language.',
       '',
-      '| Environment | Address                  | Protected |',
-      '| ----------- | ------------------------ | --------- |',
-      '| Production  | docs.example.com         | Yes       |',
-      '| Preview     | not deployed             | —         |',
+      /*
+       * Wider than a phone frame on purpose. A table narrow enough to fit
+       * proves nothing about the horizontal scroller the wrapper exists for,
+       * which is the case that broke in a real corpus while this fixture
+       * stayed green.
+       */
+      '| Environment | Address          | Protected | Deployed from | Reviewers | Retention |',
+      '| ----------- | ---------------- | --------- | ------------- | --------- | --------- |',
+      '| Production  | docs.example.com | Yes       | main          | Platform  | Indefinite |',
+      '| Preview     | not deployed     | —         | pull requests | Authors   | Seven days |',
       '',
       'The pipeline is invoked the same way in every project:',
       '',
@@ -304,10 +310,17 @@ const htmlArchives = new Map<string, Uint8Array>([
             '<p>Two things a documentation platform gets wrong quietly: wide',
             ' tables that push a phone layout sideways, and code blocks that',
             ' lose their language.</p>',
+            /*
+             * Six columns, because a table that fits a phone frame proves
+             * nothing about the horizontal scroller the wrapper exists for.
+             */
             '<table>',
-            '<tr><td>Environment</td><td>Address</td><td>Protected</td></tr>',
-            '<tr><td>Production</td><td>docs.example.com</td><td>Yes</td></tr>',
-            '<tr><td>Preview</td><td>not deployed</td><td>&#8212;</td></tr>',
+            '<tr><td>Environment</td><td>Address</td><td>Protected</td>',
+            '<td>Deployed from</td><td>Reviewers</td><td>Retention</td></tr>',
+            '<tr><td>Production</td><td>docs.example.com</td><td>Yes</td>',
+            '<td>main</td><td>Platform</td><td>Indefinite</td></tr>',
+            '<tr><td>Preview</td><td>not deployed</td><td>&#8212;</td>',
+            '<td>pull requests</td><td>Authors</td><td>Seven days</td></tr>',
             '</table>',
             '<p>The pipeline is invoked the same way in every project:</p>',
             '<pre><code>pnpm sync --full</code></pre>',

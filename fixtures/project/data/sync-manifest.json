@@ -111,8 +111,8 @@
       "stableSlug": "handbook/tables-and-code",
       "generatedMarkdownPath": "src/content/docs/_generated/doc-tables-and-code.md",
       "generatedAssetsDirectory": "src/assets/generated/doc-tables-and-code",
-      "contentHash": "sha256:5655c1345792344c63fd191a80a79c638367326669e3dac0e8a0c571acb7af6b",
-      "outputHash": "sha256:307d968887deecb17424e58f9d6116c4275ff96221c9dd63f825713e61ae81d7",
+      "contentHash": "sha256:71b90c6e65677d9485ca26bbf1f06f44c8eac3221fcadda8fb5c7e01830616b9",
+      "outputHash": "sha256:653508ef9967c42101e834c34288f18c2ef58b053f784b78c301709db764bae6",
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "hybrid",
       "warnings": [
