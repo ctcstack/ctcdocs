@@ -2,6 +2,20 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Changed
+
+- The dependencies carrying published advisories are updated: `mermaid` to
+  11.16.1, `smol-toml` to 1.6.1, and the fixture project's `wrangler` to
+  4.129.0, whose Miniflare takes the patched `undici`. Refreshing the lockfile
+  within the existing ranges clears the rest. A project that takes this release
+  clears the two advisories it inherits from these packages.
+- `astro-eslint-parser` is held at 3.0.0 by a workspace override. 3.1.0 fails
+  to parse every `.astro` component in this repository, with or without the
+  matching plugin release, so the lint step reports thirteen parsing errors
+  instead of linting. The override is a stopgap and says so.
+
 ## 0.2.2
 
 ### Fixed

@@ -19,3 +19,11 @@ minimumReleaseAgeExclude:
   - playwright@1.62.1
   - workerd@1.20260730.1
   - wrangler@4.116.0
+
+# `astro-eslint-parser` 3.1.0 cannot parse the components in this repository:
+# every `.astro` file fails with a parsing error, with or without the matching
+# `eslint-plugin-astro` 3.1.0. The parser reaches us through that plugin, so it
+# is held at the last version that reads our components. Drop this once the
+# parser can read them again.
+overrides:
+  astro-eslint-parser: 3.0.0
