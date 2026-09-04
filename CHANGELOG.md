@@ -2,6 +2,19 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Fixed
+
+- The mobile check in the browser suite accepts a table that is wider than its
+  frame. It required the table's width to match the wrapper's exactly, which no
+  table with more than about three columns can do on a phone — the case the
+  wrapper's horizontal scroller exists for. The suite now asserts what the
+  layout owes a reader: the table is never narrower than its frame, an
+  oversized one scrolls inside the wrapper rather than dragging the page
+  sideways. The fixture corpus carries a six-column table so the scrolling case
+  is exercised rather than assumed.
+
 ## 0.2.1
 
 ### Fixed

@@ -152,25 +152,35 @@ test('documentation page is accessible and responsive on mobile', async ({
     '',
   );
 
-  // A table fills its frame and scrolls inside it. The scroller is the wrapper
-  // rather than the table, because a block-level table scrolls but leaves its
-  // cells short of the frame it is drawn in.
-  // The first table on the page: a document may carry several, and the
-  // assertion is about how the wrapper treats one of them.
+  /*
+   * A table never leaves its frame short, and never takes the page with it
+   * when it exceeds one: it fills the wrapper, or it is wider and the wrapper
+   * is what scrolls. The scroller is the wrapper rather than the table,
+   * because a block-level table scrolls but leaves its cells short of the
+   * frame it is drawn in.
+   *
+   * Demanding that the width match exactly would fail every table too wide for
+   * a phone — which is the case the wrapper exists for, and the case a real
+   * corpus produces as soon as a document carries more than three columns.
+   *
+   * The first table on the page: a document may carry several, and the
+   * assertion is about how the wrapper treats one of them.
+   */
   const tableLayout = await page
     .locator('table')
     .first()
     .evaluate((table) => {
       const wrapper = table.parentElement;
+      const tableWidth = table.getBoundingClientRect().width;
+      const wrapperWidth = wrapper?.getBoundingClientRect().width ?? 0;
       return {
         display: getComputedStyle(table).display,
         wrapperClass: wrapper?.className,
         wrapperOverflowX: wrapper ? getComputedStyle(wrapper).overflowX : null,
-        fillsWrapper: wrapper
-          ? Math.abs(
-              table.getBoundingClientRect().width -
-                wrapper.getBoundingClientRect().width,
-            ) <= 2
+        narrowerThanWrapper: wrapper ? tableWidth < wrapperWidth - 2 : true,
+        overflowStaysInsideWrapper: wrapper
+          ? tableWidth <= wrapperWidth + 2 ||
+            wrapper.scrollWidth > wrapper.clientWidth
           : false,
       };
     });
@@ -178,7 +188,8 @@ test('documentation page is accessible and responsive on mobile', async ({
     display: 'table',
     wrapperClass: 'kb-table',
     wrapperOverflowX: 'auto',
-    fillsWrapper: true,
+    narrowerThanWrapper: false,
+    overflowStaysInsideWrapper: true,
   });
   expect(
     await page.evaluate(

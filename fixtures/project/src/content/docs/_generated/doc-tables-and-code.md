@@ -7,7 +7,7 @@
 "googleFileId": "doc-tables-and-code"
 "googleModifiedTime": "2026-02-06T16:45:00.000Z"
 "syncedAt": "2026-02-10T06:00:00.000Z"
-"contentHash": "sha256:5655c1345792344c63fd191a80a79c638367326669e3dac0e8a0c571acb7af6b"
+"contentHash": "sha256:71b90c6e65677d9485ca26bbf1f06f44c8eac3221fcadda8fb5c7e01830616b9"
 "folderPath":
   - "Handbook"
 "pagefind": true
@@ -16,10 +16,10 @@
 
 Two things a documentation platform gets wrong quietly: wide tables that push a phone layout sideways, and code blocks that lose their language.
 
-| Environment | Address          | Protected |
-| ----------- | ---------------- | --------- |
-| Production  | docs.example.com | Yes       |
-| Preview     | not deployed     | —         |
+| Environment | Address          | Protected | Deployed from | Reviewers | Retention  |
+| ----------- | ---------------- | --------- | ------------- | --------- | ---------- |
+| Production  | docs.example.com | Yes       | main          | Platform  | Indefinite |
+| Preview     | not deployed     | —         | pull requests | Authors   | Seven days |
 
 The pipeline is invoked the same way in every project:
 
