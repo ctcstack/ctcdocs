@@ -339,9 +339,17 @@ For an automatic deployment:
    Require completed production deployment
    ```
 
-   The final gate fails when either deployment or the protected smoke test is
-   skipped. A green workflow therefore guarantees that the verified commit was
-   actually deployed and exercised through Cloudflare Access.
+   The candidate verification and the Access preflight run side by side, and
+   the deployment waits for both. The final gate fails when either deployment
+   or the protected smoke test is skipped. A green workflow therefore
+   guarantees that the verified commit was actually deployed and exercised
+   through Cloudflare Access.
+
+A deployment started by a sync shows the candidate verification as skipped,
+not passed. The sync job ran `pnpm verify` on the exact tree it committed, and
+its caller passes `candidate_verified: true` with `candidate_sha`, so the gate
+does not run a second time. The input is refused without a SHA, and any other
+reason for verification to be skipped still stops the deployment.
 
 For a manual re-deployment of the current `main` revision:
 

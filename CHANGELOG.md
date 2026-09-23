@@ -12,6 +12,9 @@ All three packages share a version and are released together.
   The first full sync after upgrading reorders the sidebar of any folder mixing
   unnumbered subfolders and documents. See
   [ADR-019](docs/ADR/019-folders-before-documents.md).
+- The Access preflight in `project-deploy.yml` runs beside the candidate
+  verification instead of after it. It reads only the live hostname, and the
+  deployment still waits for both.
 
 ### Added
 
@@ -22,6 +25,12 @@ All three packages share a version and are released together.
   description for a document. Each row's kind also reaches a screen reader as
   text. A page generated before this release keeps its plain list until the
   next full sync rewrites it.
+- `project-deploy.yml` takes `candidate_verified`. A caller deploying a commit
+  `project-sync.yml` produced passes it as `true` with `candidate_sha`, and the
+  candidate verification job, a second `pnpm verify` of the tree the sync job
+  had just verified, is skipped. The input fails the run without a SHA. A
+  project opts in by adding `candidate_verified: true` to the deployment job
+  of its sync workflow; without it nothing changes.
 - The workflows cache the images Astro optimizes, in `project-sync.yml`,
   `project-deploy.yml` and `project-ci.yml`, keyed by the lockfile and the
   images under `src/assets/`. Encoding them was most of every build, and a sync
