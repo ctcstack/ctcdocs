@@ -316,6 +316,26 @@ async function buildSectionIndexPages(
   const folderNodes = new Map(
     selection.folders.map((folder) => [folder.item.id, folder]),
   );
+  /*
+   * Published documents anywhere below a folder: the number a reader needs to
+   * know whether opening it is worth the click. A document the manifest does
+   * not record is not published, so it is not counted.
+   */
+  const documentCounts = new Map<string, number>();
+  function documentCount(folderId: string): number {
+    const known = documentCounts.get(folderId);
+    if (known !== undefined) {
+      return known;
+    }
+    const node = folderNodes.get(folderId);
+    const count = node
+      ? node.documentIds.filter((id) => manifest.documents[id] !== undefined)
+          .length +
+        node.childFolderIds.reduce((sum, id) => sum + documentCount(id), 0)
+      : 0;
+    documentCounts.set(folderId, count);
+    return count;
+  }
   for (const folder of folderRecords) {
     const node = folderNodes.get(folder.googleFolderId);
     const path = folder.generatedMarkdownPath;
@@ -344,13 +364,21 @@ async function buildSectionIndexPages(
         return name !== undefined && slug !== undefined && label !== undefined
           ? {
               sibling: { id: child.id, name, kind: child.kind },
-              entry: {
-                label,
-                slug,
-                ...(child.kind === 'document' && childDocument?.description
-                  ? { description: childDocument.description }
-                  : {}),
-              } satisfies SectionIndexEntry,
+              entry: (child.kind === 'folder'
+                ? {
+                    kind: 'folder',
+                    label,
+                    slug,
+                    documentCount: documentCount(child.id),
+                  }
+                : {
+                    kind: 'document',
+                    label,
+                    slug,
+                    ...(childDocument?.description
+                      ? { description: childDocument.description }
+                      : {}),
+                  }) satisfies SectionIndexEntry,
             }
           : undefined;
       })

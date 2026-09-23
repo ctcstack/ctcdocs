@@ -2,6 +2,27 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Changed
+
+- Among siblings nobody numbered, folders now come before documents: in the
+  sidebar, and on section pages. A landing document still opens its folder, and
+  a number in a Drive name still places an item exactly where it was numbered.
+  The first full sync after upgrading reorders the sidebar of any folder mixing
+  unnumbered subfolders and documents. See
+  [ADR-019](docs/ADR/019-folders-before-documents.md).
+
+### Added
+
+- A section page tells folders from documents. Its frontmatter records each
+  entry's kind, and for a folder, how many documents sit anywhere below it. The
+  site draws a folder glyph and the count ("Empty" when there are none) for a
+  folder, and a document glyph, the date its source was last edited and its
+  description for a document. Each row's kind also reaches a screen reader as
+  text. A page generated before this release keeps its plain list until the
+  next full sync rewrites it.
+
 ## 0.4.0
 
 ### Added

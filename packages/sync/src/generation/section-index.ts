@@ -37,13 +37,26 @@ const processor = unified().use(remarkGfm).use(remarkStringify, {
   strong: '*',
 });
 
-export interface SectionIndexEntry {
+interface SectionIndexEntryBase {
   /** The name a reader sees, with any order prefix already removed. */
   label: string;
   /** Stable slug of the subfolder or document this entry points at. */
   slug: string;
+}
+
+interface SectionIndexFolderEntry extends SectionIndexEntryBase {
+  kind: 'folder';
+  /** Documents anywhere below the subfolder, so an empty one is visible. */
+  documentCount: number;
+}
+
+interface SectionIndexDocumentEntry extends SectionIndexEntryBase {
+  kind: 'document';
   description?: string;
 }
+
+export type SectionIndexEntry =
+  SectionIndexFolderEntry | SectionIndexDocumentEntry;
 
 export interface SectionIndexInput {
   title: string;
@@ -63,7 +76,10 @@ export function sectionIndexPath(googleFolderId: string): string {
  * that open a Markdown link, and remark escapes them correctly by construction.
  */
 function listItem(entry: SectionIndexEntry): ListItem {
-  const description = entry.description?.replace(/\s+/gu, ' ').trim();
+  const description =
+    entry.kind === 'document'
+      ? entry.description?.replace(/\s+/gu, ' ').trim()
+      : undefined;
   return {
     type: 'listItem',
     spread: false,
@@ -111,6 +127,26 @@ function createSectionIndexBody(entries: readonly SectionIndexEntry[]): string {
   return processor.stringify(tree);
 }
 
+/*
+ * The listing again, as data: what each entry is and how much a folder holds.
+ * The body stays a plain Markdown list — readable as it stands and the
+ * fallback when nothing renders the frontmatter — while the reader interface
+ * draws folders and documents apart from this. Labels, descriptions and dates
+ * are not repeated here: the interface reads them from the pages the entries
+ * point at, so the listing and its targets can never disagree. See docs/ADR/019-folders-before-documents.md.
+ */
+function frontmatterEntries(entries: readonly SectionIndexEntry[]) {
+  return entries.map((entry) =>
+    entry.kind === 'folder'
+      ? {
+          kind: entry.kind,
+          slug: entry.slug,
+          documentCount: entry.documentCount,
+        }
+      : { kind: entry.kind, slug: entry.slug },
+  );
+}
+
 export function generateSectionIndexDocument(
   input: SectionIndexInput,
   markdownHeader: string,
@@ -123,6 +159,7 @@ export function generateSectionIndexDocument(
       sourceType: 'section-index',
       contentHash: computeGeneratedContentHash(body, NO_ASSETS),
       folderPath: input.folderPath,
+      entries: frontmatterEntries(input.entries),
       pagefind: false,
     },
     {

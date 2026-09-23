@@ -108,6 +108,35 @@ describe('navigation order', () => {
       .toEqual(['Overview', 'README', 'About']);
   });
 
+  it('places unnumbered folders before unnumbered documents', () => {
+    expect(
+      order([
+        document('Appendix'),
+        folder('Zulu'),
+        document('Beta'),
+        folder('alpha'),
+      ]),
+    ).toEqual(['alpha', 'Zulu', 'Appendix', 'Beta']);
+  });
+
+  it('keeps an explicit number and the landing document ahead of folders', () => {
+    expect(
+      order([
+        folder('Archive'),
+        document('02 - Procedure'),
+        document('Appendix'),
+        folder('01 - Policies'),
+        document('Overview'),
+      ]),
+    ).toEqual([
+      'Overview',
+      '01 - Policies',
+      '02 - Procedure',
+      'Archive',
+      'Appendix',
+    ]);
+  });
+
   it('does not promote a folder that carries a landing title', () => {
     expect(order([folder('Overview'), document('01 - Introduction')])).toEqual([
       '01 - Introduction',
@@ -150,7 +179,9 @@ describe('navigation order', () => {
         fc.nat(),
         (unique, rotation) => {
           const siblings = unique.map((name, index) =>
-            document(name, `id-${index}`),
+            index % 2 === 0
+              ? document(name, `id-${index}`)
+              : folder(name, `id-${index}`),
           );
           const offset = rotation % siblings.length;
           const rotated = [
