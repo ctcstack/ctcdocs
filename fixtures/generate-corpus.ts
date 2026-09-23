@@ -46,6 +46,7 @@ const ROOT_ID = 'folder-root';
  */
 const CREATED_AT = '2026-01-05T09:00:00.000Z';
 const MODIFIED_AT = new Map([
+  ['doc-style-guide', '2026-02-01T14:10:00.000Z'],
   ['doc-getting-started', '2026-02-02T11:30:00.000Z'],
   ['doc-overview', '2026-02-05T08:15:00.000Z'],
   ['doc-tables-and-code', '2026-02-06T16:45:00.000Z'],
@@ -85,7 +86,9 @@ function document(id: string, name: string, parent: string): DriveItem {
  * The synthetic Drive.
  *
  * `Handbook` holds a landing document, so its card describes itself.
- * `Reference` deliberately holds none, which is the fallback case.
+ * `Reference` deliberately holds none, which is the fallback case. It also
+ * holds a subfolder and an empty folder, so its section page lists folders
+ * ahead of documents and shows what each folder holds, the empty one included.
  */
 const items: DriveItem[] = [
   folder(ROOT_ID, 'Published', DRIVE_ID),
@@ -97,6 +100,9 @@ const items: DriveItem[] = [
   document('doc-tables-and-code', '01 - Tables and code', 'folder-handbook'),
   document('doc-diagrams', 'Diagrams', 'folder-reference'),
   document('doc-screenshots', 'Screenshots', 'folder-reference'),
+  folder('folder-reference-guides', 'Guides', 'folder-reference'),
+  folder('folder-reference-archive', 'Archive', 'folder-reference'),
+  document('doc-style-guide', 'Style guide', 'folder-reference-guides'),
 ];
 
 /** Google's Markdown export, as the pipeline receives it. */
@@ -189,6 +195,16 @@ const markdownExports = new Map<string, string>([
       '',
       'Поиск должен находить документ по слову «синхронизация», а страница —',
       'загружать кириллический поднабор шрифта и ничего лишнего.',
+      '',
+    ].join('\n'),
+  ],
+  [
+    'doc-style-guide',
+    [
+      '# Style guide',
+      '',
+      'A document one folder deeper than its section, so the section page',
+      'has a subfolder to list and a document count to report.',
       '',
     ].join('\n'),
   ],

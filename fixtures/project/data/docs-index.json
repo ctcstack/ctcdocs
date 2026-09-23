@@ -45,6 +45,21 @@
       "language": "en"
     },
     {
+      "id": "doc-style-guide",
+      "title": "Style guide",
+      "slug": "reference/guides/style-guide",
+      "markdownPath": "src/content/docs/_generated/doc-style-guide.md",
+      "sourceUrl": "https://docs.google.com/document/d/doc-style-guide/edit",
+      "googleModifiedTime": "2026-02-01T14:10:00.000Z",
+      "syncedAt": "2026-02-10T06:00:00.000Z",
+      "contentHash": "sha256:ace8ddb30893fb7f938499fb2e46d9c60b826540c372a8f174ae3e8a4e4f8054",
+      "folderPath": [
+        "Reference",
+        "Guides"
+      ],
+      "language": "en"
+    },
+    {
       "id": "doc-screenshots",
       "title": "Screenshots",
       "slug": "reference/screenshots",
