@@ -23,6 +23,18 @@ All three packages share a version and are released together.
   text. A page generated before this release keeps its plain list until the
   next full sync rewrites it.
 
+### Fixed
+
+- Dependencies are downloaded once per lockfile rather than in every job. The
+  workflows cached the pnpm store through `actions/setup-node`, whose key
+  names only the lockfile, and the dependency audit in `project-ci.yml`, which
+  installs nothing, usually saved its near-empty store under that key first;
+  every job after it restored that and fetched every package again. Each
+  workflow now caches the store and pnpm's cache directory itself, under a key
+  of its own, and the audit restores and saves nothing. Keeping the cache
+  directory also keeps pnpm's record that the lockfile passed its supply-chain
+  check. Entries under the old key are no longer read and expire on their own.
+
 ## 0.4.0
 
 ### Added

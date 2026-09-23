@@ -103,7 +103,29 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
-          cache: pnpm
+          package-manager-cache: false
+
+      - name: Locate the pnpm store
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path --silent)" >> "${GITHUB_OUTPUT}"
+
+      # The store is cached by this workflow rather than by setup-node. Its
+      # cache key names only the lockfile, and a job that restores the cache
+      # without installing, like the dependency audit, saves the near-empty
+      # store it started from under that key first; every later job then
+      # restored nothing and downloaded every package. The pnpm cache
+      # directory is kept too: it records that this lockfile already passed
+      # the supply-chain policy check, which otherwise repeats on every run.
+      # Only a successful job saves, and pnpm checks what it links from the
+      # store against the hashes it recorded for each package.
+      - name: Restore the pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ steps.pnpm-store.outputs.path }}
+            ~/.cache/pnpm
+          key: ctcdocs-pnpm-v1-${{ runner.os }}-${{ runner.arch }}-${{ inputs.pnpm_version }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml') }}
 
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
