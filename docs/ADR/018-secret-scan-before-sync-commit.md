@@ -1,6 +1,6 @@
 # ADR-018: A sync run scans what it commits, and a finding stops it
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-23
 - Owners: CTCDocs maintainers
 - Supersedes: none
