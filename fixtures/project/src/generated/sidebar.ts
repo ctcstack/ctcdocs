@@ -32,6 +32,15 @@ export const generatedSidebar = [
     "label": "Reference",
     "items": [
       {
+        "label": "Guides",
+        "items": [
+          {
+            "label": "Style guide",
+            "slug": "reference/guides/style-guide"
+          }
+        ]
+      },
+      {
         "label": "Diagrams",
         "slug": "reference/diagrams"
       },

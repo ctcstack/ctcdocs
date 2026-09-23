@@ -99,6 +99,24 @@
         "fallback:media_object"
       ]
     },
+    "doc-style-guide": {
+      "googleFileId": "doc-style-guide",
+      "googleParentId": "folder-reference-guides",
+      "googleName": "Style guide",
+      "displayTitle": "Style guide",
+      "description": "A document one folder deeper than its section, so the section page has a subfolder to list and a document count to report.",
+      "googleModifiedTime": "2026-02-01T14:10:00.000Z",
+      "googleCreatedTime": "2026-01-05T09:00:00.000Z",
+      "sourceUrl": "https://docs.google.com/document/d/doc-style-guide/edit",
+      "stableSlug": "reference/guides/style-guide",
+      "generatedMarkdownPath": "src/content/docs/_generated/doc-style-guide.md",
+      "generatedAssetsDirectory": "src/assets/generated/doc-style-guide",
+      "contentHash": "sha256:ace8ddb30893fb7f938499fb2e46d9c60b826540c372a8f174ae3e8a4e4f8054",
+      "outputHash": "sha256:8040c3ef2aac356c90143feacfdf31fcbdd1df4b39275f387c7ddff4c1d6a13b",
+      "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
+      "exportMode": "markdown",
+      "warnings": []
+    },
     "doc-tables-and-code": {
       "googleFileId": "doc-tables-and-code",
       "googleParentId": "folder-handbook",
@@ -138,6 +156,24 @@
       "sortOrder": 2,
       "stableSlug": "reference",
       "generatedMarkdownPath": "src/content/docs/_generated/section-folder-reference.md"
+    },
+    "folder-reference-archive": {
+      "googleFolderId": "folder-reference-archive",
+      "googleParentId": "folder-reference",
+      "googleName": "Archive",
+      "displayLabel": "Archive",
+      "sortOrder": null,
+      "stableSlug": "reference/archive",
+      "generatedMarkdownPath": "src/content/docs/_generated/section-folder-reference-archive.md"
+    },
+    "folder-reference-guides": {
+      "googleFolderId": "folder-reference-guides",
+      "googleParentId": "folder-reference",
+      "googleName": "Guides",
+      "displayLabel": "Guides",
+      "sortOrder": null,
+      "stableSlug": "reference/guides",
+      "generatedMarkdownPath": "src/content/docs/_generated/section-folder-reference-guides.md"
     },
     "folder-root": {
       "googleFolderId": "folder-root",
