@@ -327,6 +327,31 @@ For a failed sync:
 4. run `pnpm verify`;
 5. retry the workflow from a clean `main`.
 
+A failed Google request ends the sync step with one line:
+
+```text
+ERROR [GOOGLE_<CATEGORY>]: status=<HTTP status> reason=<code> fileId=<Google file ID> requestId=<ID>
+```
+
+`reason` is the machine-readable code Google returned, and `fileId` the file
+the request was about — the document being exported or inspected, or the
+configured root folder. Each is left out when there is none. Google's own error
+message is never printed, because it can quote a title or a URL. A file ID
+names a document without revealing it: the manifest already records every
+published one, and opening it still takes access to the Drive.
+
+| Category                     | Reason                                       | What to do                                                                                                                |
+| ---------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `GOOGLE_RATE_LIMIT`          | `rateLimitExceeded`, `userRateLimitExceeded` | Already retried with exponential backoff before failing. Rerun later.                                                     |
+| `GOOGLE_RATE_LIMIT`          | `dailyLimitExceeded`                         | A daily quota; not retried. Review the Drive API quotas of the Cloud project.                                             |
+| `GOOGLE_EXPORT_SIZE_LIMIT`   | `exportSizeLimitExceeded`, or none           | Google exports at most 10 MB, images included. Split the document or reduce its images.                                   |
+| `GOOGLE_DOWNLOAD_RESTRICTED` | `cannotExportFile`, `cannotDownloadFile`     | The document stops viewers from downloading it. Lift that restriction; do not raise the identity above Viewer.            |
+| `GOOGLE_PERMISSION`          | `SERVICE_DISABLED`, `accessNotConfigured`    | The Drive or Docs API is not enabled in the Cloud project.                                                                |
+| `GOOGLE_PERMISSION`          | any other, or none                           | The identity cannot read the file. Check that it is still a Viewer of the Shared Drive and the file is inside that Drive. |
+
+The command exits with 2 for `GOOGLE_AUTHENTICATION`, 3 for `GOOGLE_PERMISSION`
+and `GOOGLE_DOWNLOAD_RESTRICTED`, and 1 otherwise.
+
 For a failed deployment:
 
 1. confirm that the previous Worker deployment is still active;

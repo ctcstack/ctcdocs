@@ -21,9 +21,12 @@ export {
 } from './google/drive-types.js';
 export {
   GoogleApiError,
+  categorizeGoogleApiFailure,
   categorizeGoogleApiStatus,
+  isRetryableGoogleApiFailure,
   isRetryableGoogleApiStatus,
   type GoogleApiErrorCategory,
+  type GoogleApiErrorOptions,
 } from './google/google-api-error.js';
 export {
   InventoryGraphError,

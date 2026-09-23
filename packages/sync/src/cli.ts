@@ -25,7 +25,10 @@ import {
   createEnvironmentGoogleAccessTokenProvider,
   GoogleAuthenticationConfigurationError,
 } from './google/auth.js';
-import { GoogleApiError } from './google/google-api-error.js';
+import {
+  describeGoogleApiError,
+  GoogleApiError,
+} from './google/google-api-error.js';
 import { InventoryGraphError } from './inventory/inventory-graph.js';
 import { serializeInventoryReport } from './inventory/inventory-report.js';
 import { runInventory } from './inventory/run-inventory.js';
@@ -214,11 +217,12 @@ try {
     const exitCode =
       error.category === 'authentication'
         ? 2
-        : error.category === 'permission'
+        : error.category === 'permission' ||
+            error.category === 'download_restricted'
           ? 3
           : 1;
     console.error(
-      `ERROR [GOOGLE_${error.category.toUpperCase()}]: status=${error.status ?? 'unavailable'} requestId=${error.requestId}`,
+      `ERROR [GOOGLE_${error.category.toUpperCase()}]: ${describeGoogleApiError(error)}`,
     );
     process.exitCode = exitCode;
   } else if (error instanceof InventoryGraphError) {

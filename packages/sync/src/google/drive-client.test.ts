@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { StaticGoogleAccessTokenProvider } from './auth.js';
 import { GoogleDriveClient, MAX_GOOGLE_EXPORT_BYTES } from './drive-client.js';
-import { GoogleApiError } from './google-api-error.js';
+import { describeGoogleApiError, GoogleApiError } from './google-api-error.js';
 
 interface CapturedRequest {
   url: URL;
@@ -47,6 +47,39 @@ function createQueuedFetch(
     }
     return next;
   };
+}
+
+function driveErrorResponse(
+  status: number,
+  reason: string,
+  headers?: ConstructorParameters<typeof Headers>[0],
+): Response {
+  return jsonResponse(
+    {
+      error: {
+        code: status,
+        message: 'Private Title at https://example.invalid/private',
+        errors: [
+          {
+            domain: 'global',
+            reason,
+            message: 'Private Title at https://example.invalid/private',
+          },
+        ],
+      },
+    },
+    status,
+    { 'x-request-id': 'request-id', ...headers },
+  );
+}
+
+async function captureError(promise: Promise<unknown>): Promise<unknown> {
+  try {
+    await promise;
+  } catch (error: unknown) {
+    return error;
+  }
+  return expect.unreachable('Expected request to fail');
 }
 
 function driveItem(id: string): Record<string, unknown> {
@@ -178,6 +211,175 @@ describe('Google Drive read-only client', () => {
     },
   );
 
+  it.each([
+    ['rateLimitExceeded', 'rate_limit'],
+    ['userRateLimitExceeded', 'rate_limit'],
+    ['dailyLimitExceeded', 'rate_limit'],
+    ['exportSizeLimitExceeded', 'export_size_limit'],
+    ['cannotDownloadFile', 'download_restricted'],
+    ['cannotExportFile', 'download_restricted'],
+    ['insufficientFilePermissions', 'permission'],
+  ] as const)(
+    'reports a 403 with reason %s as %s, naming the exported file',
+    async (reason, category) => {
+      const error = await captureError(
+        createClient(createQueuedFetch([driveErrorResponse(403, reason)]), {
+          maxRetries: 0,
+        }).exportMarkdown('doc-id'),
+      );
+
+      expect(error).toBeInstanceOf(GoogleApiError);
+      expect(error).toMatchObject({
+        category,
+        status: 403,
+        reasons: [reason],
+        fileId: 'doc-id',
+        requestId: 'request-id',
+      });
+      const line = describeGoogleApiError(error as GoogleApiError);
+      expect(line).toBe(
+        `status=403 reason=${reason} fileId=doc-id requestId=request-id`,
+      );
+      for (const text of [line, (error as Error).message]) {
+        expect(text).not.toContain('Private Title');
+        expect(text).not.toContain('example.invalid');
+      }
+    },
+  );
+
+  it.each(['rateLimitExceeded', 'userRateLimitExceeded'])(
+    'retries a 403 %s with the rate-limit backoff',
+    async (reason) => {
+      const delays: number[] = [];
+      const client = createClient(
+        createQueuedFetch([
+          driveErrorResponse(403, reason),
+          driveErrorResponse(403, reason, { 'retry-after': '3' }),
+          new Response('# Safe\n', {
+            headers: { 'content-type': 'text/markdown' },
+          }),
+        ]),
+        {
+          sleep: async (milliseconds) => {
+            delays.push(milliseconds);
+          },
+        },
+      );
+
+      await expect(client.exportMarkdown('doc-id')).resolves.toEqual(
+        new TextEncoder().encode('# Safe\n'),
+      );
+      expect(delays).toEqual([250, 3_000]);
+    },
+  );
+
+  it('reports a rate limit once the retry budget is spent', async () => {
+    const delays: number[] = [];
+    const client = createClient(
+      createQueuedFetch([
+        driveErrorResponse(403, 'userRateLimitExceeded'),
+        driveErrorResponse(403, 'userRateLimitExceeded'),
+        driveErrorResponse(403, 'userRateLimitExceeded'),
+      ]),
+      {
+        maxRetries: 2,
+        sleep: async (milliseconds) => {
+          delays.push(milliseconds);
+        },
+      },
+    );
+
+    await expect(client.exportHtmlZip('doc-id')).rejects.toMatchObject({
+      category: 'rate_limit',
+      reasons: ['userRateLimitExceeded'],
+      fileId: 'doc-id',
+    });
+    expect(delays).toEqual([250, 500]);
+  });
+
+  it.each([
+    'dailyLimitExceeded',
+    'exportSizeLimitExceeded',
+    'cannotDownloadFile',
+    'cannotExportFile',
+    'insufficientFilePermissions',
+  ])('does not retry a 403 %s', async (reason) => {
+    const capturedRequests: CapturedRequest[] = [];
+    const delays: number[] = [];
+    const client = createClient(
+      createQueuedFetch([driveErrorResponse(403, reason)], capturedRequests),
+      {
+        maxRetries: 3,
+        sleep: async (milliseconds) => {
+          delays.push(milliseconds);
+        },
+      },
+    );
+
+    await expect(client.exportHtmlZip('doc-id')).rejects.toMatchObject({
+      reasons: [reason],
+      fileId: 'doc-id',
+    });
+    expect(capturedRequests).toHaveLength(1);
+    expect(delays).toEqual([]);
+  });
+
+  it('keeps a 403 without a readable reason a permission failure', async () => {
+    const error = await captureError(
+      createClient(
+        createQueuedFetch([
+          new Response('<html>Private Title</html>', {
+            status: 403,
+            headers: {
+              'content-type': 'text/html',
+              'x-request-id': 'request-id',
+            },
+          }),
+        ]),
+        { maxRetries: 2 },
+      ).exportMarkdown('doc-id'),
+    );
+
+    expect(error).toMatchObject({
+      category: 'permission',
+      reasons: [],
+      fileId: 'doc-id',
+    });
+    expect(describeGoogleApiError(error as GoogleApiError)).toBe(
+      'status=403 fileId=doc-id requestId=request-id',
+    );
+  });
+
+  it('names the configured root folder when its lookup fails, and no file for the inventory', async () => {
+    await expect(
+      createClient(
+        createQueuedFetch([
+          jsonResponse({ id: 'drive-id' }),
+          driveErrorResponse(404, 'notFound'),
+        ]),
+        { maxRetries: 0 },
+      ).validateReadScope('root'),
+    ).rejects.toMatchObject({
+      category: 'invalid_response',
+      reasons: ['notFound'],
+      fileId: 'root',
+    });
+
+    const inventoryError = await captureError(
+      createClient(
+        createQueuedFetch([
+          driveErrorResponse(403, 'teamDriveMembershipRequired'),
+        ]),
+        { maxRetries: 0 },
+      ).listInventory(),
+    );
+    expect(inventoryError).toMatchObject({
+      category: 'permission',
+      reasons: ['teamDriveMembershipRequired'],
+    });
+    expect((inventoryError as GoogleApiError).fileId).toBeUndefined();
+  });
+
   it('retries network failures with deterministic exponential backoff', async () => {
     const delays: number[] = [];
     const client = createClient(
@@ -294,7 +496,7 @@ describe('Google Drive read-only client', () => {
   });
 
   it('rejects declared and streamed exports above the 10 MB limit', async () => {
-    await expect(
+    const declaredError = await captureError(
       createClient(
         createQueuedFetch([
           new Response('small', {
@@ -304,7 +506,12 @@ describe('Google Drive read-only client', () => {
           }),
         ]),
       ).exportMarkdown('declared-too-large'),
-    ).rejects.toThrow('10 MB');
+    );
+    expect(declaredError).toMatchObject({
+      message: expect.stringContaining('10 MB'),
+      category: 'export_size_limit',
+      fileId: 'declared-too-large',
+    });
 
     const oversizedChunk = new Uint8Array(MAX_GOOGLE_EXPORT_BYTES + 1);
     await expect(
@@ -320,6 +527,10 @@ describe('Google Drive read-only client', () => {
           ),
         ]),
       ).exportMarkdown('streamed-too-large'),
-    ).rejects.toThrow('10 MB');
+    ).rejects.toMatchObject({
+      message: expect.stringContaining('10 MB'),
+      category: 'export_size_limit',
+      fileId: 'streamed-too-large',
+    });
   });
 });

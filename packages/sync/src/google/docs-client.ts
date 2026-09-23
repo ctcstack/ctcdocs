@@ -2,9 +2,10 @@ import { z } from 'zod';
 
 import type { GoogleAccessTokenProvider } from './auth.js';
 import {
-  categorizeGoogleApiStatus,
+  categorizeGoogleApiFailure,
   GoogleApiError,
-  isRetryableGoogleApiStatus,
+  isRetryableGoogleApiFailure,
+  readGoogleApiErrorReasons,
 } from './google-api-error.js';
 
 const DOCS_API_BASE_URL = 'https://docs.googleapis.com/v1';
@@ -106,7 +107,7 @@ export class GoogleDocsClient {
     );
     url.searchParams.set('includeTabsContent', 'true');
     url.searchParams.set('fields', DOCUMENT_FIELDS);
-    const response = await this.request(url);
+    const response = await this.request(url, fileId);
 
     let parsed: z.infer<typeof documentResponseSchema>;
     try {
@@ -117,7 +118,7 @@ export class GoogleDocsClient {
         'invalid_response',
         response.status,
         this.safeRequestId(response),
-        { cause: error },
+        { cause: error, fileId },
       );
     }
 
@@ -127,6 +128,7 @@ export class GoogleDocsClient {
         'invalid_response',
         response.status,
         this.safeRequestId(response),
+        { fileId },
       );
     }
 
@@ -165,7 +167,7 @@ export class GoogleDocsClient {
     };
   }
 
-  private async request(url: URL): Promise<Response> {
+  private async request(url: URL, fileId: string): Promise<Response> {
     for (let attempt = 0; attempt <= this.options.maxRetries; attempt += 1) {
       let response: Response;
       try {
@@ -188,13 +190,14 @@ export class GoogleDocsClient {
           'network',
           undefined,
           'unavailable',
-          { cause: error },
+          { cause: error, fileId },
         );
       }
 
       if (!response.ok) {
+        const reasons = await readGoogleApiErrorReasons(response);
         if (
-          isRetryableGoogleApiStatus(response.status) &&
+          isRetryableGoogleApiFailure(response.status, reasons) &&
           attempt < this.options.maxRetries
         ) {
           await this.sleep(
@@ -207,9 +210,10 @@ export class GoogleDocsClient {
         }
         throw new GoogleApiError(
           `Google Docs API request failed with status ${response.status}.`,
-          categorizeGoogleApiStatus(response.status),
+          categorizeGoogleApiFailure(response.status, reasons),
           response.status,
           this.safeRequestId(response),
+          { reasons, fileId },
         );
       }
       return response;

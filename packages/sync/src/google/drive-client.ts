@@ -8,9 +8,10 @@ import {
   type DriveItem,
 } from './drive-types.js';
 import {
-  categorizeGoogleApiStatus,
+  categorizeGoogleApiFailure,
   GoogleApiError,
-  isRetryableGoogleApiStatus,
+  isRetryableGoogleApiFailure,
+  readGoogleApiErrorReasons,
 } from './google-api-error.js';
 
 const DRIVE_API_BASE_URL = 'https://www.googleapis.com/drive/v3';
@@ -68,6 +69,7 @@ export class GoogleDriveClient {
         supportsAllDrives: 'true',
       },
       rootFolderResponseSchema,
+      rootFolderId,
     );
     if (
       rootFolder.id !== rootFolderId ||
@@ -160,6 +162,7 @@ export class GoogleDriveClient {
       `files/${encodeURIComponent(fileId)}/export`,
       { mimeType },
       mimeType,
+      fileId,
     );
     const declaredLength = response.headers.get('content-length');
     if (
@@ -169,9 +172,10 @@ export class GoogleDriveClient {
     ) {
       throw new GoogleApiError(
         'Google Drive export exceeded the 10 MB limit.',
-        'invalid_response',
+        'export_size_limit',
         response.status,
         this.safeRequestId(response),
+        { fileId },
       );
     }
 
@@ -181,9 +185,10 @@ export class GoogleDriveClient {
       if (bytes.byteLength > MAX_GOOGLE_EXPORT_BYTES) {
         throw new GoogleApiError(
           'Google Drive export exceeded the 10 MB limit.',
-          'invalid_response',
+          'export_size_limit',
           response.status,
           this.safeRequestId(response),
+          { fileId },
         );
       }
       return bytes;
@@ -201,9 +206,10 @@ export class GoogleDriveClient {
         await reader.cancel();
         throw new GoogleApiError(
           'Google Drive export exceeded the 10 MB limit.',
-          'invalid_response',
+          'export_size_limit',
           response.status,
           this.safeRequestId(response),
+          { fileId },
         );
       }
       chunks.push(value);
@@ -222,11 +228,13 @@ export class GoogleDriveClient {
     path: string,
     searchParameters: Record<string, string>,
     schema: TSchema,
+    fileId?: string,
   ): Promise<z.infer<TSchema>> {
     const response = await this.request(
       path,
       searchParameters,
       'application/json',
+      fileId,
     );
     try {
       return schema.parse(await response.json()) as z.infer<TSchema>;
@@ -236,7 +244,7 @@ export class GoogleDriveClient {
         'invalid_response',
         response.status,
         this.safeRequestId(response),
-        { cause: error },
+        { cause: error, fileId },
       );
     }
   }
@@ -245,6 +253,7 @@ export class GoogleDriveClient {
     path: string,
     searchParameters: Record<string, string>,
     accept: string,
+    fileId?: string,
   ): Promise<Response> {
     const url = new URL(`${this.baseUrl}/${path}`);
     for (const [name, value] of Object.entries(searchParameters)) {
@@ -273,14 +282,15 @@ export class GoogleDriveClient {
           'network',
           undefined,
           'unavailable',
-          { cause: error },
+          { cause: error, fileId },
         );
       }
 
       const requestId = this.safeRequestId(response);
       if (!response.ok) {
+        const reasons = await readGoogleApiErrorReasons(response);
         if (
-          isRetryableGoogleApiStatus(response.status) &&
+          isRetryableGoogleApiFailure(response.status, reasons) &&
           attempt < this.options.maxRetries
         ) {
           await this.sleep(
@@ -294,9 +304,10 @@ export class GoogleDriveClient {
 
         throw new GoogleApiError(
           `Google Drive API request failed with status ${response.status}.`,
-          categorizeGoogleApiStatus(response.status),
+          categorizeGoogleApiFailure(response.status, reasons),
           response.status,
           requestId,
+          { reasons, fileId },
         );
       }
 

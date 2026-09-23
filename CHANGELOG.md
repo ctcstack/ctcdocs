@@ -4,6 +4,13 @@ All three packages share a version and are released together.
 
 ## Unreleased
 
+### Added
+
+- `GoogleApiError` carries `reasons` and `fileId`. `categorizeGoogleApiFailure`
+  and `isRetryableGoogleApiFailure` take the reasons into account;
+  `categorizeGoogleApiStatus` and `isRetryableGoogleApiStatus` still judge the
+  status alone.
+
 ### Changed
 
 - The dependencies carrying advisories published since 0.2.3 are updated.
@@ -20,6 +27,24 @@ All three packages share a version and are released together.
   in the background when it detects an AI agent, and the browser suite's web
   server then exits as soon as it starts. CI is unaffected. Under an agent,
   run the suite with `ASTRO_PREVIEW_BACKGROUND=1` until the platform handles it.
+
+### Fixed
+
+- A Drive or Docs request refused with 403 for a rate limit
+  (`rateLimitExceeded`, `userRateLimitExceeded`) is retried with the same
+  backoff as a 429, as Google directs, instead of failing the run as a
+  permission error.
+- A failed Google request says why and on what. The sync error line carries
+  the reason codes Google returned and the ID of the file being exported or
+  inspected, for example
+  `ERROR [GOOGLE_EXPORT_SIZE_LIMIT]: status=403 reason=exportSizeLimitExceeded fileId=<id> requestId=<id>`.
+  Only reason codes are kept from the response body, read up to 64 KiB; its
+  messages are discarded. A document over the 10 MB export limit is reported
+  as `GOOGLE_EXPORT_SIZE_LIMIT` (exit 1), whether Google or the pipeline
+  refused it, and one that stops viewers from downloading as
+  `GOOGLE_DOWNLOAD_RESTRICTED` (exit 3); both were a bare `GOOGLE_PERMISSION`
+  or `GOOGLE_INVALID_RESPONSE`. What each category asks of an operator is in
+  [Operations](docs/OPERATIONS.md#failure-handling).
 
 ## 0.2.3
 
