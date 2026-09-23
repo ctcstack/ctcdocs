@@ -6,7 +6,8 @@
  * frontmatter, no slug, and no content hash. Starlight's previous and next
  * links follow the sidebar, so they follow this too.
  *
- * See docs/ADR/013-editorial-navigation-order.md.
+ * See docs/ADR/013-editorial-navigation-order.md and
+ * docs/ADR/019-folders-before-documents.md.
  */
 import type {
   InventoryIssue,
@@ -29,10 +30,22 @@ export interface NavigationSibling {
 interface SortKey {
   /** 0 landing document, 1 numbered, 2 everything else. */
   tier: 0 | 1 | 2;
-  /** Position within the tier: the landing precedence, or the number. */
+  /**
+   * Position within the tier: the landing precedence, the number, or — among
+   * the unnumbered rest — folders before documents.
+   */
   rank: number;
   label: string;
 }
+
+/*
+ * Among siblings nobody numbered, folders come first, the way a file browser
+ * lists them: a reader scanning a folder sees its divisions before its pages.
+ * An editor's number and the landing document still outrank this, because
+ * both are decisions someone made and this is only a default. See
+ * docs/ADR/019-folders-before-documents.md.
+ */
+const UNNUMBERED_KIND_RANK = { folder: 0, document: 1 } as const;
 
 function landingRank(
   title: string,
@@ -56,7 +69,7 @@ function sortKey(
   const landing =
     sibling.kind === 'document' ? landingRank(label, landingTitles) : undefined;
   return landing === undefined
-    ? { tier: 2, rank: 0, label }
+    ? { tier: 2, rank: UNNUMBERED_KIND_RANK[sibling.kind], label }
     : { tier: 0, rank: landing, label };
 }
 

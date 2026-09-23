@@ -55,7 +55,7 @@ name of its own; they read this file. The rationale is recorded in
 | `home.recentLimit`                     | How many documents the "recently updated" band lists. A whole number of at least 1; defaults to 6.                          |
 | `home.corpusIndex`                     | Whether the home page carries the full index, which is published at `/documents/` either way. Defaults to `true`.           |
 | `navigation.landingDocumentTitles`     | Titles that open the folder they sit in, most preferred first. Also picks the description the home page shows for a folder. |
-| `navigation.sectionIndexPages`         | Whether each folder gets a generated page listing its contents at `/<folder-slug>/`.                                        |
+| `navigation.sectionIndexPages`         | Whether each folder gets a generated page listing its subfolders, then its documents, at `/<folder-slug>/`.                 |
 | `sync.generatedBy`                     | The ownership marker stamped into every generated Markdown and TypeScript file.                                             |
 | `sync.commitBotName`                   | Git author the sync workflow commits generated output as.                                                                   |
 | `sync.defaultLocale`                   | Fallback locale for documents whose language cannot be determined.                                                          |

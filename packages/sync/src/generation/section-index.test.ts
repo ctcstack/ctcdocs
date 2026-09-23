@@ -28,8 +28,14 @@ describe('section index pages', () => {
     const content = generateSectionIndexDocument(
       input({
         entries: [
-          { label: 'Runbooks', slug: 'team/runbooks' },
           {
+            kind: 'folder',
+            label: 'Runbooks',
+            slug: 'team/runbooks',
+            documentCount: 2,
+          },
+          {
+            kind: 'document',
             label: 'Guide',
             slug: 'team/guide',
             description: 'How the thing is done.',
@@ -43,6 +49,55 @@ describe('section index pages', () => {
     expect(content).toContain(
       '- [Guide](/team/guide/) — How the thing is done.\n',
     );
+  });
+
+  it('records what each entry is, so the reader can tell folders from documents', () => {
+    const content = generateSectionIndexDocument(
+      input({
+        entries: [
+          {
+            kind: 'folder',
+            label: 'Runbooks',
+            slug: 'team/runbooks',
+            documentCount: 2,
+          },
+          {
+            kind: 'folder',
+            label: 'Archive',
+            slug: 'team/archive',
+            documentCount: 0,
+          },
+          {
+            kind: 'document',
+            label: 'Guide',
+            slug: 'team/guide',
+            description: 'How the thing is done.',
+          },
+        ],
+      }),
+      TEST_MARKDOWN_HEADER,
+    );
+
+    expect(content).toContain(
+      [
+        '"entries":',
+        '  - "kind": "folder"',
+        '    "slug": "team/runbooks"',
+        '    "documentCount": 2',
+        '  - "kind": "folder"',
+        '    "slug": "team/archive"',
+        '    "documentCount": 0',
+        '  - "kind": "document"',
+        '    "slug": "team/guide"',
+        '"pagefind": false',
+      ].join('\n'),
+    );
+  });
+
+  it('writes an empty entry list for an empty folder', () => {
+    expect(
+      generateSectionIndexDocument(input(), TEST_MARKDOWN_HEADER),
+    ).toContain('"entries": []');
   });
 
   it('says so when a folder has nothing in it', () => {
@@ -74,7 +129,9 @@ describe('section index pages', () => {
   it('escapes a label that would otherwise open a link', () => {
     const content = generateSectionIndexDocument(
       input({
-        entries: [{ label: 'Rates [2026]', slug: 'team/rates' }],
+        entries: [
+          { kind: 'document', label: 'Rates [2026]', slug: 'team/rates' },
+        ],
       }),
       TEST_MARKDOWN_HEADER,
     );

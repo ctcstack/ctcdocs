@@ -60,6 +60,26 @@ const sectionFrontmatterSchema = z.strictObject({
   sourceType: z.literal('section-index'),
   contentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
   folderPath: z.array(z.string()),
+  /*
+   * Optional because a targeted run carries section pages over unchanged, and
+   * a page written before entries existed is still a valid page: the reader
+   * interface falls back to its Markdown list.
+   */
+  entries: z
+    .array(
+      z.discriminatedUnion('kind', [
+        z.strictObject({
+          kind: z.literal('folder'),
+          slug: z.string().min(1),
+          documentCount: z.number().int().nonnegative(),
+        }),
+        z.strictObject({
+          kind: z.literal('document'),
+          slug: z.string().min(1),
+        }),
+      ]),
+    )
+    .optional(),
   pagefind: z.literal(false),
 });
 
@@ -284,6 +304,15 @@ async function validateGeneratedOutputInternal(
     linkDocuments.push({ body, stableSlug: record.stableSlug });
   }
 
+  const folderSlugs = new Set(
+    Object.values(manifest.folders).flatMap((folder) =>
+      folder.stableSlug ? [folder.stableSlug] : [],
+    ),
+  );
+  const documentSlugs = new Set(
+    Object.values(manifest.documents).map((record) => record.stableSlug),
+  );
+
   for (const folder of Object.values(manifest.folders)) {
     if (!folder.generatedMarkdownPath || !folder.stableSlug) {
       continue;
@@ -302,6 +331,18 @@ async function validateGeneratedOutputInternal(
       frontmatter.title !== folder.displayLabel
     ) {
       throw new Error('Generated section page does not match the manifest.');
+    }
+    // An entry that names the wrong kind would draw a document as a folder.
+    if (
+      frontmatter.entries?.some((entry) =>
+        entry.kind === 'folder'
+          ? !folderSlugs.has(entry.slug)
+          : !documentSlugs.has(entry.slug),
+      )
+    ) {
+      throw new Error(
+        'Generated section page lists an entry the manifest does not record.',
+      );
     }
     const body = extractGeneratedDocumentBody(content, markdownHeader);
     if (body === undefined) {

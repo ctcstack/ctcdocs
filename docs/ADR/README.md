@@ -41,5 +41,6 @@ Rejected
 - ADR-016: who may read a deployment is configuration.
 - ADR-017: the full index becomes a page.
 - ADR-018: a sync run scans what it commits, and a finding stops it.
+- ADR-019: folders before documents, and a section page that tells them apart.
 
 Create a new ADR by copying `000-template.md`.

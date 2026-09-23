@@ -293,6 +293,71 @@ describe('basic Markdown sync', () => {
     expect(second.outputChanged).toBe(false);
   });
 
+  it('lists subfolders first and says how many documents each holds', async () => {
+    const repository = await mkdtemp(resolve(tmpdir(), 'kb-sync-run-'));
+    temporaryDirectories.push(repository);
+    const markdownExporter = {
+      exportMarkdown() {
+        return Promise.resolve(new TextEncoder().encode('Body.\n'));
+      },
+    };
+    const selection = buildInventorySelection(
+      [
+        folder('root', 'Published', ['drive']),
+        folder('hub', 'Hub', ['root']),
+        folder('guides', 'Guides', ['hub']),
+        folder('deep', 'Deep', ['guides']),
+        folder('archive', 'Archive', ['hub']),
+        { ...documentWithId('doc-appendix', 'Appendix'), parents: ['hub'] },
+        { ...documentWithId('doc-guide', 'Guide'), parents: ['guides'] },
+        { ...documentWithId('doc-deep', 'Deep note'), parents: ['deep'] },
+      ],
+      'root',
+      [],
+      ['drive'],
+    );
+
+    await runBasicMarkdownSync(
+      testSyncContext(repository),
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: false },
+      {
+        inventoryResult: {
+          selection,
+          report: createInventoryReport(selection, 'drive', []),
+        },
+        markdownExporter,
+        now: () => new Date(firstTimestamp),
+      },
+    );
+
+    const hubPage = await readFile(
+      resolve(repository, 'src/content/docs/_generated/section-hub.md'),
+      'utf8',
+    );
+    // Folders before documents, each group alphabetical, in both forms.
+    expect(hubPage).toContain(
+      [
+        '"entries":',
+        '  - "kind": "folder"',
+        '    "slug": "hub/archive"',
+        '    "documentCount": 0',
+        '  - "kind": "folder"',
+        '    "slug": "hub/guides"',
+        '    "documentCount": 2',
+        '  - "kind": "document"',
+        '    "slug": "hub/appendix"',
+      ].join('\n'),
+    );
+    expect(hubPage.indexOf('/hub/archive/')).toBeLessThan(
+      hubPage.indexOf('/hub/guides/'),
+    );
+    expect(hubPage.indexOf('/hub/guides/')).toBeLessThan(
+      hubPage.indexOf('/hub/appendix/'),
+    );
+  });
+
   it('renumbers folders without re-exporting the documents in them', async () => {
     const repository = await mkdtemp(resolve(tmpdir(), 'kb-sync-run-'));
     temporaryDirectories.push(repository);
