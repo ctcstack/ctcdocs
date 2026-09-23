@@ -130,6 +130,8 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
       // Source provenance moved from the footer to under the title.
       EditLink: '@ctcstack/ctcdocs/components/NoEditLink.astro',
       Head: '@ctcstack/ctcdocs/components/Head.astro',
+      // A section page draws its listing with folders and documents apart.
+      MarkdownContent: '@ctcstack/ctcdocs/components/MarkdownContent.astro',
       PageTitle: '@ctcstack/ctcdocs/components/DocumentHeader.astro',
       // Carets rather than arrows on the previous and next links.
       Pagination: '@ctcstack/ctcdocs/components/Pagination.astro',
