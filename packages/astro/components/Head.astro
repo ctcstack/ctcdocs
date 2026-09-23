@@ -12,9 +12,16 @@ import '@fontsource-variable/inter/wght.css';
 import '@fontsource-variable/jetbrains-mono/wght.css';
 
 import Default from '@astrojs/starlight/components/Head.astro';
+
+/*
+ * Starlight's layer order, inline so that no bundler can place a layered rule
+ * ahead of it. See lib/layer-order.ts.
+ */
+import { STARLIGHT_LAYER_ORDER } from '../lib/layer-order';
 ---
 
 <Default />
+<style is:inline set:html={STARLIGHT_LAYER_ORDER}></style>
 <script>
   import '../scripts/mermaid-entry';
 </script>
