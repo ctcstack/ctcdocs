@@ -19,17 +19,40 @@ function suiteDirectory(name: 'ux' | 'e2e'): string {
   return fileURLToPath(new URL(`./tests/${name}`, import.meta.url));
 }
 
+/**
+ * `ctcdocs-preview`, found through this package rather than a project's
+ * `node_modules/.bin`, which is on `PATH` only when a package manager started
+ * Playwright.
+ */
+const previewServer = fileURLToPath(
+  new URL(
+    'bin/preview.mjs',
+    import.meta.resolve('@ctcstack/ctcdocs/package.json'),
+  ),
+);
+
+/** Quotes one word for the shell Playwright runs `webServer.command` in. */
+function shellWord(value: string): string {
+  return process.platform === 'win32'
+    ? `"${value}"`
+    : `'${value.replaceAll("'", `'\\''`)}'`;
+}
+
 export interface UxConfigOptions {
   /** Port the preview server binds while the suite runs. */
   port?: number;
-  /** Command that serves the built site. Defaults to the project's `preview`. */
+  /**
+   * Command that serves the built site. Defaults to this package's
+   * `ctcdocs-preview`, which stays in the foreground under an AI agent where
+   * `astro preview` does not.
+   */
   previewCommand?: string;
 }
 
 /**
- * The local gate: builds are served from the project's own preview server, and
- * the suite asserts accessibility and interface behavior against the corpus
- * that project has.
+ * The local gate: the build is served by Astro's preview server, and the suite
+ * asserts accessibility and interface behavior against the corpus that project
+ * has.
  */
 export function defineUxConfig(
   options: UxConfigOptions = {},
@@ -61,7 +84,7 @@ export function defineUxConfig(
     webServer: {
       command:
         options.previewCommand ??
-        `pnpm preview --host 127.0.0.1 --port ${port}`,
+        `${shellWord(process.execPath)} ${shellWord(previewServer)} --host 127.0.0.1 --port ${port}`,
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
       url: baseURL,

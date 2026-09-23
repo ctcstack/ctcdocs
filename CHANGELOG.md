@@ -23,6 +23,22 @@ All three packages share a version and are released together.
   take this release of `@ctcstack/ctcdocs-sync` with it; the workflow calls the
   new command, and the scan step fails without it.
 
+### Fixed
+
+- The browser suite runs the same under an AI agent as without one, and
+  `ASTRO_PREVIEW_BACKGROUND=1`, which 0.3.0 suggested for agents, is no longer
+  needed. On macOS and Linux, `astro preview` from 7.2 onwards moves itself to
+  the background when it detects an agent, so `test:ux` run by one either
+  failed because the web server exited early, or passed and left the preview
+  holding the port for the next run to reuse. `defineUxConfig()` now serves the
+  build with `ctcdocs-preview`, a new binary of `@ctcstack/ctcdocs` that starts
+  the same server through Astro's programmatic `preview()`, which detects no
+  agent and keeps no lock file, and stays in the foreground for Playwright to
+  stop. The suite no longer runs the project's `preview` script;
+  `previewCommand` still replaces the command. A preview an earlier run left in
+  the background still holds its port and is reused outside CI: stop it once
+  with `pnpm exec astro preview stop`.
+
 ## 0.3.0
 
 ### Added

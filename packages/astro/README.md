@@ -103,13 +103,15 @@ to strip types from a file inside `node_modules`, and Playwright loads that one
 directly. `eslint` and `prettier` are JavaScript configuration and carry no
 declarations.
 
-`defineUxConfig()` starts a preview server with `pnpm preview` on port 4323.
+`defineUxConfig()` serves the build with `ctcdocs-preview` on port 4323.
 `defineAccessConfig()` takes its target from `CTCDOCS_BASE_URL`.
 
-Two binaries come with it: `ctcdocs-verify-search`, which proves the built
-Pagefind index finds the documents the corpus contains, and
+Three binaries come with it: `ctcdocs-verify-search`, which proves the built
+Pagefind index finds the documents the corpus contains;
 `ctcdocs-access-smoke`, which proves a deployment is reachable exactly by the
-audience it declares.
+audience it declares; and `ctcdocs-preview`, which serves the build with
+Astro's preview server and stays in the foreground where `astro preview` moves
+itself to the background under an AI agent.
 
 ## Documentation
 

@@ -39,6 +39,7 @@
   },
   "bin": {
     "ctcdocs-access-smoke": "./bin/access-smoke.mjs",
+    "ctcdocs-preview": "./bin/preview.mjs",
     "ctcdocs-verify-search": "./bin/verify-search.mjs"
   },
   "files": [
