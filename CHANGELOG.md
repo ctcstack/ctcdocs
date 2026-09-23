@@ -22,6 +22,10 @@ All three packages share a version and are released together.
   description for a document. Each row's kind also reaches a screen reader as
   text. A page generated before this release keeps its plain list until the
   next full sync rewrites it.
+- The workflows cache the images Astro optimizes, in `project-sync.yml`,
+  `project-deploy.yml` and `project-ci.yml`, keyed by the lockfile and the
+  images under `src/assets/`. Encoding them was most of every build, and a sync
+  that deploys builds the site three times.
 
 ### Fixed
 
