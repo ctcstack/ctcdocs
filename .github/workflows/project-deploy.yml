@@ -12,6 +12,10 @@ name: CTCDocs project deployment
 #           deploy_environment: production-deploy
 #           smoke_environment: production-smoke
 #         secrets: inherit
+#
+# A caller deploying a commit that project-sync.yml produced passes its
+# `candidate_sha` with `candidate_verified: true`: the sync job ran the same
+# gate on that exact tree before committing it, so the gate is not run twice.
 
 on:
   workflow_call:
@@ -32,6 +36,11 @@ on:
         description: Exact commit to verify and deploy
         required: false
         type: string
+      candidate_verified:
+        description: The candidate already passed pnpm verify in the job that committed it; requires candidate_sha
+        required: false
+        type: boolean
+        default: false
       pnpm_version:
         required: false
         type: string
@@ -52,6 +61,14 @@ jobs:
       present: ${{ steps.check.outputs.present }}
 
     steps:
+      # Verification is skipped only for a commit named exactly. Without a SHA
+      # the workflow would deploy whatever triggered it, which nobody verified.
+      - name: Require an exact commit for a verified candidate
+        if: inputs.candidate_verified && inputs.candidate_sha == ''
+        run: |
+          echo "::error::candidate_verified requires candidate_sha."
+          exit 1
+
       - name: Checkout candidate without persisted credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -74,7 +91,7 @@ jobs:
   verify:
     name: Verify the deployment candidate
     needs: corpus
-    if: needs.corpus.outputs.present == 'true'
+    if: needs.corpus.outputs.present == 'true' && !inputs.candidate_verified
     runs-on: ubuntu-24.04
     timeout-minutes: 25
 
@@ -145,9 +162,13 @@ jobs:
       - name: Run the project gate
         run: pnpm verify
 
+  # The preflight probes the live hostname and reads nothing from the
+  # candidate, so it runs beside verification rather than after it. It only
+  # reads, and the deployment still waits for both.
   access-preflight:
     name: Verify Access before deployment
-    needs: verify
+    needs: corpus
+    if: needs.corpus.outputs.present == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: ${{ inputs.smoke_environment }}
@@ -198,9 +219,19 @@ jobs:
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: pnpm exec ctcdocs-access-smoke --preflight
 
+  # Verification is either a success here or was skipped because the caller
+  # declared the exact candidate verified. Skipped for any other reason, such
+  # as a missing corpus, it stops the deployment like a failure does.
   deploy:
     name: Deploy immutable static assets
-    needs: access-preflight
+    needs:
+      - verify
+      - access-preflight
+    if: >-
+      !cancelled() &&
+      needs.access-preflight.result == 'success' &&
+      (needs.verify.result == 'success' ||
+      (inputs.candidate_verified && needs.verify.result == 'skipped'))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment:

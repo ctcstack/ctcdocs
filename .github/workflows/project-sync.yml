@@ -13,6 +13,18 @@ name: CTCDocs project synchronization
 #         permissions:
 #           contents: write
 #           id-token: write
+#
+# A commit this workflow outputs has already passed `pnpm verify`, so a caller
+# that deploys it says so and project-deploy.yml does not run the gate again:
+#
+#       deployment:
+#         needs: sync
+#         if: needs.sync.outputs.changed == 'true' && github.ref_name == 'main'
+#         uses: ctcstack/ctcdocs/.github/workflows/project-deploy.yml@<commit sha>
+#         with:
+#           candidate_sha: ${{ needs.sync.outputs.candidate_sha }}
+#           candidate_verified: true
+#           ...
 
 on:
   workflow_call:
