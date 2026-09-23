@@ -58,7 +58,7 @@
     "remark-gfm": "4.0.1",
     "remark-parse": "11.0.0",
     "remark-stringify": "11.0.0",
-    "smol-toml": "1.6.1",
+    "smol-toml": "1.7.2",
     "turndown": "7.2.4",
     "unified": "11.0.5",
     "yaml": "2.9.0",
@@ -70,6 +70,6 @@
     "@types/turndown": "5.0.6",
     "fast-check": "4.9.0",
     "typescript": "6.0.3",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   }
 }

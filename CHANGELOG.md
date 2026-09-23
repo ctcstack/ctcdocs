@@ -2,6 +2,25 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Changed
+
+- The dependencies carrying advisories published since 0.2.3 are updated.
+  `smol-toml` goes to 1.7.2 in `@ctcstack/ctcdocs-sync`, which reaches every
+  project. The site package now requires `astro` ^7.2.8, the first release
+  without a critical remote code execution through AVIF image optimization,
+  and `sharp` ^0.35.4, the first without libheif's vulnerabilities. Its
+  `@astrojs/markdown-remark` goes to 7.2.4, the version those `astro` releases
+  expect. The fixture project moves to `astro` 7.2.9, `sharp` 0.35.4 and
+  `wrangler` 4.131.2, whose Miniflare takes the patched `sharp`, and the
+  workspace to `vitest` 4.1.11. `pnpm audit` reports nothing at any severity.
+- A project that takes this release has to raise its own `astro` and `sharp`
+  to those versions. On macOS and Linux, `astro preview` from 7.2 onwards starts
+  in the background when it detects an AI agent, and the browser suite's web
+  server then exits as soon as it starts. CI is unaffected. Under an agent,
+  run the suite with `ASTRO_PREVIEW_BACKGROUND=1` until the platform handles it.
+
 ## 0.2.3
 
 ### Changed

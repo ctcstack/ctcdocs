@@ -69,7 +69,7 @@
     "test": "vitest run --root ../.. && node --test bin/*.test.mjs"
   },
   "dependencies": {
-    "@astrojs/markdown-remark": "7.2.2",
+    "@astrojs/markdown-remark": "7.2.4",
     "@axe-core/playwright": "4.12.1",
     "@ctcstack/ctcdocs-core": "workspace:^",
     "@eslint/js": "10.0.1",
@@ -91,17 +91,17 @@
   "peerDependencies": {
     "@astrojs/starlight": "^0.41.5",
     "@playwright/test": "^1.62.0",
-    "astro": "^7.1.6",
-    "sharp": "^0.35.0"
+    "astro": "^7.2.8",
+    "sharp": "^0.35.4"
   },
   "devDependencies": {
     "@astrojs/starlight": "0.41.5",
     "@playwright/test": "1.62.1",
     "@types/mdast": "4.0.4",
     "@types/node": "22.20.1",
-    "astro": "7.1.6",
+    "astro": "7.2.9",
     "linkedom": "0.18.12",
     "typescript": "6.0.3",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   }
 }
