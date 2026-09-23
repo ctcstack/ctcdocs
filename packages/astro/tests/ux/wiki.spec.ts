@@ -305,6 +305,20 @@ test('a section page tells its folders from its documents', async ({
 
   await page.goto(`/${section.slug}/`);
 
+  /*
+   * A page generated before its entries were recorded keeps the Markdown list
+   * in its body, and that list still has to lead to the subfolder.
+   */
+  if (!section.recordsEntries) {
+    await expect(page.locator('.section-list')).toHaveCount(0);
+    await expect(
+      page
+        .locator('.sl-markdown-content > ul')
+        .locator(`a[href="/${subfolder.slug}/"]`),
+    ).toHaveText(subfolder.label);
+    return;
+  }
+
   // The listing is drawn from the page's entries, not its Markdown fallback.
   const list = page.locator('.section-list');
   await expect(list).toBeVisible();

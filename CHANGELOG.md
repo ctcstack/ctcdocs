@@ -2,6 +2,18 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Fixed
+
+- The browser suite passes on a project that has just taken 0.5.0. The
+  section-page check drew its sample from the manifest and always expected the
+  new listing, but section pages generated before 0.5.0 record no entries and,
+  as intended, keep their Markdown list until the next sync rewrites them, so
+  the upgrade's own pull request failed until a sync had run. The check now
+  reads the sample page's frontmatter: a page without entries must show its
+  Markdown list, linking the subfolder, and no listing.
+
 ## 0.5.0
 
 ### Changed
