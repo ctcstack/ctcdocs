@@ -146,7 +146,7 @@ fails the gate for a reason that has nothing to do with what you are testing.
 | `public/robots.txt`    | `Disallow: /` for a private deployment; anything else for a public one              |
 | `public/_headers`      | Cache and robots headers for `/*.md` and `/assets/generated/*`, matching visibility |
 | `src/styles/brand.css` | The accent triad per theme. See [DESIGN.md](DESIGN.md)                              |
-| `.gitleaks.toml`       | Secret-scanning allowlist, covering only paths Git never tracks                     |
+| `.gitleaks.toml`       | Secret-scanning rules; path exemptions cover only paths Git never tracks            |
 | `tsconfig.json`        | Extends `astro/tsconfigs/strict`, includes `.astro/types.d.ts`                      |
 | `eslint.config.js`     | `import { ctcdocsEslintConfig } from '@ctcstack/ctcdocs/eslint'` plus your ignores  |
 | `prettier.config.mjs`  | `export { default } from '@ctcstack/ctcdocs/prettier'`                              |

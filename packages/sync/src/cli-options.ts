@@ -16,6 +16,11 @@ interface SyncSummaryCliOptions {
   command: 'write:sync-summary';
 }
 
+/** Scans the files a sync run changed for secrets, before they are committed. */
+interface ScanGeneratedDiffCliOptions {
+  command: 'scan:generated-diff';
+}
+
 interface NotifyFailureCliOptions {
   command: 'notify:failure';
 }
@@ -39,6 +44,7 @@ export type CliOptions =
   | GeneratedDiffCliOptions
   | GeneratedPathsCliOptions
   | NotifyFailureCliOptions
+  | ScanGeneratedDiffCliOptions
   | SyncSummaryCliOptions
   | ValidateCliOptions
   | SyncCliOptions;
@@ -59,6 +65,7 @@ export function parseCliOptions(arguments_: readonly string[]): CliOptions {
 
   if (
     command === 'validate:generated-diff' ||
+    command === 'scan:generated-diff' ||
     command === 'write:sync-summary' ||
     command === 'notify:failure' ||
     command === 'generated-paths'
@@ -144,6 +151,6 @@ export function parseCliOptions(arguments_: readonly string[]): CliOptions {
   }
 
   throw new CliUsageError(
-    'Usage: ctcdocs-sync <sync [--dry-run] [--inventory-only] [--full] [--file <id>] [--reseed-slug <id>] [--json] | validate | validate:generated-diff | write:sync-summary | notify:failure | generated-paths>',
+    'Usage: ctcdocs-sync <sync [--dry-run] [--inventory-only] [--full] [--file <id>] [--reseed-slug <id>] [--json] | validate | validate:generated-diff | scan:generated-diff | write:sync-summary | notify:failure | generated-paths>',
   );
 }

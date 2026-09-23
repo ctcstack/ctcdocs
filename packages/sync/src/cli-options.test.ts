@@ -5,6 +5,9 @@ import { CliUsageError, parseCliOptions } from './cli-options.js';
 describe('CLI option parsing', () => {
   it('parses validation and Markdown sync options', () => {
     expect(parseCliOptions(['validate'])).toEqual({ command: 'validate' });
+    expect(parseCliOptions(['scan:generated-diff'])).toEqual({
+      command: 'scan:generated-diff',
+    });
     expect(parseCliOptions(['sync', '--dry-run', '--json'])).toEqual({
       command: 'sync',
       dryRun: true,
@@ -61,6 +64,9 @@ describe('CLI option parsing', () => {
     });
     expect(() => parseCliOptions(['sync', '--unknown'])).toThrow(CliUsageError);
     expect(() => parseCliOptions(['validate', '--unknown'])).toThrow(
+      'does not accept options',
+    );
+    expect(() => parseCliOptions(['scan:generated-diff', '--staged'])).toThrow(
       'does not accept options',
     );
     expect(() => parseCliOptions(['sync', '--inventory-only'])).toThrow(

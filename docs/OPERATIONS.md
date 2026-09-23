@@ -147,14 +147,14 @@ Full regeneration:
 
 The sync job checks out `main`, writes through the atomic output writer, checks
 the complete working-tree diff against the shared generated-path allowlist,
-runs `pnpm verify`, stages only generated paths, and pushes without force. A
-concurrent human merge causes a safe non-fast-forward failure; the next run
-starts from the new `main`.
+runs `pnpm verify`, scans every changed generated file for secrets, stages only
+generated paths, and pushes without force. A concurrent human merge causes a
+safe non-fast-forward failure; the next run starts from the new `main`.
 
 No-op syncs create no commit. A successful content commit uses:
 
 ```text
-chore(kb): sync Google Drive content
+chore(content): sync Google Drive content
 ```
 
 ## Local read-only diagnostics
@@ -309,14 +309,15 @@ When `SYNC_FAILURE_WEBHOOK_URL` is configured, failure notification contains
 only:
 
 ```text
-Knowledge Base sync failed
+Documentation sync failed
 Run: <GitHub Actions run URL>
-Stage: <configuration|authentication|sync|generated-validation|build|final-generated-validation|commit|push>
+Stage: <configuration|authentication|sync|generated-validation|build|final-generated-validation|secret-scan|commit|push>
 Errors: 1
 ```
 
 It never includes document bodies, titles, tokens, private URLs, or exception
-payloads. GitHub notifications remain the fallback when the webhook is absent
+payloads. A secret scan failure is reported by its stage alone: the rule, the
+file and the document stay in the run log. GitHub notifications remain the fallback when the webhook is absent
 or unavailable.
 
 For a failed sync:
@@ -352,12 +353,87 @@ published one, and opening it still takes access to the Drive.
 The command exits with 2 for `GOOGLE_AUTHENTICATION`, 3 for `GOOGLE_PERMISSION`
 and `GOOGLE_DOWNLOAD_RESTRICTED`, and 1 otherwise.
 
+A failure at the `secret-scan` stage has a procedure of its own:
+[Secret scan findings](#secret-scan-findings).
+
 For a failed deployment:
 
 1. confirm that the previous Worker deployment is still active;
 2. fix forward when no internal content was exposed;
 3. use the rollback workflow for a user-visible regression;
 4. treat any anonymous content response as a security incident.
+
+## Secret scan findings
+
+A sync commit is pushed with the workflow's own token, and a push made with it
+starts no other workflow, so the project's CI never scans it. The sync therefore
+scans every generated file the run added or changed before it commits. It uses
+the gitleaks release the CI gate runs, and the project's own `.gitleaks.toml` and
+`.gitleaksignore`. The decision is recorded in
+[ADR-018](ADR/018-secret-scan-before-sync-commit.md).
+
+A finding fails the run at the `secret-scan` stage. Nothing is committed or
+pushed, so `main` and the deployment keep the last good output, and every other
+document's update waits with it. Each finding is one line:
+
+```text
+ERROR [SECRET_SCAN]: rule=<gitleaks rule ID> path=<generated file> line=<line> fileId=<Google file ID>
+```
+
+`fileId` is the document — or the folder, for a section page — that the
+manifest records for the file. It is left out for the outputs no single file
+owns: the sidebar, the redirect map and the data files. `line` counts lines of
+the generated Markdown, not of the Google Doc. The value is never printed, and
+neither is the text around it: the scanner redacts its report, writes it
+outside the repository, and the report is deleted once read.
+
+The command exits with 5 for findings. It exits with 1 when the scan could not
+run or its result could not be trusted: the scanner is missing or failed,
+`.gitleaks.toml` is missing, or `.gitleaks.toml` exempts a file the run changed.
+The scanner's own messages are withheld from the log; reproduce a scanner
+failure by running `gitleaks dir --no-banner .` in a checkout of the project.
+
+For a finding:
+
+1. Find the value in the document the file ID names. To see the exact line,
+   export that one document locally with `pnpm sync --file <google-file-id>`
+   and open the generated file at the reported line. With the pinned gitleaks
+   on `PATH`, `pnpm exec ctcdocs-sync scan:generated-diff` then repeats the
+   scan, and confirms an allowlist entry before it goes to review.
+2. **A credential:** treat it as exposed to everyone who can read the document.
+   Rotate it, then remove it from the document and rerun the sync. It never
+   reached Git or the site.
+3. **Not a credential** — an example key, a placeholder, an identifier shaped
+   like one: accept it in a reviewed pull request to the project, then rerun the
+   sync. Prefer an allowlist scoped to the rule and naming the value:
+
+   ```toml
+   [[allowlists]]
+   description = "Placeholder key in the integration guide's examples"
+   targetRules = ["generic-api-key"]
+   regexes = ['''^<the exact placeholder value>$''']
+   ```
+
+   The alternative is a line in `.gitleaksignore` copied from the finding,
+   `<path>:<rule>:<line>`. It silences that rule at that line of that file, for
+   the sync and for both CI scans. It stops matching when an edit above the
+   value moves it, and it keeps silencing whatever later lands on that line.
+
+Two routes are refused. A `paths` exemption covering generated files is rejected
+by both `validate` and the scan. `gitleaks:allow` written into the document is
+ignored, because the sync scans with `--ignore-gitleaks-allow`: an allowlist
+entry goes through review, and document text does not. Anchor path exemptions
+at the repository root (`^dist/` rather than `(^|/)dist/`), so that a Drive
+folder whose slug matches one cannot exempt its documents.
+
+The scan reads only what a run changes. A value an earlier sync committed is
+what the CI gate's history scan reports, on whichever pull request runs next.
+Rotate it first, then remove it from the document so the next sync removes it
+from the corpus. History still holds it. Either rewrite history, which is the
+project's decision and requires every clone to be refreshed, or record the
+finding's commit-qualified fingerprint, `<commit>:<path>:<rule>:<line>`, in
+`.gitleaksignore`. Use the commit-qualified form here. The short form would also
+let through a new value that lands on the same line of the same document.
 
 ## Rollback
 
@@ -426,7 +502,9 @@ zizmor .github/workflows
 gitleaks git --no-banner .
 ```
 
-Keep all third-party actions pinned to full commit SHAs. Update Wrangler's
+Keep all third-party actions pinned to full commit SHAs. The gitleaks release
+and checksum in `project-sync.yml` and `project-ci.yml` move together, so the
+sync scan and the CI gate apply the same rules; a test fails when they differ. Update Wrangler's
 compatibility date deliberately, review Cloudflare release notes, and run a
 protected deployment smoke after merging runtime or deployment-tool changes.
 

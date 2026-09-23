@@ -25,6 +25,23 @@ describe('sync failure notification', () => {
     expect(selectFailureStage({})).toBe('workflow');
   });
 
+  it('names a secret scan finding as its stage and nothing more', () => {
+    const notification = createFailureNotification({
+      ...baseEnvironment,
+      SYNC_STAGE_BUILD: 'success',
+      SYNC_STAGE_FINAL_VALIDATION: 'success',
+      SYNC_STAGE_SECRET_SCAN: 'failure',
+      SYNC_STAGE_COMMIT: 'skipped',
+    });
+
+    expect(notification).toEqual({
+      text: 'Documentation sync failed',
+      run: 'https://github.com/example-org/example-docs/actions/runs/12345',
+      stage: 'secret-scan',
+      errors: 1,
+    });
+  });
+
   it('carries only aggregate operational data', () => {
     expect(createFailureNotification(baseEnvironment)).toEqual({
       text: 'Documentation sync failed',

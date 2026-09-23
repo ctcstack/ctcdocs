@@ -21,6 +21,7 @@ const STAGE_VARIABLES = [
   ['generated-validation', 'SYNC_STAGE_VALIDATION'],
   ['build', 'SYNC_STAGE_BUILD'],
   ['final-generated-validation', 'SYNC_STAGE_FINAL_VALIDATION'],
+  ['secret-scan', 'SYNC_STAGE_SECRET_SCAN'],
   ['commit', 'SYNC_STAGE_COMMIT'],
   ['push', 'SYNC_STAGE_PUSH'],
 ] as const;

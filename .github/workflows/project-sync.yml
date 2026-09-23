@@ -108,6 +108,22 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
 
+      # The release and checksum match project-ci.yml, so the scan below and the
+      # project's CI gate apply the same rules. Change them together.
+      - name: Install the checksummed secret scanner
+        shell: bash
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          set -euo pipefail
+
+          curl --fail --silent --show-error --location \
+            --output "${RUNNER_TEMP}/gitleaks.tar.gz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  ${RUNNER_TEMP}/gitleaks.tar.gz" | sha256sum --check
+          tar --extract --gzip --file "${RUNNER_TEMP}/gitleaks.tar.gz" --directory "${RUNNER_TEMP}" gitleaks
+
       # Read-only, short-lived, and federated: no service account key exists.
       - name: Authenticate to Google Cloud
         id: authentication
@@ -172,6 +188,19 @@ jobs:
         env:
           SYNC_OUTPUT_CHANGED: ${{ steps.changes.outputs.changed }}
         run: pnpm exec ctcdocs-sync write:sync-summary
+
+      # The push below is made with the workflow's token, which starts no other
+      # workflow, so the project's CI never scans what a sync commits. Every
+      # file this run changed is scanned here instead, with the project's own
+      # .gitleaks.toml and .gitleaksignore, and a finding fails the run before
+      # anything is committed. The log names the rule, the file and the line,
+      # never the value. See docs/ADR/018-secret-scan-before-sync-commit.md.
+      - name: Scan the generated diff for secrets
+        id: secret_scan
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          CTCDOCS_GITLEAKS_BINARY: ${{ runner.temp }}/gitleaks
+        run: pnpm exec ctcdocs-sync scan:generated-diff
 
       # Only the paths a sync run may write are staged, and the pipeline itself
       # is asked what those are so the list cannot drift from the allowlist it
@@ -240,6 +269,7 @@ jobs:
           SYNC_STAGE_VALIDATION: ${{ steps.generated_validation.outcome }}
           SYNC_STAGE_BUILD: ${{ steps.build.outcome }}
           SYNC_STAGE_FINAL_VALIDATION: ${{ steps.final_validation.outcome }}
+          SYNC_STAGE_SECRET_SCAN: ${{ steps.secret_scan.outcome }}
           SYNC_STAGE_COMMIT: ${{ steps.commit.outcome }}
           SYNC_STAGE_PUSH: ${{ steps.push.outcome }}
         run: pnpm exec ctcdocs-sync notify:failure

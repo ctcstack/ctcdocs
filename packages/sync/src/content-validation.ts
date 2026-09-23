@@ -11,9 +11,9 @@ import {
   type SiteConfiguration,
 } from '@ctcstack/ctcdocs-core';
 import { parse as parseJsonWithComments } from 'jsonc-parser';
-import { parse as parseToml } from 'smol-toml';
 import { z } from 'zod';
 
+import { gitleaksExemptPatterns } from './gitleaks-configuration.js';
 import type { SyncContext } from './project-context.js';
 
 const runCommand = promisify(execFile);
@@ -178,22 +178,6 @@ async function validateHeaders(
   }
 
   return errors;
-}
-
-/** Every `paths` entry of every allowlist in a gitleaks configuration. */
-function gitleaksExemptPatterns(content: string): string[] {
-  const parsed = parseToml(content) as Record<string, unknown>;
-  const allowlists = [
-    ...(Array.isArray(parsed.allowlists) ? parsed.allowlists : []),
-    ...(parsed.allowlist === undefined ? [] : [parsed.allowlist]),
-  ];
-
-  return allowlists.flatMap((allowlist) => {
-    const paths = (allowlist as Record<string, unknown>).paths;
-    return Array.isArray(paths)
-      ? paths.filter((path): path is string => typeof path === 'string')
-      : [];
-  });
 }
 
 /**

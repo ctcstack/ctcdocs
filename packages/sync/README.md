@@ -21,6 +21,7 @@ pnpm add @ctcstack/ctcdocs-sync
 ctcdocs-sync sync [--dry-run] [--full] [--file <id>] [--reseed-slug <id>] [--json]
 ctcdocs-sync validate
 ctcdocs-sync validate:generated-diff
+ctcdocs-sync scan:generated-diff
 ctcdocs-sync write:sync-summary
 ctcdocs-sync notify:failure
 ctcdocs-sync generated-paths
@@ -36,6 +37,13 @@ configuration against the project configuration, the crawler rules and response
 headers against the declared visibility, that the secret scanner's path
 exemptions are untracked, and that every generated file carries its ownership
 marker. A project that has never synchronized passes it and says so.
+
+`scan:generated-diff` is the one the sync workflow runs before it commits. It
+scans every generated file the run added or changed with gitleaks, using the
+project's `.gitleaks.toml` and `.gitleaksignore`, and fails on a finding. The
+log names the rule, the file, the line and the Google file ID, never the value.
+It runs the `gitleaks` on `PATH`, or the binary `CTCDOCS_GITLEAKS_BINARY`
+names.
 
 ## What it will not do
 

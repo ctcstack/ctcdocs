@@ -2,6 +2,27 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Added
+
+- The sync workflow scans every generated file a run added or changed for
+  secrets before it commits, and a finding fails the run: nothing is committed,
+  pushed or deployed. The scan runs `ctcdocs-sync scan:generated-diff` with the
+  gitleaks release `project-ci.yml` pins, and the project's own `.gitleaks.toml`
+  and `.gitleaksignore`. It logs each finding as
+  `ERROR [SECRET_SCAN]: rule=<id> path=<file> line=<n> fileId=<id>`, never the
+  value, and exits with 5. A `gitleaks:allow` written into a document is
+  ignored, and a path exemption covering a changed generated file fails the run.
+  The failure notification reports the new stage `secret-scan` and nothing else.
+  The pushes a sync makes start no other workflow, so until now the project's
+  CI never scanned them. See
+  [ADR-018](docs/ADR/018-secret-scan-before-sync-commit.md) and
+  [Operations](docs/OPERATIONS.md#secret-scan-findings).
+- A project that moves its `project-sync.yml` reference to this release has to
+  take this release of `@ctcstack/ctcdocs-sync` with it; the workflow calls the
+  new command, and the scan step fails without it.
+
 ## 0.3.0
 
 ### Added

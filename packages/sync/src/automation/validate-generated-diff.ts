@@ -21,7 +21,12 @@ function readNullSeparatedGitOutput(
   return output.split('\0').filter(Boolean);
 }
 
-function listChangedPaths(repositoryRoot: string): readonly string[] {
+/**
+ * Every path a sync run changed: tracked files that differ from `HEAD`, and
+ * untracked files Git does not ignore. It is what the commit step stages, once
+ * this validation has confined it to the generated paths.
+ */
+export function listChangedPaths(repositoryRoot: string): readonly string[] {
   return [
     ...readNullSeparatedGitOutput(repositoryRoot, [
       'diff',

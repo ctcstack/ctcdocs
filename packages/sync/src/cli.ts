@@ -12,6 +12,11 @@ import { ZodError } from 'zod';
 import { UnsafeZipError } from './archive/safe-zip.js';
 import { GeneratedDiffValidationError } from './automation/generated-diff.js';
 import { notifySyncFailure } from './automation/notify-failure.js';
+import { scanGeneratedDiff } from './automation/scan-generated-diff.js';
+import {
+  SecretFindingsError,
+  SecretScanError,
+} from './automation/secret-scan.js';
 import { validateGeneratedDiff } from './automation/validate-generated-diff.js';
 import {
   SyncSummaryError,
@@ -119,6 +124,11 @@ async function main(): Promise<void> {
 
   if (options.command === 'validate:generated-diff') {
     validateGeneratedDiff(repositoryRoot);
+    return;
+  }
+
+  if (options.command === 'scan:generated-diff') {
+    await scanGeneratedDiff(repositoryRoot);
     return;
   }
 
@@ -260,6 +270,14 @@ try {
     process.exitCode = 1;
   } else if (error instanceof GeneratedDiffValidationError) {
     console.error(`ERROR [GENERATED_DIFF]: ${error.message}`);
+    process.exitCode = 1;
+  } else if (error instanceof SecretFindingsError) {
+    for (const finding of error.findings) {
+      console.error(`ERROR [SECRET_SCAN]: ${finding}`);
+    }
+    process.exitCode = 5;
+  } else if (error instanceof SecretScanError) {
+    console.error(`ERROR [SECRET_SCAN]: ${error.message}`);
     process.exitCode = 1;
   } else if (error instanceof SyncSummaryError) {
     console.error(`ERROR [SYNC_SUMMARY]: ${error.message}`);
