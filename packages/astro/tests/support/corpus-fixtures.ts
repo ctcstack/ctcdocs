@@ -12,6 +12,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { parseFrontmatter } from '@astrojs/markdown-remark';
 import { findProjectRoot, PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
 
 export interface CorpusFixture {
@@ -127,6 +128,12 @@ export interface SectionFixture {
   slug: string;
   /** A folder listed on the section's page, which has a page of its own. */
   subfolder: { slug: string; label: string };
+  /**
+   * Whether the page records its entries in its frontmatter. A page generated
+   * before entries existed does not, and shows its Markdown list until the
+   * next sync rewrites it, so a project that has just upgraded has only those.
+   */
+  recordsEntries: boolean;
 }
 
 interface ManifestFolder {
@@ -135,6 +142,13 @@ interface ManifestFolder {
   displayLabel: string;
   stableSlug?: string;
   generatedMarkdownPath?: string;
+}
+
+function pageRecordsEntries(generatedMarkdownPath: string): boolean {
+  const { frontmatter } = parseFrontmatter(
+    readFileSync(resolve(repositoryRoot, generatedMarkdownPath), 'utf8'),
+  );
+  return Array.isArray(frontmatter.entries);
 }
 
 /**
@@ -159,6 +173,7 @@ export function sectionWithSubfolder(): SectionFixture | undefined {
       return {
         slug: parent.stableSlug,
         subfolder: { slug: child.stableSlug, label: child.displayLabel },
+        recordsEntries: pageRecordsEntries(parent.generatedMarkdownPath ?? ''),
       };
     }
   }
