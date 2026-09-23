@@ -1,6 +1,6 @@
 {
   "name": "@ctcstack/ctcdocs-core",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Configuration schema, project layout, and generated-path allowlist shared by the CTCDocs platform packages.",
   "keywords": [
     "ctcdocs",
