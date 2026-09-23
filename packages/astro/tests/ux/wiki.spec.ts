@@ -262,6 +262,39 @@ test('a synchronized document leads with its position and provenance', async ({
   }
 });
 
+/** A computed length in pixels for a value written in rem. */
+async function remInPixels(page: Page, rem: number): Promise<string> {
+  const rootSize = await page.evaluate(() =>
+    Number.parseFloat(getComputedStyle(document.documentElement).fontSize),
+  );
+  return `${rootSize * rem}px`;
+}
+
+/*
+ * Starlight's reset zeroes every margin from `starlight.reset`, and the
+ * platform's component rules outrank it only while that layer is declared
+ * before them. The bundler can link a stylesheet of component rules ahead of
+ * Starlight's own declaration, so the order is declared inline in the head;
+ * a margin the platform sets is where losing it shows. Both layers the
+ * platform writes to are checked: `starlight.components` on the home page and
+ * `starlight.core` under a document title.
+ */
+test('platform styles outrank the Starlight reset on every kind of page', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('.recent-icon').first()).toHaveCSS(
+    'margin-inline-end',
+    await remInPixels(page, 0.5),
+  );
+
+  await page.goto(`/${anyDocument().slug}/`);
+  await expect(page.locator('h1#_top')).toHaveCSS(
+    'margin-top',
+    await remInPixels(page, 0.5),
+  );
+});
+
 test('a section page tells its folders from its documents', async ({
   page,
 }) => {

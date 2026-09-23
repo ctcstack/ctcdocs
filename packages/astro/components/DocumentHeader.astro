@@ -67,7 +67,12 @@ const showBreadcrumb = entry.data.template !== 'splash';
 
 <style>
   @layer starlight.core {
-    h1 {
+    /*
+     * Qualified by the content panel so the title sits close under the trail:
+     * the panel's own `.sl-container > * + *` spacing is in this layer too,
+     * and a bare `h1` loses to it on specificity.
+     */
+    :global(.sl-container) > h1 {
       color: var(--sl-color-white);
       font-size: var(--sl-text-h1);
       font-weight: 600;
