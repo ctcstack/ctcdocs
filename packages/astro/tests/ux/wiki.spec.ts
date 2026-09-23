@@ -8,7 +8,13 @@ import {
   documentInFolder,
   documentWithAsset,
   documentWithTable,
+  sectionWithSubfolder,
 } from '../support/corpus-fixtures.js';
+
+/** Folder labels are Drive names, so they may carry pattern syntax. */
+function escapeRegExp(value: string): string {
+  return value.replace(/[$()*+.?[\\\]^{|}]/gu, '\\$&');
+}
 
 async function expectNoAccessibilityViolations(page: Page): Promise<void> {
   const results = await new AxeBuilder({ page }).analyze();
@@ -254,6 +260,54 @@ test('a synchronized document leads with its position and provenance', async ({
       page.getByRole('heading', { level: 1, name: folder, exact: true }),
     ).toBeVisible();
   }
+});
+
+test('a section page tells its folders from its documents', async ({
+  page,
+}) => {
+  const section = sectionWithSubfolder();
+  test.skip(!section, 'The corpus has no section page listing a subfolder.');
+  if (!section) return;
+  const { subfolder } = section;
+
+  await page.goto(`/${section.slug}/`);
+
+  // The listing is drawn from the page's entries, not its Markdown fallback.
+  const list = page.locator('.section-list');
+  await expect(list).toBeVisible();
+  await expect(page.locator('.sl-markdown-content > ul')).toHaveCount(1);
+
+  /*
+   * The folder glyph is decorative, so what the row is has to reach a screen
+   * reader as text too — and a folder row says how much it holds, which is
+   * how an empty one is visible before anyone opens it.
+   */
+  const folderRow = list.locator('li[data-kind="folder"]', {
+    has: page.locator(`a[href="/${subfolder.slug}/"]`),
+  });
+  await expect(folderRow).toHaveCount(1);
+  const folderLink = folderRow.getByRole('link');
+  await expect(folderLink).toHaveAccessibleName(
+    new RegExp(`^${escapeRegExp(subfolder.label)} \\(folder\\)`, 'u'),
+  );
+  await expect(folderRow.locator('.section-entry-meta')).toHaveText(
+    /^(Empty|1 document|\d+ documents)$/u,
+  );
+
+  const theme = page.getByRole('combobox', { name: 'Select theme' });
+  await theme.selectOption({ label: 'Light' });
+  await expectNoAccessibilityViolations(page);
+  await theme.selectOption({ label: 'Dark' });
+  await expectNoAccessibilityViolations(page);
+
+  await folderLink.click();
+  await expect(
+    page.getByRole('heading', {
+      level: 1,
+      name: subfolder.label,
+      exact: true,
+    }),
+  ).toBeVisible();
 });
 
 test('generated documents expose their protected Markdown projection', async ({

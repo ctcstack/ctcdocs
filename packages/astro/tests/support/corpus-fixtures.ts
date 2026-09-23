@@ -122,3 +122,45 @@ export function documentWithAsset():
   }
   return undefined;
 }
+
+export interface SectionFixture {
+  slug: string;
+  /** A folder listed on the section's page, which has a page of its own. */
+  subfolder: { slug: string; label: string };
+}
+
+interface ManifestFolder {
+  googleFolderId: string;
+  googleParentId: string | null;
+  displayLabel: string;
+  stableSlug?: string;
+  generatedMarkdownPath?: string;
+}
+
+/**
+ * A section page that lists a subfolder, read from the manifest, which records
+ * every folder that has a page and the folder it sits in. Whether a corpus has
+ * one is a property of that corpus, so a test that needs it skips without.
+ */
+export function sectionWithSubfolder(): SectionFixture | undefined {
+  const manifest = JSON.parse(
+    readFileSync(resolve(repositoryRoot, PROJECT_LAYOUT.manifestFile), 'utf8'),
+  ) as { folders?: Record<string, ManifestFolder> };
+  const withPages = Object.values(manifest.folders ?? {})
+    .filter((folder) => folder.generatedMarkdownPath && folder.stableSlug)
+    .sort((left, right) =>
+      (left.stableSlug ?? '') < (right.stableSlug ?? '') ? -1 : 1,
+    );
+  for (const parent of withPages) {
+    const child = withPages.find(
+      (folder) => folder.googleParentId === parent.googleFolderId,
+    );
+    if (child?.stableSlug && parent.stableSlug) {
+      return {
+        slug: parent.stableSlug,
+        subfolder: { slug: child.stableSlug, label: child.displayLabel },
+      };
+    }
+  }
+  return undefined;
+}

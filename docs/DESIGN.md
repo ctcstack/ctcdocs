@@ -365,6 +365,17 @@ above the first or below the last.
   lighter gray fell below the contrast floor in the light theme, and this is text
   a reader must read.
 
+### Section Listing Row
+
+What a section page lists, built on the corpus index row. A folder row carries
+a folder glyph, its name at weight 600, and how many documents sit below it in
+the right-hand column ("Empty" in italics when there are none). A document row
+carries the document glyph, its name at ink weight, the date its source was last
+edited with the same freshness rank, and its description underneath in muted
+text, clamped to two lines and hung under the name. The glyph and the weight
+are two cues, neither of them color. The kind also reaches a screen reader as
+text. Hairlines between siblings only; hover and focus as on the index row.
+
 ### Provenance Row
 
 Directly under a document title: one fact and three actions. Freshness ("Updated

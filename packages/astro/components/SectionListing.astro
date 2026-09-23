@@ -1,0 +1,231 @@
+---
+/**
+ * What a folder holds, drawn so a reader can tell its divisions from its pages.
+ *
+ * A folder row carries a folder glyph and how many documents sit anywhere
+ * below it, so an empty folder is visible before anyone opens it. A document
+ * row carries the document glyph, the date its source was last edited, and
+ * the description it publishes. The glyphs are decorative: what each row is
+ * also reaches a screen reader as text, because a distinction made only in a
+ * picture is a distinction some readers never get.
+ *
+ * Rows are the ruled record of the full index and the recency band, so the
+ * three lists read as one system. See docs/ADR/019-folders-before-documents.md.
+ */
+import { formatDate } from '../lib/corpus';
+import {
+  documentCountLabel,
+  type SectionListingRow,
+} from '../lib/section-listing';
+
+type Props = { rows: SectionListingRow[] };
+
+const { rows } = Astro.props;
+
+/*
+ * Carries its own leading space, so the name reads "Label (folder)" however
+ * the markup around it is wrapped: runs of whitespace collapse to one.
+ */
+const KIND_TEXT = { folder: ' (folder)', document: ' (document)' } as const;
+---
+
+{/* `not-content` opts the list out of Starlight's prose spacing. */}
+<ul class="section-list not-content">
+  {
+    rows.map((row) => (
+      <li class="section-entry" data-kind={row.kind}>
+        <a class="section-entry-link" href={row.href}>
+          <span class="section-entry-title">
+            {row.kind === 'folder' ? (
+              <svg
+                aria-hidden="true"
+                class="section-entry-icon"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.5"
+                viewBox="0 0 16 16"
+              >
+                <path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.38a1.5 1.5 0 0 1 1.06.44L8 4.5h4.5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z" />
+              </svg>
+            ) : (
+              <svg
+                aria-hidden="true"
+                class="section-entry-icon"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.5"
+                viewBox="0 0 16 16"
+              >
+                <path d="M9 2H4.5A1.5 1.5 0 0 0 3 3.5v9A1.5 1.5 0 0 0 4.5 14h7a1.5 1.5 0 0 0 1.5-1.5V6z" />
+                <path d="M9 2v4h4" />
+              </svg>
+            )}
+            {row.label}
+            <span class="section-entry-kind">{KIND_TEXT[row.kind]}</span>
+          </span>
+          {row.kind === 'folder' ? (
+            <span
+              class="section-entry-meta"
+              data-empty={row.documentCount === 0 ? '' : undefined}
+            >
+              {documentCountLabel(row.documentCount)}
+            </span>
+          ) : (
+            row.modified && (
+              <relative-date class="section-entry-meta">
+                <time datetime={row.modified.toISOString()}>
+                  {formatDate(row.modified)}
+                </time>
+              </relative-date>
+            )
+          )}
+        </a>
+        {row.kind === 'document' && row.description && (
+          <p class="section-entry-description">{row.description}</p>
+        )}
+      </li>
+    ))
+  }
+</ul>
+
+<script>
+  import '../scripts/relative-date';
+</script>
+
+<style>
+  @layer starlight.components {
+    .section-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .section-entry {
+      padding: 0.625rem 0;
+    }
+
+    /* A hairline between siblings only, as on every ruled record. */
+    .section-entry + .section-entry {
+      border-top: 1px solid var(--sl-color-hairline);
+    }
+
+    .section-entry-link {
+      align-items: baseline;
+      column-gap: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      line-height: var(--sl-line-height-headings);
+      text-decoration: none;
+    }
+
+    /*
+     * The negative indent with matching padding hangs a wrapped name under its
+     * own first character instead of under the glyph, and the description
+     * below takes the same inset so the column holds.
+     */
+    .section-entry-title {
+      color: var(--sl-color-white);
+      flex: 1 1 18ch;
+      padding-inline-start: 1.5rem;
+      text-indent: -1.5rem;
+      text-wrap: pretty;
+    }
+
+    /*
+     * A folder is a division, not a page, and it takes weight for that: with
+     * the glyph, that is two cues, neither of them color, which stays reserved
+     * for the accent.
+     */
+    .section-entry[data-kind='folder'] .section-entry-title {
+      font-weight: 600;
+    }
+
+    /*
+     * The theme sets `svg { display: block }`, which would break the line.
+     *
+     * Spacing in this block is padding, never margin: depending on how a
+     * build splits its stylesheets, Starlight's reset layer can end up ranked
+     * above this one, and its `* { margin: 0 }` would then take the space
+     * between the glyph and the name. The box is sized as the reset sizes
+     * every box, border-box, so the result is the same in either order: a
+     * glyph at the name's own size and 0.5rem of space, the 1.5rem the name
+     * hangs from.
+     */
+    .section-entry-icon {
+      box-sizing: border-box;
+      color: var(--sl-color-gray-3);
+      display: inline-block;
+      height: 1rem;
+      padding-inline-end: 0.5rem;
+      vertical-align: -0.125em;
+      width: 1.5rem;
+    }
+
+    .section-entry-link:hover :is(.section-entry-title, .section-entry-icon) {
+      color: var(--sl-color-text-accent);
+    }
+
+    .section-entry-link:focus-visible {
+      border-radius: 0.25rem;
+      outline: 2px solid var(--sl-color-text-accent);
+      outline-offset: 2px;
+    }
+
+    /* Announced, not shown: the glyph already says it to a sighted reader. */
+    .section-entry-kind {
+      clip-path: inset(50%);
+      height: 1px;
+      overflow: hidden;
+      position: absolute;
+      white-space: nowrap;
+      width: 1px;
+    }
+
+    .section-entry-meta {
+      color: var(--sl-color-gray-3);
+      display: block;
+      font-size: var(--sl-text-sm);
+      font-variant-numeric: tabular-nums;
+      text-align: end;
+      white-space: nowrap;
+    }
+
+    @media (min-width: 30rem) {
+      .section-entry-meta {
+        flex: 0 0 8.5rem;
+      }
+    }
+
+    .section-entry-meta[data-empty] {
+      font-style: italic;
+    }
+
+    .section-entry-meta[data-age='fresh'] {
+      color: var(--sl-color-white);
+      font-weight: 500;
+    }
+
+    .section-entry-meta[data-age='recent'] {
+      color: var(--sl-color-gray-2);
+    }
+
+    /*
+     * Two lines at most: the description is there to tell two similar titles
+     * apart, and a longer one belongs to the document, one click away.
+     */
+    .section-entry-description {
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      color: var(--sl-color-gray-3);
+      display: -webkit-box;
+      font-size: var(--sl-text-sm);
+      line-height: var(--sl-line-height);
+      overflow: hidden;
+      padding-block-start: 0.25rem;
+      padding-inline-start: 1.5rem;
+    }
+  }
+</style>

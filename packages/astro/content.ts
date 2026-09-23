@@ -19,6 +19,26 @@ export const collections = {
           .regex(/^sha256:[a-f0-9]{64}$/u)
           .optional(),
         folderPath: z.array(z.string()).optional(),
+        /*
+         * A section page's listing as data: what each entry is, and how many
+         * documents a folder holds. Absent on pages generated before it
+         * existed, which then show their Markdown list.
+         */
+        entries: z
+          .array(
+            z.discriminatedUnion('kind', [
+              z.object({
+                kind: z.literal('folder'),
+                slug: z.string().min(1),
+                documentCount: z.number().int().nonnegative(),
+              }),
+              z.object({
+                kind: z.literal('document'),
+                slug: z.string().min(1),
+              }),
+            ]),
+          )
+          .optional(),
         pagefind: z.boolean().default(true),
       }),
     }),

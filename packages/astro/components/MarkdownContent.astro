@@ -1,0 +1,45 @@
+---
+/**
+ * Overrides Starlight's `MarkdownContent`.
+ *
+ * Every page renders exactly as Starlight renders it, except a section page
+ * whose frontmatter records its entries: that one draws the listing with
+ * folders and documents told apart, instead of the plain Markdown list in its
+ * body. The Markdown list is the fallback whenever the entries cannot be drawn,
+ * so a page generated before they existed still reads correctly.
+ *
+ * See docs/ADR/019-folders-before-documents.md.
+ */
+import Default from '@astrojs/starlight/components/MarkdownContent.astro';
+import { getCollection } from 'astro:content';
+
+import SectionListing from './SectionListing.astro';
+import { sectionListingRows, type ListedPage } from '../lib/section-listing';
+
+const { entry } = Astro.locals.starlightRoute;
+
+async function loadRows() {
+  if (entry.data.sourceType !== 'section-index' || !entry.data.entries) {
+    return undefined;
+  }
+  const docs = await getCollection('docs');
+  const pages = new Map<string, ListedPage>(
+    docs.map((doc) => [
+      doc.id,
+      {
+        sourceType: doc.data.sourceType,
+        title: doc.data.title,
+        description: doc.data.description,
+        googleModifiedTime: doc.data.googleModifiedTime,
+      },
+    ]),
+  );
+  return sectionListingRows(entry.data.entries, pages);
+}
+
+const rows = await loadRows();
+---
+
+<Default>
+  {rows ? <SectionListing rows={rows} /> : <slot />}
+</Default>
