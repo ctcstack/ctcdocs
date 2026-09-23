@@ -198,6 +198,23 @@ jobs:
       - name: Install Chromium for verification
         run: pnpm exec playwright install --with-deps chromium
 
+      # Astro keeps every image it optimizes under its cache directory, keyed by
+      # the source bytes and the transform, and reuses an entry instead of
+      # encoding the image again. That encoding is most of a build. The key
+      # changes with the images, so a run that adds one restores the closest
+      # earlier cache and saves a new one; an entry for an image that no
+      # longer exists is never read. It starts over whenever the lockfile
+      # changes, which is also when Astro or sharp might encode differently.
+      # The cache holds the optimized images, which is the same content the
+      # repository already holds, and is readable only by this repository.
+      - name: Restore optimized images
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.astro/assets
+          key: ctcdocs-astro-assets-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('src/assets/**') }}
+          restore-keys: |
+            ctcdocs-astro-assets-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-
+
       - name: Verify the site the new content produces
         id: build
         run: pnpm verify
