@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildSearchCases } from './verify-search.mjs';
+import { buildSearchCases, resultPath } from './verify-search.mjs';
 
 const documentOf = (title, slug) => ({ title, slug });
 
@@ -68,4 +68,35 @@ test('a non-Latin title survives the split', () => {
     buildSearchCases([documentOf('Рабочие_заметки команды', 'notes')]),
     [['Рабочие заметки команды', '/notes/']],
   );
+});
+
+test('a result for a non-ASCII slug matches the slug the corpus records', () => {
+  /*
+   * A Drive title typed with a Cyrillic `С` produced the slug
+   * `сtc-delivery-team-weekly-team-syncs`. Pagefind returned it percent-encoded
+   * and the check reported it missing while search found it first.
+   */
+  assert.equal(
+    resultPath('/company/%D1%81tc-delivery-team-weekly-team-syncs/'),
+    '/company/сtc-delivery-team-weekly-team-syncs/',
+  );
+  assert.equal(resultPath('/runbook/'), '/runbook/');
+  assert.equal(
+    resultPath(
+      'https://docs.example/notes/%D0%B7%D0%B0%D0%BC%D0%B5%D1%82%D0%BA%D0%B8/',
+    ),
+    '/notes/заметки/',
+  );
+});
+
+test('a document with a non-ASCII slug is always searched for', () => {
+  const documents = [
+    ...Array.from({ length: 6 }, (_, index) =>
+      documentOf(`Document number ${index}`, `document-${index}`),
+    ),
+    documentOf('Рабочие заметки', 'рабочие-заметки'),
+  ];
+  const cases = buildSearchCases(documents);
+  assert.equal(cases.length, 5);
+  assert.deepEqual(cases[0], ['Рабочие заметки', '/рабочие-заметки/']);
 });

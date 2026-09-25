@@ -135,6 +135,21 @@ async function withSearchIndex(bundleRoot, run) {
   }
 }
 
+/**
+ * The site path a Pagefind result points at, as the corpus spells it.
+ *
+ * Pagefind returns URLs, and a URL carries its path percent-encoded: a slug
+ * with a letter outside ASCII — `сtc-delivery`, whose first letter is
+ * Cyrillic — comes back as `/%D1%81tc-delivery/`. The corpus records the
+ * decoded slug, so comparing the two unmodified reported a document the search
+ * interface finds first as missing from the index.
+ */
+export function resultPath(resultUrl) {
+  return decodeURIComponent(
+    new URL(resultUrl, 'https://site.invalid').pathname,
+  );
+}
+
 async function expectResult(pagefind, query, expectedPath) {
   const search = await pagefind.search(query);
   assert(search.results.length > 0, `No Pagefind result for "${query}".`);
@@ -142,10 +157,7 @@ async function expectResult(pagefind, query, expectedPath) {
     search.results.slice(0, 5).map((result) => result.data()),
   );
   assert(
-    results.some(
-      (result) =>
-        new URL(result.url, 'https://site.invalid').pathname === expectedPath,
-    ),
+    results.some((result) => resultPath(result.url) === expectedPath),
     `Pagefind did not return ${expectedPath} for "${query}".`,
   );
 }
@@ -163,10 +175,22 @@ async function expectResult(pagefind, query, expectedPath) {
  * Words shorter than four characters, and the ordering prefixes editors put in
  * Drive names, are not evidence that indexing works: they match too much or
  * nothing at all.
+ *
+ * A document whose slug leaves ASCII is searched for first. Its address is the
+ * one a URL percent-encodes, so it is the case most likely to go wrong, and at
+ * five cases it would otherwise only be reached when the corpus happened to
+ * list it early.
  */
 export function buildSearchCases(documents) {
+  const encodesSlug = (document) =>
+    typeof document.slug === 'string' &&
+    encodeURI(document.slug) !== document.slug;
+  const ordered = [
+    ...documents.filter(encodesSlug),
+    ...documents.filter((document) => !encodesSlug(document)),
+  ];
   const cases = [];
-  for (const document of documents) {
+  for (const document of ordered) {
     const words = String(document.title ?? '')
       .split(/[^\p{Letter}\p{Number}-]+/u)
       .filter((word) => word.length >= 4 && !/^\d+$/u.test(word));
