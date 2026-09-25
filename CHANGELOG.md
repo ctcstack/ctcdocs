@@ -2,6 +2,18 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Fixed
+
+- The search check finds a document whose slug leaves ASCII. Pagefind returns
+  a result's address percent-encoded, and the check compared it with the slug
+  as the corpus records it, so a document search returned first was reported
+  missing and the sync failed. A Drive title typed with one Cyrillic letter was
+  enough. Result paths are now decoded before they are compared, and a
+  document with such a slug is always among the ones searched for, so the
+  fixture corpus's Cyrillic document now exercises the case.
+
 ## 0.5.1
 
 ### Fixed
