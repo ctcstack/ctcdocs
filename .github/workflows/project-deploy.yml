@@ -348,6 +348,11 @@ jobs:
   smoke:
     name: Verify the protected deployment
     needs: deploy
+    # Explicit, because the implicit `success()` also requires every job
+    # upstream of `deploy`: a sync deployment skips `verify` on purpose
+    # (`candidate_verified`), and the default would then skip this check of
+    # a deployment that did happen, leaving the gate below to fail it.
+    if: ${{ !cancelled() && needs.deploy.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: ${{ inputs.smoke_environment }}
