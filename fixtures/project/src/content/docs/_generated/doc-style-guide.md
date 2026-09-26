@@ -2,6 +2,7 @@
 "title": "Style guide"
 "description": "A document one folder deeper than its section, so the section page has a subfolder to list and a document count to report."
 "slug": "reference/guides/style-guide"
+"shortId": "dbb1dc"
 "editUrl": "https://docs.google.com/document/d/doc-style-guide/edit"
 "sourceType": "google-doc"
 "googleFileId": "doc-style-guide"

@@ -1,6 +1,7 @@
 ---
 "title": "Guides"
 "slug": "reference/guides"
+"shortId": "e0a0b3"
 "sourceType": "section-index"
 "contentHash": "sha256:4919d4d372ce988cf7418ac3870cff396c059c4c7fa7bd13ea2e517d95d82b35"
 "folderPath":

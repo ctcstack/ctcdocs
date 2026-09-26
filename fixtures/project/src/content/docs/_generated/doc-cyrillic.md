@@ -2,6 +2,7 @@
 "title": "Рабочие заметки"
 "description": "Этот документ существует для того, чтобы поиск и подстановка шрифтов проверялись на кириллице, а не только на латинице."
 "slug": "рабочие-заметки"
+"shortId": "f18785"
 "editUrl": "https://docs.google.com/document/d/doc-cyrillic/edit"
 "sourceType": "google-doc"
 "googleFileId": "doc-cyrillic"

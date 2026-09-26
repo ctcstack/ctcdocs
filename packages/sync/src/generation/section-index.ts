@@ -61,6 +61,8 @@ export type SectionIndexEntry =
 export interface SectionIndexInput {
   title: string;
   slug: string;
+  /** The permanent link's ID (ADR-022). */
+  shortId: string;
   /** Display labels of the folders above this one. */
   folderPath: string[];
   entries: readonly SectionIndexEntry[];
@@ -156,6 +158,7 @@ export function generateSectionIndexDocument(
     {
       title: input.title,
       slug: input.slug,
+      shortId: input.shortId,
       sourceType: 'section-index',
       contentHash: computeGeneratedContentHash(body, NO_ASSETS),
       folderPath: input.folderPath,

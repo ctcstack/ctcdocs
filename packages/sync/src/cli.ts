@@ -89,6 +89,9 @@ function printSyncSummary(
     console.log(`Old URL: /${result.slugChange.oldSlug}/`);
     console.log(`New URL: /${result.slugChange.newSlug}/`);
   }
+  if (result.addressesMoved > 0) {
+    console.log(`Addresses moved (redirects kept): ${result.addressesMoved}`);
+  }
 }
 
 function printInventorySummary(

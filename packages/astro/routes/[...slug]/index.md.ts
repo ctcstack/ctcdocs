@@ -1,3 +1,4 @@
+import { permanentLinkPath } from '@ctcstack/ctcdocs-core';
 import type { APIRoute, GetStaticPaths } from 'astro';
 import { getCollection } from 'astro:content';
 
@@ -16,12 +17,17 @@ function required(value: string | undefined, field: string): string {
 }
 
 export const getStaticPaths = (async () => {
-  const entries = await getCollection(
-    'docs',
+  const allEntries = await getCollection('docs');
+  const entries = allEntries.filter(
     ({ data }) => data.sourceType === 'google-doc',
   );
   const stableSlugs = new Set(
     entries.map(({ id }) => required(id, 'route ID')),
+  );
+  const permanentLinks = Object.fromEntries(
+    allEntries.flatMap(({ data, id }) =>
+      data.shortId ? [[permanentLinkPath(data.shortId), `/${id}/`]] : [],
+    ),
   );
 
   return entries.map((entry) => {
@@ -43,6 +49,7 @@ export const getStaticPaths = (async () => {
           body,
           ownershipHeader: markdownOwnershipHeader,
           stableSlugs,
+          permanentLinks,
         }),
       } satisfies MarkdownPageProps,
     };

@@ -3,8 +3,10 @@ export {
   GENERATED_FILE_ALLOWLIST,
   PLATFORM_ROUTE_HREFS,
   PLATFORM_ROUTES,
+  permanentLinkPath,
   PROJECT_LAYOUT,
   RESERVED_SLUGS,
+  SHORT_ID_PATTERN,
 } from './project-layout.js';
 export {
   assertGeneratedPathAllowed,
@@ -22,6 +24,7 @@ export {
   SiteConfigurationError,
 } from './site-configuration.js';
 export type {
+  AddressPolicy,
   BrandConfiguration,
   DeploymentConfiguration,
   DeploymentEnvironmentConfiguration,

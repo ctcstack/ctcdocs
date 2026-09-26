@@ -312,3 +312,215 @@ describe('stable slug allocation', () => {
     ).toMatch(/^new\/location--/u);
   });
 });
+
+describe('addresses that follow names', () => {
+  function folderRecord(id: string, stableSlug: string) {
+    return {
+      googleFolderId: id,
+      googleParentId: 'root',
+      googleName: id,
+      displayLabel: id,
+      sortOrder: null,
+      stableSlug,
+    };
+  }
+
+  function manifestWith(
+    documents: Record<string, string>,
+    folders: Record<string, string> = {},
+    redirects: Record<string, [string, string]> = {},
+  ) {
+    const manifest = createEmptyManifest('drive', 'root', timestamp);
+    for (const [id, slug] of Object.entries(documents)) {
+      manifest.documents[id] = documentRecord(id, slug);
+    }
+    for (const [id, slug] of Object.entries(folders)) {
+      manifest.folders[id] = folderRecord(id, slug);
+    }
+    for (const [source, [googleFileId, targetSlug]] of Object.entries(
+      redirects,
+    )) {
+      manifest.redirects[source] = {
+        googleFileId,
+        targetSlug,
+        createdAt: timestamp,
+      };
+    }
+    return manifest;
+  }
+
+  const root = folder('root', ['Published']);
+
+  it('moves a document to the address of its new place', () => {
+    const allocation = allocateStableSlugs(
+      [root, folder('sales', ['Published', 'Sales'])],
+      [document('file-a', ['Published', 'Sales', 'Pricing'])],
+      manifestWith({ 'file-a': 'marketing/pricing' }, { sales: 'sales' }),
+      'follow-names',
+    );
+
+    expect(allocation.documents.get('file-a')).toBe('sales/pricing');
+    expect(allocation.moves).toEqual([
+      {
+        itemId: 'file-a',
+        oldSlug: 'marketing/pricing',
+        newSlug: 'sales/pricing',
+      },
+    ]);
+  });
+
+  it('moves a renamed folder together with what it holds', () => {
+    const allocation = allocateStableSlugs(
+      [root, folder('team', ['Published', 'Delivery'])],
+      [document('file-a', ['Published', 'Delivery', 'Guide'])],
+      manifestWith({ 'file-a': 'team/guide' }, { team: 'team' }),
+      'follow-names',
+    );
+
+    expect(allocation.folders.get('team')).toBe('delivery');
+    expect(allocation.documents.get('file-a')).toBe('delivery/guide');
+    expect(allocation.moves.map((move) => move.itemId)).toEqual([
+      'team',
+      'file-a',
+    ]);
+  });
+
+  it('moves nothing when only the order prefix changes', () => {
+    const allocation = allocateStableSlugs(
+      [root, folder('team', ['Published', '07 - Team'])],
+      [document('file-a', ['Published', '07 - Team', '2. Guide'])],
+      manifestWith({ 'file-a': 'team/guide' }, { team: 'team' }),
+      'follow-names',
+    );
+
+    expect(allocation.moves).toEqual([]);
+    expect(allocation.documents.get('file-a')).toBe('team/guide');
+  });
+
+  it('keeps every address under the stable policy', () => {
+    const allocation = allocateStableSlugs(
+      [root, folder('sales', ['Published', 'Sales'])],
+      [document('file-a', ['Published', 'Sales', 'Pricing'])],
+      manifestWith({ 'file-a': 'marketing/pricing' }, { sales: 'sales' }),
+    );
+
+    expect(allocation.documents.get('file-a')).toBe('marketing/pricing');
+    expect(allocation.moves).toEqual([]);
+  });
+
+  it('lets a document renamed back reclaim its earlier address', () => {
+    const allocation = allocateStableSlugs(
+      [root],
+      [document('file-a', ['Published', 'Pricing'])],
+      manifestWith(
+        { 'file-a': 'price-list' },
+        {},
+        { pricing: ['file-a', 'price-list'] },
+      ),
+      'follow-names',
+    );
+
+    expect(allocation.documents.get('file-a')).toBe('pricing');
+    expect(allocation.moves).toEqual([
+      { itemId: 'file-a', oldSlug: 'price-list', newSlug: 'pricing' },
+    ]);
+  });
+
+  it('gives a document the address a redirect of another answers', () => {
+    const allocation = allocateStableSlugs(
+      [root],
+      [
+        document('file-a', ['Published', 'Price list']),
+        document('file-b', ['Published', 'Pricing']),
+      ],
+      manifestWith(
+        { 'file-a': 'price-list', 'file-b': 'rates' },
+        {},
+        { pricing: ['file-a', 'price-list'] },
+      ),
+      'follow-names',
+    );
+
+    expect(allocation.documents.get('file-a')).toBe('price-list');
+    expect(allocation.documents.get('file-b')).toBe('pricing');
+  });
+  it('hands the address a document left to the one now named after it', () => {
+    const allocation = allocateStableSlugs(
+      [root],
+      [
+        document('file-a', ['Published', 'Pricing 2026']),
+        document('file-new', ['Published', 'Pricing']),
+      ],
+      manifestWith({ 'file-a': 'pricing' }),
+      'follow-names',
+    );
+
+    expect(allocation.documents.get('file-a')).toBe('pricing-2026');
+    expect(allocation.documents.get('file-new')).toBe('pricing');
+  });
+  it('lets two documents swap titles and addresses', () => {
+    const allocation = allocateStableSlugs(
+      [root],
+      [
+        document('file-a', ['Published', 'Beta']),
+        document('file-b', ['Published', 'Alpha']),
+      ],
+      manifestWith({ 'file-a': 'alpha', 'file-b': 'beta' }),
+      'follow-names',
+    );
+
+    expect(allocation.documents.get('file-a')).toBe('beta');
+    expect(allocation.documents.get('file-b')).toBe('alpha');
+  });
+  it('keeps a suffixed address while its base is taken, and drops the suffix once it is free', () => {
+    const suffixed = allocateStableSlugs(
+      [root],
+      [
+        document('file-a', ['Published', 'Guide']),
+        document('file-b', ['Published', 'Guide']),
+      ],
+      createEmptyManifest('drive', 'root', timestamp),
+      'follow-names',
+    );
+    const holder = suffixed.documents.get('file-a');
+    const other = suffixed.documents.get('file-b');
+    expect([holder, other]).toContain('guide');
+    const [keeperId, suffixedId] =
+      holder === 'guide' ? ['file-a', 'file-b'] : ['file-b', 'file-a'];
+    const suffixedSlug = suffixed.documents.get(suffixedId) ?? '';
+    expect(suffixedSlug).toMatch(/^guide--/u);
+
+    const unchanged = allocateStableSlugs(
+      [root],
+      [
+        document('file-a', ['Published', 'Guide']),
+        document('file-b', ['Published', 'Guide']),
+      ],
+      manifestWith({ [keeperId]: 'guide', [suffixedId]: suffixedSlug }),
+      'follow-names',
+    );
+    expect(unchanged.moves).toEqual([]);
+
+    const freed = allocateStableSlugs(
+      [root],
+      [document(suffixedId, ['Published', 'Guide'])],
+      manifestWith({ [keeperId]: 'guide', [suffixedId]: suffixedSlug }),
+      'follow-names',
+    );
+    expect(freed.documents.get(suffixedId)).toBe('guide');
+  });
+
+  it('rejects duplicate addresses already present in the manifest', () => {
+    expect(() =>
+      allocateStableSlugs(
+        [root],
+        [
+          document('file-a', ['Published', 'Same']),
+          document('file-b', ['Published', 'Same']),
+        ],
+        manifestWith({ 'file-a': 'same', 'file-b': 'same' }),
+        'follow-names',
+      ),
+    ).toThrow(/duplicate stable slugs/u);
+  });
+});

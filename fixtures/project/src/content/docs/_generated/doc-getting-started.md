@@ -2,12 +2,13 @@
 "title": "Start here"
 "description": "This corpus is synthetic. It exists so the platform can prove that a documentation site builds, navigates, searches and passes accessibility checks without any real content being involved."
 "slug": "start-here"
+"shortId": "b970ca"
 "editUrl": "https://docs.google.com/document/d/doc-getting-started/edit"
 "sourceType": "google-doc"
 "googleFileId": "doc-getting-started"
 "googleModifiedTime": "2026-02-02T11:30:00.000Z"
 "syncedAt": "2026-02-10T06:00:00.000Z"
-"contentHash": "sha256:eba01666478b766805effec9cfc3bfa865adefa31ef92f63e0c18237aafe638a"
+"contentHash": "sha256:bb2065bdabdd9332571d2c0f29c3eb306f3e2c500401c70c40d0b0e4e7755e2b"
 "folderPath": []
 "pagefind": true
 ---
@@ -19,5 +20,5 @@ This corpus is synthetic. It exists so the platform can prove that a
 documentation site builds, navigates, searches and passes accessibility
 checks without any real content being involved.
 
-Start with the [handbook overview](/handbook/overview/),
+Start with the [handbook overview](/d/76ff21/),
 which describes what each section holds.

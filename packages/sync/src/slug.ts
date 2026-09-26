@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { RESERVED_SLUGS } from '@ctcstack/ctcdocs-core';
+import { RESERVED_SLUGS, type AddressPolicy } from '@ctcstack/ctcdocs-core';
 
 import type { SelectedInventoryItem } from './inventory/inventory-graph.js';
 import type { SyncManifest } from './manifest.js';
@@ -47,11 +47,20 @@ function allocateUniqueSlug(
   throw new Error('Unable to allocate a unique stable slug.');
 }
 
+/** An address that changed in this allocation. The old one becomes a redirect. */
+export interface AddressMove {
+  itemId: string;
+  oldSlug: string;
+  newSlug: string;
+}
+
 export interface StableSlugAllocation {
   /** Folder identifier to section address, excluding the publication root. */
   folders: Map<string, string>;
   /** Google file identifier to document address. */
   documents: Map<string, string>;
+  /** Recorded addresses that moved, in allocation order. Empty when stable. */
+  moves: AddressMove[];
 }
 
 /** Carries forward the addresses the manifest already owns, in id order. */
@@ -128,7 +137,11 @@ export function allocateStableSlugs(
   folders: readonly SelectedInventoryItem[],
   documents: readonly SelectedInventoryItem[],
   existingManifest: SyncManifest,
+  policy: AddressPolicy = 'stable',
 ): StableSlugAllocation {
+  if (policy === 'follow-names') {
+    return allocateFollowingNames(folders, documents, existingManifest);
+  }
   const allocatedSlugs = new Set(Object.keys(existingManifest.redirects));
   const allocatedDocuments = new Map<string, string>();
   const allocatedFolders = new Map<string, string>();
@@ -161,7 +174,113 @@ export function allocateStableSlugs(
   allocateRemaining(folders, allocatedSlugs, allocatedFolders);
   allocateRemaining(documents, allocatedSlugs, allocatedDocuments);
 
-  return { folders: allocatedFolders, documents: allocatedDocuments };
+  return {
+    folders: allocatedFolders,
+    documents: allocatedDocuments,
+    moves: [],
+  };
+}
+
+interface RecordedItem {
+  item: SelectedInventoryItem;
+  recordedSlug: string;
+  derivedSlug: string;
+  kind: 'folder' | 'document';
+}
+
+/**
+ * Allocation when addresses follow names (ADR-021). An address is what the
+ * item's current Drive path yields; nothing it was called before holds a claim
+ * on it. In one pass over the one namespace folders and documents share:
+ *
+ * 1. Recorded items whose current path still yields their address keep it.
+ * 2. The platform's own routes are reserved.
+ * 3. Recorded items whose path now yields another address are placed, folders
+ *    first, then by address and ID. An address one of them has just given up
+ *    is free for any other, so two documents can swap titles cleanly. A taken
+ *    address yields the collision suffix, and since that suffix is derived
+ *    from the item's own ID, an item that already carries it keeps it.
+ * 4. New folders, then new documents, as under `stable`.
+ *
+ * Redirects are the caller's affair and never reserve an address here: an item
+ * named after an address a redirect answers takes it, and the redirect goes.
+ */
+function allocateFollowingNames(
+  folders: readonly SelectedInventoryItem[],
+  documents: readonly SelectedInventoryItem[],
+  existingManifest: SyncManifest,
+): StableSlugAllocation {
+  const recordedDocuments = new Map(
+    Object.entries(existingManifest.documents).map(
+      ([fileId, record]) => [fileId, record.stableSlug] as const,
+    ),
+  );
+  const recordedFolders = new Map(
+    Object.entries(existingManifest.folders).flatMap(([folderId, record]) =>
+      record.stableSlug === undefined
+        ? []
+        : [[folderId, record.stableSlug] as const],
+    ),
+  );
+  const recordedItem =
+    (kind: RecordedItem['kind'], recordedSlugs: ReadonlyMap<string, string>) =>
+    (item: SelectedInventoryItem): RecordedItem[] => {
+      const recordedSlug = recordedSlugs.get(item.item.id);
+      return recordedSlug === undefined
+        ? []
+        : [{ item, recordedSlug, derivedSlug: proposedSlug(item), kind }];
+    };
+  const recorded = [
+    ...documents.flatMap(recordedItem('document', recordedDocuments)),
+    ...folders.flatMap(recordedItem('folder', recordedFolders)),
+  ];
+
+  const claimed = new Set<string>();
+  const allocatedDocuments = new Map<string, string>();
+  const allocatedFolders = new Map<string, string>();
+  const resultFor = (kind: RecordedItem['kind']) =>
+    kind === 'document' ? allocatedDocuments : allocatedFolders;
+
+  for (const { item, recordedSlug, derivedSlug, kind } of recorded) {
+    if (recordedSlug !== derivedSlug) {
+      continue;
+    }
+    if (claimed.has(recordedSlug)) {
+      throw new Error('The existing manifest contains duplicate stable slugs.');
+    }
+    claimed.add(recordedSlug);
+    resultFor(kind).set(item.item.id, recordedSlug);
+  }
+  for (const slug of RESERVED_SLUGS) {
+    claimed.add(slug);
+  }
+
+  const moves: AddressMove[] = [];
+  const unsettled = recorded
+    .filter(({ recordedSlug, derivedSlug }) => recordedSlug !== derivedSlug)
+    .sort(
+      (left, right) =>
+        (left.kind === right.kind ? 0 : left.kind === 'folder' ? -1 : 1) ||
+        compareText(left.derivedSlug, right.derivedSlug) ||
+        compareText(left.item.item.id, right.item.item.id),
+    );
+  for (const { item, recordedSlug, derivedSlug, kind } of unsettled) {
+    const slug = allocateUniqueSlug(derivedSlug, item.item.id, claimed);
+    claimed.add(slug);
+    resultFor(kind).set(item.item.id, slug);
+    if (slug !== recordedSlug) {
+      moves.push({
+        itemId: item.item.id,
+        oldSlug: recordedSlug,
+        newSlug: slug,
+      });
+    }
+  }
+
+  allocateRemaining(folders, claimed, allocatedFolders);
+  allocateRemaining(documents, claimed, allocatedDocuments);
+
+  return { folders: allocatedFolders, documents: allocatedDocuments, moves };
 }
 
 export function allocateReseededSlug(

@@ -1,7 +1,12 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { posix, relative, resolve } from 'node:path';
 
-import { PROJECT_LAYOUT, RESERVED_SLUGS } from '@ctcstack/ctcdocs-core';
+import {
+  PLATFORM_ROUTES,
+  PROJECT_LAYOUT,
+  RESERVED_SLUGS,
+  SHORT_ID_PATTERN,
+} from '@ctcstack/ctcdocs-core';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 
@@ -37,6 +42,7 @@ const frontmatterSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1).optional(),
   slug: z.string().min(1),
+  shortId: z.string().regex(SHORT_ID_PATTERN),
   editUrl: z.url(),
   sourceType: z.literal('google-doc'),
   googleFileId: z.string().min(1),
@@ -57,6 +63,7 @@ const frontmatterSchema = z.object({
 const sectionFrontmatterSchema = z.strictObject({
   title: z.string().min(1),
   slug: z.string().min(1),
+  shortId: z.string().regex(SHORT_ID_PATTERN),
   sourceType: z.literal('section-index'),
   contentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
   folderPath: z.array(z.string()),
@@ -260,6 +267,7 @@ async function validateGeneratedOutputInternal(
     if (
       frontmatter.googleFileId !== record.googleFileId ||
       frontmatter.slug !== record.stableSlug ||
+      frontmatter.shortId !== record.shortId ||
       frontmatter.contentHash !== record.contentHash
     ) {
       throw new Error('Generated frontmatter does not match the manifest.');
@@ -328,6 +336,7 @@ async function validateGeneratedOutputInternal(
       folder.generatedMarkdownPath !==
         `src/content/docs/_generated/section-${folder.googleFolderId}.md` ||
       frontmatter.slug !== folder.stableSlug ||
+      frontmatter.shortId !== folder.shortId ||
       frontmatter.title !== folder.displayLabel
     ) {
       throw new Error('Generated section page does not match the manifest.');
@@ -364,11 +373,60 @@ async function validateGeneratedOutputInternal(
   ) {
     throw new Error('Generated output contains an orphan asset.');
   }
+  /*
+   * Every published item has a short ID, and no two share one: `/d/<short
+   * ID>/` names exactly one page (ADR-022). No address may be one of those
+   * permanent links either, or the link would be shadowed by a page.
+   */
+  const permanentLinkSlugs = new Set<string>();
+  for (const [itemId, shortId, hasAddress] of [
+    ...Object.values(manifest.documents).map(
+      (record) => [record.googleFileId, record.shortId, true] as const,
+    ),
+    ...Object.values(manifest.folders).map(
+      (folder) =>
+        [
+          folder.googleFolderId,
+          folder.shortId,
+          folder.stableSlug !== undefined,
+        ] as const,
+    ),
+  ]) {
+    if (!hasAddress) {
+      continue;
+    }
+    if (shortId === undefined) {
+      throw new Error(`Manifest records no short ID for ${itemId}.`);
+    }
+    const permanentSlug = `${PLATFORM_ROUTES.permanentLinks}/${shortId}`;
+    if (permanentLinkSlugs.has(permanentSlug)) {
+      throw new Error('Generated output contains duplicate short IDs.');
+    }
+    permanentLinkSlugs.add(permanentSlug);
+  }
+  for (const permanentSlug of permanentLinkSlugs) {
+    if (slugs.has(permanentSlug) || permanentSlug in manifest.redirects) {
+      throw new Error(
+        `/${permanentSlug}/ is both an address and a permanent link.`,
+      );
+    }
+  }
+  if (context.site.navigation.addresses === 'follow-names') {
+    const owners = Object.values(manifest.redirects).map(
+      (redirect) => redirect.googleFileId,
+    );
+    if (new Set(owners).size !== owners.length) {
+      throw new Error(
+        'Addresses follow names, but an item keeps more than one earlier address.',
+      );
+    }
+  }
   for (const [sourceSlug, redirect] of Object.entries(manifest.redirects)) {
     if (
       slugs.has(sourceSlug) ||
       sourceSlug === redirect.targetSlug ||
-      manifest.documents[redirect.googleFileId]?.stableSlug !==
+      (manifest.documents[redirect.googleFileId]?.stableSlug ??
+        manifest.folders[redirect.googleFileId]?.stableSlug) !==
         redirect.targetSlug
     ) {
       throw new Error('Generated redirect metadata is invalid.');
@@ -377,7 +435,7 @@ async function validateGeneratedOutputInternal(
   if (
     findBrokenInternalLinks(
       linkDocuments,
-      new Set(Object.keys(manifest.redirects)),
+      new Set([...Object.keys(manifest.redirects), ...permanentLinkSlugs]),
     ).length > 0
   ) {
     throw new Error('Generated output contains a broken internal page link.');

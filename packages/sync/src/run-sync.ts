@@ -49,7 +49,10 @@ import {
 } from './markdown/generated-document.js';
 import { detectMarkdownFallbackReasons } from './markdown/analyze-markdown.js';
 import { normalizeMarkdown } from './markdown/normalize-markdown.js';
-import { rewriteInternalGoogleLinks } from './links/rewrite-internal-links.js';
+import {
+  rewriteInternalGoogleLinks,
+  type InternalLinkTargets,
+} from './links/rewrite-internal-links.js';
 import {
   CONVERTER_VERSION,
   loadManifest,
@@ -63,6 +66,8 @@ import { compareNavigationSiblings } from './navigation-order.js';
 import { parseOrderedLabel } from './ordered-label.js';
 import { writeGeneratedOutputAtomically } from './output/atomic-writer.js';
 import { validateGeneratedOutput } from './output/validate-generated-output.js';
+import { keepPreviousAddresses } from './redirect-history.js';
+import { allocateShortIds } from './short-id.js';
 import { allocateReseededSlug, allocateStableSlugs } from './slug.js';
 
 const MANIFEST_PATH = PROJECT_LAYOUT.manifestFile;
@@ -100,6 +105,8 @@ export interface SyncRunResult {
     newSlug: string;
     oldSlug: string;
   };
+  /** Addresses that followed their item's new name or place (ADR-021). */
+  addressesMoved: number;
 }
 
 export class SyncSelectionError extends Error {
@@ -109,6 +116,7 @@ export class SyncSelectionError extends Error {
 interface PlannedDocument {
   selected: SelectedInventoryItem;
   stableSlug: string;
+  shortId: string;
   existingRecord?: SyncedDocumentRecord;
   existingContent?: string;
   existingAssets: ExistingAsset[];
@@ -339,7 +347,7 @@ async function buildSectionIndexPages(
   for (const folder of folderRecords) {
     const node = folderNodes.get(folder.googleFolderId);
     const path = folder.generatedMarkdownPath;
-    if (!node || !path || !folder.stableSlug) {
+    if (!node || !path || !folder.stableSlug || !folder.shortId) {
       continue;
     }
     const entries = [
@@ -398,6 +406,7 @@ async function buildSectionIndexPages(
         {
           title: folder.displayLabel,
           slug: folder.stableSlug,
+          shortId: folder.shortId,
           folderPath: node.path
             .slice(1, -1)
             .map((segment) => parseOrderedLabel(segment).label),
@@ -495,18 +504,49 @@ export async function runBasicMarkdownSync(
       'The requested Google file ID is not a document in the selected corpus.',
     );
   }
+  /*
+   * A redirect leaves with its target (ADR-021). Only a run over the whole
+   * corpus knows what left; a targeted run keeps every redirect it found.
+   */
+  const currentItemIds = new Set([
+    ...inventory.selection.folders.map((folder) => folder.item.id),
+    ...inventory.selection.documents.map((document) => document.item.id),
+  ]);
+  let redirects = Object.fromEntries(
+    Object.entries(existingManifest.redirects)
+      .filter(
+        ([, redirect]) =>
+          targetedFileId !== undefined ||
+          currentItemIds.has(redirect.googleFileId),
+      )
+      .map(([slug, redirect]) => [slug, { ...redirect }]),
+  );
+  /*
+   * A targeted run sees one document, so it cannot tell a rename from a
+   * collision elsewhere in the corpus: it keeps every address where it is.
+   */
+  const addressPolicy = targetedFileId ? 'stable' : site.navigation.addresses;
   const slugAllocation = allocateStableSlugs(
     inventory.selection.folders,
     inventory.selection.documents,
-    existingManifest,
+    { ...existingManifest, redirects },
+    addressPolicy,
   );
   const stableSlugs = slugAllocation.documents;
   const folderSlugs = slugAllocation.folders;
-  const redirects = Object.fromEntries(
-    Object.entries(existingManifest.redirects).map(([slug, redirect]) => [
-      slug,
-      { ...redirect },
-    ]),
+  if (addressPolicy === 'follow-names') {
+    redirects = keepPreviousAddresses(
+      redirects,
+      slugAllocation.moves,
+      new Map([...stableSlugs, ...folderSlugs]),
+      runTimestamp,
+    );
+  }
+  const shortIds = allocateShortIds(
+    inventory.selection.folders,
+    inventory.selection.documents,
+    existingManifest,
+    inventory.selection.rootFolderId,
   );
   let slugChange: SyncRunResult['slugChange'];
   if (options.reseedSlugFileId) {
@@ -553,31 +593,55 @@ export async function runBasicMarkdownSync(
       document.item.id === targetedFileId ||
       existingManifest.documents[document.item.id] !== undefined,
   );
-  const rewriteStableSlugs = targetedFileId
-    ? new Map([
+  /*
+   * The targets a link may name. A targeted run rewrites one document against
+   * the whole published corpus, including documents the inventory no longer
+   * lists but the run preserves.
+   */
+  const recordedShortIds = targetedFileId
+    ? [
         ...Object.values(existingManifest.documents).map(
-          (record) => [record.googleFileId, record.stableSlug] as const,
+          (record) => [record.googleFileId, record.shortId] as const,
         ),
-        ...selectedForPlan.map(
-          (document) =>
-            [
-              document.item.id,
-              stableSlugs.get(document.item.id) ??
-                (() => {
-                  throw new SyncSelectionError(
-                    'Stable slug allocation is incomplete.',
-                  );
-                })(),
-            ] as const,
+        ...Object.values(existingManifest.folders).map(
+          (record) => [record.googleFolderId, record.shortId] as const,
         ),
-      ])
-    : stableSlugs;
+      ].flatMap(([itemId, shortId]) =>
+        shortId === undefined ? [] : [[itemId, shortId] as const],
+      )
+    : [];
+  const recordedAddresses = targetedFileId
+    ? Object.values(existingManifest.documents).map(
+        (record) => [record.stableSlug, record.googleFileId] as const,
+      )
+    : [];
+  const linkTargets: InternalLinkTargets = {
+    shortIds: new Map([...recordedShortIds, ...shortIds]),
+    addressOwners: new Map([
+      ...recordedAddresses,
+      ...Object.entries(redirects).map(
+        ([source, redirect]) => [source, redirect.googleFileId] as const,
+      ),
+      ...[...folderSlugs, ...stableSlugs].map(
+        ([itemId, slug]) => [slug, itemId] as const,
+      ),
+    ]),
+    siteOrigins: [
+      ...new Set([
+        new URL(configuration.SYNC_SITE_BASE_URL).origin,
+        ...Object.values(site.deployment.environments).map(
+          (environment) => environment.url,
+        ),
+      ]),
+    ],
+  };
   const sectionIndexPages = site.navigation.sectionIndexPages;
   const folders: Record<string, SyncedFolderRecord> = Object.fromEntries(
     inventory.selection.folders
       .map((folder) => {
         const orderedLabel = parseOrderedLabel(folder.item.name);
         const stableSlug = folderSlugs.get(folder.item.id);
+        const shortId = stableSlug ? shortIds.get(folder.item.id) : undefined;
         return [
           folder.item.id,
           {
@@ -593,6 +657,9 @@ export async function runBasicMarkdownSync(
             ...(stableSlug && sectionIndexPages
               ? { generatedMarkdownPath: sectionIndexPath(folder.item.id) }
               : {}),
+            // After the fields above: the manifest schema's own key order,
+            // which is how an unchanged manifest is recognized.
+            ...(shortId ? { shortId } : {}),
           },
         ] as const;
       })
@@ -637,6 +704,11 @@ export async function runBasicMarkdownSync(
             (() => {
               throw new Error('Stable slug allocation is incomplete.');
             })(),
+          shortId:
+            shortIds.get(selected.item.id) ??
+            (() => {
+              throw new Error('Short ID allocation is incomplete.');
+            })(),
           ...(existingRecord ? { existingRecord } : {}),
           ...(existingContent !== undefined ? { existingContent } : {}),
           existingAssets,
@@ -647,6 +719,8 @@ export async function runBasicMarkdownSync(
             : forceFullExport ||
               corpusChanged ||
               existingRecord === undefined ||
+              existingRecord.stableSlug !== stableSlugs.get(selected.item.id) ||
+              existingRecord.shortId !== shortIds.get(selected.item.id) ||
               metadataChanged ||
               existingOutputInvalid,
           added: existingRecord === undefined,
@@ -718,7 +792,7 @@ export async function runBasicMarkdownSync(
       }
       const rewritten = rewriteInternalGoogleLinks(
         normalized.body,
-        rewriteStableSlugs,
+        linkTargets,
       );
       normalized.body = rewritten.body;
       warnings = [...new Set([...warnings, ...rewritten.warnings])].sort();
@@ -733,6 +807,7 @@ export async function runBasicMarkdownSync(
         planned.existingRecord &&
         planned.existingContent !== undefined &&
         planned.existingRecord.stableSlug === planned.stableSlug &&
+        planned.existingRecord.shortId === planned.shortId &&
         planned.existingRecord.contentHash === contentHash
       ) {
         return {
@@ -750,6 +825,7 @@ export async function runBasicMarkdownSync(
             ? { description: normalized.description }
             : {}),
           slug: planned.stableSlug,
+          shortId: planned.shortId,
           sourceUrl: sourceUrl(planned.selected.item.id),
           googleFileId: planned.selected.item.id,
           googleModifiedTime: planned.selected.item.modifiedTime,
@@ -781,6 +857,7 @@ export async function runBasicMarkdownSync(
         lastSuccessfulSyncAt: runTimestamp,
         exportMode,
         warnings,
+        shortId: planned.shortId,
       };
       return {
         fileId: planned.selected.item.id,
@@ -998,5 +1075,6 @@ export async function runBasicMarkdownSync(
     report,
     outputChanged: writeResult.changed,
     ...(slugChange ? { slugChange } : {}),
+    addressesMoved: slugAllocation.moves.length,
   };
 }

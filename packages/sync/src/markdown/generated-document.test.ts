@@ -17,6 +17,7 @@ describe('generated Markdown document', () => {
         title: 'Fixture',
         description: 'Synthetic description.',
         slug: 'fixture',
+        shortId: 'abc123',
         sourceUrl: 'https://docs.google.com/document/d/fixture/edit',
         googleFileId: 'fixture',
         googleModifiedTime: '2026-01-01T00:00:00.000Z',
@@ -69,6 +70,7 @@ describe('generated Markdown document', () => {
       {
         title: 'Empty fixture',
         slug: 'empty-fixture',
+        shortId: 'def456',
         sourceUrl: 'https://docs.google.com/document/d/empty/edit',
         googleFileId: 'empty',
         googleModifiedTime: '2026-01-01T00:00:00.000Z',

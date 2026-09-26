@@ -2,6 +2,7 @@
 "title": "Overview"
 "description": "The handbook collects the working agreements a new joiner needs in their first week: how documents are published, where drafts live, and which sections are maintained by which team."
 "slug": "handbook/overview"
+"shortId": "76ff21"
 "editUrl": "https://docs.google.com/document/d/doc-overview/edit"
 "sourceType": "google-doc"
 "googleFileId": "doc-overview"

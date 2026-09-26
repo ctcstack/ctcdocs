@@ -18,6 +18,10 @@ function input(body: string) {
     body: `${marker}\n\n${body}`,
     ownershipHeader: marker,
     stableSlugs: new Set(['section/target']),
+    permanentLinks: {
+      '/d/a1b2c3/': '/section/target/',
+      '/d/0f0f0f/': '/section/',
+    },
   };
 }
 
@@ -45,6 +49,23 @@ describe('published Markdown', () => {
     expect(result).toContain('/section/target/index.md#heading');
     expect(result).toContain('href="/section/target/index.md"');
     expect(result).toContain('https://example.com');
+  });
+
+  it('names the Markdown of the page a permanent link leads to', () => {
+    const result = serializePublishedMarkdown(
+      input(
+        '[Document](/d/a1b2c3/#heading)\n\n' +
+          '<a href="/d/a1b2c3/">HTML document</a>\n\n' +
+          '[Section](/d/0f0f0f/)\n\n' +
+          '[Unknown](/d/ffffff/)',
+      ),
+    );
+
+    expect(result).toContain('(/section/target/index.md#heading)');
+    expect(result).toContain('href="/section/target/index.md"');
+    // A section has no Markdown projection; its page is the destination.
+    expect(result).toContain('[Section](/section/)');
+    expect(result).toContain('[Unknown](/d/ffffff/)');
   });
 
   it('preserves generated asset references', () => {

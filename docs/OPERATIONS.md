@@ -286,8 +286,48 @@ Use slug reseeding only for an approved URL change. A normal rename or move
 must retain the existing slug. Deletions disappear only after a complete
 inventory confirms that the document is outside the managed corpus.
 
-Never test create, move, rename, or delete behavior against production Drive.
-Use the protected test Shared Drive corpus.
+### Addresses that follow names
+
+While a corpus is still being arranged, set `navigation.addresses` to
+`follow-names` ([ADR-021](ADR/021-addresses-may-follow-names.md)). Every sync
+over the whole corpus then gives each folder and document the address its
+current Drive path yields. A renamed folder moves with everything below it,
+and two documents can swap titles and addresses. The sync summary reports how
+many addresses moved:
+
+```text
+Addresses moved (redirects kept): 3
+```
+
+Each item keeps one earlier address as a redirect, so an address copied from
+the browser survives one rename. The redirect goes when the item moves again,
+or when another item is named after that address. Renumbering moves nothing,
+because the order prefix is not part of an address. A sync targeted at one
+file keeps every address where it is.
+
+A reader who opens an address that no longer exists lands on the 404 page,
+which searches the site for the words of that address. Anyone who needs a
+link that lasts copies the page's permanent link instead (see below).
+
+Switch back to `stable` once people have started sharing addresses. The
+addresses stay where they are, and so do the redirects.
+
+In either mode, the redirects that point at a folder or document are removed
+when it leaves the corpus.
+
+### Permanent links
+
+Every document and section page answers at `/d/<short ID>/`, for example
+`/d/3f2a1c/` ([ADR-022](ADR/022-permanent-short-ids.md)). The short ID is
+recorded in the manifest when the page is first synchronized and never
+changes, so the link survives every rename and move. **Copy link** on the page
+copies it.
+
+Links between documents are stored the same way. The sync writes a link to
+another document, whether a Google Docs link or a pasted address of this site,
+as its permanent link. The site resolves it to the current address when it
+builds. The first sync after upgrading to a platform with permanent links
+exports every document again, because the converter version changed.
 
 ## Deployment
 

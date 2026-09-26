@@ -12,6 +12,14 @@ export const collections = {
           .enum(['google-doc', 'manual', 'section-index'])
           .default('manual'),
         googleFileId: z.string().min(1).optional(),
+        /*
+         * The ID behind the page's permanent link, `/d/<short ID>/`. Absent
+         * on pages generated before permanent links existed.
+         */
+        shortId: z
+          .string()
+          .regex(/^[0-9a-f]{6,64}$/u)
+          .optional(),
         googleModifiedTime: z.iso.datetime().optional(),
         syncedAt: z.iso.datetime().optional(),
         contentHash: z
