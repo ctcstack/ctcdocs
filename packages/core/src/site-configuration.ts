@@ -125,6 +125,15 @@ export interface NavigationConfiguration {
    * slugs are reserved either way, so turning this on or off moves no address.
    */
   readonly sectionIndexPages: boolean;
+  /**
+   * The Unicode scripts a letter in a Drive name may belong to, such as
+   * `["Latin"]`, or `null` when any script is accepted. A name becomes a
+   * heading, a sidebar label and, once, a permanent address, so a deployment
+   * whose editors write in one alphabet can refuse a letter typed on the other
+   * keyboard layout before it reaches any of them. Whatever this allows, a
+   * single word never mixes Latin, Cyrillic and Greek letters (ADR-020).
+   */
+  readonly nameScripts: readonly string[] | null;
 }
 
 export interface SiteConfiguration {
@@ -240,6 +249,46 @@ function optionalFlag(
   fallback: boolean,
 ): boolean {
   return source[key] === undefined ? fallback : flag(source, key, path);
+}
+
+/**
+ * A list of distinct Unicode script names, as a `\p{Script=…}` property
+ * escape spells them. Each name is proved by compiling that escape, so a typo
+ * fails here rather than letting every letter through, or none.
+ */
+function optionalScriptList(
+  source: Record<string, unknown>,
+  key: string,
+  path: string,
+): readonly string[] | null {
+  const value = source[key];
+  if (value === undefined) {
+    return null;
+  }
+  if (!Array.isArray(value) || value.length === 0) {
+    fail(path, 'must be a non-empty array of Unicode script names');
+  }
+  const scripts = value.map((entry, index) => {
+    if (typeof entry !== 'string' || !/^[A-Za-z_]+$/u.test(entry)) {
+      fail(
+        `${path}[${index}]`,
+        'must be a Unicode script name such as "Latin"',
+      );
+    }
+    try {
+      new RegExp(`\\p{Script=${entry}}`, 'u');
+    } catch {
+      fail(
+        `${path}[${index}]`,
+        'must be a Unicode script name such as "Latin"',
+      );
+    }
+    return entry;
+  });
+  if (new Set(scripts).size !== scripts.length) {
+    fail(path, 'must not repeat a script');
+  }
+  return Object.freeze(scripts);
 }
 
 /**
@@ -395,6 +444,11 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
         navigationSource,
         'sectionIndexPages',
         'navigation.sectionIndexPages',
+      ),
+      nameScripts: optionalScriptList(
+        navigationSource,
+        'nameScripts',
+        'navigation.nameScripts',
       ),
     },
     sync: {

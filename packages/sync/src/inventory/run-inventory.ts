@@ -2,6 +2,7 @@ import type { SyncConfiguration } from '../config.js';
 import type { GoogleAccessTokenProvider } from '../google/auth.js';
 import type { SyncContext } from '../project-context.js';
 import { GoogleDriveClient } from '../google/drive-client.js';
+import { findNameScriptIssues } from '../name-scripts.js';
 import { findNavigationOrderIssues } from '../navigation-order.js';
 import {
   buildInventorySelection,
@@ -46,6 +47,19 @@ export async function runInventory(
     configuration.GOOGLE_IGNORED_FOLDER_IDS,
     [configuration.GOOGLE_DRIVE_ID],
   );
+  /*
+   * A letter from the wrong alphabet is not a warning. The name becomes the
+   * document's permanent address on its first sync, and an address outlives
+   * the rename that corrects the title, so the run stops before anything is
+   * exported, whatever SYNC_FAIL_ON_WARNING says.
+   */
+  const nameIssues = findNameScriptIssues(
+    graph,
+    context.site.navigation.nameScripts,
+  );
+  if (nameIssues.length > 0) {
+    throw new InventoryGraphError(nameIssues);
+  }
   /*
    * How the corpus is named is reported on the same channel as how it is
    * shaped: both are things an editor did in Drive that an operator has to see,

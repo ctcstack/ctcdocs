@@ -220,6 +220,31 @@ a name opening with digits and a space in a folder already using the
 convention. `pnpm sync:inventory` counts them by code; adding `--json` names
 the item behind each one.
 
+### Letters from one alphabet
+
+A word in a Drive name uses letters of one alphabet
+([ADR-020](ADR/020-letters-from-one-alphabet.md)). A Cyrillic `С` typed into
+`Company` looks right, but it would become part of the document's permanent
+address. So the sync stops at inventory, before anything is exported, whatever
+`SYNC_FAIL_ON_WARNING` says:
+
+```text
+ERROR [INVENTORY_GRAPH]: mixed_script_name
+ERROR [INVENTORY_GRAPH]: mixed_script_name itemId=<Google file ID> U+0421 Cyrillic at character 1
+```
+
+Open the item by its ID, retype the letter at that position, and rerun the
+sync. Only Latin, Cyrillic and Greek are checked against each other, and words
+are split at spaces, hyphens and punctuation, so `SEO-продвижение` is accepted.
+
+A project whose names are all in one alphabet can say so with
+`navigation.nameScripts` (see [Configuration](CONFIGURATION.md)). A letter of
+any other script is then reported as `disallowed_name_script`, which also
+catches a whole word typed on the wrong layout.
+
+An item published before the rule keeps its address when its title is
+corrected. Changing the address is a slug reseed, below.
+
 ## Linking to a section
 
 Every folder below the publication root has an address of its own,

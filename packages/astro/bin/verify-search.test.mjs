@@ -73,12 +73,12 @@ test('a non-Latin title survives the split', () => {
 test('a result for a non-ASCII slug matches the slug the corpus records', () => {
   /*
    * A Drive title typed with a Cyrillic `С` produced the slug
-   * `сtc-delivery-team-weekly-team-syncs`. Pagefind returned it percent-encoded
+   * `сompany-handbook`. Pagefind returned it percent-encoded
    * and the check reported it missing while search found it first.
    */
   assert.equal(
-    resultPath('/company/%D1%81tc-delivery-team-weekly-team-syncs/'),
-    '/company/сtc-delivery-team-weekly-team-syncs/',
+    resultPath('/team/%D1%81ompany-handbook/'),
+    '/team/сompany-handbook/',
   );
   assert.equal(resultPath('/runbook/'), '/runbook/');
   assert.equal(

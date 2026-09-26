@@ -6,6 +6,7 @@ import {
 
 export type InventoryIssueCode =
   | 'cycle'
+  | 'disallowed_name_script'
   | 'duplicate_id'
   | 'duplicate_navigation_order'
   | 'ignored_not_found'
@@ -13,6 +14,7 @@ export type InventoryIssueCode =
   | 'ignored_outside_root'
   | 'ignored_root'
   | 'multiple_landing_documents'
+  | 'mixed_script_name'
   | 'multiple_parents'
   | 'root_not_folder'
   | 'root_not_found'
@@ -23,6 +25,11 @@ export interface InventoryIssue {
   code: InventoryIssueCode;
   itemId: string;
   relatedId?: string;
+  /**
+   * What an operator needs to find the problem in Drive, for issues about a
+   * name: code points and positions, never the name itself.
+   */
+  detail?: string;
 }
 
 export class InventoryGraphError extends Error {
