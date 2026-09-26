@@ -44,5 +44,6 @@ Rejected
 - ADR-019: folders before documents, and a section page that tells them apart.
 - ADR-020: a Drive name is written in one alphabet.
 - ADR-021: addresses may follow Drive names.
+- ADR-022: every page has a permanent short ID.
 
 Create a new ADR by copying `000-template.md`.

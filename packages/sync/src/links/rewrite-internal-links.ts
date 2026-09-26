@@ -5,6 +5,8 @@ import remarkParse from 'remark-parse';
 import remarkStringify from 'remark-stringify';
 import { unified } from 'unified';
 
+import { permanentLinkPath, PLATFORM_ROUTES } from '@ctcstack/ctcdocs-core';
+
 import { unwrapGoogleRedirect } from '../conversion/url-policy.js';
 
 const GOOGLE_FILE_ID = /^[A-Za-z0-9_-]+$/u;
@@ -25,6 +27,25 @@ const processor = unified()
 export interface InternalLinkRewrite {
   body: string;
   warnings: string[];
+}
+
+/**
+ * What a link inside the corpus can point at, keyed the two ways a link names
+ * its target. A link is written as the target's permanent link (ADR-022), so
+ * the document that holds it never changes when the target is renamed or
+ * moved; the site resolves it to the current address when it builds.
+ */
+export interface InternalLinkTargets {
+  /** Drive ID of every published document and folder to its short ID. */
+  shortIds: ReadonlyMap<string, string>;
+  /**
+   * Every address the site answers for an item, current or redirected, to
+   * that item's Drive ID. An editor who pastes a page's address rather than
+   * its Google Doc gets the same permanent link.
+   */
+  addressOwners: ReadonlyMap<string, string>;
+  /** Origins the site is served from, for pasted absolute addresses. */
+  siteOrigins: readonly string[];
 }
 
 interface GoogleDocumentLink {
@@ -82,9 +103,56 @@ function safeFragment(fragment: string): {
     : { fragment: '', removed: true };
 }
 
+const PERMANENT_LINK = new RegExp(
+  `^${PLATFORM_ROUTES.permanentLinks}/([0-9a-f]{6,64})$`,
+  'u',
+);
+
+/**
+ * The item a site address names, when the address is this site's: a
+ * root-relative path, or an absolute URL on one of the site's origins.
+ */
+function siteLinkTarget(
+  value: string,
+  targets: InternalLinkTargets,
+): { shortId: string; fragment: string } | undefined {
+  if (value.startsWith('//')) {
+    return undefined;
+  }
+  let url: URL;
+  try {
+    url = new URL(value, 'https://relative.invalid');
+  } catch {
+    return undefined;
+  }
+  if (
+    url.origin !== 'https://relative.invalid' &&
+    !targets.siteOrigins.includes(url.origin)
+  ) {
+    return undefined;
+  }
+  if (url.origin === 'https://relative.invalid' && !value.startsWith('/')) {
+    return undefined;
+  }
+  let path: string;
+  try {
+    path = decodeURIComponent(url.pathname).replace(/^\/+|\/+$/gu, '');
+  } catch {
+    return undefined;
+  }
+  const permanent = PERMANENT_LINK.exec(path)?.[1];
+  const knownShortIds = new Set(targets.shortIds.values());
+  if (permanent && knownShortIds.has(permanent)) {
+    return { shortId: permanent, fragment: url.hash };
+  }
+  const owner = targets.addressOwners.get(path);
+  const shortId = owner ? targets.shortIds.get(owner) : undefined;
+  return shortId ? { shortId, fragment: url.hash } : undefined;
+}
+
 function rewriteUrl(
   value: string,
-  stableSlugs: ReadonlyMap<string, string>,
+  targets: InternalLinkTargets,
 ): { url: string; removedFragment: boolean } | undefined {
   /*
    * A Google redirect is unwrapped before anything else is decided about the
@@ -96,14 +164,22 @@ function rewriteUrl(
   const target = unwrapped ?? value;
 
   const googleLink = parseGoogleDocumentLink(target);
-  const stableSlug = googleLink
-    ? stableSlugs.get(googleLink.fileId)
+  const shortId = googleLink
+    ? targets.shortIds.get(googleLink.fileId)
     : undefined;
-  if (googleLink && stableSlug) {
+  if (googleLink && shortId) {
     const fragment = safeFragment(googleLink.fragment);
     return {
-      url: `/${stableSlug}/${fragment.fragment}`,
+      url: `${permanentLinkPath(shortId)}${fragment.fragment}`,
       removedFragment: fragment.removed,
+    };
+  }
+
+  const siteLink = siteLinkTarget(target, targets);
+  if (siteLink) {
+    return {
+      url: `${permanentLinkPath(siteLink.shortId)}${siteLink.fragment}`,
+      removedFragment: false,
     };
   }
 
@@ -128,13 +204,13 @@ function walk(
 
 export function rewriteInternalGoogleLinks(
   body: string,
-  stableSlugs: ReadonlyMap<string, string>,
+  targets: InternalLinkTargets,
 ): InternalLinkRewrite {
   const tree = processor.parse(body) as Root;
   const warnings = new Set<string>();
   walk(tree, (node) => {
     if (node.type === 'link') {
-      const rewritten = rewriteUrl(node.url, stableSlugs);
+      const rewritten = rewriteUrl(node.url, targets);
       if (rewritten) {
         (node as Link).url = rewritten.url;
         if (rewritten.removedFragment) {
@@ -146,7 +222,7 @@ export function rewriteInternalGoogleLinks(
       let changed = false;
       $('a[href]').each((_, anchor) => {
         const href = $(anchor).attr('href');
-        const rewritten = href ? rewriteUrl(href, stableSlugs) : undefined;
+        const rewritten = href ? rewriteUrl(href, targets) : undefined;
         if (!rewritten) {
           return;
         }

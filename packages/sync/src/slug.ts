@@ -35,24 +35,12 @@ function allocateUniqueSlug(
   fileId: string,
   allocatedSlugs: ReadonlySet<string>,
 ): string {
-  return allocateAvailableSlug(
-    baseSlug,
-    fileId,
-    (slug) => !allocatedSlugs.has(slug),
-  );
-}
-
-function allocateAvailableSlug(
-  baseSlug: string,
-  fileId: string,
-  isAvailable: (slug: string) => boolean,
-): string {
-  if (isAvailable(baseSlug)) {
+  if (!allocatedSlugs.has(baseSlug)) {
     return baseSlug;
   }
   for (let suffixLength = 6; suffixLength <= 64; suffixLength += 2) {
     const candidate = `${baseSlug}--${collisionSuffix(fileId, suffixLength)}`;
-    if (isAvailable(candidate)) {
+    if (!allocatedSlugs.has(candidate)) {
       return candidate;
     }
   }
@@ -60,7 +48,7 @@ function allocateAvailableSlug(
 }
 
 /** An address that changed in this allocation. The old one becomes a redirect. */
-interface AddressMove {
+export interface AddressMove {
   itemId: string;
   oldSlug: string;
   newSlug: string;
@@ -201,20 +189,21 @@ interface RecordedItem {
 }
 
 /**
- * Allocation when addresses follow names (ADR-021), in one pass over the one
- * namespace folders and documents share:
+ * Allocation when addresses follow names (ADR-021). An address is what the
+ * item's current Drive path yields; nothing it was called before holds a claim
+ * on it. In one pass over the one namespace folders and documents share:
  *
  * 1. Recorded items whose current path still yields their address keep it.
- * 2. Redirect sources and platform routes are reserved.
- * 3. Recorded items whose path yields another address are placed, folders
- *    first. Each keeps a claim on its own recorded address while this runs,
- *    so an item whose derived address is taken falls back to the suffixed
- *    address it already holds instead of moving to a new one. A redirect
- *    source is available only to the item it points at.
+ * 2. The platform's own routes are reserved.
+ * 3. Recorded items whose path now yields another address are placed, folders
+ *    first, then by address and ID. An address one of them has just given up
+ *    is free for any other, so two documents can swap titles cleanly. A taken
+ *    address yields the collision suffix, and since that suffix is derived
+ *    from the item's own ID, an item that already carries it keeps it.
  * 4. New folders, then new documents, as under `stable`.
  *
- * An address given up in step 3 becomes a redirect in the caller, so it stays
- * reserved for this run as well: no other item may take it.
+ * Redirects are the caller's affair and never reserve an address here: an item
+ * named after an address a redirect answers takes it, and the redirect goes.
  */
 function allocateFollowingNames(
   folders: readonly SelectedInventoryItem[],
@@ -233,51 +222,29 @@ function allocateFollowingNames(
         : [[folderId, record.stableSlug] as const],
     ),
   );
-  const recorded: RecordedItem[] = [
-    ...documents.flatMap((item) => {
-      const recordedSlug = recordedDocuments.get(item.item.id);
+  const recordedItem =
+    (kind: RecordedItem['kind'], recordedSlugs: ReadonlyMap<string, string>) =>
+    (item: SelectedInventoryItem): RecordedItem[] => {
+      const recordedSlug = recordedSlugs.get(item.item.id);
       return recordedSlug === undefined
         ? []
-        : [
-            {
-              item,
-              recordedSlug,
-              derivedSlug: proposedSlug(item),
-              kind: 'document' as const,
-            },
-          ];
-    }),
-    ...folders.flatMap((item) => {
-      const recordedSlug = recordedFolders.get(item.item.id);
-      return recordedSlug === undefined
-        ? []
-        : [
-            {
-              item,
-              recordedSlug,
-              derivedSlug: proposedSlug(item),
-              kind: 'folder' as const,
-            },
-          ];
-    }),
+        : [{ item, recordedSlug, derivedSlug: proposedSlug(item), kind }];
+    };
+  const recorded = [
+    ...documents.flatMap(recordedItem('document', recordedDocuments)),
+    ...folders.flatMap(recordedItem('folder', recordedFolders)),
   ];
 
   const claimed = new Set<string>();
-  const owners = new Map<string, string>();
-  for (const [sourceSlug, redirect] of Object.entries(
-    existingManifest.redirects,
-  )) {
-    owners.set(sourceSlug, redirect.googleFileId);
-  }
   const allocatedDocuments = new Map<string, string>();
   const allocatedFolders = new Map<string, string>();
   const resultFor = (kind: RecordedItem['kind']) =>
     kind === 'document' ? allocatedDocuments : allocatedFolders;
 
-  const settled = recorded.filter(
-    ({ recordedSlug, derivedSlug }) => recordedSlug === derivedSlug,
-  );
-  for (const { item, recordedSlug, kind } of settled) {
+  for (const { item, recordedSlug, derivedSlug, kind } of recorded) {
+    if (recordedSlug !== derivedSlug) {
+      continue;
+    }
     if (claimed.has(recordedSlug)) {
       throw new Error('The existing manifest contains duplicate stable slugs.');
     }
@@ -288,6 +255,7 @@ function allocateFollowingNames(
     claimed.add(slug);
   }
 
+  const moves: AddressMove[] = [];
   const unsettled = recorded
     .filter(({ recordedSlug, derivedSlug }) => recordedSlug !== derivedSlug)
     .sort(
@@ -296,34 +264,21 @@ function allocateFollowingNames(
         compareText(left.derivedSlug, right.derivedSlug) ||
         compareText(left.item.item.id, right.item.item.id),
     );
-  for (const { item, recordedSlug } of unsettled) {
-    if (claimed.has(recordedSlug) || owners.has(recordedSlug)) {
-      throw new Error('The existing manifest contains duplicate stable slugs.');
-    }
-    owners.set(recordedSlug, item.item.id);
-  }
-  const moves: AddressMove[] = [];
   for (const { item, recordedSlug, derivedSlug, kind } of unsettled) {
-    const itemId = item.item.id;
-    const slug = allocateAvailableSlug(
-      derivedSlug,
-      itemId,
-      (candidate) =>
-        !claimed.has(candidate) && (owners.get(candidate) ?? itemId) === itemId,
-    );
+    const slug = allocateUniqueSlug(derivedSlug, item.item.id, claimed);
     claimed.add(slug);
-    if (owners.get(slug) === itemId) {
-      owners.delete(slug);
-    }
-    resultFor(kind).set(itemId, slug);
+    resultFor(kind).set(item.item.id, slug);
     if (slug !== recordedSlug) {
-      moves.push({ itemId, oldSlug: recordedSlug, newSlug: slug });
+      moves.push({
+        itemId: item.item.id,
+        oldSlug: recordedSlug,
+        newSlug: slug,
+      });
     }
   }
 
-  const reserved = new Set([...claimed, ...owners.keys()]);
-  allocateRemaining(folders, reserved, allocatedFolders);
-  allocateRemaining(documents, reserved, allocatedDocuments);
+  allocateRemaining(folders, claimed, allocatedFolders);
+  allocateRemaining(documents, claimed, allocatedDocuments);
 
   return { folders: allocatedFolders, documents: allocatedDocuments, moves };
 }

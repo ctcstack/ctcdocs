@@ -6,6 +6,8 @@ export interface GeneratedDocumentInput {
   title: string;
   description?: string;
   slug: string;
+  /** The permanent link's ID (ADR-022). */
+  shortId: string;
   sourceUrl: string;
   googleFileId: string;
   googleModifiedTime: string;
@@ -98,6 +100,7 @@ export function generateMarkdownDocument(
       title: input.title,
       ...(input.description ? { description: input.description } : {}),
       slug: input.slug,
+      shortId: input.shortId,
       editUrl: input.sourceUrl,
       sourceType: 'google-doc',
       googleFileId: input.googleFileId,

@@ -426,7 +426,7 @@ describe('addresses that follow names', () => {
     ]);
   });
 
-  it('never gives one document the address a redirect holds for another', () => {
+  it('gives a document the address a redirect of another answers', () => {
     const allocation = allocateStableSlugs(
       [root],
       [
@@ -442,10 +442,9 @@ describe('addresses that follow names', () => {
     );
 
     expect(allocation.documents.get('file-a')).toBe('price-list');
-    expect(allocation.documents.get('file-b')).toMatch(/^pricing--/u);
+    expect(allocation.documents.get('file-b')).toBe('pricing');
   });
-
-  it('keeps the old address of a moved document from a new one', () => {
+  it('hands the address a document left to the one now named after it', () => {
     const allocation = allocateStableSlugs(
       [root],
       [
@@ -457,10 +456,9 @@ describe('addresses that follow names', () => {
     );
 
     expect(allocation.documents.get('file-a')).toBe('pricing-2026');
-    expect(allocation.documents.get('file-new')).toMatch(/^pricing--/u);
+    expect(allocation.documents.get('file-new')).toBe('pricing');
   });
-
-  it('does not hand a swapped address from one document to the other', () => {
+  it('lets two documents swap titles and addresses', () => {
     const allocation = allocateStableSlugs(
       [root],
       [
@@ -471,10 +469,9 @@ describe('addresses that follow names', () => {
       'follow-names',
     );
 
-    expect(allocation.documents.get('file-a')).toMatch(/^beta--/u);
-    expect(allocation.documents.get('file-b')).toMatch(/^alpha--/u);
+    expect(allocation.documents.get('file-a')).toBe('beta');
+    expect(allocation.documents.get('file-b')).toBe('alpha');
   });
-
   it('keeps a suffixed address while its base is taken, and drops the suffix once it is free', () => {
     const suffixed = allocateStableSlugs(
       [root],
@@ -518,8 +515,8 @@ describe('addresses that follow names', () => {
       allocateStableSlugs(
         [root],
         [
-          document('file-a', ['Published', 'Alpha']),
-          document('file-b', ['Published', 'Beta']),
+          document('file-a', ['Published', 'Same']),
+          document('file-b', ['Published', 'Same']),
         ],
         manifestWith({ 'file-a': 'same', 'file-b': 'same' }),
         'follow-names',

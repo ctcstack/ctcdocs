@@ -23,6 +23,7 @@ import type { AstroUserConfig } from 'astro';
 
 import { normalizeFolderName } from './lib/folder-anchor.js';
 import { remarkMermaid } from './lib/remark-mermaid.js';
+import { remarkPermanentLinks } from './lib/remark-permanent-links.js';
 import { remarkTableScroll } from './lib/remark-table-scroll.js';
 import { ctcdocsRoutes } from './route-injection.js';
 
@@ -143,6 +144,8 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
     // would repeat it from the sync commit, which is a different, less
     // meaningful date.
     lastUpdated: false,
+    // The platform serves its own 404, which searches for the missing address.
+    disable404Route: true,
     pagination: true,
     sidebar: [...sidebarPrefix, ...normalizeSidebarLabels(options.sidebar)],
     /*
@@ -187,7 +190,13 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
        * the plugins here run first without displacing theirs.
        */
       processor: unified({
-        remarkPlugins: [remarkMermaid, remarkTableScroll],
+        remarkPlugins: [
+          remarkMermaid,
+          remarkTableScroll,
+          // A link between documents is stored as a permanent link and drawn
+          // as the address it leads to today (ADR-022).
+          remarkPermanentLinks(options.redirects),
+        ],
       }),
     },
     integrations: [ctcdocsRoutes(), starlight(starlightConfiguration)],

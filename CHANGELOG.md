@@ -8,13 +8,27 @@ All three packages share a version and are released together.
 
 - `navigation.addresses` in `site.config.json`. `stable`, the default, keeps
   an address through every rename and move, as before. `follow-names` gives
-  every folder and document the address its current Drive path yields on each
-  sync over the whole corpus. Every moved address leaves a redirect, so a
-  project can follow names while its structure settles and switch back once
-  people share links. Folders now get redirects as well as documents. A
-  redirect is never handed to a different item, and a document renamed back
-  reclaims its earlier address. See
-  [ADR-021](docs/ADR/021-addresses-may-follow-names.md).
+  every folder and document the address its current Drive path yields, on
+  every sync over the whole corpus. Each item keeps one earlier address as a
+  redirect, so redirects never outnumber pages. An address an item leaves is
+  free for the next item named that way. Folders get redirects as documents
+  do. See [ADR-021](docs/ADR/021-addresses-may-follow-names.md).
+- Permanent links. Every document and section page has a short ID recorded in
+  the manifest, and answers at `/d/<short ID>/` whatever it is renamed to. A
+  page offers to copy it. `d` is now a platform route. See
+  [ADR-022](docs/ADR/022-permanent-short-ids.md).
+- The 404 page searches the site for the words of the missing address, and
+  lists what it finds. It replaces Starlight's 404 page.
+
+### Changed
+
+- A link between documents is stored as the target's permanent link, and
+  resolved to the target's current address when the site builds. A pasted
+  address of this site becomes a permanent link as well. A renamed target no
+  longer changes the documents that link to it. The converter version is now
+  `hybrid-v3`, so the first sync after upgrading exports every document again.
+- Generated documents and section pages carry `shortId` in their frontmatter,
+  and manifest records carry it too.
 
 ### Fixed
 

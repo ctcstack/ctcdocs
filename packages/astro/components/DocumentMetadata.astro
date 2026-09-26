@@ -9,9 +9,17 @@
  * Freshness is reported from `googleModifiedTime` — when a person last edited
  * the source — not from `syncedAt`, which changes on every pipeline run and
  * tells a reader nothing. The exact sync time stays available in the tooltip.
+ *
+ * A page with a permanent link offers to copy it (ADR-022): the address in the
+ * browser follows the document's name, and this one does not. A section page
+ * has no provenance to report, so the permanent link is all its row holds.
  */
+import { permanentLinkPath } from '@ctcstack/ctcdocs-core';
+
 const { entry } = Astro.locals.starlightRoute;
-const { editUrl, googleModifiedTime, sourceType, syncedAt } = entry.data;
+const { editUrl, googleModifiedTime, shortId, sourceType, syncedAt } =
+  entry.data;
+const permanentPath = shortId ? permanentLinkPath(shortId) : undefined;
 
 const sourceUrl = typeof editUrl === 'string' ? editUrl : undefined;
 const markdownUrl = `/${entry.id}/index.md`;
@@ -35,6 +43,7 @@ function formatUtcDateTime(value: string): string {
 
 const showMetadata =
   sourceType === 'google-doc' && sourceUrl && googleModifiedTime && syncedAt;
+const showSectionLink = sourceType === 'section-index' && permanentPath;
 ---
 
 {
@@ -87,6 +96,28 @@ const showMetadata =
         <span class="doc-meta-status" data-copy-status role="status" />
       </copy-markdown>
 
+      {permanentPath && (
+        <copy-link data-path={permanentPath}>
+          <button class="doc-meta-action" type="button">
+            <svg
+              aria-hidden="true"
+              class="doc-meta-icon"
+              fill="none"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.5"
+              viewBox="0 0 16 16"
+            >
+              <path d="M6.5 9.5a2.5 2.5 0 0 0 3.5 0l2.5-2.5a2.5 2.5 0 0 0-3.5-3.5L8.5 4" />
+              <path d="M9.5 6.5a2.5 2.5 0 0 0-3.5 0L3.5 9a2.5 2.5 0 0 0 3.5 3.5l.5-.5" />
+            </svg>
+            <span data-copy-label>Copy link</span>
+          </button>
+          <span class="doc-meta-status" data-copy-status role="status" />
+        </copy-link>
+      )}
+
       <a class="doc-meta-action" href={markdownUrl}>
         <svg
           aria-hidden="true"
@@ -126,6 +157,32 @@ const showMetadata =
         </svg>
         Open in Google Docs
       </a>
+    </div>
+  )
+}
+
+{
+  showSectionLink && (
+    <div class="doc-meta" data-pagefind-ignore>
+      <copy-link data-path={permanentPath}>
+        <button class="doc-meta-action" type="button">
+          <svg
+            aria-hidden="true"
+            class="doc-meta-icon"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="1.5"
+            viewBox="0 0 16 16"
+          >
+            <path d="M6.5 9.5a2.5 2.5 0 0 0 3.5 0l2.5-2.5a2.5 2.5 0 0 0-3.5-3.5L8.5 4" />
+            <path d="M9.5 6.5a2.5 2.5 0 0 0-3.5 0L3.5 9a2.5 2.5 0 0 0 3.5 3.5l.5-.5" />
+          </svg>
+          <span data-copy-label>Copy link</span>
+        </button>
+        <span class="doc-meta-status" data-copy-status role="status" />
+      </copy-link>
     </div>
   )
 }
@@ -183,6 +240,53 @@ const showMetadata =
   }
 
   customElements.define('copy-markdown', CopyMarkdown);
+
+  /**
+   * Copies the page's permanent link, which keeps working through every
+   * rename and move of the page (ADR-022). It is absolute on the origin the
+   * reader is on, so a link copied from any environment leads back to it.
+   */
+  class CopyLink extends HTMLElement {
+    connectedCallback() {
+      const button = this.querySelector('button');
+      const label = this.querySelector<HTMLElement>('[data-copy-label]');
+      const status = this.querySelector<HTMLElement>('[data-copy-status]');
+      const path = this.dataset.path;
+
+      if (!button || !label || !status || !path) return;
+
+      if (!navigator.clipboard) {
+        this.hidden = true;
+        return;
+      }
+
+      const idle = label.textContent ?? 'Copy link';
+      let resetTimer: ReturnType<typeof setTimeout> | undefined;
+
+      button.addEventListener('click', async () => {
+        clearTimeout(resetTimer);
+        try {
+          await navigator.clipboard.writeText(
+            new URL(path, window.location.origin).href,
+          );
+          label.textContent = 'Copied';
+          status.textContent = 'Permanent link copied to clipboard';
+          this.dataset.state = 'copied';
+        } catch {
+          label.textContent = 'Copy failed';
+          status.textContent = 'Could not copy the permanent link.';
+          this.dataset.state = 'failed';
+        }
+        resetTimer = setTimeout(() => {
+          label.textContent = idle;
+          status.textContent = '';
+          delete this.dataset.state;
+        }, 4000);
+      });
+    }
+  }
+
+  customElements.define('copy-link', CopyLink);
 </script>
 
 <style>
@@ -257,17 +361,20 @@ const showMetadata =
       outline-offset: 3px;
     }
 
-    copy-markdown {
+    copy-markdown,
+    copy-link {
       align-items: center;
       display: inline-flex;
       gap: 0.4rem;
     }
 
-    copy-markdown[data-state='copied'] .doc-meta-action {
+    copy-markdown[data-state='copied'] .doc-meta-action,
+    copy-link[data-state='copied'] .doc-meta-action {
       color: var(--sl-color-text-accent);
     }
 
-    copy-markdown[data-state='failed'] .doc-meta-action {
+    copy-markdown[data-state='failed'] .doc-meta-action,
+    copy-link[data-state='failed'] .doc-meta-action {
       color: var(--sl-color-red-high);
     }
 

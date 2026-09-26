@@ -42,25 +42,25 @@ name of its own; they read this file. The rationale is recorded in
 }
 ```
 
-| Value                                  | Where it shows up                                                                                                           |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `brand.name`                           | Reserved for prose that names the organization rather than the site.                                                        |
-| `brand.siteTitle`                      | Browser tab, header wordmark, home page heading, and both browser test suites.                                              |
-| `brand.siteDescription`                | Site-wide meta description and the home page's own description.                                                             |
-| `brand.faviconPath`                    | The `<link rel="icon">` target and the asset the Access smoke test probes.                                                  |
-| `deployment.workerName`                | The Worker `wrangler.jsonc` must declare; environments deploy as `<name>-<environment>`.                                    |
-| `deployment.environments.*`            | Canonical site URL, Wrangler custom domains, deployment summaries, smoke-test defaults.                                     |
-| `deployment.environments.*.visibility` | Who may read that environment: `private` (default) or `public`. See below.                                                  |
-| `home.lede`                            | The paragraph under the home page heading, in full: where documents come from and what a reader may do with them.           |
-| `home.recentLimit`                     | How many documents the "recently updated" band lists. A whole number of at least 1; defaults to 6.                          |
-| `home.corpusIndex`                     | Whether the home page carries the full index, which is published at `/documents/` either way. Defaults to `true`.           |
-| `navigation.landingDocumentTitles`     | Titles that open the folder they sit in, most preferred first. Also picks the description the home page shows for a folder. |
-| `navigation.sectionIndexPages`         | Whether each folder gets a generated page listing its subfolders, then its documents, at `/<folder-slug>/`.                 |
-| `navigation.nameScripts`               | Optional. The Unicode scripts a letter in a Drive name may belong to, such as `["Latin"]`. See below.                       |
-| `navigation.addresses`                 | Optional. `stable` (default) keeps an address through renames and moves; `follow-names` moves it with its item. See below.  |
-| `sync.generatedBy`                     | The ownership marker stamped into every generated Markdown and TypeScript file.                                             |
-| `sync.commitBotName`                   | Git author the sync workflow commits generated output as.                                                                   |
-| `sync.defaultLocale`                   | Fallback locale for documents whose language cannot be determined.                                                          |
+| Value                                  | Where it shows up                                                                                                                        |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `brand.name`                           | Reserved for prose that names the organization rather than the site.                                                                     |
+| `brand.siteTitle`                      | Browser tab, header wordmark, home page heading, and both browser test suites.                                                           |
+| `brand.siteDescription`                | Site-wide meta description and the home page's own description.                                                                          |
+| `brand.faviconPath`                    | The `<link rel="icon">` target and the asset the Access smoke test probes.                                                               |
+| `deployment.workerName`                | The Worker `wrangler.jsonc` must declare; environments deploy as `<name>-<environment>`.                                                 |
+| `deployment.environments.*`            | Canonical site URL, Wrangler custom domains, deployment summaries, smoke-test defaults.                                                  |
+| `deployment.environments.*.visibility` | Who may read that environment: `private` (default) or `public`. See below.                                                               |
+| `home.lede`                            | The paragraph under the home page heading, in full: where documents come from and what a reader may do with them.                        |
+| `home.recentLimit`                     | How many documents the "recently updated" band lists. A whole number of at least 1; defaults to 6.                                       |
+| `home.corpusIndex`                     | Whether the home page carries the full index, which is published at `/documents/` either way. Defaults to `true`.                        |
+| `navigation.landingDocumentTitles`     | Titles that open the folder they sit in, most preferred first. Also picks the description the home page shows for a folder.              |
+| `navigation.sectionIndexPages`         | Whether each folder gets a generated page listing its subfolders, then its documents, at `/<folder-slug>/`.                              |
+| `navigation.nameScripts`               | Optional. The Unicode scripts a letter in a Drive name may belong to, such as `["Latin"]`. See below.                                    |
+| `navigation.addresses`                 | Optional. `stable` (default) keeps an address through renames and moves; `follow-names` re-derives it from the Drive path on every sync. |
+| `sync.generatedBy`                     | The ownership marker stamped into every generated Markdown and TypeScript file.                                                          |
+| `sync.commitBotName`                   | Git author the sync workflow commits generated output as.                                                                                |
+| `sync.defaultLocale`                   | Fallback locale for documents whose language cannot be determined.                                                                       |
 
 ## Who may read the deployment
 

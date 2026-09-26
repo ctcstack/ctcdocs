@@ -1,0 +1,162 @@
+---
+/**
+ * The page a missing address lands on, and a way back from it.
+ *
+ * While addresses follow names (ADR-021), an address copied from the browser
+ * lasts until its page is renamed twice. The page it named usually still
+ * exists under another address, and its words are still in the one that was
+ * requested. So this page searches for them: `/sales/pricing-2025/` looks for
+ * "sales pricing 2025", and the document is usually the first result.
+ *
+ * Nothing is stored for this: the search runs in the browser against the
+ * index every page already uses. A permanent link, `/d/<short ID>/`, carries
+ * no words, and the page says so instead of searching.
+ */
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { PLATFORM_ROUTE_HREFS } from '@ctcstack/ctcdocs-core';
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Page not found',
+    description: 'No page is published at this address.',
+    tableOfContents: false,
+    pagefind: false,
+    prev: false,
+    next: false,
+  }}
+>
+  <missing-page data-pagefind-ignore>
+    <p>
+      Nothing is published at this address. Pages move when their documents are
+      renamed or moved in Drive; the permanent link a page offers does not.
+    </p>
+    <section aria-labelledby="missing-page-results" hidden data-results>
+      <h2 id="missing-page-results">Perhaps you were looking for</h2>
+      <ol data-result-list></ol>
+    </section>
+    <p>
+      Browse <a href={PLATFORM_ROUTE_HREFS.fullIndex}>all documents</a> or search
+      from the top of the page.
+    </p>
+  </missing-page>
+</StarlightPage>
+
+<script>
+  /** Words of one part of an address that are worth searching for. */
+  function wordsOf(segment: string): string[] {
+    return segment.split(/[^\p{Letter}\p{Number}]+/u).filter(
+      (word) =>
+        word.length >= 3 &&
+        // Short IDs and collision suffixes are hexadecimal, not words.
+        !/^[0-9a-f]{6,}$/u.test(word) &&
+        word !== 'index',
+    );
+  }
+
+  /**
+   * The searches to try for a missing address, most specific first. The
+   * index matches every word of a search, so a word the page never had, such
+   * as one a rename removed, would find nothing: the page's own name, the
+   * last segment, is tried next, then its words one at a time.
+   */
+  function searchesFor(pathname: string): string[] {
+    let decoded = pathname;
+    try {
+      decoded = decodeURIComponent(pathname);
+    } catch {
+      // An address that cannot be decoded is searched for as it is.
+    }
+    const segments = decoded.split('/').filter(Boolean);
+    const lastWords = wordsOf(segments.at(-1) ?? '');
+    const searches = [
+      wordsOf(decoded).join(' '),
+      lastWords.join(' '),
+      ...[...lastWords].sort((left, right) => right.length - left.length),
+    ].filter(Boolean);
+    return [...new Set(searches)];
+  }
+
+  interface PagefindResultData {
+    url: string;
+    excerpt: string;
+    meta: { title?: string };
+  }
+
+  interface Pagefind {
+    search(term: string): Promise<{
+      results: Array<{ data(): Promise<PagefindResultData> }>;
+    }>;
+  }
+
+  class MissingPage extends HTMLElement {
+    async connectedCallback() {
+      const section = this.querySelector<HTMLElement>('[data-results]');
+      const list = this.querySelector<HTMLOListElement>('[data-result-list]');
+      const searches = searchesFor(window.location.pathname);
+      if (!section || !list || searches.length === 0) return;
+
+      try {
+        const bundle = '/pagefind/pagefind.js';
+        const pagefind = (await import(/* @vite-ignore */ bundle)) as Pagefind;
+        let results: PagefindResultData[] = [];
+        for (const terms of searches) {
+          const search = await pagefind.search(terms);
+          results = await Promise.all(
+            search.results.slice(0, 5).map((result) => result.data()),
+          );
+          if (results.length > 0) break;
+        }
+        for (const result of results) {
+          const item = document.createElement('li');
+          const link = document.createElement('a');
+          link.href = result.url;
+          link.textContent = result.meta.title ?? result.url;
+          const excerpt = document.createElement('p');
+          // The excerpt marks matches with HTML; only its text is shown.
+          excerpt.textContent =
+            new DOMParser().parseFromString(result.excerpt, 'text/html').body
+              .textContent ?? '';
+          item.append(link, excerpt);
+          list.append(item);
+        }
+        section.hidden = results.length === 0;
+      } catch {
+        // Without the index the page still says what happened and where to go.
+      }
+    }
+  }
+
+  customElements.define('missing-page', MissingPage);
+</script>
+
+<style>
+  /*
+   * The results are created by the script above, after Astro scoped the
+   * stylesheet to the markup it rendered, so their selectors are global.
+   */
+  @layer starlight.components {
+    missing-page {
+      display: block;
+    }
+
+    missing-page :global(ol) {
+      list-style: none;
+      padding: 0;
+    }
+
+    missing-page :global(li) {
+      padding-block: 0.75rem;
+    }
+
+    missing-page :global(li + li) {
+      border-top: 1px solid var(--sl-color-hairline);
+    }
+
+    missing-page :global(li p) {
+      color: var(--sl-color-gray-3);
+      font-size: var(--sl-text-sm);
+      margin-top: 0.25rem;
+    }
+  }
+</style>

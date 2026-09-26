@@ -11,6 +11,8 @@ import type { AstroIntegration } from 'astro';
 
 const ROUTES = [
   { entrypoint: '@ctcstack/ctcdocs/routes/index.astro', pattern: '/' },
+  // Replaces Starlight's own, which is switched off in the preset.
+  { entrypoint: '@ctcstack/ctcdocs/routes/404.astro', pattern: '/404' },
   {
     entrypoint: '@ctcstack/ctcdocs/routes/documents/index.astro',
     pattern: `/${PLATFORM_ROUTES.fullIndex}`,

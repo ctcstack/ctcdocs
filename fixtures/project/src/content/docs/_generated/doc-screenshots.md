@@ -2,6 +2,7 @@
 "title": "Screenshots"
 "description": "A document whose media forces the HTML archive path, so the asset route and the image pipeline are exercised by the corpus."
 "slug": "reference/screenshots"
+"shortId": "d252ed"
 "editUrl": "https://docs.google.com/document/d/doc-screenshots/edit"
 "sourceType": "google-doc"
 "googleFileId": "doc-screenshots"

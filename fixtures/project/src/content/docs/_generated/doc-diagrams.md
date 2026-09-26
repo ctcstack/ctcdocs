@@ -2,6 +2,7 @@
 "title": "Diagrams"
 "description": "A mermaid fence has to be claimed before the code-frame renderer sees it, or the diagram publishes as a listing of its own source."
 "slug": "reference/diagrams"
+"shortId": "48b067"
 "editUrl": "https://docs.google.com/document/d/doc-diagrams/edit"
 "sourceType": "google-doc"
 "googleFileId": "doc-diagrams"

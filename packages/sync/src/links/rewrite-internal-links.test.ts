@@ -1,14 +1,27 @@
 import { describe, expect, it } from 'vitest';
 
-import { rewriteInternalGoogleLinks } from './rewrite-internal-links.js';
+import {
+  rewriteInternalGoogleLinks,
+  type InternalLinkTargets,
+} from './rewrite-internal-links.js';
 
-const slugs = new Map([
-  ['doc-one', 'engineering/architecture'],
-  ['doc-two', 'operations/runbook'],
-]);
+const slugs: InternalLinkTargets = {
+  shortIds: new Map([
+    ['doc-one', 'a1b2c3'],
+    ['doc-two', 'd4e5f6'],
+    ['folder-ops', '0f0f0f'],
+  ]),
+  addressOwners: new Map([
+    ['engineering/architecture', 'doc-one'],
+    ['operations/runbook', 'doc-two'],
+    ['operations', 'folder-ops'],
+    ['engineering/old-architecture', 'doc-one'],
+  ]),
+  siteOrigins: ['https://docs.example.com'],
+};
 
 describe('internal Google link rewriting', () => {
-  it('rewrites supported Docs and Drive URLs through the complete slug map', () => {
+  it('writes supported Docs and Drive URLs as permanent links', () => {
     const result = rewriteInternalGoogleLinks(
       [
         '[Edit](https://docs.google.com/document/d/doc-one/edit)',
@@ -18,8 +31,8 @@ describe('internal Google link rewriting', () => {
       slugs,
     );
 
-    expect(result.body).toContain('(/engineering/architecture/)');
-    expect(result.body).toContain('(/operations/runbook/#readable-anchor)');
+    expect(result.body).toContain('(/d/a1b2c3/)');
+    expect(result.body).toContain('(/d/d4e5f6/#readable-anchor)');
     expect(result.warnings).toEqual([]);
   });
 
@@ -54,7 +67,7 @@ describe('internal Google link rewriting', () => {
       slugs,
     );
 
-    expect(result.body).toContain('href="/engineering/architecture/"');
+    expect(result.body).toContain('href="/d/a1b2c3/"');
   });
 
   it('unwraps the redirect Google puts in front of every exported link', () => {
@@ -70,7 +83,7 @@ describe('internal Google link rewriting', () => {
     // The reader reaches the target, not Google.
     expect(result.body).toContain('(https://example.invalid/status)');
     // A wrapped link between two documents in this corpus becomes a site link.
-    expect(result.body).toContain('(/engineering/architecture/)');
+    expect(result.body).toContain('(/d/a1b2c3/)');
     // A document outside the corpus keeps its own address, unwrapped.
     expect(result.body).toContain(
       '(https://docs.google.com/document/d/outside/edit)',
@@ -109,12 +122,43 @@ describe('internal Google link rewriting', () => {
       slugs,
     );
 
-    expect(result.body).toContain('href="/operations/runbook/"');
+    expect(result.body).toContain('href="/d/d4e5f6/"');
   });
 
   it('ignores a redirect-shaped URL on a host that is not Google', () => {
     const input =
       '[Elsewhere](https://redirect.invalid/url?q=https://example.invalid/target)';
+
+    expect(rewriteInternalGoogleLinks(input, slugs).body).toBe(`${input}\n`);
+  });
+
+  it('writes a pasted site address as the permanent link of what it names', () => {
+    const result = rewriteInternalGoogleLinks(
+      [
+        '[Relative](/engineering/architecture/#setup)',
+        '[Absolute](https://docs.example.com/operations/runbook/)',
+        '[Section](/operations/)',
+        '[Earlier address](/engineering/old-architecture/)',
+        '[Permanent](https://docs.example.com/d/d4e5f6/)',
+      ].join('\n\n'),
+      slugs,
+    );
+
+    expect(result.body).toContain('[Relative](/d/a1b2c3/#setup)');
+    expect(result.body).toContain('[Absolute](/d/d4e5f6/)');
+    expect(result.body).toContain('[Section](/d/0f0f0f/)');
+    expect(result.body).toContain('[Earlier address](/d/a1b2c3/)');
+    expect(result.body).toContain('[Permanent](/d/d4e5f6/)');
+  });
+
+  it('leaves addresses it cannot attribute where they point', () => {
+    const input = [
+      '[Unknown page](/nowhere/)',
+      '[Unknown permanent link](/d/ffffff/)',
+      '[Another site](https://elsewhere.example.com/engineering/architecture/)',
+      '[Relative path](engineering/architecture/)',
+      '[Protocol-relative](//docs.example.com/operations/runbook/)',
+    ].join('\n\n');
 
     expect(rewriteInternalGoogleLinks(input, slugs).body).toBe(`${input}\n`);
   });

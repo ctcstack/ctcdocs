@@ -6,7 +6,9 @@ import { siteConfiguration } from '../../lib/project.js';
 import {
   anyDocument,
   documentInFolder,
+  documentLinkingAnother,
   documentWithAsset,
+  documentWithPermanentLink,
   documentWithTable,
   sectionWithSubfolder,
 } from '../support/corpus-fixtures.js';
@@ -405,4 +407,54 @@ test('crawler defenses are present in the built site', async ({
   const robots = await request.get('/robots.txt');
   expect(robots.ok()).toBe(true);
   expect(await robots.text()).toContain('Disallow: /');
+});
+
+test('a permanent link leads to its page, which offers to copy it', async ({
+  page,
+}) => {
+  const document = documentWithPermanentLink();
+  test.skip(!document, 'The corpus was synchronized before permanent links.');
+  const { shortId, slug } = document as { shortId: string; slug: string };
+
+  await page.goto(`/d/${shortId}/`);
+  await expect(page).toHaveURL(new RegExp(`/${escapeRegExp(slug)}/$`, 'u'));
+  await expect(page.locator('copy-link').first()).toHaveAttribute(
+    'data-path',
+    `/d/${shortId}/`,
+  );
+});
+
+test('a link between documents goes straight to the current address', async ({
+  page,
+}) => {
+  const linking = documentLinkingAnother();
+  test.skip(!linking, 'No document in the corpus links to another page.');
+  const { source, targetSlug } = linking as {
+    source: { slug: string };
+    targetSlug: string;
+  };
+
+  await page.goto(`/${source.slug}/`);
+  const content = page.locator('.sl-markdown-content');
+  await expect(
+    content.locator(`a[href^="/${targetSlug}/"]`).first(),
+  ).toBeVisible();
+  await expect(content.locator('a[href^="/d/"]')).toHaveCount(0);
+});
+
+test('a missing address searches for the page it named', async ({ page }) => {
+  const document = anyDocument();
+
+  // The hexadecimal tail stands for an address a rename has since replaced.
+  await page.goto(`/${document.slug}--0a0b0c/`);
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Page not found' }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator('missing-page [data-result-list] a')
+      .filter({ hasText: document.title })
+      .first(),
+  ).toBeVisible();
+  await expectNoAccessibilityViolations(page);
 });

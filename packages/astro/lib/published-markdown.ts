@@ -5,6 +5,8 @@ import remarkParse from 'remark-parse';
 import remarkStringify from 'remark-stringify';
 import { unified } from 'unified';
 
+import { resolvePermanentLink } from './remark-permanent-links.js';
+
 const processor = unified()
   .use(remarkParse)
   .use(remarkGfm)
@@ -30,6 +32,12 @@ export interface PublishedMarkdownInput {
   contentHash: string;
   body: string;
   stableSlugs: ReadonlySet<string>;
+  /**
+   * Each permanent link, `/d/<short ID>/`, to the address it leads to. A link
+   * between documents is stored as one (ADR-022); the projection names the
+   * target's own Markdown instead, as it does for any other corpus link.
+   */
+  permanentLinks: Readonly<Record<string, string>>;
 }
 
 function walk(
@@ -49,20 +57,23 @@ function walk(
 function markdownUrl(
   value: string,
   stableSlugs: ReadonlySet<string>,
+  permanentLinks: Readonly<Record<string, string>>,
 ): string | undefined {
-  if (!value.startsWith('/')) {
-    return undefined;
+  const resolved = resolvePermanentLink(value, permanentLinks);
+  const link = resolved ?? value;
+  if (!link.startsWith('/')) {
+    return resolved;
   }
 
   let url: URL;
   try {
-    url = new URL(value, 'https://wiki.invalid');
+    url = new URL(link, 'https://wiki.invalid');
   } catch {
-    return undefined;
+    return resolved;
   }
   const slug = url.pathname.replace(/^\/+|\/+$/gu, '');
   if (!stableSlugs.has(slug)) {
-    return undefined;
+    return resolved;
   }
   return `/${slug}/index.md${url.search}${url.hash}`;
 }
@@ -70,11 +81,12 @@ function markdownUrl(
 function rewriteInternalLinks(
   body: string,
   stableSlugs: ReadonlySet<string>,
+  permanentLinks: Readonly<Record<string, string>>,
 ): string {
   const tree = processor.parse(body) as Root;
   walk(tree, (node) => {
     if (node.type === 'link') {
-      node.url = markdownUrl(node.url, stableSlugs) ?? node.url;
+      node.url = markdownUrl(node.url, stableSlugs, permanentLinks) ?? node.url;
       return;
     }
     if (node.type !== 'html') {
@@ -85,7 +97,9 @@ function rewriteInternalLinks(
     let changed = false;
     $('a[href]').each((_, anchor) => {
       const href = $(anchor).attr('href');
-      const rewritten = href ? markdownUrl(href, stableSlugs) : undefined;
+      const rewritten = href
+        ? markdownUrl(href, stableSlugs, permanentLinks)
+        : undefined;
       if (rewritten) {
         $(anchor).attr('href', rewritten);
         changed = true;
@@ -129,6 +143,7 @@ export function serializePublishedMarkdown(
   const body = rewriteInternalLinks(
     cleanBody(input.body, input.ownershipHeader),
     input.stableSlugs,
+    input.permanentLinks,
   );
   return [
     '---',

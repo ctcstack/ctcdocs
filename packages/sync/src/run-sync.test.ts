@@ -705,9 +705,20 @@ describe('basic Markdown sync', () => {
       repository,
       'src/content/docs/_generated/doc-one.md',
     );
+    const targetShortId = (
+      JSON.parse(
+        await readFile(resolve(repository, 'data/sync-manifest.json'), 'utf8'),
+      ) as { documents: Record<string, { shortId: string }> }
+    ).documents['doc-two']?.shortId;
+    expect(targetShortId).toMatch(/^[0-9a-f]{6}$/u);
+    // A link between two documents names its target's permanent link, which
+    // no later rename or move of the target changes (ADR-022).
     await expect(readFile(sourcePath, 'utf8')).resolves.toContain(
-      '](/team/target/)',
+      `](/d/${targetShortId ?? ''}/)`,
     );
+    await expect(
+      readFile(resolve(repository, 'src/generated/redirects.ts'), 'utf8'),
+    ).resolves.toContain(`"/d/${targetShortId ?? ''}/": "/team/target/"`);
 
     await runBasicMarkdownSync(
       testSyncContext(repository),
@@ -1009,7 +1020,7 @@ describe('basic Markdown sync', () => {
     expect(unchanged.outputChanged).toBe(false);
   });
 
-  it('moves addresses that follow names and keeps a redirect for each', async () => {
+  it('moves addresses that follow names and keeps one earlier address each', async () => {
     const repository = await mkdtemp(resolve(tmpdir(), 'kb-sync-follow-'));
     temporaryDirectories.push(repository);
     const following = createSyncContext(repository, {
@@ -1089,6 +1100,8 @@ describe('basic Markdown sync', () => {
       '"/team/architecture/": "/delivery/design/"',
     );
 
+    // One earlier address per item: the document's latest move replaces the
+    // redirect of the one before, and the folder keeps its own.
     await run(following, '01 - Delivery', '03 - Architecture');
     manifest = await readManifest();
     expect(
@@ -1101,7 +1114,22 @@ describe('basic Markdown sync', () => {
     ).toEqual({
       'delivery/design': 'delivery/architecture',
       team: 'delivery',
-      'team/architecture': 'delivery/architecture',
+    });
+
+    // Named back, the document reclaims the address its redirect answered.
+    await run(following, '01 - Delivery', '04 - Design');
+    manifest = await readManifest();
+    expect(manifest.documents['doc-one']?.stableSlug).toBe('delivery/design');
+    expect(
+      Object.fromEntries(
+        Object.entries(manifest.redirects).map(([source, redirect]) => [
+          source,
+          redirect.targetSlug,
+        ]),
+      ),
+    ).toEqual({
+      'delivery/architecture': 'delivery/design',
+      team: 'delivery',
     });
 
     const frozen = await run(
@@ -1111,7 +1139,7 @@ describe('basic Markdown sync', () => {
     );
     expect(frozen.addressesMoved).toBe(0);
     expect((await readManifest()).documents['doc-one']?.stableSlug).toBe(
-      'delivery/architecture',
+      'delivery/design',
     );
 
     const again = await run(

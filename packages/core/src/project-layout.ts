@@ -47,6 +47,11 @@ export const PROJECT_LAYOUT = {
 export const PLATFORM_ROUTES = {
   /** The whole corpus, grouped by folder. See docs/ADR/017-full-index-page.md. */
   fullIndex: 'documents',
+  /**
+   * Permanent links, `/d/<short ID>/`, one per document and section. See
+   * docs/ADR/022-permanent-short-ids.md.
+   */
+  permanentLinks: 'd',
 } as const;
 
 /** Each platform route as the href a link uses. */
@@ -57,6 +62,18 @@ export const PLATFORM_ROUTE_HREFS = {
 export const RESERVED_SLUGS: readonly string[] = Object.freeze(
   Object.values(PLATFORM_ROUTES),
 );
+
+/**
+ * A short ID: lowercase hexadecimal, six characters unless six collided with
+ * another item's, in which case it is longer. It is recorded once per item and
+ * never changes, so a permanent link keeps working through every rename.
+ */
+export const SHORT_ID_PATTERN = /^[0-9a-f]{6,64}$/u;
+
+/** The site-relative permanent link of an item with this short ID. */
+export function permanentLinkPath(shortId: string): string {
+  return `/${PLATFORM_ROUTES.permanentLinks}/${shortId}/`;
+}
 
 export const GENERATED_DIRECTORY_ALLOWLIST = [
   PROJECT_LAYOUT.generatedDocumentsDirectory,

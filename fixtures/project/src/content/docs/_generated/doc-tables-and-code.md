@@ -2,12 +2,13 @@
 "title": "Tables and code"
 "description": "Two things a documentation platform gets wrong quietly: wide tables that push a phone layout sideways, and code blocks that lose their language."
 "slug": "handbook/tables-and-code"
+"shortId": "14062a"
 "editUrl": "https://docs.google.com/document/d/doc-tables-and-code/edit"
 "sourceType": "google-doc"
 "googleFileId": "doc-tables-and-code"
 "googleModifiedTime": "2026-02-06T16:45:00.000Z"
 "syncedAt": "2026-02-10T06:00:00.000Z"
-"contentHash": "sha256:71b90c6e65677d9485ca26bbf1f06f44c8eac3221fcadda8fb5c7e01830616b9"
+"contentHash": "sha256:251d5df897f505b46fab76b8a2b7c53b2d0631e7950bbe99c003748f8c8419d0"
 "folderPath":
   - "Handbook"
 "pagefind": true
@@ -27,6 +28,6 @@ The pipeline is invoked the same way in every project:
 pnpm sync --full
 ```
 
-See also the [handbook overview](/handbook/overview/) and the [status page](https://example.invalid/status).
+See also the [handbook overview](/d/76ff21/) and the [status page](https://example.invalid/status).
 
 A published page carries the same body as its Markdown projection, so an agent reading the projection sees this table too.

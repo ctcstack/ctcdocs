@@ -179,3 +179,74 @@ export function sectionWithSubfolder(): SectionFixture | undefined {
   }
   return undefined;
 }
+
+interface ManifestItem {
+  stableSlug?: string;
+  shortId?: string;
+  generatedMarkdownPath?: string;
+}
+
+function readManifestItems(): ManifestItem[] {
+  const manifest = JSON.parse(
+    readFileSync(resolve(repositoryRoot, PROJECT_LAYOUT.manifestFile), 'utf8'),
+  ) as {
+    documents?: Record<string, ManifestItem>;
+    folders?: Record<string, ManifestItem>;
+  };
+  return [
+    ...Object.values(manifest.documents ?? {}),
+    ...Object.values(manifest.folders ?? {}),
+  ];
+}
+
+/**
+ * A document and its permanent link, or nothing for a corpus synchronized
+ * before permanent links existed: its next sync gives every page one.
+ */
+export function documentWithPermanentLink():
+  { slug: string; shortId: string } | undefined {
+  const document = anyDocument();
+  const record = readManifestItems().find(
+    (item) => item.stableSlug === document.slug,
+  );
+  return record?.shortId
+    ? { slug: document.slug, shortId: record.shortId }
+    : undefined;
+}
+
+/**
+ * A document whose body links to another page of the corpus, and the address
+ * that page has today. The link is stored as a permanent link (ADR-022).
+ */
+export function documentLinkingAnother():
+  { source: CorpusFixture; targetSlug: string } | undefined {
+  const byShortId = new Map(
+    readManifestItems().flatMap((item) =>
+      item.shortId && item.stableSlug
+        ? [[item.shortId, item.stableSlug] as const]
+        : [],
+    ),
+  );
+  for (const document of documents) {
+    let body: string;
+    try {
+      body = readFileSync(
+        resolve(
+          repositoryRoot,
+          PROJECT_LAYOUT.generatedDocumentsDirectory,
+          `${document.id}.md`,
+        ),
+        'utf8',
+      );
+    } catch {
+      continue;
+    }
+    for (const [, shortId] of body.matchAll(/\]\(\/d\/([0-9a-f]{6,64})\//gu)) {
+      const targetSlug = shortId ? byShortId.get(shortId) : undefined;
+      if (targetSlug && targetSlug !== document.slug) {
+        return { source: document, targetSlug };
+      }
+    }
+  }
+  return undefined;
+}

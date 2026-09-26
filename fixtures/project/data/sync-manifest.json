@@ -1,6 +1,6 @@
 {
   "schemaVersion": 3,
-  "converterVersion": "hybrid-v2",
+  "converterVersion": "hybrid-v3",
   "normalizerVersion": "remark-html-v2",
   "driveId": "fixture-drive",
   "rootFolderId": "folder-root",
@@ -19,10 +19,11 @@
       "generatedMarkdownPath": "src/content/docs/_generated/doc-cyrillic.md",
       "generatedAssetsDirectory": "src/assets/generated/doc-cyrillic",
       "contentHash": "sha256:1b9bc321c938fb8d7fa4bd3bfca72f30efa50b1a292a2122d3bd94e9f4d66ebd",
-      "outputHash": "sha256:975e2b41697457cb3cb239189ac0371a59c8e6bddeb655ff0bc2897944add045",
+      "outputHash": "sha256:ea2c5d10b4876d0d2c58616993422cec5899cba6787d6ca8c808279191b12c93",
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "markdown",
-      "warnings": []
+      "warnings": [],
+      "shortId": "f18785"
     },
     "doc-diagrams": {
       "googleFileId": "doc-diagrams",
@@ -37,10 +38,11 @@
       "generatedMarkdownPath": "src/content/docs/_generated/doc-diagrams.md",
       "generatedAssetsDirectory": "src/assets/generated/doc-diagrams",
       "contentHash": "sha256:c47cf18d16d9c8b605f26a1058fe125e70632f8bb19b9f972c459806aedec9fb",
-      "outputHash": "sha256:6dd8da2d1601e8006c2ad2f0908a68eb1c4644e25694a920fe5c89feccffed42",
+      "outputHash": "sha256:ff5fd9161bfbb8bd1a86a34e3ec4b9e8a48d591cda15c0257c6f0865008caf52",
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "markdown",
-      "warnings": []
+      "warnings": [],
+      "shortId": "48b067"
     },
     "doc-getting-started": {
       "googleFileId": "doc-getting-started",
@@ -54,11 +56,12 @@
       "stableSlug": "start-here",
       "generatedMarkdownPath": "src/content/docs/_generated/doc-getting-started.md",
       "generatedAssetsDirectory": "src/assets/generated/doc-getting-started",
-      "contentHash": "sha256:eba01666478b766805effec9cfc3bfa865adefa31ef92f63e0c18237aafe638a",
-      "outputHash": "sha256:cf3c4609176aa8d9cf84c49478ca142ce6614a5632d11365938f49092d879821",
+      "contentHash": "sha256:bb2065bdabdd9332571d2c0f29c3eb306f3e2c500401c70c40d0b0e4e7755e2b",
+      "outputHash": "sha256:325a05963962fa46dde967e5027f7b748e6af44f2680d5e80b884cbb8c445384",
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "markdown",
-      "warnings": []
+      "warnings": [],
+      "shortId": "b970ca"
     },
     "doc-overview": {
       "googleFileId": "doc-overview",
@@ -73,10 +76,11 @@
       "generatedMarkdownPath": "src/content/docs/_generated/doc-overview.md",
       "generatedAssetsDirectory": "src/assets/generated/doc-overview",
       "contentHash": "sha256:915987bb1a69f662bb889c1c207fa823901962fdcfcdfdbe0b40a54cbc27c178",
-      "outputHash": "sha256:4fe46db295a4cac5e013a0422149e055047dbc5b295aae67004ceb8cc52d854d",
+      "outputHash": "sha256:c55096ec3095838fc940798403cb715a5530ec071410f7808e84dbf9a7b5232b",
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "markdown",
-      "warnings": []
+      "warnings": [],
+      "shortId": "76ff21"
     },
     "doc-screenshots": {
       "googleFileId": "doc-screenshots",
@@ -91,13 +95,14 @@
       "generatedMarkdownPath": "src/content/docs/_generated/doc-screenshots.md",
       "generatedAssetsDirectory": "src/assets/generated/doc-screenshots",
       "contentHash": "sha256:5da73f5114704897dac879e0bd090c8b2f9c455e5141854ad08e305ea2d3ecae",
-      "outputHash": "sha256:5a029f27dcce1dd33a145f2ed00be248d1f2bb72ae15b15955876dd85a47e17a",
+      "outputHash": "sha256:2165aaa4044719e832d9f137f99a27646e068b0f07732a4588ed015df65c9de4",
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "hybrid",
       "warnings": [
         "fallback:image",
         "fallback:media_object"
-      ]
+      ],
+      "shortId": "d252ed"
     },
     "doc-style-guide": {
       "googleFileId": "doc-style-guide",
@@ -112,10 +117,11 @@
       "generatedMarkdownPath": "src/content/docs/_generated/doc-style-guide.md",
       "generatedAssetsDirectory": "src/assets/generated/doc-style-guide",
       "contentHash": "sha256:ace8ddb30893fb7f938499fb2e46d9c60b826540c372a8f174ae3e8a4e4f8054",
-      "outputHash": "sha256:8040c3ef2aac356c90143feacfdf31fcbdd1df4b39275f387c7ddff4c1d6a13b",
+      "outputHash": "sha256:ba744c69a8e5e6907a4bf6bffef2b42d34961087ef2ebcf425676df43781bbfc",
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "markdown",
-      "warnings": []
+      "warnings": [],
+      "shortId": "dbb1dc"
     },
     "doc-tables-and-code": {
       "googleFileId": "doc-tables-and-code",
@@ -129,13 +135,14 @@
       "stableSlug": "handbook/tables-and-code",
       "generatedMarkdownPath": "src/content/docs/_generated/doc-tables-and-code.md",
       "generatedAssetsDirectory": "src/assets/generated/doc-tables-and-code",
-      "contentHash": "sha256:71b90c6e65677d9485ca26bbf1f06f44c8eac3221fcadda8fb5c7e01830616b9",
-      "outputHash": "sha256:653508ef9967c42101e834c34288f18c2ef58b053f784b78c301709db764bae6",
+      "contentHash": "sha256:251d5df897f505b46fab76b8a2b7c53b2d0631e7950bbe99c003748f8c8419d0",
+      "outputHash": "sha256:68b08c62fe977fb87f0e2799473b8f0cd9c784e45037bb9a3d30145356abb6c6",
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "hybrid",
       "warnings": [
         "fallback:table"
-      ]
+      ],
+      "shortId": "14062a"
     }
   },
   "folders": {
@@ -146,7 +153,8 @@
       "displayLabel": "Handbook",
       "sortOrder": 1,
       "stableSlug": "handbook",
-      "generatedMarkdownPath": "src/content/docs/_generated/section-folder-handbook.md"
+      "generatedMarkdownPath": "src/content/docs/_generated/section-folder-handbook.md",
+      "shortId": "1a41cd"
     },
     "folder-reference": {
       "googleFolderId": "folder-reference",
@@ -155,7 +163,8 @@
       "displayLabel": "Reference",
       "sortOrder": 2,
       "stableSlug": "reference",
-      "generatedMarkdownPath": "src/content/docs/_generated/section-folder-reference.md"
+      "generatedMarkdownPath": "src/content/docs/_generated/section-folder-reference.md",
+      "shortId": "3865e9"
     },
     "folder-reference-archive": {
       "googleFolderId": "folder-reference-archive",
@@ -164,7 +173,8 @@
       "displayLabel": "Archive",
       "sortOrder": null,
       "stableSlug": "reference/archive",
-      "generatedMarkdownPath": "src/content/docs/_generated/section-folder-reference-archive.md"
+      "generatedMarkdownPath": "src/content/docs/_generated/section-folder-reference-archive.md",
+      "shortId": "bf7106"
     },
     "folder-reference-guides": {
       "googleFolderId": "folder-reference-guides",
@@ -173,7 +183,8 @@
       "displayLabel": "Guides",
       "sortOrder": null,
       "stableSlug": "reference/guides",
-      "generatedMarkdownPath": "src/content/docs/_generated/section-folder-reference-guides.md"
+      "generatedMarkdownPath": "src/content/docs/_generated/section-folder-reference-guides.md",
+      "shortId": "e0a0b3"
     },
     "folder-root": {
       "googleFolderId": "folder-root",

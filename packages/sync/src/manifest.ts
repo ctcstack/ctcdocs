@@ -1,9 +1,10 @@
 import { readFile } from 'node:fs/promises';
 
+import { SHORT_ID_PATTERN } from '@ctcstack/ctcdocs-core';
 import { z } from 'zod';
 
 const MANIFEST_SCHEMA_VERSION = 3 as const;
-export const CONVERTER_VERSION = 'hybrid-v2';
+export const CONVERTER_VERSION = 'hybrid-v3';
 export const NORMALIZER_VERSION = 'remark-html-v2';
 
 const manifestDocumentSchema = z.object({
@@ -24,6 +25,12 @@ const manifestDocumentSchema = z.object({
   lastSuccessfulSyncAt: z.iso.datetime(),
   exportMode: z.enum(['markdown', 'html-zip', 'hybrid']),
   warnings: z.array(z.string()),
+  /**
+   * The permanent identifier behind `/d/<short ID>/` (ADR-022). Optional only
+   * so that a manifest written before it existed still loads; every manifest
+   * this pipeline writes carries it.
+   */
+  shortId: z.string().regex(SHORT_ID_PATTERN).optional(),
 });
 
 const legacyManifestFolderSchema = z.object({
@@ -43,6 +50,8 @@ const legacyManifestFolderSchema = z.object({
 const manifestFolderSchema = legacyManifestFolderSchema.extend({
   stableSlug: z.string().min(1).optional(),
   generatedMarkdownPath: z.string().min(1).optional(),
+  /** Present for every folder with an address, as for documents. */
+  shortId: z.string().regex(SHORT_ID_PATTERN).optional(),
 });
 
 const manifestRedirectSchema = z.object({
@@ -83,6 +92,7 @@ export const syncManifestSchema = z.object({
 export type SyncManifest = z.infer<typeof syncManifestSchema>;
 export type SyncedDocumentRecord = z.infer<typeof manifestDocumentSchema>;
 export type SyncedFolderRecord = z.infer<typeof manifestFolderSchema>;
+export type ManifestRedirect = z.infer<typeof manifestRedirectSchema>;
 
 export class ManifestError extends Error {
   override readonly name = 'ManifestError';

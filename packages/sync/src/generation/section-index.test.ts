@@ -11,6 +11,7 @@ function input(overrides: Partial<SectionIndexInput> = {}): SectionIndexInput {
   return {
     title: 'Team',
     slug: 'team',
+    shortId: 'abc123',
     folderPath: [],
     entries: [],
     ...overrides,
