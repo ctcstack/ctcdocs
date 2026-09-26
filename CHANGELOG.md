@@ -2,6 +2,17 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Fixed
+
+- A deployment started by a sync runs its post-deployment check again. Since
+  0.5.0 such a deployment skips the candidate verification it no longer
+  needs, and the check after the deployment inherited that skip. The assets
+  were deployed, the protected surface was never verified, and the run failed
+  at `deployment did not complete: deploy=success, smoke=skipped`. The check
+  now runs whenever the deployment succeeded.
+
 ## 0.7.0
 
 ### Added
