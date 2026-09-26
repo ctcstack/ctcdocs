@@ -239,6 +239,13 @@ try {
     console.error(
       `ERROR [INVENTORY_GRAPH]: ${error.issues.map((issue) => issue.code).join(',')}`,
     );
+    for (const issue of error.issues) {
+      if (issue.detail) {
+        console.error(
+          `ERROR [INVENTORY_GRAPH]: ${issue.code} itemId=${issue.itemId} ${issue.detail}`,
+        );
+      }
+    }
     process.exitCode = 1;
   } else if (error instanceof MarkdownNormalizationError) {
     console.error(

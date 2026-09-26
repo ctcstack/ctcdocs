@@ -42,5 +42,6 @@ Rejected
 - ADR-017: the full index becomes a page.
 - ADR-018: a sync run scans what it commits, and a finding stops it.
 - ADR-019: folders before documents, and a section page that tells them apart.
+- ADR-020: a Drive name is written in one alphabet.
 
 Create a new ADR by copying `000-template.md`.

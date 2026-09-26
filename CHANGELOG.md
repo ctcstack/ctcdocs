@@ -2,6 +2,27 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Added
+
+- A word in a Drive name has to use letters of one alphabet. A name with a
+  Cyrillic letter typed into a Latin word, or the reverse, stops the sync at
+  inventory with `mixed_script_name`, before the stray letter becomes part of
+  a permanent address. The log names the item ID, the code point and its
+  position, never the name. Latin, Cyrillic and Greek are checked against each
+  other; a name in any one script is unaffected. See
+  [ADR-020](docs/ADR/020-letters-from-one-alphabet.md).
+- `navigation.nameScripts` in `site.config.json` lists the scripts a letter in
+  a Drive name may belong to, such as `["Latin"]`. A letter of any other script
+  stops the sync with `disallowed_name_script`. Without it, any script is
+  accepted.
+
+### Changed
+
+- A sync that stops on a name-level inventory issue prints one line per
+  finding after the list of codes.
+
 ## 0.5.2
 
 ### Fixed

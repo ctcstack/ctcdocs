@@ -136,4 +136,65 @@ describe('inventory orchestration', () => {
       issues: [{ code: 'ignored_not_found', itemId: 'missing-folder' }],
     });
   });
+
+  it('stops on a letter from the wrong alphabet even when warnings pass', async () => {
+    const responses = [
+      jsonResponse({ id: 'drive-id' }),
+      jsonResponse({
+        id: 'published',
+        driveId: 'drive-id',
+        mimeType: 'application/vnd.google-apps.folder',
+        trashed: false,
+      }),
+      jsonResponse({
+        files: [
+          {
+            id: 'published',
+            name: 'Published',
+            mimeType: 'application/vnd.google-apps.folder',
+            parents: [],
+            modifiedTime: '2026-01-01T00:00:00.000Z',
+            createdTime: '2026-01-01T00:00:00.000Z',
+            trashed: false,
+          },
+          {
+            id: 'document',
+            name: 'Сompany handbook',
+            mimeType: 'application/vnd.google-apps.document',
+            parents: ['published'],
+            modifiedTime: '2026-01-02T00:00:00.000Z',
+            createdTime: '2026-01-02T00:00:00.000Z',
+            trashed: false,
+          },
+        ],
+      }),
+    ];
+    const fetchImplementation: typeof fetch = async () => {
+      const response = responses.shift();
+      if (!response) {
+        throw new Error('Unexpected request');
+      }
+      return response;
+    };
+
+    await expect(
+      runInventory(
+        context,
+        configuration,
+        new StaticGoogleAccessTokenProvider('short-lived-token'),
+        {
+          fetchImplementation,
+          baseUrl: 'https://example.invalid/drive/v3',
+        },
+      ),
+    ).rejects.toMatchObject({
+      issues: [
+        {
+          code: 'mixed_script_name',
+          itemId: 'document',
+          detail: 'U+0421 Cyrillic at character 1',
+        },
+      ],
+    });
+  });
 });

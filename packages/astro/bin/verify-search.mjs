@@ -139,8 +139,8 @@ async function withSearchIndex(bundleRoot, run) {
  * The site path a Pagefind result points at, as the corpus spells it.
  *
  * Pagefind returns URLs, and a URL carries its path percent-encoded: a slug
- * with a letter outside ASCII — `сtc-delivery`, whose first letter is
- * Cyrillic — comes back as `/%D1%81tc-delivery/`. The corpus records the
+ * with a letter outside ASCII — `сompany-handbook`, whose first letter is
+ * Cyrillic — comes back as `/%D1%81ompany-handbook/`. The corpus records the
  * decoded slug, so comparing the two unmodified reported a document the search
  * interface finds first as missing from the index.
  */

@@ -228,6 +228,40 @@ describe('parseSiteConfiguration', () => {
     },
   );
 
+  it('accepts any script in Drive names unless told otherwise', () => {
+    expect(
+      parseSiteConfiguration(validConfiguration()).navigation.nameScripts,
+    ).toBeNull();
+  });
+
+  it('keeps the scripts a project allows in Drive names', () => {
+    const raw = validConfiguration();
+    (raw.navigation as Record<string, unknown>).nameScripts = [
+      'Latin',
+      'Cyrillic',
+    ];
+
+    expect(parseSiteConfiguration(raw).navigation.nameScripts).toEqual([
+      'Latin',
+      'Cyrillic',
+    ]);
+  });
+
+  it.each<[unknown, string]>([
+    [[], 'an empty list'],
+    [['Latinish'], 'a script Unicode does not know by that name'],
+    [['Latin}|.'], 'a name that is not a bare word'],
+    [['Latin', 'Latin'], 'a repeated script'],
+    ['Latin', 'a bare string'],
+  ])('rejects %s as name scripts (%s)', (scripts) => {
+    const raw = validConfiguration();
+    (raw.navigation as Record<string, unknown>).nameScripts = scripts;
+
+    expect(() => parseSiteConfiguration(raw)).toThrow(
+      /navigation\.nameScripts/u,
+    );
+  });
+
   it('rejects a home page that opens with nothing', () => {
     const raw = validConfiguration();
     (raw.home as Record<string, unknown>).lede = '   ';
