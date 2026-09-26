@@ -100,6 +100,8 @@ export interface SyncRunResult {
     newSlug: string;
     oldSlug: string;
   };
+  /** Addresses that followed their item's new name or place (ADR-021). */
+  addressesMoved: number;
 }
 
 export class SyncSelectionError extends Error {
@@ -495,19 +497,49 @@ export async function runBasicMarkdownSync(
       'The requested Google file ID is not a document in the selected corpus.',
     );
   }
+  /*
+   * A redirect leaves with its target (ADR-021). Only a run over the whole
+   * corpus knows what left; a targeted run keeps every redirect it found.
+   */
+  const currentItemIds = new Set([
+    ...inventory.selection.folders.map((folder) => folder.item.id),
+    ...inventory.selection.documents.map((document) => document.item.id),
+  ]);
+  let redirects = Object.fromEntries(
+    Object.entries(existingManifest.redirects)
+      .filter(
+        ([, redirect]) =>
+          targetedFileId !== undefined ||
+          currentItemIds.has(redirect.googleFileId),
+      )
+      .map(([slug, redirect]) => [slug, { ...redirect }]),
+  );
   const slugAllocation = allocateStableSlugs(
     inventory.selection.folders,
     inventory.selection.documents,
-    existingManifest,
+    { ...existingManifest, redirects },
+    targetedFileId ? 'stable' : site.navigation.addresses,
   );
   const stableSlugs = slugAllocation.documents;
   const folderSlugs = slugAllocation.folders;
-  const redirects = Object.fromEntries(
-    Object.entries(existingManifest.redirects).map(([slug, redirect]) => [
-      slug,
-      { ...redirect },
-    ]),
-  );
+  for (const move of slugAllocation.moves) {
+    redirects = Object.fromEntries(
+      Object.entries(redirects).filter(
+        ([source, redirect]) =>
+          source !== move.newSlug || redirect.googleFileId !== move.itemId,
+      ),
+    );
+    for (const redirect of Object.values(redirects)) {
+      if (redirect.targetSlug === move.oldSlug) {
+        redirect.targetSlug = move.newSlug;
+      }
+    }
+    redirects[move.oldSlug] = {
+      googleFileId: move.itemId,
+      targetSlug: move.newSlug,
+      createdAt: runTimestamp,
+    };
+  }
   let slugChange: SyncRunResult['slugChange'];
   if (options.reseedSlugFileId) {
     const existingRecord = existingManifest.documents[options.reseedSlugFileId];
@@ -647,6 +679,7 @@ export async function runBasicMarkdownSync(
             : forceFullExport ||
               corpusChanged ||
               existingRecord === undefined ||
+              existingRecord.stableSlug !== stableSlugs.get(selected.item.id) ||
               metadataChanged ||
               existingOutputInvalid,
           added: existingRecord === undefined,
@@ -998,5 +1031,6 @@ export async function runBasicMarkdownSync(
     report,
     outputChanged: writeResult.changed,
     ...(slugChange ? { slugChange } : {}),
+    addressesMoved: slugAllocation.moves.length,
   };
 }

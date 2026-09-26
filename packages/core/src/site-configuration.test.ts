@@ -262,6 +262,33 @@ describe('parseSiteConfiguration', () => {
     );
   });
 
+  it('keeps addresses stable unless told otherwise', () => {
+    expect(
+      parseSiteConfiguration(validConfiguration()).navigation.addresses,
+    ).toBe('stable');
+  });
+
+  it('lets addresses follow Drive names', () => {
+    const raw = validConfiguration();
+    (raw.navigation as Record<string, unknown>).addresses = 'follow-names';
+
+    expect(parseSiteConfiguration(raw).navigation.addresses).toBe(
+      'follow-names',
+    );
+  });
+
+  it.each<[unknown]>([['follow'], [true], [null]])(
+    'rejects %s as the address policy',
+    (value) => {
+      const raw = validConfiguration();
+      (raw.navigation as Record<string, unknown>).addresses = value;
+
+      expect(() => parseSiteConfiguration(raw)).toThrow(
+        /navigation\.addresses must be "stable" or "follow-names"/u,
+      );
+    },
+  );
+
   it('rejects a home page that opens with nothing', () => {
     const raw = validConfiguration();
     (raw.home as Record<string, unknown>).lede = '   ';

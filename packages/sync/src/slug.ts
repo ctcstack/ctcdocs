@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { RESERVED_SLUGS } from '@ctcstack/ctcdocs-core';
+import { RESERVED_SLUGS, type AddressPolicy } from '@ctcstack/ctcdocs-core';
 
 import type { SelectedInventoryItem } from './inventory/inventory-graph.js';
 import type { SyncManifest } from './manifest.js';
@@ -35,16 +35,35 @@ function allocateUniqueSlug(
   fileId: string,
   allocatedSlugs: ReadonlySet<string>,
 ): string {
-  if (!allocatedSlugs.has(baseSlug)) {
+  return allocateAvailableSlug(
+    baseSlug,
+    fileId,
+    (slug) => !allocatedSlugs.has(slug),
+  );
+}
+
+function allocateAvailableSlug(
+  baseSlug: string,
+  fileId: string,
+  isAvailable: (slug: string) => boolean,
+): string {
+  if (isAvailable(baseSlug)) {
     return baseSlug;
   }
   for (let suffixLength = 6; suffixLength <= 64; suffixLength += 2) {
     const candidate = `${baseSlug}--${collisionSuffix(fileId, suffixLength)}`;
-    if (!allocatedSlugs.has(candidate)) {
+    if (isAvailable(candidate)) {
       return candidate;
     }
   }
   throw new Error('Unable to allocate a unique stable slug.');
+}
+
+/** An address that changed in this allocation. The old one becomes a redirect. */
+interface AddressMove {
+  itemId: string;
+  oldSlug: string;
+  newSlug: string;
 }
 
 export interface StableSlugAllocation {
@@ -52,6 +71,8 @@ export interface StableSlugAllocation {
   folders: Map<string, string>;
   /** Google file identifier to document address. */
   documents: Map<string, string>;
+  /** Recorded addresses that moved, in allocation order. Empty when stable. */
+  moves: AddressMove[];
 }
 
 /** Carries forward the addresses the manifest already owns, in id order. */
@@ -128,7 +149,11 @@ export function allocateStableSlugs(
   folders: readonly SelectedInventoryItem[],
   documents: readonly SelectedInventoryItem[],
   existingManifest: SyncManifest,
+  policy: AddressPolicy = 'stable',
 ): StableSlugAllocation {
+  if (policy === 'follow-names') {
+    return allocateFollowingNames(folders, documents, existingManifest);
+  }
   const allocatedSlugs = new Set(Object.keys(existingManifest.redirects));
   const allocatedDocuments = new Map<string, string>();
   const allocatedFolders = new Map<string, string>();
@@ -161,7 +186,146 @@ export function allocateStableSlugs(
   allocateRemaining(folders, allocatedSlugs, allocatedFolders);
   allocateRemaining(documents, allocatedSlugs, allocatedDocuments);
 
-  return { folders: allocatedFolders, documents: allocatedDocuments };
+  return {
+    folders: allocatedFolders,
+    documents: allocatedDocuments,
+    moves: [],
+  };
+}
+
+interface RecordedItem {
+  item: SelectedInventoryItem;
+  recordedSlug: string;
+  derivedSlug: string;
+  kind: 'folder' | 'document';
+}
+
+/**
+ * Allocation when addresses follow names (ADR-021), in one pass over the one
+ * namespace folders and documents share:
+ *
+ * 1. Recorded items whose current path still yields their address keep it.
+ * 2. Redirect sources and platform routes are reserved.
+ * 3. Recorded items whose path yields another address are placed, folders
+ *    first. Each keeps a claim on its own recorded address while this runs,
+ *    so an item whose derived address is taken falls back to the suffixed
+ *    address it already holds instead of moving to a new one. A redirect
+ *    source is available only to the item it points at.
+ * 4. New folders, then new documents, as under `stable`.
+ *
+ * An address given up in step 3 becomes a redirect in the caller, so it stays
+ * reserved for this run as well: no other item may take it.
+ */
+function allocateFollowingNames(
+  folders: readonly SelectedInventoryItem[],
+  documents: readonly SelectedInventoryItem[],
+  existingManifest: SyncManifest,
+): StableSlugAllocation {
+  const recordedDocuments = new Map(
+    Object.entries(existingManifest.documents).map(
+      ([fileId, record]) => [fileId, record.stableSlug] as const,
+    ),
+  );
+  const recordedFolders = new Map(
+    Object.entries(existingManifest.folders).flatMap(([folderId, record]) =>
+      record.stableSlug === undefined
+        ? []
+        : [[folderId, record.stableSlug] as const],
+    ),
+  );
+  const recorded: RecordedItem[] = [
+    ...documents.flatMap((item) => {
+      const recordedSlug = recordedDocuments.get(item.item.id);
+      return recordedSlug === undefined
+        ? []
+        : [
+            {
+              item,
+              recordedSlug,
+              derivedSlug: proposedSlug(item),
+              kind: 'document' as const,
+            },
+          ];
+    }),
+    ...folders.flatMap((item) => {
+      const recordedSlug = recordedFolders.get(item.item.id);
+      return recordedSlug === undefined
+        ? []
+        : [
+            {
+              item,
+              recordedSlug,
+              derivedSlug: proposedSlug(item),
+              kind: 'folder' as const,
+            },
+          ];
+    }),
+  ];
+
+  const claimed = new Set<string>();
+  const owners = new Map<string, string>();
+  for (const [sourceSlug, redirect] of Object.entries(
+    existingManifest.redirects,
+  )) {
+    owners.set(sourceSlug, redirect.googleFileId);
+  }
+  const allocatedDocuments = new Map<string, string>();
+  const allocatedFolders = new Map<string, string>();
+  const resultFor = (kind: RecordedItem['kind']) =>
+    kind === 'document' ? allocatedDocuments : allocatedFolders;
+
+  const settled = recorded.filter(
+    ({ recordedSlug, derivedSlug }) => recordedSlug === derivedSlug,
+  );
+  for (const { item, recordedSlug, kind } of settled) {
+    if (claimed.has(recordedSlug)) {
+      throw new Error('The existing manifest contains duplicate stable slugs.');
+    }
+    claimed.add(recordedSlug);
+    resultFor(kind).set(item.item.id, recordedSlug);
+  }
+  for (const slug of RESERVED_SLUGS) {
+    claimed.add(slug);
+  }
+
+  const unsettled = recorded
+    .filter(({ recordedSlug, derivedSlug }) => recordedSlug !== derivedSlug)
+    .sort(
+      (left, right) =>
+        (left.kind === right.kind ? 0 : left.kind === 'folder' ? -1 : 1) ||
+        compareText(left.derivedSlug, right.derivedSlug) ||
+        compareText(left.item.item.id, right.item.item.id),
+    );
+  for (const { item, recordedSlug } of unsettled) {
+    if (claimed.has(recordedSlug) || owners.has(recordedSlug)) {
+      throw new Error('The existing manifest contains duplicate stable slugs.');
+    }
+    owners.set(recordedSlug, item.item.id);
+  }
+  const moves: AddressMove[] = [];
+  for (const { item, recordedSlug, derivedSlug, kind } of unsettled) {
+    const itemId = item.item.id;
+    const slug = allocateAvailableSlug(
+      derivedSlug,
+      itemId,
+      (candidate) =>
+        !claimed.has(candidate) && (owners.get(candidate) ?? itemId) === itemId,
+    );
+    claimed.add(slug);
+    if (owners.get(slug) === itemId) {
+      owners.delete(slug);
+    }
+    resultFor(kind).set(itemId, slug);
+    if (slug !== recordedSlug) {
+      moves.push({ itemId, oldSlug: recordedSlug, newSlug: slug });
+    }
+  }
+
+  const reserved = new Set([...claimed, ...owners.keys()]);
+  allocateRemaining(folders, reserved, allocatedFolders);
+  allocateRemaining(documents, reserved, allocatedDocuments);
+
+  return { folders: allocatedFolders, documents: allocatedDocuments, moves };
 }
 
 export function allocateReseededSlug(

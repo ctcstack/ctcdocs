@@ -57,6 +57,7 @@ name of its own; they read this file. The rationale is recorded in
 | `navigation.landingDocumentTitles`     | Titles that open the folder they sit in, most preferred first. Also picks the description the home page shows for a folder. |
 | `navigation.sectionIndexPages`         | Whether each folder gets a generated page listing its subfolders, then its documents, at `/<folder-slug>/`.                 |
 | `navigation.nameScripts`               | Optional. The Unicode scripts a letter in a Drive name may belong to, such as `["Latin"]`. See below.                       |
+| `navigation.addresses`                 | Optional. `stable` (default) keeps an address through renames and moves; `follow-names` moves it with its item. See below.  |
 | `sync.generatedBy`                     | The ownership marker stamped into every generated Markdown and TypeScript file.                                             |
 | `sync.commitBotName`                   | Git author the sync workflow commits generated output as.                                                                   |
 | `sync.defaultLocale`                   | Fallback locale for documents whose language cannot be determined.                                                          |
@@ -118,6 +119,7 @@ than reaching a deployment:
   because the precedence between them would otherwise depend on which one a
   folder happens to contain;
 - `navigation.sectionIndexPages` must be present and boolean;
+- `navigation.addresses`, where present, must be `stable` or `follow-names`;
 - `navigation.nameScripts`, where present, must be a non-empty list of distinct
   Unicode script names that a `\p{Script=…}` escape accepts, such as `Latin`
   or `Cyrillic`;

@@ -22,6 +22,7 @@ export {
   SiteConfigurationError,
 } from './site-configuration.js';
 export type {
+  AddressPolicy,
   BrandConfiguration,
   DeploymentConfiguration,
   DeploymentEnvironmentConfiguration,

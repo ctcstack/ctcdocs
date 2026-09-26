@@ -19,6 +19,7 @@ import {
   createInventoryReport,
   type InventoryReport,
 } from './inventory/inventory-report.js';
+import { createSyncContext } from './project-context.js';
 import { runBasicMarkdownSync } from './run-sync.js';
 import { createStoredZipFixture } from './test-support/create-zip-fixture.js';
 import {
@@ -1006,6 +1007,168 @@ describe('basic Markdown sync', () => {
       },
     );
     expect(unchanged.outputChanged).toBe(false);
+  });
+
+  it('moves addresses that follow names and keeps a redirect for each', async () => {
+    const repository = await mkdtemp(resolve(tmpdir(), 'kb-sync-follow-'));
+    temporaryDirectories.push(repository);
+    const following = createSyncContext(repository, {
+      ...testSiteConfiguration,
+      navigation: {
+        ...testSiteConfiguration.navigation,
+        addresses: 'follow-names',
+      },
+    });
+    const markdownExporter = {
+      exportMarkdown: () =>
+        Promise.resolve(new TextEncoder().encode('Body.\n')),
+    };
+    const run = (
+      context: typeof following,
+      folderName: string,
+      documentName: string,
+    ) =>
+      runBasicMarkdownSync(
+        context,
+        configuration,
+        tokenProvider,
+        { dryRun: false, full: false },
+        {
+          inventoryResult: (() => {
+            const selection = buildInventorySelection(
+              [
+                folder('root', 'Published', ['drive']),
+                folder('team', folderName, ['root']),
+                document(secondTimestamp, documentName),
+              ],
+              'root',
+              [],
+              ['drive'],
+            );
+            return {
+              selection,
+              report: createInventoryReport(selection, 'drive', []),
+            };
+          })(),
+          markdownExporter,
+          now: () => new Date(secondTimestamp),
+        },
+      );
+    const readManifest = async () =>
+      JSON.parse(
+        await readFile(resolve(repository, 'data/sync-manifest.json'), 'utf8'),
+      ) as {
+        documents: Record<string, { stableSlug: string }>;
+        folders: Record<string, { stableSlug?: string }>;
+        redirects: Record<string, { googleFileId: string; targetSlug: string }>;
+      };
+
+    await run(following, '01 - Team', '01 - Architecture');
+    const moved = await run(following, '01 - Delivery', '02 - Design');
+
+    expect(moved.addressesMoved).toBe(2);
+    let manifest = await readManifest();
+    expect(manifest.folders['team']?.stableSlug).toBe('delivery');
+    expect(manifest.documents['doc-one']?.stableSlug).toBe('delivery/design');
+    expect(manifest.redirects).toEqual({
+      team: expect.objectContaining({
+        googleFileId: 'team',
+        targetSlug: 'delivery',
+      }),
+      'team/architecture': expect.objectContaining({
+        googleFileId: 'doc-one',
+        targetSlug: 'delivery/design',
+      }),
+    });
+    const redirectModule = await readFile(
+      resolve(repository, 'src/generated/redirects.ts'),
+      'utf8',
+    );
+    expect(redirectModule).toContain('"/team/": "/delivery/"');
+    expect(redirectModule).toContain(
+      '"/team/architecture/": "/delivery/design/"',
+    );
+
+    await run(following, '01 - Delivery', '03 - Architecture');
+    manifest = await readManifest();
+    expect(
+      Object.fromEntries(
+        Object.entries(manifest.redirects).map(([source, redirect]) => [
+          source,
+          redirect.targetSlug,
+        ]),
+      ),
+    ).toEqual({
+      'delivery/design': 'delivery/architecture',
+      team: 'delivery',
+      'team/architecture': 'delivery/architecture',
+    });
+
+    const frozen = await run(
+      testSyncContext(repository),
+      '01 - Platform',
+      '04 - Handbook',
+    );
+    expect(frozen.addressesMoved).toBe(0);
+    expect((await readManifest()).documents['doc-one']?.stableSlug).toBe(
+      'delivery/architecture',
+    );
+
+    const again = await run(
+      testSyncContext(repository),
+      '01 - Platform',
+      '04 - Handbook',
+    );
+    expect(again.outputChanged).toBe(false);
+  });
+
+  it('removes the redirects of a document that leaves the corpus', async () => {
+    const repository = await mkdtemp(resolve(tmpdir(), 'kb-sync-prune-'));
+    temporaryDirectories.push(repository);
+    const markdownExporter = {
+      exportMarkdown: () =>
+        Promise.resolve(new TextEncoder().encode('Body.\n')),
+    };
+    const run = (items: DriveItem[], reseedSlugFileId?: string) => {
+      const selection = buildInventorySelection(
+        [
+          folder('root', 'Published', ['drive']),
+          folder('team', '01 - Team', ['root']),
+          ...items,
+        ],
+        'root',
+        [],
+        ['drive'],
+      );
+      return runBasicMarkdownSync(
+        testSyncContext(repository),
+        configuration,
+        tokenProvider,
+        {
+          dryRun: false,
+          full: false,
+          ...(reseedSlugFileId ? { reseedSlugFileId } : {}),
+        },
+        {
+          inventoryResult: {
+            selection,
+            report: createInventoryReport(selection, 'drive', []),
+          },
+          markdownExporter,
+          now: () => new Date(secondTimestamp),
+        },
+      );
+    };
+    const kept = documentWithId('doc-two', 'Glossary');
+
+    await run([document(), kept]);
+    await run([document(secondTimestamp, 'Renamed'), kept], 'doc-one');
+    await run([kept]);
+
+    const manifest = JSON.parse(
+      await readFile(resolve(repository, 'data/sync-manifest.json'), 'utf8'),
+    ) as { redirects: Record<string, unknown> };
+    expect(manifest.redirects).toEqual({});
   });
 
   it('blocks publication of a broken internal page link', async () => {

@@ -2,6 +2,26 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Added
+
+- `navigation.addresses` in `site.config.json`. `stable`, the default, keeps
+  an address through every rename and move, as before. `follow-names` gives
+  every folder and document the address its current Drive path yields on each
+  sync over the whole corpus. Every moved address leaves a redirect, so a
+  project can follow names while its structure settles and switch back once
+  people share links. Folders now get redirects as well as documents. A
+  redirect is never handed to a different item, and a document renamed back
+  reclaims its earlier address. See
+  [ADR-021](docs/ADR/021-addresses-may-follow-names.md).
+
+### Fixed
+
+- A redirect is removed when the folder or document it points at leaves the
+  corpus. Until now it stayed in the manifest, and output validation rejected
+  every later sync.
+
 ## 0.6.0
 
 ### Added

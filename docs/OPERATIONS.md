@@ -286,6 +286,32 @@ Use slug reseeding only for an approved URL change. A normal rename or move
 must retain the existing slug. Deletions disappear only after a complete
 inventory confirms that the document is outside the managed corpus.
 
+### Addresses that follow names
+
+While a corpus is still being arranged, set `navigation.addresses` to
+`follow-names` ([ADR-021](ADR/021-addresses-may-follow-names.md)). Every sync
+over the whole corpus then gives each folder and document the address its
+current Drive path yields, as a reseed would, and leaves a redirect from the
+old address. A renamed folder moves with everything below it. The sync summary
+reports how many addresses moved:
+
+```text
+Addresses moved (redirects kept): 3
+```
+
+Renumbering moves nothing, because the order prefix is not part of an address.
+A sync targeted at one file keeps every other address where it is. A redirect
+is never given to a different item: a new document that wants a moved
+document's old address gets a suffixed one instead. A document renamed back
+reclaims its earlier address.
+
+Switch back to `stable` once people have started sharing links. The addresses
+stay where they are, and so do the redirects. The first sync after switching
+to `follow-names` moves every address that has drifted from its item's name.
+
+In either mode, the redirects that point at a folder or document are removed
+when it leaves the corpus.
+
 Never test create, move, rename, or delete behavior against production Drive.
 Use the protected test Shared Drive corpus.
 

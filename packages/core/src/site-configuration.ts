@@ -134,7 +134,17 @@ export interface NavigationConfiguration {
    * single word never mixes Latin, Cyrillic and Greek letters (ADR-020).
    */
   readonly nameScripts: readonly string[] | null;
+  /**
+   * Whether an address stays where it was first given (`stable`, ADR-005) or
+   * follows its item's current Drive path on every sync over the whole corpus
+   * (`follow-names`, ADR-021). Either way a moved address leaves a redirect,
+   * so a project can switch while its structure settles and back once people
+   * share links. Defaults to `stable`.
+   */
+  readonly addresses: AddressPolicy;
 }
+
+export type AddressPolicy = 'stable' | 'follow-names';
 
 export interface SiteConfiguration {
   readonly brand: BrandConfiguration;
@@ -312,6 +322,21 @@ function optionalCount(
   return value;
 }
 
+function optionalAddressPolicy(
+  source: Record<string, unknown>,
+  key: string,
+  path: string,
+): AddressPolicy {
+  const value = source[key];
+  if (value === undefined) {
+    return 'stable';
+  }
+  if (value !== 'stable' && value !== 'follow-names') {
+    fail(path, 'must be "stable" or "follow-names"');
+  }
+  return value;
+}
+
 function optionalVisibility(
   source: Record<string, unknown>,
   path: string,
@@ -449,6 +474,11 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
         navigationSource,
         'nameScripts',
         'navigation.nameScripts',
+      ),
+      addresses: optionalAddressPolicy(
+        navigationSource,
+        'addresses',
+        'navigation.addresses',
       ),
     },
     sync: {

@@ -368,7 +368,8 @@ async function validateGeneratedOutputInternal(
     if (
       slugs.has(sourceSlug) ||
       sourceSlug === redirect.targetSlug ||
-      manifest.documents[redirect.googleFileId]?.stableSlug !==
+      (manifest.documents[redirect.googleFileId]?.stableSlug ??
+        manifest.folders[redirect.googleFileId]?.stableSlug) !==
         redirect.targetSlug
     ) {
       throw new Error('Generated redirect metadata is invalid.');
