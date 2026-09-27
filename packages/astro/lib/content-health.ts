@@ -24,6 +24,7 @@ interface HealthIssue {
   text?: string;
   detail?: string;
   headingId?: string;
+  tabId?: string;
   related?: { slug: string; title: string };
 }
 
@@ -71,10 +72,19 @@ export function loadHealthReport(): HealthReport | undefined {
     : undefined;
 }
 
-/** Opens the document in Google Docs, at the paragraph when there is one. */
-export function googleDocsUrl(id: string, headingId?: string): string {
-  const url = `https://docs.google.com/document/d/${encodeURIComponent(id)}/edit`;
-  return headingId ? `${url}#heading=${encodeURIComponent(headingId)}` : url;
+/**
+ * Opens the document in Google Docs: in the tab and at the paragraph an issue
+ * names, when it names them.
+ */
+export function googleDocsUrl(
+  id: string,
+  issue?: { headingId?: string; tabId?: string },
+): string {
+  const tab = issue?.tabId ? `?tab=${encodeURIComponent(issue.tabId)}` : '';
+  const heading = issue?.headingId
+    ? `#heading=${encodeURIComponent(issue.headingId)}`
+    : '';
+  return `https://docs.google.com/document/d/${encodeURIComponent(id)}/edit${tab}${heading}`;
 }
 
 /** The top-level folder a document is filed under, for the section filter. */

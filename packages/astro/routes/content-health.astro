@@ -192,8 +192,7 @@ const isFileNameCheck = (code: string) => code.startsWith('file-name-');
                                 class="health-source"
                                 href={googleDocsUrl(
                                   document.id,
-                                  issues.find((issue) => issue.headingId)
-                                    ?.headingId,
+                                  issues.find((issue) => issue.headingId),
                                 )}
                                 rel="noopener noreferrer"
                                 target="_blank"
@@ -218,10 +217,7 @@ const isFileNameCheck = (code: string) => code.startsWith('file-name-');
                                   {'Line: '}
                                   {issue.headingId ? (
                                     <a
-                                      href={googleDocsUrl(
-                                        document.id,
-                                        issue.headingId,
-                                      )}
+                                      href={googleDocsUrl(document.id, issue)}
                                       rel="noopener noreferrer"
                                       target="_blank"
                                     >

@@ -104,7 +104,7 @@ describe('Google Docs structural client', () => {
       positionedObjectCount: 1,
       tabCount: 2,
       titleFacts: {
-        version: 2,
+        version: 3,
         firstBlocks: [],
         titleCount: 0,
         heading1Count: 0,
@@ -149,7 +149,26 @@ describe('Google Docs structural client', () => {
                   paragraph('NORMAL_TEXT', '\n'),
                   paragraph('TITLE', 'Pricing handbook\n', 'h.title'),
                   paragraph('SUBTITLE', 'For the sales team\n', 'h.sub'),
-                  { table: { columns: 2 } },
+                  {
+                    table: {
+                      columns: 1,
+                      tableRows: [
+                        {
+                          tableCells: [
+                            {
+                              content: [
+                                paragraph(
+                                  'HEADING_3',
+                                  'Сontent fields\n',
+                                  'h.cell',
+                                ),
+                              ],
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  },
                   paragraph('HEADING_1', 'Rates\n', 'h.rates'),
                   paragraph('HEADING_1', 'Dіscounts\n', 'h.discounts'),
                   paragraph('TITLE', 'Appendix\n', 'h.appendix'),
@@ -160,7 +179,12 @@ describe('Google Docs structural client', () => {
           {
             tabProperties: { tabId: 'second' },
             documentTab: {
-              body: { content: [paragraph('TITLE', 'Second tab\n')] },
+              body: {
+                content: [
+                  paragraph('TITLE', 'Second tab\n'),
+                  paragraph('HEADING_2', 'Nеxt steps\n', 'h.next'),
+                ],
+              },
             },
           },
         ],
@@ -169,7 +193,7 @@ describe('Google Docs structural client', () => {
     ).inspectDocument('doc-id');
 
     expect(result.titleFacts).toEqual({
-      version: 2,
+      version: 3,
       firstBlocks: ['title', 'subtitle', 'table'],
       candidate: {
         style: 'title',
@@ -183,12 +207,26 @@ describe('Google Docs structural client', () => {
         { text: 'Pricing handbook', headingId: 'h.title', blockIndex: 0 },
         { text: 'Appendix', headingId: 'h.appendix', blockIndex: 5 },
       ],
-      // The second letter of `Dіscounts` is CYRILLIC SMALL LETTER BYELORUSSIAN-UKRAINIAN I.
+      // Found in every tab and inside table cells, each with its tab.
       mixedScriptHeadings: [
         {
+          text: 'Сontent fields',
+          detail: 'U+0421 Cyrillic at character 1',
+          headingId: 'h.cell',
+          tabId: 'first',
+        },
+        {
+          // CYRILLIC SMALL LETTER BYELORUSSIAN-UKRAINIAN I.
           text: 'Dіscounts',
           detail: 'U+0456 Cyrillic at character 2',
           headingId: 'h.discounts',
+          tabId: 'first',
+        },
+        {
+          text: 'Nеxt steps',
+          detail: 'U+0435 Cyrillic at character 2',
+          headingId: 'h.next',
+          tabId: 'second',
         },
       ],
     });
