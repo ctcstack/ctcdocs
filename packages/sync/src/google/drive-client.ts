@@ -124,7 +124,7 @@ export class GoogleDriveClient {
           pageSize: '1000',
           q: 'trashed = false',
           fields:
-            'nextPageToken,incompleteSearch,files(id,name,mimeType,parents,modifiedTime,createdTime,trashed,webViewLink,shortcutDetails(targetId,targetMimeType),size)',
+            'nextPageToken,incompleteSearch,files(id,name,mimeType,parents,modifiedTime,createdTime,trashed,webViewLink,shortcutDetails(targetId,targetMimeType),size,lastModifyingUser(displayName))',
           ...(pageToken ? { pageToken } : {}),
         },
         driveFileListResponseSchema,

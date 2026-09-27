@@ -21,6 +21,7 @@ import {
 } from './inventory/inventory-report.js';
 import { createSyncContext } from './project-context.js';
 import { runBasicMarkdownSync } from './run-sync.js';
+import { readSourceTitle } from './titles/source-title.js';
 import { createStoredZipFixture } from './test-support/create-zip-fixture.js';
 import {
   testSiteConfiguration,
@@ -1208,6 +1209,16 @@ describe('basic Markdown sync', () => {
           new TextEncoder().encode('# Architecture\n\n## Сontacts\n\nBody.\n'),
         ),
     };
+    const paragraph = (
+      namedStyleType: string,
+      content: string,
+      headingId?: string,
+    ) => ({
+      paragraph: {
+        paragraphStyle: { namedStyleType, ...(headingId ? { headingId } : {}) },
+        elements: [{ textRun: { content } }],
+      },
+    });
     let inspections = 0;
     const documentInspector = {
       inspectDocument: () => {
@@ -1218,18 +1229,17 @@ describe('basic Markdown sync', () => {
           inlineObjectCount: 0,
           positionedObjectCount: 0,
           tabCount: 1,
-          titleFacts: {
-            firstBlocks: ['heading-1' as const, 'heading-2' as const],
-            candidate: {
-              style: 'heading-1' as const,
-              text: 'Architecture',
-              blockIndex: 0,
-            },
-            titleCount: 0,
-            heading1Count: 1,
-          },
+          titleFacts: readSourceTitle([
+            paragraph('HEADING_1', 'Architecture\n', 'h.title'),
+            paragraph('HEADING_2', 'Сontacts\n', 'h.contacts'),
+            paragraph('NORMAL_TEXT', 'Body.\n'),
+          ]),
         });
       },
+    };
+    const edited = {
+      ...document(),
+      lastModifyingUser: { displayName: 'Editor One' },
     };
     const run = (now: string) =>
       runBasicMarkdownSync(
@@ -1238,7 +1248,7 @@ describe('basic Markdown sync', () => {
         tokenProvider,
         { dryRun: false, full: false },
         {
-          inventoryResult: inventory(),
+          inventoryResult: inventory(edited),
           markdownExporter,
           documentInspector,
           now: () => new Date(now),
@@ -1263,11 +1273,23 @@ describe('basic Markdown sync', () => {
         slug: 'team/architecture',
         name: '01 - Architecture',
         title: 'Architecture',
+        folderPath: ['Team'],
+        lastEditedBy: 'Editor One',
         removedTitleHeading: true,
         match: 'identical',
         similarity: 1,
-        mixedScriptHeadings: [
-          { text: 'Сontacts', detail: 'U+0421 Cyrillic at character 1' },
+        issues: [
+          {
+            check: 'heading-mixes-alphabets',
+            text: 'Сontacts',
+            detail: 'U+0421 Cyrillic at character 1',
+            headingId: 'h.contacts',
+          },
+          {
+            check: 'title-styled-as-heading-1',
+            text: 'Architecture',
+            headingId: 'h.title',
+          },
         ],
       }),
     ]);

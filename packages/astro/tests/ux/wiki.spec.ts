@@ -5,6 +5,7 @@ import { folderAnchorId, folderTrail } from '../../lib/folder-anchor.js';
 import { siteConfiguration } from '../../lib/project.js';
 import {
   anyDocument,
+  contentHealthReport,
   documentInFolder,
   documentLinkingAnother,
   documentWithAsset,
@@ -457,4 +458,42 @@ test('a missing address searches for the page it named', async ({ page }) => {
       .first(),
   ).toBeVisible();
   await expectNoAccessibilityViolations(page);
+});
+
+test('the content health page links each issue to its document', async ({
+  page,
+}) => {
+  await page.goto('/content-health/');
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Content health' }),
+  ).toBeVisible();
+  const report = contentHealthReport();
+  test.skip(
+    !report || report.issueCount === 0,
+    'The corpus has no content health report with issues yet.',
+  );
+  const { linkedIssueCount, sections } = report as {
+    linkedIssueCount: number;
+    sections: string[];
+  };
+
+  const sourceLinks = page.locator(
+    'content-health a[href^="https://docs.google.com/document/d/"]',
+  );
+  await expect(sourceLinks.first()).toBeVisible();
+  if (linkedIssueCount > 0) {
+    await expect(
+      page.locator('content-health a[href*="/edit#heading="]').first(),
+    ).toBeAttached();
+  }
+  await expectNoAccessibilityViolations(page);
+
+  // Narrowing to one section leaves only that section's documents.
+  const [section] = sections;
+  await page.getByLabel('Section').selectOption(section ?? '');
+  const visible = page.locator('content-health li:visible');
+  await expect(visible.first()).toBeVisible();
+  for (const item of await visible.all()) {
+    await expect(item).toHaveAttribute('data-section', section ?? '');
+  }
 });

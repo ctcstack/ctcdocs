@@ -1078,33 +1078,40 @@ export async function runBasicMarkdownSync(
     serializeRedirectMap(createRedirectMap(candidateManifest), sourceHeader),
   );
   /*
-   * The title report (ADR-023). A document exported in this run reports what
-   * its source says now; any other keeps what the run that last exported it
-   * recorded. Headings are checked in the body as published, every run.
+   * The title report (ADR-023, ADR-024). A document exported in this run
+   * reports what its source says now; any other keeps what the run that last
+   * exported it recorded. Who last edited it comes from this run's inventory.
    */
   const recordedTitles = recordedTitleFacts(
     await readOptionalFile(
       resolve(repositoryRoot, PROJECT_LAYOUT.titleReportFile),
     ),
   );
+  const inventoryItems = new Map(
+    inventory.selection.documents.map((document) => [
+      document.item.id,
+      document.item,
+    ]),
+  );
   const titleReport = createTitleReport(
     Object.values(candidateManifest.documents).map((record) => {
       const exported = exportedById.get(record.googleFileId);
       const recorded = recordedTitles.get(record.googleFileId);
-      const content = output.get(record.generatedMarkdownPath);
+      const item = inventoryItems.get(record.googleFileId);
       return {
         id: record.googleFileId,
         slug: record.stableSlug,
         name: record.googleName,
         title: record.displayTitle,
+        folderPath: folderPaths.get(record.googleFileId) ?? [],
+        lastEditedBy:
+          item?.lastModifyingUser?.displayName ??
+          recorded?.lastEditedBy ??
+          null,
         source: exported ? exported.titleFacts : (recorded?.source ?? null),
         removedTitleHeading: exported
           ? exported.removedTitleHeading
           : (recorded?.removedTitleHeading ?? null),
-        body:
-          typeof content === 'string'
-            ? (extractGeneratedDocumentBody(content, markdownHeader) ?? '')
-            : '',
       };
     }),
   );
@@ -1124,6 +1131,7 @@ export async function runBasicMarkdownSync(
     outputChanged: writeResult.changed,
     ...(slugChange ? { slugChange } : {}),
     addressesMoved: slugAllocation.moves.length,
-    headingsMixingAlphabets: titleReport.summary.mixedScriptHeadings,
+    headingsMixingAlphabets:
+      titleReport.summary.checks['heading-mixes-alphabets'],
   };
 }

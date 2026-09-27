@@ -24,6 +24,38 @@ All three packages share a version and are released together.
   ships the shared Prettier configuration, so it always needed one; the
   requirement is now stated rather than assumed.
 
+## Unreleased
+
+### Added
+
+- The content health page at `/content-health/`. It groups what editors have
+  to fix by the action that fixes it, with an instruction for each check.
+  Each document links to its page and to Google Docs, at the line concerned
+  when there is one. Filters narrow the list to one section or to whoever last
+  edited the document. It is not in the sidebar or in search. See
+  [ADR-024](docs/ADR/024-content-health-page.md).
+- Checks in the title report:
+  - a heading that mixes alphabets, now read from the source with a link to
+    it;
+  - a document that opens with another document's title;
+  - an empty document;
+  - the proposed one-Title-line convention (title styled as Heading 1, no
+    title line, title not first, Title style on a section);
+  - Drive names with "Copy of", a file extension, underscores or extra spaces.
+- The sync's job summary lists the checks as counts, with a link to the page.
+- Who last edited each document, from Drive's `lastModifyingUser` display
+  name.
+
+### Changed
+
+- `content-health` is a platform route.
+- The title report moves to schema version 2. It lists its checks, and each
+  document lists its issues, section and last editor. Facts recorded by 0.8.0
+  count as not inspected: run a full sync once after upgrading.
+- Title similarity takes the better of character edit similarity and shared
+  words, and a reordered title is classified as `reordered`.
+- The Docs API request also reads each paragraph's heading ID.
+
 ## 0.8.0
 
 ### Added

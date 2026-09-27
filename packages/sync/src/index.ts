@@ -57,3 +57,4 @@ export {
   type RunSyncOptions,
   type SyncRunResult,
 } from './run-sync.js';
+export { readSourceTitle } from './titles/source-title.js';

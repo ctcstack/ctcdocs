@@ -1,10 +1,18 @@
 import { appendFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import { PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
+import {
+  loadSiteConfiguration,
+  PLATFORM_ROUTE_HREFS,
+  PROJECT_LAYOUT,
+} from '@ctcstack/ctcdocs-core';
 
 import { syncReportSchema } from '../generation/sync-report.js';
-import { renderSyncJobSummary } from './sync-summary.js';
+import { titleReportSchema, type TitleReport } from '../titles/title-report.js';
+import {
+  renderContentHealthSummary,
+  renderSyncJobSummary,
+} from './sync-summary.js';
 
 export class SyncSummaryError extends Error {
   override readonly name = 'SyncSummaryError';
@@ -36,5 +44,24 @@ export async function writeSyncSummary(
     renderSyncJobSummary(report, environment.SYNC_OUTPUT_CHANGED === 'true'),
     'utf8',
   );
+  const titleReport = titleReportSchema.safeParse(
+    JSON.parse(
+      await readFile(
+        resolve(repositoryRoot, PROJECT_LAYOUT.titleReportFile),
+        'utf8',
+      ).catch(() => 'null'),
+    ),
+  );
+  if (titleReport.success) {
+    const site = loadSiteConfiguration(repositoryRoot);
+    await appendFile(
+      summaryPath,
+      renderContentHealthSummary(
+        titleReport.data as unknown as TitleReport,
+        `${site.deployment.environments.production.url}${PLATFORM_ROUTE_HREFS.contentHealth}`,
+      ),
+      'utf8',
+    );
+  }
   console.log('Sync job summary written.');
 }

@@ -25,6 +25,13 @@ export const driveItemSchema = z.object({
     })
     .optional(),
   size: z.string().regex(/^\d+$/u).optional(),
+  /**
+   * Who last edited the file, by display name only: the content health page
+   * uses it to show each editor what is theirs to fix (ADR-024).
+   */
+  lastModifyingUser: z
+    .object({ displayName: z.string().optional() })
+    .optional(),
 });
 
 export type DriveItem = z.infer<typeof driveItemSchema>;

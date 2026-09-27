@@ -20,7 +20,7 @@ const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{1,128}$/u;
  * asked only whether they are there.
  */
 const BODY_FIELDS =
-  'body(content(paragraph(paragraphStyle(namedStyleType),elements(textRun(content),inlineObjectElement(inlineObjectId))),table(columns),tableOfContents(content(startIndex))))';
+  'body(content(paragraph(paragraphStyle(namedStyleType,headingId),elements(textRun(content),inlineObjectElement(inlineObjectId))),table(columns),tableOfContents(content(startIndex))))';
 const DOCUMENT_FIELDS = `tabs(tabProperties(tabId),documentTab(inlineObjects,positionedObjects,${BODY_FIELDS}),childTabs(tabProperties(tabId)))`;
 
 type Sleep = (milliseconds: number) => Promise<void>;
@@ -57,7 +57,10 @@ const structuralElementSchema = z
     paragraph: z
       .object({
         paragraphStyle: z
-          .object({ namedStyleType: z.string().optional() })
+          .object({
+            namedStyleType: z.string().optional(),
+            headingId: z.string().optional(),
+          })
           .passthrough()
           .optional(),
         elements: z
