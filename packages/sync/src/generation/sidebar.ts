@@ -1,3 +1,7 @@
+import {
+  documentName,
+  GOOGLE_DRIVE_PDF_MIME_TYPE,
+} from '../google/drive-types.js';
 import type {
   InventoryFolderNode,
   InventorySelection,
@@ -13,6 +17,8 @@ import { parseOrderedLabel } from '../ordered-label.js';
 interface SidebarLink {
   label: string;
   slug: string;
+  /** Marks a page that presents a PDF rather than a document (ADR-027). */
+  badge?: string;
 }
 
 interface SidebarGroup {
@@ -38,8 +44,11 @@ function documentLink(
     );
   }
   return {
-    label: parseOrderedLabel(document.item.name).label,
+    label: parseOrderedLabel(documentName(document.item)).label,
     slug: record.stableSlug,
+    ...(document.item.mimeType === GOOGLE_DRIVE_PDF_MIME_TYPE
+      ? { badge: 'PDF' }
+      : {}),
   };
 }
 

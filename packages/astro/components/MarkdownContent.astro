@@ -13,6 +13,7 @@
 import Default from '@astrojs/starlight/components/MarkdownContent.astro';
 import { getCollection } from 'astro:content';
 
+import PdfFile from './PdfFile.astro';
 import SectionListing from './SectionListing.astro';
 import { sectionListingRows, type ListedPage } from '../lib/section-listing';
 
@@ -38,8 +39,48 @@ async function loadRows() {
 }
 
 const rows = await loadRows();
+
+/*
+ * A PDF's page (ADR-027) shows the file first, and its text below, folded
+ * while the file is there to read. Search indexes the text either way.
+ */
+const { pdf, googleFileId, editUrl, title } = entry.data;
+const pdfText = Boolean(entry.body?.trim());
 ---
 
 <Default>
-  {rows ? <SectionListing rows={rows} /> : <slot />}
+  {
+    pdf && googleFileId && (
+      <PdfFile
+        googleFileId={googleFileId}
+        title={title}
+        file={pdf.file}
+        bytes={pdf.bytes}
+        pages={pdf.pages}
+        sourceUrl={typeof editUrl === 'string' ? editUrl : undefined}
+      />
+    )
+  }
+  {
+    rows ? (
+      <SectionListing rows={rows} />
+    ) : pdf && pdfText ? (
+      <details class="pdf-text" open={!pdf.file}>
+        <summary>Text of the PDF</summary>
+        <slot />
+      </details>
+    ) : (
+      <slot />
+    )
+  }
 </Default>
+
+<style>
+  @layer starlight.components {
+    .pdf-text > summary {
+      cursor: pointer;
+      font-weight: 600;
+      margin-block-end: 1rem;
+    }
+  }
+</style>

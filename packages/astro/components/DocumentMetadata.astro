@@ -41,8 +41,12 @@ function formatUtcDateTime(value: string): string {
   });
 }
 
+const isPdf = sourceType === 'drive-pdf';
 const showMetadata =
-  sourceType === 'google-doc' && sourceUrl && googleModifiedTime && syncedAt;
+  (sourceType === 'google-doc' || isPdf) &&
+  sourceUrl &&
+  googleModifiedTime &&
+  syncedAt;
 const showSectionLink = sourceType === 'section-index' && permanentPath;
 ---
 
@@ -155,7 +159,7 @@ const showSectionLink = sourceType === 'section-index' && permanentPath;
           <path d="M13 3 8 8" />
           <path d="M12 9.5v3A1.5 1.5 0 0 1 10.5 14h-7A1.5 1.5 0 0 1 2 12.5v-7A1.5 1.5 0 0 1 3.5 4h3" />
         </svg>
-        Open in Google Docs
+        {isPdf ? 'Open in Google Drive' : 'Open in Google Docs'}
       </a>
     </div>
   )

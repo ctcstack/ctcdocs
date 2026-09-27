@@ -32,6 +32,7 @@ import {
   createUnpublishedItems,
   UNPUBLISHED_REASONS,
   type HeldDocument,
+  type IncompleteDocument,
 } from './generation/unpublished.js';
 import {
   createRedirectMap,
@@ -43,8 +44,13 @@ import {
   type GoogleDocumentStructure,
 } from './google/docs-client.js';
 import { GoogleDriveClient } from './google/drive-client.js';
+import {
+  documentName,
+  GOOGLE_DRIVE_PDF_MIME_TYPE,
+} from './google/drive-types.js';
 import { GoogleApiError } from './google/google-api-error.js';
 import {
+  InventoryGraphError,
   withDocumentsHeldBack,
   type InventorySelection,
   type RecordedPlacement,
@@ -59,8 +65,10 @@ import {
   computeGeneratedContentHash,
   extractGeneratedDocumentBody,
   extractGeneratedFolderPath,
+  extractGeneratedFrontmatter,
   generateMarkdownDocument,
   sha256,
+  type GeneratedPdfFacts,
 } from './markdown/generated-document.js';
 import { detectMarkdownFallbackReasons } from './markdown/analyze-markdown.js';
 import {
@@ -81,8 +89,16 @@ import {
   type SyncManifest,
 } from './manifest.js';
 import { compareNavigationSiblings } from './navigation-order.js';
+import { findNameScriptIssues } from './name-scripts.js';
 import { parseOrderedLabel } from './ordered-label.js';
 import { writeGeneratedOutputAtomically } from './output/atomic-writer.js';
+import {
+  looksLikePdf,
+  MAX_READ_BYTES,
+  MAX_SITE_FILE_BYTES,
+  pdfTextToMarkdown,
+  readPdfText,
+} from './pdf/read-pdf.js';
 import { validateGeneratedOutput } from './output/validate-generated-output.js';
 import { keepPreviousAddresses } from './redirect-history.js';
 import {
@@ -91,7 +107,11 @@ import {
   serializeTitleReport,
 } from './titles/title-report.js';
 import { allocateShortIds } from './short-id.js';
-import { allocateReseededSlug, allocateStableSlugs } from './slug.js';
+import {
+  allocateReseededSlug,
+  allocateStableSlugs,
+  slugifySegment,
+} from './slug.js';
 
 const MANIFEST_PATH = PROJECT_LAYOUT.manifestFile;
 const SIDEBAR_PATH = `${PROJECT_LAYOUT.generatedSourceDirectory}/sidebar.ts`;
@@ -106,6 +126,10 @@ interface DocumentInspector {
   inspectDocument(fileId: string): Promise<GoogleDocumentStructure>;
 }
 
+interface FileDownloader {
+  downloadFile(fileId: string, maxBytes: number): Promise<Uint8Array>;
+}
+
 export interface RunSyncOptions {
   dryRun: boolean;
   fileId?: string;
@@ -117,6 +141,7 @@ export interface RunSyncDependencies extends InventoryRunDependencies {
   inventoryResult?: InventoryRunResult;
   markdownExporter?: MarkdownExporter;
   documentInspector?: DocumentInspector;
+  fileDownloader?: FileDownloader;
   docsBaseUrl?: string;
   now?: () => Date;
 }
@@ -222,8 +247,77 @@ async function readOptionalFile(path: string): Promise<string | undefined> {
   }
 }
 
-function sourceUrl(fileId: string): string {
-  return `https://docs.google.com/document/d/${encodeURIComponent(fileId)}/edit`;
+function sourceUrl(fileId: string, mimeType: string): string {
+  return mimeType === GOOGLE_DRIVE_PDF_MIME_TYPE
+    ? `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/view`
+    : `https://docs.google.com/document/d/${encodeURIComponent(fileId)}/edit`;
+}
+
+/**
+ * The published PDF's file name: its title in Latin letters and digits, so a
+ * download is named after the document, or `document.pdf` when the title has
+ * none to offer.
+ */
+function pdfFileName(title: string): string {
+  const slug = slugifySegment(title).slice(0, 80).replace(/-+$/u, '');
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(slug)
+    ? `${slug}.pdf`
+    : 'document.pdf';
+}
+
+/** What a PDF's page cannot show, by the warning its record carries. */
+const PDF_TEXT_WARNINGS: Readonly<Record<string, string | undefined>> = {
+  'pdf:no_text': undefined,
+  'pdf:password': 'It is protected with a password.',
+  'pdf:damaged': 'It is damaged.',
+  'pdf:unreadable': 'It could not be read.',
+};
+
+/** The parts of a PDF's page that are missing, from its record (ADR-027). */
+function incompletePdf(record: SyncedDocumentRecord): IncompleteDocument[] {
+  if (record.exportMode !== 'pdf') {
+    return [];
+  }
+  if (record.warnings.includes('pdf:too_large_to_read')) {
+    return [{ reason: 'pdf-too-large', record }];
+  }
+  const missing: IncompleteDocument[] = [];
+  if (record.warnings.includes('pdf:not_on_site')) {
+    missing.push({ reason: 'pdf-over-site-limit', record });
+  }
+  const noText = record.warnings.find(
+    (warning) => warning in PDF_TEXT_WARNINGS,
+  );
+  if (noText) {
+    const detail = PDF_TEXT_WARNINGS[noText];
+    missing.push({
+      reason: 'pdf-no-text',
+      ...(detail ? { detail } : {}),
+      record,
+    });
+  }
+  return missing;
+}
+
+/** The PDF facts a page recorded in its frontmatter, when it has them. */
+function recordedPdfFacts(content: string): GeneratedPdfFacts | undefined {
+  const frontmatter = extractGeneratedFrontmatter(content);
+  const pdf =
+    typeof frontmatter === 'object' && frontmatter !== null
+      ? (frontmatter as { pdf?: unknown }).pdf
+      : undefined;
+  if (typeof pdf !== 'object' || pdf === null) {
+    return undefined;
+  }
+  const { file, bytes, pages } = pdf as Record<string, unknown>;
+  if (typeof bytes !== 'number') {
+    return undefined;
+  }
+  return {
+    ...(typeof file === 'string' ? { file } : {}),
+    bytes,
+    pages: typeof pages === 'number' ? pages : null,
+  };
 }
 
 function generatedMarkdownPath(fileId: string): string {
@@ -510,6 +604,21 @@ interface ResolvedRun {
   inventory: InventoryRunResult;
   exporter: MarkdownExporter;
   inspector: DocumentInspector;
+  /** Downloads a PDF, up to the most the sync reads. */
+  downloader: { downloadFile(fileId: string): Promise<Uint8Array> };
+}
+
+/** A document's page before its frontmatter and record are written. */
+interface ConvertedDocument {
+  body: string;
+  description?: string;
+  removedTitleHeading: boolean;
+  assets: ExistingAsset[];
+  exportMode: SyncedDocumentRecord['exportMode'];
+  warnings: string[];
+  titleFacts: NonNullable<GoogleDocumentStructure['titleFacts']> | null;
+  pdf?: GeneratedPdfFacts;
+  sourceChecksum?: string;
 }
 
 export async function runBasicMarkdownSync(
@@ -566,7 +675,38 @@ export async function runBasicMarkdownSync(
             ? { baseUrl: dependencies.docsBaseUrl }
             : {}),
         }));
+  const downloader: FileDownloader =
+    dependencies.fileDownloader ??
+    (exporter instanceof GoogleDriveClient
+      ? exporter
+      : {
+          downloadFile: () =>
+            Promise.reject(new Error('PDF download is unavailable.')),
+        });
+  /*
+   * A document named with a letter from another alphabet is held back from the
+   * start (ADR-027): its name would become its address. A folder named so has
+   * already stopped the inventory. A targeted run asked for the document, so
+   * it stops on it instead.
+   */
+  const documentIds = new Set(
+    inventory.selection.documents.map((document) => document.item.id),
+  );
+  const nameIssues = findNameScriptIssues(
+    inventory.selection,
+    context.site.navigation.nameScripts,
+  ).filter((issue) => documentIds.has(issue.itemId));
+  const targetedFileId = options.fileId ?? options.reseedSlugFileId;
+  const targetedIssue = nameIssues.find(
+    (issue) => issue.itemId === targetedFileId,
+  );
+  if (targetedIssue) {
+    throw new InventoryGraphError([targetedIssue]);
+  }
   const exportHtmlZip = exporter.exportHtmlZip?.bind(exporter);
+  const downloadFile = remember((fileId) =>
+    downloader.downloadFile(fileId, MAX_READ_BYTES),
+  );
   return synchronize(
     context,
     configuration,
@@ -583,8 +723,17 @@ export async function runBasicMarkdownSync(
           inspector.inspectDocument(fileId),
         ),
       },
+      downloader: { downloadFile: (fileId) => downloadFile(fileId) },
     },
-    new Map(),
+    new Map(
+      nameIssues.map((issue) => [
+        issue.itemId,
+        {
+          reason: 'name-script',
+          ...(issue.detail ? { detail: issue.detail } : {}),
+        },
+      ]),
+    ),
   );
 }
 
@@ -602,7 +751,7 @@ async function synchronize(
   held: ReadonlyMap<string, HeldDocument>,
 ): Promise<SyncRunResult> {
   const { markdownHeader, repositoryRoot, site, sourceHeader } = context;
-  const { runTimestamp, inventory, exporter, inspector } = run;
+  const { runTimestamp, inventory, exporter, inspector, downloader } = run;
   const existingManifest = await loadManifest(
     resolve(repositoryRoot, MANIFEST_PATH),
     configuration.GOOGLE_DRIVE_ID,
@@ -889,8 +1038,11 @@ async function synchronize(
       }),
   );
 
-  const exportDocument = async (planned: PlannedDocument) => {
-    const title = parseOrderedLabel(planned.selected.item.name).label;
+  /** A Google Doc's body and images, from its Markdown or HTML export. */
+  const convertGoogleDocument = async (
+    planned: PlannedDocument,
+    title: string,
+  ): Promise<ConvertedDocument> => {
     const [markdownExport, structure] = await Promise.all([
       exporter.exportMarkdown(planned.selected.item.id),
       inspector.inspectDocument(planned.selected.item.id),
@@ -954,12 +1106,134 @@ async function synchronize(
       warnings = converted.warnings;
     }
     const rewritten = rewriteInternalGoogleLinks(normalized.body, linkTargets);
-    normalized.body = rewritten.body;
-    warnings = [...new Set([...warnings, ...rewritten.warnings])].sort();
+    return {
+      body: rewritten.body,
+      ...(normalized.description
+        ? { description: normalized.description }
+        : {}),
+      removedTitleHeading: normalized.removedTitleHeading,
+      assets,
+      exportMode,
+      warnings: [...new Set([...warnings, ...rewritten.warnings])].sort(),
+      titleFacts: structure.titleFacts ?? null,
+    };
+  };
+
+  /**
+   * A PDF's page (ADR-027): the file itself when the site can serve it, and
+   * its text, for search and for agents. A file Drive reports unchanged is not
+   * downloaded again: its published text and file are reused, under its
+   * current name.
+   */
+  const convertPdf = async (
+    planned: PlannedDocument,
+    title: string,
+  ): Promise<ConvertedDocument> => {
+    const { item } = planned.selected;
+    const sourceChecksum = item.sha256Checksum
+      ? `sha256:${item.sha256Checksum}`
+      : undefined;
+    const fileName = pdfFileName(title);
+    const assetPath = `${generatedAssetsDirectory(item.id)}/${fileName}`;
+    const common = {
+      removedTitleHeading: false,
+      exportMode: 'pdf' as const,
+      titleFacts: null,
+      ...(sourceChecksum ? { sourceChecksum } : {}),
+    };
+
+    const recorded = planned.existingRecord;
+    if (
+      recorded?.exportMode === 'pdf' &&
+      sourceChecksum !== undefined &&
+      recorded.sourceChecksum === sourceChecksum &&
+      !planned.existingOutputInvalid &&
+      planned.existingContent !== undefined
+    ) {
+      const facts = recordedPdfFacts(planned.existingContent);
+      const body = extractGeneratedDocumentBody(
+        planned.existingContent,
+        markdownHeader,
+      );
+      const [published, ...others] = planned.existingAssets;
+      if (
+        facts &&
+        body !== undefined &&
+        others.length === 0 &&
+        (facts.file === undefined) === (published === undefined)
+      ) {
+        return {
+          ...common,
+          body,
+          ...(recorded.description
+            ? { description: recorded.description }
+            : {}),
+          assets: published
+            ? [{ repositoryPath: assetPath, bytes: published.bytes }]
+            : [],
+          warnings: recorded.warnings,
+          pdf: {
+            ...(published ? { file: fileName } : {}),
+            bytes: facts.bytes,
+            pages: facts.pages,
+          },
+        };
+      }
+    }
+
+    const size = item.size === undefined ? undefined : Number(item.size);
+    if (size !== undefined && size > MAX_READ_BYTES) {
+      return {
+        ...common,
+        body: '',
+        assets: [],
+        warnings: ['pdf:too_large_to_read'],
+        pdf: { bytes: size, pages: null },
+      };
+    }
+    const bytes = await downloader.downloadFile(item.id);
+    if (!looksLikePdf(bytes)) {
+      throw new UnsafeAssetError('The file is not a PDF.');
+    }
+    const text = await readPdfText(bytes);
+    const markdown = pdfTextToMarkdown(text.pages, title);
+    const onSite = bytes.byteLength <= MAX_SITE_FILE_BYTES;
+    return {
+      ...common,
+      body: markdown.body,
+      ...(markdown.description ? { description: markdown.description } : {}),
+      assets: onSite ? [{ repositoryPath: assetPath, bytes }] : [],
+      warnings: [
+        ...(text.unreadable
+          ? [`pdf:${text.unreadable}`]
+          : markdown.hasText
+            ? []
+            : ['pdf:no_text']),
+        ...(markdown.truncated ? ['pdf:text_truncated'] : []),
+        ...(onSite ? [] : ['pdf:not_on_site']),
+      ].sort(),
+      pdf: {
+        ...(onSite ? { file: fileName } : {}),
+        bytes: bytes.byteLength,
+        pages: text.pageCount,
+      },
+    };
+  };
+
+  const exportDocument = async (planned: PlannedDocument) => {
+    const { item } = planned.selected;
+    const title = parseOrderedLabel(documentName(item)).label;
+    const converted =
+      item.mimeType === GOOGLE_DRIVE_PDF_MIME_TYPE
+        ? await convertPdf(planned, title)
+        : await convertGoogleDocument(planned, title);
     const folderPath = planned.selected.path
       .slice(1, -1)
       .map((segment) => parseOrderedLabel(segment).label);
-    const contentHash = computeGeneratedContentHash(normalized.body, assets);
+    const contentHash = computeGeneratedContentHash(
+      converted.body,
+      converted.assets,
+    );
     if (
       !versionChanged &&
       !planned.metadataChanged &&
@@ -968,67 +1242,68 @@ async function synchronize(
       planned.existingContent !== undefined &&
       planned.existingRecord.stableSlug === planned.stableSlug &&
       planned.existingRecord.shortId === planned.shortId &&
-      planned.existingRecord.contentHash === contentHash
+      planned.existingRecord.contentHash === contentHash &&
+      planned.existingRecord.sourceChecksum === converted.sourceChecksum
     ) {
       return {
-        fileId: planned.selected.item.id,
+        fileId: item.id,
         content: planned.existingContent,
         record: planned.existingRecord,
         folderPath,
         assets: planned.existingAssets,
-        titleFacts: structure.titleFacts ?? null,
-        removedTitleHeading: normalized.removedTitleHeading,
+        titleFacts: converted.titleFacts,
+        removedTitleHeading: converted.removedTitleHeading,
       };
     }
     const content = generateMarkdownDocument(
       {
         title,
-        ...(normalized.description
-          ? { description: normalized.description }
+        ...(converted.description
+          ? { description: converted.description }
           : {}),
         slug: planned.stableSlug,
         shortId: planned.shortId,
-        sourceUrl: sourceUrl(planned.selected.item.id),
-        googleFileId: planned.selected.item.id,
-        googleModifiedTime: planned.selected.item.modifiedTime,
+        sourceUrl: sourceUrl(item.id, item.mimeType),
+        googleFileId: item.id,
+        googleModifiedTime: item.modifiedTime,
         syncedAt: runTimestamp,
         folderPath,
-        normalizedBody: normalized.body,
+        normalizedBody: converted.body,
         contentHash,
+        ...(converted.pdf ? { pdf: converted.pdf } : {}),
       },
       markdownHeader,
     );
     const record: SyncedDocumentRecord = {
-      googleFileId: planned.selected.item.id,
+      googleFileId: item.id,
       googleParentId: planned.selected.parentId,
-      googleName: planned.selected.item.name,
+      googleName: item.name,
       displayTitle: title,
-      ...(normalized.description
-        ? { description: normalized.description }
-        : {}),
-      googleModifiedTime: planned.selected.item.modifiedTime,
-      googleCreatedTime: planned.selected.item.createdTime,
-      sourceUrl: sourceUrl(planned.selected.item.id),
+      ...(converted.description ? { description: converted.description } : {}),
+      googleModifiedTime: item.modifiedTime,
+      googleCreatedTime: item.createdTime,
+      sourceUrl: sourceUrl(item.id, item.mimeType),
       stableSlug: planned.stableSlug,
-      generatedMarkdownPath: generatedMarkdownPath(planned.selected.item.id),
-      generatedAssetsDirectory: generatedAssetsDirectory(
-        planned.selected.item.id,
-      ),
+      generatedMarkdownPath: generatedMarkdownPath(item.id),
+      generatedAssetsDirectory: generatedAssetsDirectory(item.id),
       contentHash,
       outputHash: sha256(content),
       lastSuccessfulSyncAt: runTimestamp,
-      exportMode,
-      warnings,
+      exportMode: converted.exportMode,
+      warnings: converted.warnings,
       shortId: planned.shortId,
+      ...(converted.sourceChecksum
+        ? { sourceChecksum: converted.sourceChecksum }
+        : {}),
     };
     return {
-      fileId: planned.selected.item.id,
+      fileId: item.id,
       content,
       record,
       folderPath,
-      assets,
-      titleFacts: structure.titleFacts ?? null,
-      removedTitleHeading: normalized.removedTitleHeading,
+      assets: converted.assets,
+      titleFacts: converted.titleFacts,
+      removedTitleHeading: converted.removedTitleHeading,
     };
   };
   const failures = new Map<string, HeldDocument>();
@@ -1198,6 +1473,14 @@ async function synchronize(
         )
       : [],
   );
+  const incomplete = new Map(
+    Object.values(candidateManifest.documents).flatMap((record) => {
+      const missing = incompletePdf(record);
+      return missing.length > 0
+        ? [[record.googleFileId, missing] as const]
+        : [];
+    }),
+  );
   const unpublished = createUnpublishedItems(
     inventory.selection,
     new Map([...carriedForward, ...held]),
@@ -1208,6 +1491,7 @@ async function synchronize(
       }),
       ...kept,
     ]),
+    incomplete,
   );
   const report: SyncReport = {
     schemaVersion: 2,
@@ -1225,6 +1509,8 @@ async function synchronize(
         (item) => item.status === 'not-published',
       ).length,
       outOfDate: unpublished.filter((item) => item.status === 'out-of-date')
+        .length,
+      incomplete: unpublished.filter((item) => item.status === 'incomplete')
         .length,
       ignored: selection.ignoredItemCount,
     },
@@ -1319,27 +1605,30 @@ async function synchronize(
   const inventoryItems = new Map(
     selection.documents.map((document) => [document.item.id, document.item]),
   );
+  // A PDF has no paragraph styles to report on: the report covers Google Docs.
   const titleReport = createTitleReport(
-    Object.values(candidateManifest.documents).map((record) => {
-      const exported = exportedById.get(record.googleFileId);
-      const recorded = recordedTitles.get(record.googleFileId);
-      const item = inventoryItems.get(record.googleFileId);
-      return {
-        id: record.googleFileId,
-        slug: record.stableSlug,
-        name: record.googleName,
-        title: record.displayTitle,
-        folderPath: folderPaths.get(record.googleFileId) ?? [],
-        lastEditedBy:
-          item?.lastModifyingUser?.displayName ??
-          recorded?.lastEditedBy ??
-          null,
-        source: exported ? exported.titleFacts : (recorded?.source ?? null),
-        removedTitleHeading: exported
-          ? exported.removedTitleHeading
-          : (recorded?.removedTitleHeading ?? null),
-      };
-    }),
+    Object.values(candidateManifest.documents)
+      .filter((record) => record.exportMode !== 'pdf')
+      .map((record) => {
+        const exported = exportedById.get(record.googleFileId);
+        const recorded = recordedTitles.get(record.googleFileId);
+        const item = inventoryItems.get(record.googleFileId);
+        return {
+          id: record.googleFileId,
+          slug: record.stableSlug,
+          name: record.googleName,
+          title: record.displayTitle,
+          folderPath: folderPaths.get(record.googleFileId) ?? [],
+          lastEditedBy:
+            item?.lastModifyingUser?.displayName ??
+            recorded?.lastEditedBy ??
+            null,
+          source: exported ? exported.titleFacts : (recorded?.source ?? null),
+          removedTitleHeading: exported
+            ? exported.removedTitleHeading
+            : (recorded?.removedTitleHeading ?? null),
+        };
+      }),
   );
   output.set(PROJECT_LAYOUT.titleReportFile, serializeTitleReport(titleReport));
 

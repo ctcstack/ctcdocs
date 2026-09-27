@@ -92,9 +92,11 @@ const trail = (item: { folderPath: readonly string[] }) =>
   item.folderPath.length > 0 ? item.folderPath.join(' › ') : 'General';
 const isFileNameCheck = (code: string) => code.startsWith('file-name-');
 const status = (item: UnpublishedItem) =>
-  item.status === 'out-of-date' && item.publishedVersion
-    ? `The site shows the version edited on ${item.publishedVersion.slice(0, 10)}.`
-    : 'Not on the site.';
+  item.status === 'incomplete'
+    ? 'On the site, incomplete.'
+    : item.status === 'out-of-date' && item.publishedVersion
+      ? `The site shows the version edited on ${item.publishedVersion.slice(0, 10)}.`
+      : 'Not on the site.';
 ---
 
 <StarlightPage
@@ -187,8 +189,9 @@ const status = (item: UnpublishedItem) =>
             <section class="health-severity" data-severity-section>
               <h2 id="not-on-the-site">Not on the site</h2>
               <p class="health-lede">
-                Files in the published folders that the site does not show, or
-                shows in an earlier version. Each needs one change in Drive.
+                Files in the published folders that the site does not show,
+                shows in an earlier version, or shows only in part. Each needs
+                one change in Drive.
               </p>
               {unpublishedGroups.length === 0 && ignoredFolders.length === 0 ? (
                 <p class="health-empty">

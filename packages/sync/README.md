@@ -5,8 +5,9 @@ The synchronization pipeline of
 the `ctcdocs-sync` command line a project's workflows run.
 
 It exports the Google Docs of a managed Shared Drive folder, converts them to
-standard Markdown with their images, allocates stable slugs that survive a
-rename, and writes the result atomically into the paths a CTCDocs project owns.
+standard Markdown with their images, publishes the PDF files it holds with
+their text, allocates stable slugs that survive a rename, and writes the result
+atomically into the paths a CTCDocs project owns.
 A run twice over unchanged input produces no diff.
 
 ## Install

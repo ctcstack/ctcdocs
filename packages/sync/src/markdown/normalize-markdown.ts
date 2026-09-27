@@ -74,7 +74,10 @@ function normalizedComparisonText(node: Root | RootContent): string {
     .toLocaleLowerCase('en');
 }
 
-function truncateDescription(value: string, maximumLength = 200): string {
+export function truncateDescription(
+  value: string,
+  maximumLength = 200,
+): string {
   const normalized = value.replace(/\s+/gu, ' ').trim();
   if (normalized.length <= maximumLength) {
     return normalized;

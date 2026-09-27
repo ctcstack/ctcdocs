@@ -27,6 +27,8 @@ export interface PublishedMarkdownInput {
    */
   ownershipHeader: string;
   sourceUrl: string;
+  /** The published PDF, when the page is one's and the site serves it. */
+  fileUrl?: string;
   googleModifiedTime: string;
   syncedAt: string;
   contentHash: string;
@@ -149,6 +151,7 @@ export function serializePublishedMarkdown(
     '---',
     `title: ${yamlString(input.title)}`,
     `source_url: ${yamlString(input.sourceUrl)}`,
+    ...(input.fileUrl ? [`file_url: ${yamlString(input.fileUrl)}`] : []),
     `modified_at: ${yamlString(input.googleModifiedTime)}`,
     `synced_at: ${yamlString(input.syncedAt)}`,
     `content_hash: ${yamlString(input.contentHash)}`,

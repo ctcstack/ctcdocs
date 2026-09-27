@@ -100,7 +100,11 @@ function folderDescription(
 
 export async function loadCorpus(): Promise<Corpus> {
   const docs = await getCollection('docs');
-  const synced = docs.filter((doc) => doc.data.sourceType === 'google-doc');
+  const synced = docs.filter(
+    (doc) =>
+      doc.data.sourceType === 'google-doc' ||
+      doc.data.sourceType === 'drive-pdf',
+  );
   const sections = await loadSectionHrefs();
 
   const groups = new Map<string, CorpusGroup>();

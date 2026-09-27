@@ -32,11 +32,13 @@ export type SectionListingRow =
       modified: Date | undefined;
     };
 
-/** The page kind an entry must point at, so a folder is never drawn as a page. */
-const EXPECTED_SOURCE = {
-  folder: 'section-index',
-  document: 'google-doc',
-} as const;
+/** The page kinds an entry may point at, so a folder is never drawn as a page. */
+const EXPECTED_SOURCES: Readonly<
+  Record<'folder' | 'document', readonly string[]>
+> = {
+  folder: ['section-index'],
+  document: ['google-doc', 'drive-pdf'],
+};
 
 /**
  * Returns the rows to draw, or `undefined` when the page should show its own
@@ -54,7 +56,7 @@ export function sectionListingRows(
   const rows: SectionListingRow[] = [];
   for (const entry of entries) {
     const page = pages.get(entry.slug);
-    if (!page || page.sourceType !== EXPECTED_SOURCE[entry.kind]) {
+    if (!page || !EXPECTED_SOURCES[entry.kind].includes(page.sourceType)) {
       return undefined;
     }
     const href = `/${entry.slug}/`;

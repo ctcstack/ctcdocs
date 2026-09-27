@@ -23,7 +23,7 @@ const manifestDocumentSchema = z.object({
   contentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
   outputHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
   lastSuccessfulSyncAt: z.iso.datetime(),
-  exportMode: z.enum(['markdown', 'html-zip', 'hybrid']),
+  exportMode: z.enum(['markdown', 'html-zip', 'hybrid', 'pdf']),
   warnings: z.array(z.string()),
   /**
    * The permanent identifier behind `/d/<short ID>/` (ADR-022). Optional only
@@ -31,6 +31,14 @@ const manifestDocumentSchema = z.object({
    * this pipeline writes carries it.
    */
   shortId: z.string().regex(SHORT_ID_PATTERN).optional(),
+  /**
+   * For a PDF, the SHA-256 Drive reports for the file, so an unchanged file is
+   * not downloaded again (ADR-027).
+   */
+  sourceChecksum: z
+    .string()
+    .regex(/^sha256:[a-f0-9]{64}$/u)
+    .optional(),
 });
 
 const legacyManifestFolderSchema = z.object({

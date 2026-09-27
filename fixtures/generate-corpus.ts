@@ -12,6 +12,7 @@
  *
  * Run it with `pnpm fixtures:generate`.
  */
+import { createHash } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,6 +35,8 @@ import {
   type DriveItem,
   type InventoryRunResult,
 } from '@ctcstack/ctcdocs-sync';
+
+import { createPdfFixture } from '../packages/sync/src/test-support/create-pdf-fixture.ts';
 
 const FOLDER = 'application/vnd.google-apps.folder';
 const DOCUMENT = 'application/vnd.google-apps.document';
@@ -138,6 +141,44 @@ const items: DriveItem[] = [
 
 /** Documents Google refuses to export, as it does anything over 10 MB. */
 const oversized = new Set(['doc-brand-assets']);
+
+/*
+ * PDF files (ADR-027): one with text over two pages, and one of scanned pages
+ * with none, which the content health page lists as incomplete.
+ */
+const pdfFiles = new Map<string, Uint8Array>([
+  [
+    'pdf-release-checklist',
+    createPdfFixture([
+      [
+        'Release checklist',
+        'Every release follows the same steps, in this order.',
+        '1. Freeze the branch and announce the window.',
+        '2. Run the full verification gate.',
+      ],
+      [
+        'After the release',
+        'Watch the error rate for an hour before closing the window.',
+      ],
+    ]),
+  ],
+  ['pdf-scanned-form', createPdfFixture([[]])],
+]);
+
+function pdf(id: string, name: string, parent: string): DriveItem {
+  const bytes = pdfFiles.get(id) ?? new Uint8Array();
+  return {
+    ...document(id, name, parent),
+    mimeType: 'application/pdf',
+    size: String(bytes.byteLength),
+    sha256Checksum: createHash('sha256').update(bytes).digest('hex'),
+  };
+}
+
+items.push(
+  pdf('pdf-release-checklist', 'Release checklist.pdf', 'folder-reference'),
+  pdf('pdf-scanned-form', 'Scanned form.pdf', 'folder-handbook'),
+);
 
 /** Google's Markdown export, as the pipeline receives it. */
 const markdownExports = new Map<string, string>([
@@ -492,6 +533,15 @@ const dependencies = {
         throw new Error(`No synthetic archive for ${fileId}.`);
       }
       return Promise.resolve(archive);
+    },
+  },
+  fileDownloader: {
+    downloadFile: (fileId: string) => {
+      const bytes = pdfFiles.get(fileId);
+      if (!bytes) {
+        throw new Error(`No synthetic PDF for ${fileId}.`);
+      }
+      return Promise.resolve(bytes);
     },
   },
   documentInspector: {

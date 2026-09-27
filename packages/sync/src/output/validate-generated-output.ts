@@ -16,7 +16,10 @@ import {
   serializeRedirectMap,
 } from '../generation/redirects.js';
 import { syncReportSchema } from '../generation/sync-report.js';
-import { validateImageAsset } from '../assets/validate-asset.js';
+import {
+  validateImageAsset,
+  validatePdfAsset,
+} from '../assets/validate-asset.js';
 import { findBrokenInternalLinks } from '../links/validate-internal-links.js';
 import { collectMarkdownImageUrls } from '../markdown/analyze-markdown.js';
 import {
@@ -45,13 +48,25 @@ const frontmatterSchema = z.object({
   slug: z.string().min(1),
   shortId: z.string().regex(SHORT_ID_PATTERN),
   editUrl: z.url(),
-  sourceType: z.literal('google-doc'),
+  sourceType: z.enum(['google-doc', 'drive-pdf']),
   googleFileId: z.string().min(1),
   googleModifiedTime: z.iso.datetime(),
   syncedAt: z.iso.datetime(),
   contentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
   folderPath: z.array(z.string()),
   pagefind: z.literal(true),
+  tableOfContents: z.literal(false).optional(),
+  /** Present on the page of a PDF, and only there (ADR-027). */
+  pdf: z
+    .strictObject({
+      file: z
+        .string()
+        .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*\.pdf$/u)
+        .optional(),
+      bytes: z.number().int().nonnegative(),
+      pages: z.number().int().nonnegative().nullable(),
+    })
+    .optional(),
 });
 
 /*
@@ -185,9 +200,17 @@ async function validateGeneratedOutputInternal(
   if (
     JSON.stringify(
       titleReport.documents.map((document) => document.id).sort(),
-    ) !== JSON.stringify(Object.keys(manifest.documents).sort())
+    ) !==
+    JSON.stringify(
+      Object.values(manifest.documents)
+        .filter((record) => record.exportMode !== 'pdf')
+        .map((record) => record.googleFileId)
+        .sort(),
+    )
   ) {
-    throw new Error('The title report does not cover exactly the manifest.');
+    throw new Error(
+      'The title report does not cover exactly the Google Docs in the manifest.',
+    );
   }
 
   const generatedDirectory = resolve(
@@ -280,11 +303,14 @@ async function validateGeneratedOutputInternal(
     const frontmatter = frontmatterSchema.parse(
       parseFrontmatter(content, markdownHeader),
     );
+    const isPdf = record.exportMode === 'pdf';
     if (
       frontmatter.googleFileId !== record.googleFileId ||
       frontmatter.slug !== record.stableSlug ||
       frontmatter.shortId !== record.shortId ||
-      frontmatter.contentHash !== record.contentHash
+      frontmatter.contentHash !== record.contentHash ||
+      (frontmatter.sourceType === 'drive-pdf') !== isPdf ||
+      (frontmatter.pdf !== undefined) !== isPdf
     ) {
       throw new Error('Generated frontmatter does not match the manifest.');
     }
@@ -309,6 +335,20 @@ async function validateGeneratedOutputInternal(
         throw new Error('Generated Markdown references a missing asset.');
       }
       validateImageAsset(repositoryPath, bytes);
+      referencedAssets.add(repositoryPath);
+      documentAssets.set(repositoryPath, bytes);
+    }
+    // The published PDF is named by the page, not referenced by its body.
+    if (frontmatter.pdf?.file) {
+      const repositoryPath = `${expectedAssetsDirectory}/${frontmatter.pdf.file}`;
+      const bytes = allAssets.get(repositoryPath);
+      if (!bytes) {
+        throw new Error('A PDF page names a file that is missing.');
+      }
+      validatePdfAsset(bytes);
+      if (bytes.byteLength !== frontmatter.pdf.bytes) {
+        throw new Error('A published PDF does not match its recorded size.');
+      }
       referencedAssets.add(repositoryPath);
       documentAssets.set(repositoryPath, bytes);
     }

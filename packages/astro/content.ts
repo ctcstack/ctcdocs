@@ -9,7 +9,7 @@ export const collections = {
     schema: docsSchema({
       extend: z.object({
         sourceType: z
-          .enum(['google-doc', 'manual', 'section-index'])
+          .enum(['google-doc', 'drive-pdf', 'manual', 'section-index'])
           .default('manual'),
         googleFileId: z.string().min(1).optional(),
         /*
@@ -46,6 +46,18 @@ export const collections = {
               }),
             ]),
           )
+          .optional(),
+        /*
+         * A page that publishes a PDF (ADR-027): the file's name in the
+         * page's asset directory when the site serves it, its size and its
+         * page count.
+         */
+        pdf: z
+          .object({
+            file: z.string().optional(),
+            bytes: z.number().int().nonnegative(),
+            pages: z.number().int().nonnegative().nullable(),
+          })
           .optional(),
         pagefind: z.boolean().default(true),
       }),

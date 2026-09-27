@@ -495,6 +495,50 @@ describe('documents held back', () => {
     ]);
   });
 
+  it('holds back a document named with a letter from another alphabet', async () => {
+    const root = await repository();
+    // "Сontacts" opens with a Cyrillic С.
+    const items = [
+      document('doc-alpha', 'Alpha'),
+      document('doc-mixed', 'Сontacts'),
+    ];
+    const calls: string[] = [];
+    const result = await runBasicMarkdownSync(
+      testSyncContext(root),
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: false },
+      {
+        inventoryResult: inventoryOf(items),
+        markdownExporter: exporterOf({}, calls),
+        now: () => new Date(firstTimestamp),
+      },
+    );
+
+    expect(calls).toEqual(['doc-alpha']);
+    expect(result.report.unpublished).toEqual([
+      expect.objectContaining({
+        id: 'doc-mixed',
+        status: 'not-published',
+        reason: 'name-script',
+        detail: 'U+0421 Cyrillic at character 1',
+      }),
+    ]);
+    await expect(
+      runBasicMarkdownSync(
+        testSyncContext(root),
+        configuration,
+        tokenProvider,
+        { dryRun: false, full: false, fileId: 'doc-mixed' },
+        {
+          inventoryResult: inventoryOf(items),
+          markdownExporter: exporterOf({}),
+          now: () => new Date(secondTimestamp),
+        },
+      ),
+    ).rejects.toMatchObject({ issues: [{ code: 'mixed_script_name' }] });
+  });
+
   it('stops a targeted run on the document it was asked for', async () => {
     const root = await repository();
     await runBasicMarkdownSync(

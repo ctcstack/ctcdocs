@@ -17,12 +17,14 @@ const mimeTypes = new Map([
   ['.png', 'image/png'],
   ['.svg', 'image/svg+xml'],
   ['.webp', 'image/webp'],
+  ['.pdf', 'application/pdf'],
 ]);
 
 export const getStaticPaths = (async () => {
   const entries = await getCollection(
     'docs',
-    ({ data }) => data.sourceType === 'google-doc',
+    ({ data }) =>
+      data.sourceType === 'google-doc' || data.sourceType === 'drive-pdf',
   );
   const paths = [];
 

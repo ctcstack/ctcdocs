@@ -21,6 +21,8 @@ export interface CorpusFixture {
   slug: string;
   title: string;
   folderPath: string[];
+  /** Absent from an index written before PDF files were published. */
+  format?: 'google-doc' | 'pdf';
 }
 
 /*
@@ -49,7 +51,39 @@ function readDocuments(): CorpusFixture[] {
   return documents as CorpusFixture[];
 }
 
-const documents = readDocuments();
+const allDocuments = readDocuments();
+/*
+ * Google Docs: the samples below are about a document's page, and a PDF's page
+ * is a file and its text (ADR-027), sampled on its own.
+ */
+const documents = allDocuments.filter((document) => document.format !== 'pdf');
+
+/** A page that publishes a PDF, with the file when the site serves it. */
+export function pdfDocument():
+  { document: CorpusFixture; fileUrl: string | undefined } | undefined {
+  for (const document of allDocuments) {
+    if (document.format !== 'pdf') {
+      continue;
+    }
+    const directory = resolve(
+      repositoryRoot,
+      PROJECT_LAYOUT.generatedAssetsDirectory,
+      document.id,
+    );
+    let files: string[] = [];
+    try {
+      files = readdirSync(directory).filter((name) => name.endsWith('.pdf'));
+    } catch {
+      // A PDF too large for the site to serve has no file.
+    }
+    const [file] = files;
+    return {
+      document,
+      fileUrl: file ? `/assets/generated/${document.id}/${file}` : undefined,
+    };
+  }
+  return undefined;
+}
 
 /** Any synchronized document. Used where only the page shape matters. */
 export function anyDocument(): CorpusFixture {
@@ -111,8 +145,10 @@ export function documentWithAsset():
     } catch {
       continue;
     }
-    const asset = assets.find((name) =>
-      statSync(resolve(directory, name)).isFile(),
+    const asset = assets.find(
+      (name) =>
+        /\.(?:gif|jpe?g|png|svg|webp)$/iu.test(name) &&
+        statSync(resolve(directory, name)).isFile(),
     );
     if (asset) {
       return {

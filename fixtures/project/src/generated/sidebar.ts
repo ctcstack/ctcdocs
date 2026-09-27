@@ -25,6 +25,11 @@ export const generatedSidebar = [
       {
         "label": "Tables and code",
         "slug": "handbook/tables-and-code"
+      },
+      {
+        "label": "Scanned form",
+        "slug": "handbook/scanned-form",
+        "badge": "PDF"
       }
     ]
   },
@@ -43,6 +48,11 @@ export const generatedSidebar = [
       {
         "label": "Diagrams",
         "slug": "reference/diagrams"
+      },
+      {
+        "label": "Release checklist",
+        "slug": "reference/release-checklist",
+        "badge": "PDF"
       },
       {
         "label": "Screenshots",

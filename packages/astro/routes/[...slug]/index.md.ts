@@ -19,7 +19,8 @@ function required(value: string | undefined, field: string): string {
 export const getStaticPaths = (async () => {
   const allEntries = await getCollection('docs');
   const entries = allEntries.filter(
-    ({ data }) => data.sourceType === 'google-doc',
+    ({ data }) =>
+      data.sourceType === 'google-doc' || data.sourceType === 'drive-pdf',
   );
   const stableSlugs = new Set(
     entries.map(({ id }) => required(id, 'route ID')),
@@ -40,6 +41,11 @@ export const getStaticPaths = (async () => {
         content: serializePublishedMarkdown({
           title: data.title,
           sourceUrl: required(data.editUrl?.toString(), 'editUrl'),
+          ...(data.pdf?.file && data.googleFileId
+            ? {
+                fileUrl: `/assets/generated/${data.googleFileId}/${data.pdf.file}`,
+              }
+            : {}),
           googleModifiedTime: required(
             data.googleModifiedTime,
             'googleModifiedTime',

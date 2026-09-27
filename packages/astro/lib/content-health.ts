@@ -93,7 +93,7 @@ export function sectionOf(item: { folderPath: readonly string[] }): string {
   return item.folderPath[0] ?? 'General';
 }
 
-type UnpublishedStatus = 'not-published' | 'out-of-date';
+type UnpublishedStatus = 'not-published' | 'out-of-date' | 'incomplete';
 
 interface UnpublishedReason {
   code: string;
