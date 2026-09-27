@@ -43,7 +43,7 @@ export interface MixedScriptHeading {
   detail: string;
 }
 
-export interface TitleReportDocument {
+interface TitleReportDocument {
   id: string;
   slug: string;
   /** The Drive name, as an editor typed it. */

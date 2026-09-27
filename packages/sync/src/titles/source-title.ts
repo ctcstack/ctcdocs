@@ -24,7 +24,7 @@ export type SourceBlockKind =
   | 'table'
   | 'table-of-contents';
 
-export interface SourceTitleCandidate {
+interface SourceTitleCandidate {
   /** Google's Title style, or the first Heading 1 when there is no Title. */
   style: 'title' | 'heading-1';
   text: string;
