@@ -61,7 +61,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe('Google Docs structural client', () => {
-  it('inspects every top-level tab without requesting document bodies', async () => {
+  it('inspects every top-level tab and reads only styles and text of the body', async () => {
     const capturedRequests: CapturedRequest[] = [];
     const result = await createClient(
       jsonResponse({
@@ -103,16 +103,65 @@ describe('Google Docs structural client', () => {
       inlineObjectCount: 1,
       positionedObjectCount: 1,
       tabCount: 2,
+      titleFacts: { firstBlocks: [], titleCount: 0, heading1Count: 0 },
     });
     expect(
       capturedRequests[0]?.url.searchParams.get('includeTabsContent'),
     ).toBe('true');
-    expect(capturedRequests[0]?.url.searchParams.get('fields')).not.toContain(
-      'body',
-    );
+    // The title report needs a paragraph's style and text, and nothing of its
+    // formatting: the export already carries the body itself.
+    const fields = capturedRequests[0]?.url.searchParams.get('fields') ?? '';
+    expect(fields).toContain('paragraphStyle(namedStyleType)');
+    expect(fields).toContain('textRun(content)');
+    expect(fields).not.toContain('textStyle');
     expect(capturedRequests[0]?.headers.get('authorization')).toBe(
       'Bearer secret-token',
     );
+  });
+
+  it('reads how the first tab opens for the title report', async () => {
+    const paragraph = (namedStyleType: string, content: string) => ({
+      paragraph: {
+        paragraphStyle: { namedStyleType },
+        elements: [{ textRun: { content } }],
+      },
+    });
+    const result = await createClient(
+      jsonResponse({
+        tabs: [
+          {
+            tabProperties: { tabId: 'first' },
+            documentTab: {
+              body: {
+                content: [
+                  {},
+                  paragraph('NORMAL_TEXT', '\n'),
+                  paragraph('TITLE', 'Pricing handbook\n'),
+                  paragraph('SUBTITLE', 'For the sales team\n'),
+                  { table: { columns: 2 } },
+                  paragraph('HEADING_1', 'Rates\n'),
+                  paragraph('HEADING_1', 'Discounts\n'),
+                ],
+              },
+            },
+          },
+          {
+            tabProperties: { tabId: 'second' },
+            documentTab: {
+              body: { content: [paragraph('TITLE', 'Second tab\n')] },
+            },
+          },
+        ],
+      }),
+      [],
+    ).inspectDocument('doc-id');
+
+    expect(result.titleFacts).toEqual({
+      firstBlocks: ['title', 'subtitle', 'table'],
+      candidate: { style: 'title', text: 'Pricing handbook', blockIndex: 0 },
+      titleCount: 1,
+      heading1Count: 2,
+    });
   });
 
   it('fails closed for nested tabs and invalid structural responses', async () => {

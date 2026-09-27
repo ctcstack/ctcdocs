@@ -18,6 +18,7 @@ function output(content: string): Map<string, string> {
     ['data/sync-manifest.json', `manifest:${content}`],
     ['data/docs-index.json', `index:${content}`],
     ['data/latest-sync-report.json', `report:${content}`],
+    ['data/title-report.json', `titles:${content}`],
   ]);
 }
 

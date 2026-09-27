@@ -67,6 +67,11 @@ import { parseOrderedLabel } from './ordered-label.js';
 import { writeGeneratedOutputAtomically } from './output/atomic-writer.js';
 import { validateGeneratedOutput } from './output/validate-generated-output.js';
 import { keepPreviousAddresses } from './redirect-history.js';
+import {
+  createTitleReport,
+  recordedTitleFacts,
+  serializeTitleReport,
+} from './titles/title-report.js';
 import { allocateShortIds } from './short-id.js';
 import { allocateReseededSlug, allocateStableSlugs } from './slug.js';
 
@@ -107,6 +112,8 @@ export interface SyncRunResult {
   };
   /** Addresses that followed their item's new name or place (ADR-021). */
   addressesMoved: number;
+  /** Documents with a heading that mixes alphabets in a word (ADR-023). */
+  headingsMixingAlphabets: number;
 }
 
 export class SyncSelectionError extends Error {
@@ -449,7 +456,7 @@ export async function runBasicMarkdownSync(
       ...(dependencies.sleep ? { sleep: dependencies.sleep } : {}),
       ...(dependencies.baseUrl ? { baseUrl: dependencies.baseUrl } : {}),
     });
-  const inspector =
+  const inspector: DocumentInspector =
     dependencies.documentInspector ??
     (dependencies.markdownExporter
       ? {
@@ -751,7 +758,11 @@ export async function runBasicMarkdownSync(
         fallbackReasons.add('media_object');
       }
 
-      let normalized: { body: string; description?: string };
+      let normalized: {
+        body: string;
+        description?: string;
+        removedTitleHeading: boolean;
+      };
       let assets: ExistingAsset[] = [];
       let exportMode: SyncedDocumentRecord['exportMode'] = 'markdown';
       let warnings: string[];
@@ -775,6 +786,7 @@ export async function runBasicMarkdownSync(
           ...(conversion.description
             ? { description: conversion.description }
             : {}),
+          removedTitleHeading: conversion.removedTitleHeading,
         };
         assets = conversion.assets.map((asset) => ({
           bytes: asset.bytes,
@@ -816,6 +828,8 @@ export async function runBasicMarkdownSync(
           record: planned.existingRecord,
           folderPath,
           assets: planned.existingAssets,
+          titleFacts: structure.titleFacts ?? null,
+          removedTitleHeading: normalized.removedTitleHeading,
         };
       }
       const content = generateMarkdownDocument(
@@ -865,6 +879,8 @@ export async function runBasicMarkdownSync(
         record,
         folderPath,
         assets,
+        titleFacts: structure.titleFacts ?? null,
+        removedTitleHeading: normalized.removedTitleHeading,
       };
     },
   );
@@ -1061,6 +1077,38 @@ export async function runBasicMarkdownSync(
     REDIRECTS_PATH,
     serializeRedirectMap(createRedirectMap(candidateManifest), sourceHeader),
   );
+  /*
+   * The title report (ADR-023). A document exported in this run reports what
+   * its source says now; any other keeps what the run that last exported it
+   * recorded. Headings are checked in the body as published, every run.
+   */
+  const recordedTitles = recordedTitleFacts(
+    await readOptionalFile(
+      resolve(repositoryRoot, PROJECT_LAYOUT.titleReportFile),
+    ),
+  );
+  const titleReport = createTitleReport(
+    Object.values(candidateManifest.documents).map((record) => {
+      const exported = exportedById.get(record.googleFileId);
+      const recorded = recordedTitles.get(record.googleFileId);
+      const content = output.get(record.generatedMarkdownPath);
+      return {
+        id: record.googleFileId,
+        slug: record.stableSlug,
+        name: record.googleName,
+        title: record.displayTitle,
+        source: exported ? exported.titleFacts : (recorded?.source ?? null),
+        removedTitleHeading: exported
+          ? exported.removedTitleHeading
+          : (recorded?.removedTitleHeading ?? null),
+        body:
+          typeof content === 'string'
+            ? (extractGeneratedDocumentBody(content, markdownHeader) ?? '')
+            : '',
+      };
+    }),
+  );
+  output.set(PROJECT_LAYOUT.titleReportFile, serializeTitleReport(titleReport));
 
   const writeResult = await writeGeneratedOutputAtomically(
     repositoryRoot,
@@ -1076,5 +1124,6 @@ export async function runBasicMarkdownSync(
     outputChanged: writeResult.changed,
     ...(slugChange ? { slugChange } : {}),
     addressesMoved: slugAllocation.moves.length,
+    headingsMixingAlphabets: titleReport.summary.mixedScriptHeadings,
   };
 }

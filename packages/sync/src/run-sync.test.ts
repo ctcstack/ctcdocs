@@ -1199,6 +1199,85 @@ describe('basic Markdown sync', () => {
     expect(manifest.redirects).toEqual({});
   });
 
+  it('reports how each document opens, and keeps it for unchanged documents', async () => {
+    const repository = await mkdtemp(resolve(tmpdir(), 'kb-sync-titles-'));
+    temporaryDirectories.push(repository);
+    const markdownExporter = {
+      exportMarkdown: () =>
+        Promise.resolve(
+          new TextEncoder().encode('# Architecture\n\n## Сontacts\n\nBody.\n'),
+        ),
+    };
+    let inspections = 0;
+    const documentInspector = {
+      inspectDocument: () => {
+        inspections += 1;
+        return Promise.resolve({
+          hasEmbeddedDrawings: false,
+          hasImages: false,
+          inlineObjectCount: 0,
+          positionedObjectCount: 0,
+          tabCount: 1,
+          titleFacts: {
+            firstBlocks: ['heading-1' as const, 'heading-2' as const],
+            candidate: {
+              style: 'heading-1' as const,
+              text: 'Architecture',
+              blockIndex: 0,
+            },
+            titleCount: 0,
+            heading1Count: 1,
+          },
+        });
+      },
+    };
+    const run = (now: string) =>
+      runBasicMarkdownSync(
+        testSyncContext(repository),
+        configuration,
+        tokenProvider,
+        { dryRun: false, full: false },
+        {
+          inventoryResult: inventory(),
+          markdownExporter,
+          documentInspector,
+          now: () => new Date(now),
+        },
+      );
+
+    const first = await run(firstTimestamp);
+    expect(first.headingsMixingAlphabets).toBe(1);
+    const report = JSON.parse(
+      await readFile(resolve(repository, 'data/title-report.json'), 'utf8'),
+    ) as {
+      summary: { inspected: number; removedTitleHeading: number };
+      documents: Array<Record<string, unknown>>;
+    };
+    expect(report.summary).toMatchObject({
+      inspected: 1,
+      removedTitleHeading: 1,
+    });
+    expect(report.documents).toEqual([
+      expect.objectContaining({
+        id: 'doc-one',
+        slug: 'team/architecture',
+        name: '01 - Architecture',
+        title: 'Architecture',
+        removedTitleHeading: true,
+        match: 'identical',
+        similarity: 1,
+        mixedScriptHeadings: [
+          { text: 'Сontacts', detail: 'U+0421 Cyrillic at character 1' },
+        ],
+      }),
+    ]);
+
+    // Not exported again, so not inspected again: the facts carry over.
+    const second = await run(secondTimestamp);
+    expect(inspections).toBe(1);
+    expect(second.outputChanged).toBe(false);
+  });
+
   it('blocks publication of a broken internal page link', async () => {
     const repository = await mkdtemp(resolve(tmpdir(), 'kb-sync-broken-link-'));
     temporaryDirectories.push(repository);

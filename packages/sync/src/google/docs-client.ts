@@ -7,11 +7,21 @@ import {
   isRetryableGoogleApiFailure,
   readGoogleApiErrorReasons,
 } from './google-api-error.js';
+import {
+  readSourceTitle,
+  type SourceTitleFacts,
+} from '../titles/source-title.js';
 
 const DOCS_API_BASE_URL = 'https://docs.googleapis.com/v1';
 const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{1,128}$/u;
-const DOCUMENT_FIELDS =
-  'tabs(tabProperties(tabId),documentTab(inlineObjects,positionedObjects),childTabs(tabProperties(tabId)))';
+/*
+ * The body is read for the paragraph style and text of each block, which is
+ * what the title report is built from; tables and a table of contents are
+ * asked only whether they are there.
+ */
+const BODY_FIELDS =
+  'body(content(paragraph(paragraphStyle(namedStyleType),elements(textRun(content),inlineObjectElement(inlineObjectId))),table(columns),tableOfContents(content(startIndex))))';
+const DOCUMENT_FIELDS = `tabs(tabProperties(tabId),documentTab(inlineObjects,positionedObjects,${BODY_FIELDS}),childTabs(tabProperties(tabId)))`;
 
 type Sleep = (milliseconds: number) => Promise<void>;
 
@@ -42,6 +52,38 @@ const positionedObjectSchema = z
   })
   .passthrough();
 
+const structuralElementSchema = z
+  .object({
+    paragraph: z
+      .object({
+        paragraphStyle: z
+          .object({ namedStyleType: z.string().optional() })
+          .passthrough()
+          .optional(),
+        elements: z
+          .array(
+            z
+              .object({
+                textRun: z
+                  .object({ content: z.string().optional() })
+                  .passthrough()
+                  .optional(),
+                inlineObjectElement: z
+                  .object({ inlineObjectId: z.string().optional() })
+                  .passthrough()
+                  .optional(),
+              })
+              .passthrough(),
+          )
+          .optional(),
+      })
+      .passthrough()
+      .optional(),
+    table: z.object({}).passthrough().optional(),
+    tableOfContents: z.object({}).passthrough().optional(),
+  })
+  .passthrough();
+
 const tabSchema = z
   .object({
     tabProperties: z.object({ tabId: z.string().min(1) }).passthrough(),
@@ -50,6 +92,12 @@ const tabSchema = z
         inlineObjects: z.record(z.string(), inlineObjectSchema).optional(),
         positionedObjects: z
           .record(z.string(), positionedObjectSchema)
+          .optional(),
+        body: z
+          .object({
+            content: z.array(structuralElementSchema).optional(),
+          })
+          .passthrough()
           .optional(),
       })
       .passthrough()
@@ -74,6 +122,8 @@ export interface GoogleDocumentStructure {
   inlineObjectCount: number;
   positionedObjectCount: number;
   tabCount: number;
+  /** How the first tab opens, for the title report. */
+  titleFacts?: SourceTitleFacts;
 }
 
 export interface GoogleDocsClientOptions {
@@ -164,6 +214,9 @@ export class GoogleDocsClient {
       inlineObjectCount,
       positionedObjectCount,
       tabCount: parsed.tabs.length,
+      titleFacts: readSourceTitle(
+        parsed.tabs[0]?.documentTab?.body?.content ?? [],
+      ),
     };
   }
 

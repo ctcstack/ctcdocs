@@ -41,6 +41,8 @@ export interface NormalizedMarkdown {
   body: string;
   description?: string;
   warnings: string[];
+  /** A leading Heading 1 equal to the title was dropped as a copy of it. */
+  removedTitleHeading: boolean;
 }
 
 export interface MarkdownNormalizationOptions {
@@ -157,12 +159,12 @@ function validateNodes(
   return issues;
 }
 
-function normalizeHeadings(tree: Root, title: string): void {
+function normalizeHeadings(tree: Root, title: string): boolean {
   const firstContentIndex = tree.children.findIndex(
     (node) => node.type !== 'thematicBreak',
   );
   const firstContent = tree.children[firstContentIndex];
-  if (
+  const removed = Boolean(
     firstContent?.type === 'heading' &&
     firstContent.depth === 1 &&
     normalizedComparisonText(firstContent) ===
@@ -170,8 +172,9 @@ function normalizeHeadings(tree: Root, title: string): void {
         .label.normalize('NFKC')
         .replace(/\s+/gu, ' ')
         .trim()
-        .toLocaleLowerCase('en')
-  ) {
+        .toLocaleLowerCase('en'),
+  );
+  if (removed) {
     tree.children.splice(firstContentIndex, 1);
   }
 
@@ -180,6 +183,7 @@ function normalizeHeadings(tree: Root, title: string): void {
       (node as Heading).depth = 2;
     }
   });
+  return removed;
 }
 
 function findDescription(tree: Root): string | undefined {
@@ -220,7 +224,7 @@ export function normalizeMarkdown(
   }
 
   restoreInlineCode(tree);
-  normalizeHeadings(tree, title);
+  const removedTitleHeading = normalizeHeadings(tree, title);
   const description = findDescription(tree);
   const body = markdownProcessor.stringify(tree).trimEnd();
 
@@ -228,5 +232,6 @@ export function normalizeMarkdown(
     body: body.length === 0 ? '' : `${body}\n`,
     ...(description ? { description } : {}),
     warnings: restored.warnings,
+    removedTitleHeading,
   };
 }

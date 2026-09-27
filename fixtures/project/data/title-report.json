@@ -1,0 +1,257 @@
+{
+  "schemaVersion": 1,
+  "summary": {
+    "documents": 7,
+    "inspected": 7,
+    "firstBlock": {
+      "title": 0,
+      "subtitle": 0,
+      "heading-1": 7,
+      "heading-2": 0,
+      "heading-3": 0,
+      "heading-4": 0,
+      "heading-5": 0,
+      "heading-6": 0,
+      "text": 0,
+      "image": 0,
+      "table": 0,
+      "table-of-contents": 0,
+      "empty": 0
+    },
+    "candidate": {
+      "title": 0,
+      "heading-1": 7,
+      "none": 0
+    },
+    "candidateOpensDocument": 7,
+    "match": {
+      "identical": 6,
+      "normalized": 0,
+      "contains": 0,
+      "contained": 0,
+      "similar": 0,
+      "different": 1,
+      "none": 0
+    },
+    "removedTitleHeading": 6,
+    "severalTitles": 0,
+    "severalHeading1": 0,
+    "names": {
+      "orderPrefix": 1,
+      "underscorePrefix": 0,
+      "underscores": 0,
+      "fileExtension": 0
+    },
+    "mixedScriptHeadings": 0
+  },
+  "documents": [
+    {
+      "id": "doc-overview",
+      "slug": "handbook/overview",
+      "name": "Overview",
+      "title": "Overview",
+      "source": {
+        "firstBlocks": [
+          "heading-1",
+          "text",
+          "text"
+        ],
+        "candidate": {
+          "style": "heading-1",
+          "text": "Overview",
+          "blockIndex": 0
+        },
+        "titleCount": 0,
+        "heading1Count": 1
+      },
+      "removedTitleHeading": true,
+      "match": "identical",
+      "similarity": 1,
+      "nameFeatures": {
+        "orderPrefix": false,
+        "underscorePrefix": false,
+        "underscores": false,
+        "fileExtension": false
+      },
+      "mixedScriptHeadings": []
+    },
+    {
+      "id": "doc-tables-and-code",
+      "slug": "handbook/tables-and-code",
+      "name": "01 - Tables and code",
+      "title": "Tables and code",
+      "source": {
+        "firstBlocks": [
+          "heading-1",
+          "text",
+          "text"
+        ],
+        "candidate": {
+          "style": "heading-1",
+          "text": "Tables and code",
+          "blockIndex": 0
+        },
+        "titleCount": 0,
+        "heading1Count": 1
+      },
+      "removedTitleHeading": true,
+      "match": "identical",
+      "similarity": 1,
+      "nameFeatures": {
+        "orderPrefix": true,
+        "underscorePrefix": false,
+        "underscores": false,
+        "fileExtension": false
+      },
+      "mixedScriptHeadings": []
+    },
+    {
+      "id": "doc-diagrams",
+      "slug": "reference/diagrams",
+      "name": "Diagrams",
+      "title": "Diagrams",
+      "source": {
+        "firstBlocks": [
+          "heading-1",
+          "text",
+          "text"
+        ],
+        "candidate": {
+          "style": "heading-1",
+          "text": "Diagrams",
+          "blockIndex": 0
+        },
+        "titleCount": 0,
+        "heading1Count": 1
+      },
+      "removedTitleHeading": true,
+      "match": "identical",
+      "similarity": 1,
+      "nameFeatures": {
+        "orderPrefix": false,
+        "underscorePrefix": false,
+        "underscores": false,
+        "fileExtension": false
+      },
+      "mixedScriptHeadings": []
+    },
+    {
+      "id": "doc-style-guide",
+      "slug": "reference/guides/style-guide",
+      "name": "Style guide",
+      "title": "Style guide",
+      "source": {
+        "firstBlocks": [
+          "heading-1",
+          "text"
+        ],
+        "candidate": {
+          "style": "heading-1",
+          "text": "Style guide",
+          "blockIndex": 0
+        },
+        "titleCount": 0,
+        "heading1Count": 1
+      },
+      "removedTitleHeading": true,
+      "match": "identical",
+      "similarity": 1,
+      "nameFeatures": {
+        "orderPrefix": false,
+        "underscorePrefix": false,
+        "underscores": false,
+        "fileExtension": false
+      },
+      "mixedScriptHeadings": []
+    },
+    {
+      "id": "doc-screenshots",
+      "slug": "reference/screenshots",
+      "name": "Screenshots",
+      "title": "Screenshots",
+      "source": {
+        "firstBlocks": [
+          "heading-1",
+          "text"
+        ],
+        "candidate": {
+          "style": "heading-1",
+          "text": "Screenshots",
+          "blockIndex": 0
+        },
+        "titleCount": 0,
+        "heading1Count": 1
+      },
+      "removedTitleHeading": true,
+      "match": "identical",
+      "similarity": 1,
+      "nameFeatures": {
+        "orderPrefix": false,
+        "underscorePrefix": false,
+        "underscores": false,
+        "fileExtension": false
+      },
+      "mixedScriptHeadings": []
+    },
+    {
+      "id": "doc-getting-started",
+      "slug": "start-here",
+      "name": "Start here",
+      "title": "Start here",
+      "source": {
+        "firstBlocks": [
+          "heading-1",
+          "text",
+          "text"
+        ],
+        "candidate": {
+          "style": "heading-1",
+          "text": "Getting started",
+          "blockIndex": 0
+        },
+        "titleCount": 0,
+        "heading1Count": 1
+      },
+      "removedTitleHeading": false,
+      "match": "different",
+      "similarity": 0.27,
+      "nameFeatures": {
+        "orderPrefix": false,
+        "underscorePrefix": false,
+        "underscores": false,
+        "fileExtension": false
+      },
+      "mixedScriptHeadings": []
+    },
+    {
+      "id": "doc-cyrillic",
+      "slug": "рабочие-заметки",
+      "name": "Рабочие заметки",
+      "title": "Рабочие заметки",
+      "source": {
+        "firstBlocks": [
+          "heading-1",
+          "text",
+          "text"
+        ],
+        "candidate": {
+          "style": "heading-1",
+          "text": "Рабочие заметки",
+          "blockIndex": 0
+        },
+        "titleCount": 0,
+        "heading1Count": 1
+      },
+      "removedTitleHeading": true,
+      "match": "identical",
+      "similarity": 1,
+      "nameFeatures": {
+        "orderPrefix": false,
+        "underscorePrefix": false,
+        "underscores": false,
+        "fileExtension": false
+      },
+      "mixedScriptHeadings": []
+    }
+  ]
+}

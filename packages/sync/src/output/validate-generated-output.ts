@@ -25,6 +25,7 @@ import {
   sha256,
 } from '../markdown/generated-document.js';
 import { syncManifestSchema } from '../manifest.js';
+import { titleReportSchema } from '../titles/title-report.js';
 import type { SyncContext } from '../project-context.js';
 
 /**
@@ -173,6 +174,21 @@ async function validateGeneratedOutputInternal(
       ),
     ),
   );
+  const titleReport = titleReportSchema.parse(
+    JSON.parse(
+      await readFile(
+        resolve(stagedRepositoryRoot, PROJECT_LAYOUT.titleReportFile),
+        'utf8',
+      ),
+    ),
+  );
+  if (
+    JSON.stringify(
+      titleReport.documents.map((document) => document.id).sort(),
+    ) !== JSON.stringify(Object.keys(manifest.documents).sort())
+  ) {
+    throw new Error('The title report does not cover exactly the manifest.');
+  }
 
   const generatedDirectory = resolve(
     stagedRepositoryRoot,

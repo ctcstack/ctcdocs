@@ -30,6 +30,12 @@ interface GeneratedPathsCliOptions {
   command: 'generated-paths';
 }
 
+/** Summarizes the title report the last sync wrote (ADR-023). */
+interface TitlesCliOptions {
+  command: 'titles';
+  list: boolean;
+}
+
 interface SyncCliOptions {
   command: 'sync';
   dryRun: boolean;
@@ -47,6 +53,7 @@ export type CliOptions =
   | ScanGeneratedDiffCliOptions
   | SyncSummaryCliOptions
   | ValidateCliOptions
+  | TitlesCliOptions
   | SyncCliOptions;
 
 export class CliUsageError extends Error {
@@ -55,6 +62,14 @@ export class CliUsageError extends Error {
 
 export function parseCliOptions(arguments_: readonly string[]): CliOptions {
   const [command, ...flags] = arguments_;
+
+  if (command === 'titles') {
+    const unknown = flags.filter((flag) => flag !== '--list');
+    if (unknown.length > 0) {
+      throw new CliUsageError('The titles command accepts only --list.');
+    }
+    return { command: 'titles', list: flags.includes('--list') };
+  }
 
   if (command === 'validate') {
     if (flags.length > 0) {
