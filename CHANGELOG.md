@@ -2,29 +2,7 @@
 
 All three packages share a version and are released together.
 
-## Unreleased
-
-### Added
-
-- `ctcdocs-sync validate` fails when the project's Prettier configuration
-  would format a generated path, and names each one to add to
-  `.prettierignore`. It asks Prettier itself, reading `.gitignore` and
-  `.prettierignore` the way `prettier --check .` does, and it checks every
-  path the allowlist names whether or not the sync has written it yet. A
-  project that listed generated files one by one did not ignore
-  `data/title-report.json` after 0.8.0, and learned so only when a full sync
-  had exported everything and then failed its format check.
-
-### Changed
-
-- `@ctcstack/ctcdocs-sync` declares `prettier` 3 as a peer dependency. Every
-  project already installs it for its format check; validation now uses the
-  same copy, so the answer is the one the format check would give.
-- `@ctcstack/ctcdocs` declares `prettier` 3 as a peer dependency as well. It
-  ships the shared Prettier configuration, so it always needed one; the
-  requirement is now stated rather than assumed.
-
-## Unreleased
+## 0.9.0
 
 ### Added
 
@@ -45,6 +23,14 @@ All three packages share a version and are released together.
 - The sync's job summary lists the checks as counts, with a link to the page.
 - Who last edited each document, from Drive's `lastModifyingUser` display
   name.
+- `ctcdocs-sync validate` fails when the project's Prettier configuration
+  would format a generated path, and names each one to add to
+  `.prettierignore`. It asks Prettier itself, reading `.gitignore` and
+  `.prettierignore` the way `prettier --check .` does, and it checks every
+  path the allowlist names whether or not the sync has written it yet. A
+  project that listed generated files one by one did not ignore
+  `data/title-report.json` after 0.8.0, and learned so only when a full sync
+  had exported everything and then failed its format check.
 
 ### Changed
 
@@ -55,6 +41,12 @@ All three packages share a version and are released together.
 - Title similarity takes the better of character edit similarity and shared
   words, and a reordered title is classified as `reordered`.
 - The Docs API request also reads each paragraph's heading ID.
+- `@ctcstack/ctcdocs-sync` declares `prettier` 3 as a peer dependency. Every
+  project already installs it for its format check; validation now uses the
+  same copy, so the answer is the one the format check would give.
+- `@ctcstack/ctcdocs` declares `prettier` 3 as a peer dependency as well. It
+  ships the shared Prettier configuration, so it always needed one; the
+  requirement is now stated rather than assumed.
 
 ## 0.8.0
 
