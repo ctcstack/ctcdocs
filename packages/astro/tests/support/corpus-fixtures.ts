@@ -301,3 +301,38 @@ export function contentHealthReport():
     ),
   };
 }
+
+/**
+ * What the last sync left off the site (ADR-025), when the corpus has a sync
+ * report in the shape the content health page reads.
+ */
+export function unpublishedReport():
+  | {
+      items: Array<{ name: string; sourceUrl: string; slug?: string }>;
+      ignoredFolders: number;
+    }
+  | undefined {
+  let report: unknown;
+  try {
+    report = JSON.parse(
+      readFileSync(
+        resolve(repositoryRoot, PROJECT_LAYOUT.syncReportFile),
+        'utf8',
+      ),
+    );
+  } catch {
+    return undefined;
+  }
+  const typed = report as {
+    schemaVersion?: number;
+    unpublished?: Array<{ name: string; sourceUrl: string; slug?: string }>;
+    ignoredFolders?: unknown[];
+  };
+  if (typed.schemaVersion !== 2 || !typed.unpublished) {
+    return undefined;
+  }
+  return {
+    items: typed.unpublished,
+    ignoredFolders: typed.ignoredFolders?.length ?? 0,
+  };
+}

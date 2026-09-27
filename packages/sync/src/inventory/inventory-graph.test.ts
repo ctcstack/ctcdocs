@@ -12,6 +12,7 @@ import {
 import {
   buildInventorySelection,
   InventoryGraphError,
+  withDocumentsHeldBack,
 } from './inventory-graph.js';
 import {
   createInventoryReport,
@@ -184,5 +185,132 @@ describe('Google Drive inventory graph', () => {
     expect(() =>
       buildInventorySelection(items, 'published', ['root-document']),
     ).toThrow(InventoryGraphError);
+  });
+});
+
+function makeDocument(id: string, parent: string, name = id): DriveItem {
+  return {
+    ...makeFolder(id, [parent], name),
+    mimeType: 'application/vnd.google-apps.document',
+  };
+}
+
+describe('ignored folders', () => {
+  it('names each ignored folder with its path and what it holds', () => {
+    const selection = buildInventorySelection(
+      [
+        makeFolder('root', ['drive'], 'Published'),
+        makeFolder('team', ['root'], '01 - Team'),
+        makeFolder('drafts', ['team'], 'Drafts'),
+        makeFolder('drafts-old', ['drafts'], 'Old'),
+        makeDocument('draft-a', 'drafts-old'),
+        makeDocument('draft-b', 'drafts'),
+      ],
+      'root',
+      ['drafts', 'drafts-old'],
+      ['drive'],
+    );
+
+    expect(
+      selection.ignoredFolders.map((folder) => [
+        folder.item.id,
+        folder.path,
+        folder.itemCount,
+      ]),
+    ).toEqual([
+      ['drafts', ['Published', '01 - Team', 'Drafts'], 3],
+      ['drafts-old', ['Published', '01 - Team', 'Drafts', 'Old'], 1],
+    ]);
+    expect(selection.ignoredItemCount).toBe(4);
+  });
+});
+
+describe('documents held back', () => {
+  const selection = buildInventorySelection(
+    [
+      makeFolder('root', ['drive'], 'Published'),
+      makeFolder('team', ['root'], 'Team'),
+      makeFolder('sales', ['root'], 'Sales'),
+      makeDocument('doc-kept', 'sales', 'Moved and renamed'),
+      makeDocument('doc-new', 'team', 'New'),
+      makeDocument('doc-other', 'team', 'Other'),
+    ],
+    'root',
+    [],
+    ['drive'],
+  );
+
+  it('puts a document back where the manifest saw it and leaves one out', () => {
+    const { selection: heldBack, replaced } = withDocumentsHeldBack(
+      selection,
+      new Map([
+        [
+          'doc-kept',
+          {
+            name: 'Kept',
+            parentId: 'team',
+            modifiedTime: '2025-12-01T00:00:00.000Z',
+          },
+        ],
+      ]),
+      new Set(['doc-new']),
+    );
+
+    expect([...replaced]).toEqual(['doc-kept']);
+    expect(
+      heldBack.documents.map((document) => [
+        document.item.id,
+        document.item.name,
+        document.parentId,
+        document.path,
+        document.item.modifiedTime,
+      ]),
+    ).toEqual([
+      [
+        'doc-kept',
+        'Kept',
+        'team',
+        ['Published', 'Team', 'Kept'],
+        '2025-12-01T00:00:00.000Z',
+      ],
+      [
+        'doc-other',
+        'Other',
+        'team',
+        ['Published', 'Team', 'Other'],
+        '2026-01-01T00:00:00.000Z',
+      ],
+    ]);
+    const documentIds = Object.fromEntries(
+      heldBack.folders.map((folder) => [folder.item.id, folder.documentIds]),
+    );
+    expect(documentIds).toEqual({
+      root: [],
+      sales: [],
+      team: ['doc-kept', 'doc-other'],
+    });
+  });
+
+  it('leaves out a document whose recorded folder is gone', () => {
+    const { selection: heldBack, replaced } = withDocumentsHeldBack(
+      selection,
+      new Map([
+        [
+          'doc-kept',
+          {
+            name: 'Kept',
+            parentId: 'deleted-folder',
+            modifiedTime: '2025-12-01T00:00:00.000Z',
+          },
+        ],
+      ]),
+      new Set(),
+    );
+
+    expect(replaced.size).toBe(0);
+    expect(heldBack.documents.map((document) => document.item.id)).toEqual([
+      'doc-new',
+      'doc-other',
+    ]);
   });
 });

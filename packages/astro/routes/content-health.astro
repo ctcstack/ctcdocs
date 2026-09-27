@@ -1,12 +1,13 @@
 ---
 /**
- * What editors have to fix, grouped by the action that fixes it (ADR-024).
+ * What editors have to fix, grouped by the action that fixes it (ADR-024),
+ * and what in the published folders is not on the site, with why (ADR-025).
  *
- * Every item links to the page on this site and to the document in Google
- * Docs, at the paragraph concerned when the check is about one. Filters
- * narrow the list to one section of the corpus or to whoever last edited a
- * document, which is how the work is shared out. The page is rebuilt on every
- * sync, so a fixed item disappears after the next one.
+ * Every item links to the document in Google Drive or Docs, at the paragraph
+ * concerned when the check is about one, and to its page on this site when it
+ * has one. Filters narrow the list to one section of the corpus or to whoever
+ * last edited a file, which is how the work is shared out. The page is rebuilt
+ * on every sync, so a fixed item disappears after the next one.
  *
  * It is not in the sidebar and not in search: it is an address people are
  * sent to, not part of the documentation.
@@ -17,12 +18,14 @@ import { PLATFORM_ROUTE_HREFS } from '@ctcstack/ctcdocs-core';
 import {
   googleDocsUrl,
   loadHealthReport,
+  loadUnpublishedReport,
   sectionOf,
-  type HealthDocument,
   type HealthSeverity,
+  type UnpublishedItem,
 } from '../lib/content-health';
 
 const report = loadHealthReport();
+const unpublishedReport = loadUnpublishedReport();
 
 const SEVERITIES: Array<{
   severity: HealthSeverity;
@@ -52,11 +55,19 @@ const SEVERITIES: Array<{
 
 const byName = (left: string, right: string) => left.localeCompare(right, 'en');
 const documents = report?.documents ?? [];
-const sections = [...new Set(documents.map(sectionOf))].sort(byName);
+const unpublished = unpublishedReport?.unpublished ?? [];
+const ignoredFolders = unpublishedReport?.ignoredFolders ?? [];
+const sections = [
+  ...new Set([
+    ...documents.map(sectionOf),
+    ...unpublished.map(sectionOf),
+    ...ignoredFolders.map(sectionOf),
+  ]),
+].sort(byName);
 const editors = [
   ...new Set(
-    documents.flatMap((document) =>
-      document.lastEditedBy ? [document.lastEditedBy] : [],
+    [...documents, ...unpublished].flatMap((item) =>
+      item.lastEditedBy ? [item.lastEditedBy] : [],
     ),
   ),
 ].sort(byName);
@@ -70,10 +81,20 @@ const groups = (report?.checks ?? []).map((check) => ({
     }))
     .filter((entry) => entry.issues.length > 0),
 }));
+const unpublishedGroups = (unpublishedReport?.reasons ?? [])
+  .map((reason) => ({
+    reason,
+    items: unpublished.filter((item) => item.reason === reason.code),
+  }))
+  .filter((group) => group.items.length > 0);
 
-const trail = (document: HealthDocument) =>
-  document.folderPath.length > 0 ? document.folderPath.join(' › ') : 'General';
+const trail = (item: { folderPath: readonly string[] }) =>
+  item.folderPath.length > 0 ? item.folderPath.join(' › ') : 'General';
 const isFileNameCheck = (code: string) => code.startsWith('file-name-');
+const status = (item: UnpublishedItem) =>
+  item.status === 'out-of-date' && item.publishedVersion
+    ? `The site shows the version edited on ${item.publishedVersion.slice(0, 10)}.`
+    : 'Not on the site.';
 ---
 
 <StarlightPage
@@ -89,7 +110,7 @@ const isFileNameCheck = (code: string) => code.startsWith('file-name-');
 >
   <content-health data-pagefind-ignore>
     {
-      !report ? (
+      !report && !unpublishedReport ? (
         <p>
           The next sync writes the report this page is built from. Check back
           after it has run.
@@ -104,24 +125,34 @@ const isFileNameCheck = (code: string) => code.startsWith('file-name-');
           </p>
 
           <dl class="health-stats">
-            <div>
-              <dt>Documents to fix</dt>
-              <dd>{report.summary.severity.fix}</dd>
-            </div>
-            <div>
-              <dt>Following the proposed convention</dt>
-              <dd>
-                {report.summary.conforming}
-                <span> of {report.summary.inspected}</span>
-              </dd>
-            </div>
-            <div>
-              <dt>Worth a look</dt>
-              <dd>{report.summary.severity.note}</dd>
-            </div>
+            {unpublishedReport && (
+              <div>
+                <dt>Not on the site</dt>
+                <dd>{unpublished.length}</dd>
+              </div>
+            )}
+            {report && (
+              <>
+                <div>
+                  <dt>Documents to fix</dt>
+                  <dd>{report.summary.severity.fix}</dd>
+                </div>
+                <div>
+                  <dt>Following the proposed convention</dt>
+                  <dd>
+                    {report.summary.conforming}
+                    <span> of {report.summary.inspected}</span>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Worth a look</dt>
+                  <dd>{report.summary.severity.note}</dd>
+                </div>
+              </>
+            )}
           </dl>
 
-          {report.summary.inspected < report.summary.documents && (
+          {report && report.summary.inspected < report.summary.documents && (
             <p class="health-notice">
               {report.summary.documents - report.summary.inspected} documents
               have not been inspected yet. A full sync inspects every document.
@@ -152,99 +183,199 @@ const isFileNameCheck = (code: string) => code.startsWith('file-name-');
             <p class="health-filter-status" role="status" data-status />
           </form>
 
-          {SEVERITIES.map(({ severity, heading, lede, open }) => {
-            const inSeverity = groups.filter(
-              (group) =>
-                group.check.severity === severity && group.documents.length > 0,
-            );
-            return (
-              <section class="health-severity" data-severity-section>
-                <h2>{heading}</h2>
-                <p class="health-lede">{lede}</p>
-                {inSeverity.length === 0 ? (
-                  <p class="health-empty">Nothing to do here.</p>
-                ) : (
-                  <p class="health-empty" data-filter-empty hidden>
-                    Nothing here for this filter.
-                  </p>
-                )}
-                {inSeverity.length > 0 &&
-                  inSeverity.map(({ check, documents: entries }) => (
-                    <details class="health-check" open={open} data-check>
-                      <summary>
-                        <span class="health-check-title">{check.title}</span>
-                        <span class="health-count" data-count>
-                          {entries.length}
-                        </span>
-                      </summary>
-                      <p class="health-instruction">{check.instruction}</p>
-                      <ul>
-                        {entries.map(({ document, issues }) => (
-                          <li
-                            data-section={sectionOf(document)}
-                            data-editor={document.lastEditedBy ?? ''}
+          {unpublishedReport && (
+            <section class="health-severity" data-severity-section>
+              <h2 id="not-on-the-site">Not on the site</h2>
+              <p class="health-lede">
+                Files in the published folders that the site does not show, or
+                shows in an earlier version. Each needs one change in Drive.
+              </p>
+              {unpublishedGroups.length === 0 && ignoredFolders.length === 0 ? (
+                <p class="health-empty">
+                  Every file in the published folders is on the site.
+                </p>
+              ) : (
+                <p class="health-empty" data-filter-empty hidden>
+                  Nothing here for this filter.
+                </p>
+              )}
+              {unpublishedGroups.map(({ reason, items }) => (
+                <details class="health-check" open data-check>
+                  <summary>
+                    <span class="health-check-title">{reason.title}</span>
+                    <span class="health-count" data-count>
+                      {items.length}
+                    </span>
+                  </summary>
+                  <p class="health-instruction">{reason.instruction}</p>
+                  <ul>
+                    {items.map((item) => (
+                      <li
+                        data-section={sectionOf(item)}
+                        data-editor={item.lastEditedBy ?? ''}
+                      >
+                        <div class="health-item-head">
+                          {item.slug ? (
+                            <a href={`/${item.slug}/`}>{item.name}</a>
+                          ) : (
+                            <span class="health-item-name">{item.name}</span>
+                          )}
+                          <a
+                            class="health-source"
+                            href={item.sourceUrl}
+                            rel="noopener noreferrer"
+                            target="_blank"
                           >
-                            <div class="health-item-head">
-                              <a href={`/${document.slug}/`}>
-                                {document.title}
-                              </a>
-                              <a
-                                class="health-source"
-                                href={googleDocsUrl(
-                                  document.id,
-                                  issues.find((issue) => issue.headingId),
-                                )}
-                                rel="noopener noreferrer"
-                                target="_blank"
-                              >
-                                Open in Google Docs
-                              </a>
-                            </div>
-                            <p class="health-meta">
-                              {trail(document)}
-                              {document.lastEditedBy &&
-                                ` · last edited by ${document.lastEditedBy}`}
-                            </p>
-                            {isFileNameCheck(check.code) && (
-                              <p class="health-detail">
-                                Drive name: “{document.name}”
+                            Open in Google Drive
+                          </a>
+                        </div>
+                        <p class="health-meta">
+                          {trail(item)} · {item.type}
+                          {item.lastEditedBy &&
+                            ` · last edited by ${item.lastEditedBy}`}
+                        </p>
+                        <p class="health-detail">
+                          {status(item)}
+                          {item.detail && ` ${item.detail}`}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ))}
+              {ignoredFolders.length > 0 && (
+                <details class="health-check" data-check>
+                  <summary>
+                    <span class="health-check-title">
+                      Folders the site is configured to leave out
+                    </span>
+                    <span class="health-count" data-count>
+                      {ignoredFolders.length}
+                    </span>
+                  </summary>
+                  <p class="health-instruction">
+                    Nothing in these folders is published, on purpose. Ask
+                    whoever maintains the site if one of them should be.
+                  </p>
+                  <ul>
+                    {ignoredFolders.map((folder) => (
+                      <li data-section={sectionOf(folder)} data-editor="">
+                        <div class="health-item-head">
+                          <span class="health-item-name">{folder.name}</span>
+                        </div>
+                        <p class="health-meta">
+                          {trail(folder)} · {folder.items}{' '}
+                          {folder.items === 1 ? 'item' : 'items'}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </section>
+          )}
+
+          {report ? (
+            SEVERITIES.map(({ severity, heading, lede, open }) => {
+              const inSeverity = groups.filter(
+                (group) =>
+                  group.check.severity === severity &&
+                  group.documents.length > 0,
+              );
+              return (
+                <section class="health-severity" data-severity-section>
+                  <h2>{heading}</h2>
+                  <p class="health-lede">{lede}</p>
+                  {inSeverity.length === 0 ? (
+                    <p class="health-empty">Nothing to do here.</p>
+                  ) : (
+                    <p class="health-empty" data-filter-empty hidden>
+                      Nothing here for this filter.
+                    </p>
+                  )}
+                  {inSeverity.length > 0 &&
+                    inSeverity.map(({ check, documents: entries }) => (
+                      <details class="health-check" open={open} data-check>
+                        <summary>
+                          <span class="health-check-title">{check.title}</span>
+                          <span class="health-count" data-count>
+                            {entries.length}
+                          </span>
+                        </summary>
+                        <p class="health-instruction">{check.instruction}</p>
+                        <ul>
+                          {entries.map(({ document, issues }) => (
+                            <li
+                              data-section={sectionOf(document)}
+                              data-editor={document.lastEditedBy ?? ''}
+                            >
+                              <div class="health-item-head">
+                                <a href={`/${document.slug}/`}>
+                                  {document.title}
+                                </a>
+                                <a
+                                  class="health-source"
+                                  href={googleDocsUrl(
+                                    document.id,
+                                    issues.find((issue) => issue.headingId),
+                                  )}
+                                  rel="noopener noreferrer"
+                                  target="_blank"
+                                >
+                                  Open in Google Docs
+                                </a>
+                              </div>
+                              <p class="health-meta">
+                                {trail(document)}
+                                {document.lastEditedBy &&
+                                  ` · last edited by ${document.lastEditedBy}`}
                               </p>
-                            )}
-                            {issues
-                              .filter((issue) => issue.text)
-                              .map((issue) => (
+                              {isFileNameCheck(check.code) && (
                                 <p class="health-detail">
-                                  {'Line: '}
-                                  {issue.headingId ? (
-                                    <a
-                                      href={googleDocsUrl(document.id, issue)}
-                                      rel="noopener noreferrer"
-                                      target="_blank"
-                                    >
-                                      “{issue.text}”
-                                    </a>
-                                  ) : (
-                                    <span>“{issue.text}”</span>
-                                  )}
-                                  {issue.detail && ` — ${issue.detail}`}
-                                  {issue.related && (
-                                    <>
-                                      {' — the title of '}
-                                      <a href={`/${issue.related.slug}/`}>
-                                        {issue.related.title}
-                                      </a>
-                                    </>
-                                  )}
+                                  Drive name: “{document.name}”
                                 </p>
-                              ))}
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
-                  ))}
-              </section>
-            );
-          })}
+                              )}
+                              {issues
+                                .filter((issue) => issue.text)
+                                .map((issue) => (
+                                  <p class="health-detail">
+                                    {'Line: '}
+                                    {issue.headingId ? (
+                                      <a
+                                        href={googleDocsUrl(document.id, issue)}
+                                        rel="noopener noreferrer"
+                                        target="_blank"
+                                      >
+                                        “{issue.text}”
+                                      </a>
+                                    ) : (
+                                      <span>“{issue.text}”</span>
+                                    )}
+                                    {issue.detail && ` — ${issue.detail}`}
+                                    {issue.related && (
+                                      <>
+                                        {' — the title of '}
+                                        <a href={`/${issue.related.slug}/`}>
+                                          {issue.related.title}
+                                        </a>
+                                      </>
+                                    )}
+                                  </p>
+                                ))}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    ))}
+                </section>
+              );
+            })
+          ) : (
+            <p class="health-notice">
+              The next sync writes the title report the checks below this list
+              are built from.
+            </p>
+          )}
 
           <p class="health-footer">
             Browse <a href={PLATFORM_ROUTE_HREFS.fullIndex}>all documents</a>.
@@ -286,7 +417,7 @@ const isFileNameCheck = (code: string) => code.startsWith('file-name-');
           if (match) {
             visible += 1;
             const link = item.querySelector('a');
-            if (link) shown.add(link.getAttribute('href') ?? '');
+            shown.add(link?.getAttribute('href') ?? item.textContent ?? '');
           }
         }
         check.hidden = visible === 0;
@@ -301,7 +432,7 @@ const isFileNameCheck = (code: string) => code.startsWith('file-name-');
       }
       status.textContent =
         section || editor
-          ? `Showing ${shown.size} documents${section ? ` in ${section}` : ''}${editor ? ` last edited by ${editor}` : ''}.`
+          ? `Showing ${shown.size} items${section ? ` in ${section}` : ''}${editor ? ` last edited by ${editor}` : ''}.`
           : '';
     }
   }
@@ -414,6 +545,10 @@ const isFileNameCheck = (code: string) => code.startsWith('file-name-');
     .health-check li {
       border-top: 1px solid var(--sl-color-hairline);
       padding-block: 0.625rem;
+    }
+
+    .health-item-name {
+      font-weight: 600;
     }
 
     .health-item-head {

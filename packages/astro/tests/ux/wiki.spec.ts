@@ -6,6 +6,7 @@ import { siteConfiguration } from '../../lib/project.js';
 import {
   anyDocument,
   contentHealthReport,
+  unpublishedReport,
   documentInFolder,
   documentLinkingAnother,
   documentWithAsset,
@@ -496,4 +497,32 @@ test('the content health page links each issue to its document', async ({
   for (const item of await visible.all()) {
     await expect(item).toHaveAttribute('data-section', section ?? '');
   }
+});
+
+test('the content health page names what is not on the site', async ({
+  page,
+}) => {
+  const report = unpublishedReport();
+  test.skip(
+    !report || report.items.length + report.ignoredFolders === 0,
+    'The corpus has no files left off the site.',
+  );
+  const { items } = report as NonNullable<typeof report>;
+
+  await page.goto('/content-health/');
+  const section = page.locator('section:has(> h2#not-on-the-site)');
+  await expect(
+    section.getByRole('heading', { level: 2, name: 'Not on the site' }),
+  ).toBeVisible();
+  for (const item of items) {
+    const entry = section
+      .locator('li')
+      .filter({ has: page.locator(`a[href="${item.sourceUrl}"]`) });
+    await expect(entry).toHaveCount(1);
+    await expect(entry).toContainText(item.name);
+    if (item.slug) {
+      await expect(entry.locator(`a[href="/${item.slug}/"]`)).toBeVisible();
+    }
+  }
+  await expectNoAccessibilityViolations(page);
 });

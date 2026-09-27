@@ -136,7 +136,9 @@ Normal manual sync:
 1. Open **Actions → Knowledge Base sync**.
 2. Select **Run workflow** on `main`.
 3. Leave **Export every managed Google Doc** disabled.
-4. Review the aggregate job summary and generated commit.
+4. Review the job summary and the generated commit. The summary names every
+   file in the published folders that is not on the site, with the reason
+   ([ADR-025](ADR/025-name-every-file-left-off-the-site.md)).
 
 Full regeneration:
 
@@ -275,7 +277,27 @@ Every sync writes `data/title-report.json`
 `/content-health/` ([ADR-024](ADR/024-content-health-page.md)). Send editors
 there. It is not in the sidebar or in search.
 
-The page groups issues by what fixes them:
+The page opens with what is **not on the site**
+([ADR-025](ADR/025-name-every-file-left-off-the-site.md)): every file in the
+published folders that the site does not show, or shows in an earlier version,
+grouped by reason with what to do and a link to it in Drive.
+
+- **Google cannot export the document** — it is over 10 MB.
+- **Downloading is turned off for the file.**
+- **The document holds something the site will not publish** — the detail
+  names what conversion refused.
+- **The site does not publish this kind of file** — sheets, slides, uploads.
+- **Shortcuts are not followed.**
+- **Folders the site is configured to leave out** — the ignored folders, with
+  the number of items in each.
+
+A document in one of the first three groups is held back
+([ADR-026](ADR/026-hold-back-a-document-that-cannot-be-exported.md)): if it
+was published before, the site keeps that version and the page says when it
+was edited; if not, it stays off the site. Every other document is published
+as usual, and the held one is tried again on every sync.
+
+Then the checks, grouped by what fixes them:
 
 - **Fix.** A heading that mixes alphabets, a document that opens with
   another document's title, an empty document.
@@ -291,7 +313,10 @@ out the work. The page is rebuilt on every sync, so a fixed item disappears
 after the next one.
 
 The job summary of every sync lists the same checks as counts, with a link to
-the page. It never names a document.
+the page, and never names a document there. The files that are not on the
+site are the exception: the summary lists each with its folder, name, type and
+reason, up to 200, because a file that never reached the site cannot be found
+on it. The run log prints only reason codes and counts.
 
 At a terminal, the same report reads:
 
@@ -446,14 +471,21 @@ message is never printed, because it can quote a title or a URL. A file ID
 names a document without revealing it: the manifest already records every
 published one, and opening it still takes access to the Drive.
 
-| Category                     | Reason                                       | What to do                                                                                                                |
-| ---------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `GOOGLE_RATE_LIMIT`          | `rateLimitExceeded`, `userRateLimitExceeded` | Already retried with exponential backoff before failing. Rerun later.                                                     |
-| `GOOGLE_RATE_LIMIT`          | `dailyLimitExceeded`                         | A daily quota; not retried. Review the Drive API quotas of the Cloud project.                                             |
-| `GOOGLE_EXPORT_SIZE_LIMIT`   | `exportSizeLimitExceeded`, or none           | Google exports at most 10 MB, images included. Split the document or reduce its images.                                   |
-| `GOOGLE_DOWNLOAD_RESTRICTED` | `cannotExportFile`, `cannotDownloadFile`     | The document stops viewers from downloading it. Lift that restriction; do not raise the identity above Viewer.            |
-| `GOOGLE_PERMISSION`          | `SERVICE_DISABLED`, `accessNotConfigured`    | The Drive or Docs API is not enabled in the Cloud project.                                                                |
-| `GOOGLE_PERMISSION`          | any other, or none                           | The identity cannot read the file. Check that it is still a Viewer of the Shared Drive and the file is inside that Drive. |
+| Category                     | Reason                                       | What to do                                                                                                     |
+| ---------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `GOOGLE_RATE_LIMIT`          | `rateLimitExceeded`, `userRateLimitExceeded` | Already retried with exponential backoff before failing. Rerun later.                                          |
+| `GOOGLE_RATE_LIMIT`          | `dailyLimitExceeded`                         | A daily quota; not retried. Review the Drive API quotas of the Cloud project.                                  |
+| `GOOGLE_EXPORT_SIZE_LIMIT`   | `exportSizeLimitExceeded`, or none           | Google exports at most 10 MB, images included. Split the document or reduce its images.                        |
+| `GOOGLE_DOWNLOAD_RESTRICTED` | `cannotExportFile`, `cannotDownloadFile`     | The document stops viewers from downloading it. Lift that restriction; do not raise the identity above Viewer. |
+
+A full or scheduled sync no longer stops on these two, or on content that
+conversion refuses: it holds that document back, publishes the rest and lists
+it under "Not on the site"
+([ADR-026](ADR/026-hold-back-a-document-that-cannot-be-exported.md)). The line
+above appears when a targeted `--file` run fails on the document it was asked
+for.
+| `GOOGLE_PERMISSION` | `SERVICE_DISABLED`, `accessNotConfigured` | The Drive or Docs API is not enabled in the Cloud project. |
+| `GOOGLE_PERMISSION` | any other, or none | The identity cannot read the file. Check that it is still a Viewer of the Shared Drive and the file is inside that Drive. |
 
 The command exits with 2 for `GOOGLE_AUTHENTICATION`, 3 for `GOOGLE_PERMISSION`
 and `GOOGLE_DOWNLOAD_RESTRICTED`, and 1 otherwise.

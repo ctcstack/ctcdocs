@@ -2,6 +2,33 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Added
+
+- Every file in the published folders that is not on the site is named, with
+  the reason and what to do: a kind of file the site does not publish, a
+  shortcut, or a document the sync could not export. The content health page
+  lists them first under "Not on the site", with a link to each in Drive, and
+  the folders the configuration ignores with how much each holds. The job
+  summary lists the same files by folder, name, type and reason. See
+  [ADR-025](docs/ADR/025-name-every-file-left-off-the-site.md).
+
+### Changed
+
+- A document that cannot be exported for a reason of its own — over Google's
+  10 MB export limit, downloading turned off, or content conversion refuses —
+  no longer stops the sync. It is held back: a document already published
+  keeps that version and its address, a new one stays off the site, and the
+  rest of the corpus is published. It is tried again on every sync. Failures
+  that are not the document's own, and a targeted `--file` run, still stop the
+  run. See [ADR-026](docs/ADR/026-hold-back-a-document-that-cannot-be-exported.md).
+- `data/latest-sync-report.json` moves to schema version 2. It lists the files
+  not on the site, the reasons and the ignored folders, and counts them. The
+  first sync after upgrading rewrites it.
+- The inventory report lists the ignored folders with their paths and item
+  counts.
+
 ## 0.9.1
 
 ### Fixed

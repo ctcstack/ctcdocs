@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "generatedAt": "2026-02-10T06:00:00.000Z",
   "dryRun": false,
   "summary": {
@@ -8,7 +8,86 @@
     "unchanged": 6,
     "removed": 0,
     "folders": 5,
-    "unsupported": 0,
-    "warnings": 0
-  }
+    "unsupported": 2,
+    "warnings": 0,
+    "notPublished": 3,
+    "outOfDate": 0,
+    "ignored": 2
+  },
+  "reasons": [
+    {
+      "code": "export-too-large",
+      "title": "Google cannot export the document: it is over 10 MB",
+      "instruction": "Google refuses to export a document larger than 10 MB, and large images are the usual cause. Compress or crop the images, or split the document in two."
+    },
+    {
+      "code": "download-restricted",
+      "title": "Downloading is turned off for the file",
+      "instruction": "The owner turned off downloading, printing and copying for viewers, so the sync cannot read the file. Turn it back on under Share → Settings, or ask the owner to."
+    },
+    {
+      "code": "content-rejected",
+      "title": "The document holds something the site will not publish",
+      "instruction": "Conversion stopped on content it cannot publish safely, named under the document. Remove or replace that part of the document."
+    },
+    {
+      "code": "unsupported-type",
+      "title": "The site does not publish this kind of file",
+      "instruction": "The site publishes Google Docs. If this content belongs on the site, save it as a Google Doc and remove the original, or link to the file from a document. If it does not, move it out of the published folders."
+    },
+    {
+      "code": "shortcut",
+      "title": "Shortcuts are not followed",
+      "instruction": "A shortcut points to a file kept somewhere else, and the sync does not follow it. Move the original into this folder, or link to it from a document instead."
+    }
+  ],
+  "unpublished": [
+    {
+      "id": "doc-brand-assets",
+      "name": "Brand assets",
+      "folderPath": [
+        "Handbook"
+      ],
+      "type": "Google Docs",
+      "mimeType": "application/vnd.google-apps.document",
+      "status": "not-published",
+      "reason": "export-too-large",
+      "sourceUrl": "https://drive.google.com/open?id=doc-brand-assets",
+      "lastEditedBy": "Avery Example"
+    },
+    {
+      "id": "shortcut-policies",
+      "name": "Policies",
+      "folderPath": [
+        "Handbook"
+      ],
+      "type": "Shortcut to Google Docs",
+      "mimeType": "application/vnd.google-apps.shortcut",
+      "status": "not-published",
+      "reason": "shortcut",
+      "sourceUrl": "https://drive.google.com/open?id=shortcut-policies",
+      "lastEditedBy": "Robin Sample"
+    },
+    {
+      "id": "sheet-glossary",
+      "name": "Glossary",
+      "folderPath": [
+        "Reference"
+      ],
+      "type": "Google Sheets",
+      "mimeType": "application/vnd.google-apps.spreadsheet",
+      "status": "not-published",
+      "reason": "unsupported-type",
+      "sourceUrl": "https://drive.google.com/open?id=sheet-glossary",
+      "lastEditedBy": "Avery Example"
+    }
+  ],
+  "ignoredFolders": [
+    {
+      "id": "folder-drafts",
+      "name": "Drafts",
+      "folderPath": [],
+      "items": 1
+    }
+  ]
 }
