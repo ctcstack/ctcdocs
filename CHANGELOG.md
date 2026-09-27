@@ -2,6 +2,27 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Added
+
+- The title report. Every sync writes `data/title-report.json`: how each
+  document opens (Title, Heading 1 or text), its title candidate and how that
+  compares with the Drive name, whether a leading Heading 1 was dropped as a
+  copy, and what the Drive name carries besides a title. It observes and
+  changes nothing, so a title convention can be decided from numbers.
+  `ctcdocs-sync titles` summarizes it, and `--list` names the documents. See
+  [ADR-023](docs/ADR/023-title-report.md).
+- Headings that mix alphabets inside a word are listed in the title report,
+  and the sync summary counts the documents. They do not stop a sync.
+
+### Changed
+
+- The Docs API request made for each exported document also reads the named
+  style and text of body paragraphs. Formatting is not requested.
+- `data/title-report.json` is a generated file. A project's rules that list
+  generated paths should include it.
+
 ## 0.7.1
 
 ### Fixed

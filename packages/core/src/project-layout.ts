@@ -30,6 +30,8 @@ export const PROJECT_LAYOUT = {
   manifestFile: 'data/sync-manifest.json',
   documentIndexFile: 'data/docs-index.json',
   syncReportFile: 'data/latest-sync-report.json',
+  /** What each document's opening says about its title (ADR-023). */
+  titleReportFile: 'data/title-report.json',
 } as const;
 
 /**
@@ -85,4 +87,5 @@ export const GENERATED_FILE_ALLOWLIST = [
   PROJECT_LAYOUT.manifestFile,
   PROJECT_LAYOUT.documentIndexFile,
   PROJECT_LAYOUT.syncReportFile,
+  PROJECT_LAYOUT.titleReportFile,
 ] as const;

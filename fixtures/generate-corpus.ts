@@ -402,6 +402,38 @@ function inventory(driveItems: readonly DriveItem[]): InventoryRunResult {
 }
 
 const encoder = new TextEncoder();
+/**
+ * What the Docs API would say about how a synthetic document opens. Its
+ * export is Markdown written to stand for Google's, so a `#` line stands for
+ * a Heading 1 and anything else for body text.
+ */
+function syntheticTitleFacts(markdown: string) {
+  const blocks = markdown
+    .split(/\n{2,}/u)
+    .map((block) => block.trim())
+    .filter(Boolean);
+  const kinds = blocks.map((block) => {
+    const depth = /^(#{1,6}) /u.exec(block)?.[1]?.length;
+    return depth ? (`heading-${depth}` as const) : ('text' as const);
+  });
+  const candidateIndex = kinds.indexOf('heading-1');
+  const candidateBlock = blocks[candidateIndex];
+  return {
+    firstBlocks: kinds.slice(0, 3),
+    ...(candidateBlock
+      ? {
+          candidate: {
+            style: 'heading-1' as const,
+            text: candidateBlock.replace(/^# /u, ''),
+            blockIndex: candidateIndex,
+          },
+        }
+      : {}),
+    titleCount: 0,
+    heading1Count: kinds.filter((kind) => kind === 'heading-1').length,
+  };
+}
+
 const dependencies = {
   inventoryResult: inventory(items),
   markdownExporter: {
@@ -428,6 +460,7 @@ const dependencies = {
         inlineObjectCount: fileId === 'doc-screenshots' ? 1 : 0,
         positionedObjectCount: 0,
         tabCount: 1,
+        titleFacts: syntheticTitleFacts(markdownExports.get(fileId) ?? ''),
       }),
   },
   now: () => RUN_AT,

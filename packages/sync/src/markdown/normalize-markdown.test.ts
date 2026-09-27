@@ -26,7 +26,11 @@ describe('Markdown normalization', () => {
     expect(first.description).toBe(
       'This is a sanitized introductory paragraph with a safe link.',
     );
-    expect(second).toEqual(first);
+    expect(second.body).toBe(first.body);
+    expect(second.description).toBe(first.description);
+    // The first pass drops the copy of the title; the second has none left.
+    expect(first.removedTitleHeading).toBe(true);
+    expect(second.removedTitleHeading).toBe(false);
   });
 
   it('demotes a non-matching leading H1 and accepts safe relative URLs', () => {
@@ -38,7 +42,11 @@ describe('Markdown normalization', () => {
   });
 
   it('returns no description for empty content and truncates long paragraphs', () => {
-    expect(normalizeMarkdown('', 'Empty')).toEqual({ body: '', warnings: [] });
+    expect(normalizeMarkdown('', 'Empty')).toEqual({
+      body: '',
+      warnings: [],
+      removedTitleHeading: false,
+    });
     const result = normalizeMarkdown(`${'word '.repeat(60)}\n`, 'Long');
     expect(result.description?.endsWith('…')).toBe(true);
     expect(result.description?.length).toBeLessThanOrEqual(201);

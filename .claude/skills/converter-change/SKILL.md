@@ -83,6 +83,7 @@ src/generated/
 data/sync-manifest.json
 data/docs-index.json
 data/latest-sync-report.json
+data/title-report.json
 ```
 
 They are relative to a project root. In this repository the only such root is

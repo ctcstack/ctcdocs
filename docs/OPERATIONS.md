@@ -268,6 +268,40 @@ An overview document is not this page. It keeps its own address and appears in
 the listing like any other document. See
 [ADR-014](ADR/014-section-index-pages.md).
 
+## The title report
+
+Every sync writes `data/title-report.json`
+([ADR-023](ADR/023-title-report.md)). It records how each document opens,
+read from the paragraph styles in Google Docs:
+
+- whether the document opens with a Title, a Heading 1 or body text;
+- the title candidate (the first Title paragraph, or else the first
+  Heading 1) and how it compares with the Drive name the page is titled by;
+- whether a leading Heading 1 was dropped as a copy of that name;
+- what the Drive name carries besides a title: order prefixes, underscores,
+  file extensions.
+
+It changes nothing on the site. Read it with:
+
+```bash
+pnpm exec ctcdocs-sync titles
+pnpm exec ctcdocs-sync titles --list
+```
+
+The first prints counts only. `--list` names the documents behind each count
+and quotes their headings, so run it at a terminal, not in a CI log. A
+document not exported since the platform began writing the report is counted
+as not yet inspected. Run the sync once with `full` to inspect every
+document.
+
+The report also lists headings that mix alphabets inside a word, such as a
+Cyrillic `С` typed into `Contacts`. These do not stop a sync; the sync summary
+gives their count:
+
+```text
+Documents with a heading mixing alphabets: 1 (see data/title-report.json)
+```
+
 ## Content lifecycle operations
 
 Re-export one managed document locally:

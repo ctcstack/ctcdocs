@@ -132,6 +132,17 @@ function strayLetters(letters: readonly Letter[]): Letter[] {
   );
 }
 
+/**
+ * The letters of a piece of text that stray into another alphabet inside one
+ * word, described as a diagnostic, or `undefined` when there are none. The
+ * title report uses it for headings, where a stray letter is reported rather
+ * than refused: a heading is content, and content does not stop a sync.
+ */
+export function describeMixedScript(text: string): string | undefined {
+  const stray = strayLetters(lettersOf(text));
+  return stray.length > 0 ? describeLetters(stray) : undefined;
+}
+
 function nameIssue(
   item: SelectedInventoryItem,
   allowedPatterns: readonly RegExp[] | null,

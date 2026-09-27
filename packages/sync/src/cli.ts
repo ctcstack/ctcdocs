@@ -1,15 +1,19 @@
 #!/usr/bin/env node
 
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { loadEnvFile } from 'node:process';
 
 import {
   GENERATED_DIRECTORY_ALLOWLIST,
   GENERATED_FILE_ALLOWLIST,
+  PROJECT_LAYOUT,
 } from '@ctcstack/ctcdocs-core';
 import { ZodError } from 'zod';
 
 import { UnsafeZipError } from './archive/safe-zip.js';
+import { formatTitleReport } from './titles/format-title-report.js';
+import { titleReportSchema, type TitleReport } from './titles/title-report.js';
 import { GeneratedDiffValidationError } from './automation/generated-diff.js';
 import { notifySyncFailure } from './automation/notify-failure.js';
 import { scanGeneratedDiff } from './automation/scan-generated-diff.js';
@@ -92,6 +96,12 @@ function printSyncSummary(
   if (result.addressesMoved > 0) {
     console.log(`Addresses moved (redirects kept): ${result.addressesMoved}`);
   }
+  // A count only: headings are document content and stay out of the log.
+  if (result.headingsMixingAlphabets > 0) {
+    console.log(
+      `Documents with a heading mixing alphabets: ${result.headingsMixingAlphabets} (see ${PROJECT_LAYOUT.titleReportFile})`,
+    );
+  }
 }
 
 function printInventorySummary(
@@ -156,6 +166,26 @@ async function main(): Promise<void> {
       ...GENERATED_FILE_ALLOWLIST,
     ]) {
       console.log(generatedPath);
+    }
+    return;
+  }
+
+  if (options.command === 'titles') {
+    const path = PROJECT_LAYOUT.titleReportFile;
+    let content: string;
+    try {
+      content = await readFile(resolve(context.repositoryRoot, path), 'utf8');
+    } catch {
+      throw new CliUsageError(
+        `${path} does not exist yet; it is written by the next sync.`,
+      );
+    }
+    const report = titleReportSchema.parse(JSON.parse(content)) as TitleReport;
+    for (const line of formatTitleReport(report, {
+      list: options.list,
+      path,
+    })) {
+      console.log(line);
     }
     return;
   }

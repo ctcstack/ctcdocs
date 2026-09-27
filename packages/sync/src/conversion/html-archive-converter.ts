@@ -69,6 +69,7 @@ export interface HtmlArchiveConversion {
   hasComplexTables: boolean;
   sanitizedHtml: string;
   warnings: string[];
+  removedTitleHeading: boolean;
 }
 
 export interface HtmlArchiveConversionOptions {
@@ -387,5 +388,6 @@ export function convertHtmlArchive(
     hasComplexTables,
     sanitizedHtml,
     warnings: [...new Set([...warnings, ...normalized.warnings])].sort(),
+    removedTitleHeading: normalized.removedTitleHeading,
   };
 }
