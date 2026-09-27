@@ -20,6 +20,9 @@ All three packages share a version and are released together.
 - `@ctcstack/ctcdocs-sync` declares `prettier` 3 as a peer dependency. Every
   project already installs it for its format check; validation now uses the
   same copy, so the answer is the one the format check would give.
+- `@ctcstack/ctcdocs` declares `prettier` 3 as a peer dependency as well. It
+  ships the shared Prettier configuration, so it always needed one; the
+  requirement is now stated rather than assumed.
 
 ## 0.8.0
 
