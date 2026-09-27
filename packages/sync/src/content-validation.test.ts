@@ -4,7 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-import { PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
+import {
+  GENERATED_DIRECTORY_ALLOWLIST,
+  GENERATED_FILE_ALLOWLIST,
+  PROJECT_LAYOUT,
+} from '@ctcstack/ctcdocs-core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { validateRepositoryContent } from './content-validation.js';
@@ -46,11 +50,25 @@ paths = [
 ]
 `;
 
+/**
+ * What a project's `.prettierignore` holds for the paths the sync owns: each
+ * generated directory as a whole, and each generated file.
+ */
+const GENERATED_PRETTIER_IGNORE = [
+  ...GENERATED_DIRECTORY_ALLOWLIST.map((directory) => `${directory}/`),
+  ...GENERATED_FILE_ALLOWLIST,
+];
+
+function prettierIgnore(paths: readonly string[]): string {
+  return `node_modules/\ndist/\n\n${paths.join('\n')}\n`;
+}
+
 interface FixtureOptions {
   robots?: string;
   visibility?: 'private' | 'public';
   headers?: string;
   gitleaks?: string;
+  prettierIgnore?: string;
   generatedName?: string;
   generatedContent?: string;
   routePattern?: string;
@@ -79,6 +97,10 @@ async function createProject(options: FixtureOptions = {}): Promise<string> {
   await writeFile(
     join(root, PROJECT_LAYOUT.gitleaksConfigurationFile),
     options.gitleaks ?? GITLEAKS_CONFIGURATION,
+  );
+  await writeFile(
+    join(root, '.prettierignore'),
+    options.prettierIgnore ?? prettierIgnore(GENERATED_PRETTIER_IGNORE),
   );
   await writeFile(
     join(root, PROJECT_LAYOUT.wranglerConfigurationFile),
@@ -238,6 +260,87 @@ describe('repository content validation', () => {
     expect(result.errors).toEqual([
       expect.stringContaining('secret scanning has no configuration'),
     ]);
+  });
+});
+
+describe('generated paths and the formatter', () => {
+  it('accepts a project whose formatter ignores every generated path', async () => {
+    const result = await validate({ withoutCorpus: true });
+
+    expect(result.errors).toEqual([]);
+  });
+
+  it('accepts a project that ignores everything', async () => {
+    const result = await validate({ prettierIgnore: '*\n' });
+
+    expect(result.errors).toEqual([]);
+  });
+
+  it('names a generated file the formatter would check', async () => {
+    const result = await validate({
+      withoutCorpus: true,
+      prettierIgnore: prettierIgnore(
+        GENERATED_PRETTIER_IGNORE.filter(
+          (path) => path !== PROJECT_LAYOUT.titleReportFile,
+        ),
+      ),
+    });
+
+    expect(result.errors).toEqual([
+      `Prettier would format generated paths that the sync writes byte for byte, so \`prettier --check .\` fails once they are written: ${PROJECT_LAYOUT.titleReportFile}. Add them to .prettierignore.`,
+    ]);
+  });
+
+  it('does not accept a rule that covers only the top of a generated directory', async () => {
+    const result = await validate({
+      prettierIgnore: prettierIgnore([
+        ...GENERATED_PRETTIER_IGNORE.filter(
+          (path) => path !== `${PROJECT_LAYOUT.generatedDocumentsDirectory}/`,
+        ),
+        `${PROJECT_LAYOUT.generatedDocumentsDirectory}/*.md`,
+      ]),
+    });
+
+    expect(result.errors).toEqual([
+      expect.stringContaining(
+        `: ${PROJECT_LAYOUT.generatedDocumentsDirectory}/. Add them`,
+      ),
+    ]);
+  });
+
+  it('reports every generated path when there is nothing to ignore them', async () => {
+    const root = await createProject({ withoutCorpus: true });
+    await rm(join(root, '.prettierignore'));
+
+    const result = await validateRepositoryContent(testSyncContext(root));
+
+    expect(result.errors).toHaveLength(1);
+    for (const path of [
+      `${PROJECT_LAYOUT.generatedDocumentsDirectory}/`,
+      `${PROJECT_LAYOUT.generatedSourceDirectory}/`,
+      ...GENERATED_FILE_ALLOWLIST,
+    ]) {
+      expect(result.errors[0]).toContain(path);
+    }
+  });
+
+  it('honours the ignore rules Prettier reads from .gitignore', async () => {
+    const root = await createProject({
+      withoutCorpus: true,
+      prettierIgnore: prettierIgnore(
+        GENERATED_PRETTIER_IGNORE.filter(
+          (path) => path !== PROJECT_LAYOUT.titleReportFile,
+        ),
+      ),
+    });
+    await writeFile(
+      join(root, '.gitignore'),
+      `${PROJECT_LAYOUT.titleReportFile}\n`,
+    );
+
+    const result = await validateRepositoryContent(testSyncContext(root));
+
+    expect(result.errors).toEqual([]);
   });
 });
 

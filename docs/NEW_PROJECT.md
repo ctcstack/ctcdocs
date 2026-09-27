@@ -150,10 +150,32 @@ fails the gate for a reason that has nothing to do with what you are testing.
 | `tsconfig.json`        | Extends `astro/tsconfigs/strict`, includes `.astro/types.d.ts`                      |
 | `eslint.config.js`     | `import { ctcdocsEslintConfig } from '@ctcstack/ctcdocs/eslint'` plus your ignores  |
 | `prettier.config.mjs`  | `export { default } from '@ctcstack/ctcdocs/prettier'`                              |
+| `.prettierignore`      | Every generated path, so the formatter never touches what the sync owns             |
 
 `ctcdocs-sync validate` checks that `robots.txt`, `_headers` and `.gitleaks.toml`
 exist and agree with your configuration, so run it early and let it tell you what
 is missing rather than reading this table twice.
+
+The sync writes its output byte for byte, and `format:check` runs Prettier over
+the whole repository, so `.prettierignore` must cover every generated path.
+List each directory whole rather than the files in it, because the sync nests
+them:
+
+```text
+src/content/docs/_generated/
+src/assets/generated/
+src/generated/
+data/sync-manifest.json
+data/docs-index.json
+data/latest-sync-report.json
+data/title-report.json
+```
+
+Ignoring all of `data/` works as well, as long as nothing hand-written lives
+there. `ctcdocs-sync validate` asks Prettier about each generated path —
+including ones the sync has not written yet — and names any it would format, so
+a release that adds a generated file fails validation on the upgrade rather than
+format checking after the first sync that writes it.
 
 ### 5. Scripts
 

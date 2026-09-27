@@ -202,15 +202,18 @@ is its identity, its brand, its content and its workflows — the list in the
 1. Write `site.config.json`.
 2. Write `wrangler.jsonc` with the same Worker name and hostnames.
    `ctcdocs-sync validate` tells you if you missed one.
-3. Add `public/favicon.svg` and the accent triads in `src/styles/brand.css`.
-4. Point the sync at the Shared Drive with `GOOGLE_DRIVE_ID` and
+3. List every generated path in `.prettierignore`, following
+   [NEW_PROJECT.md](NEW_PROJECT.md#4-the-rest-of-the-files).
+   `ctcdocs-sync validate` names any the formatter would still check.
+4. Add `public/favicon.svg` and the accent triads in `src/styles/brand.css`.
+5. Point the sync at the Shared Drive with `GOOGLE_DRIVE_ID` and
    `GOOGLE_ROOT_FOLDER_ID`, following
    [GOOGLE_WORKSPACE_SETUP.md](GOOGLE_WORKSPACE_SETUP.md).
-5. Create the Cloudflare Access application and custom domains, following
+6. Create the Cloudflare Access application and custom domains, following
    [CLOUDFLARE_SETUP.md](CLOUDFLARE_SETUP.md).
-6. Set the repository and environment secrets and variables listed in
+7. Set the repository and environment secrets and variables listed in
    [DEPLOYMENT.md](DEPLOYMENT.md).
-7. Run a first sync, then the project's own gate:
+8. Run a first sync, then the project's own gate:
 
 ```bash
 ctcdocs-sync sync --full

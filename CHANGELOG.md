@@ -2,6 +2,25 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Added
+
+- `ctcdocs-sync validate` fails when the project's Prettier configuration
+  would format a generated path, and names each one to add to
+  `.prettierignore`. It asks Prettier itself, reading `.gitignore` and
+  `.prettierignore` the way `prettier --check .` does, and it checks every
+  path the allowlist names whether or not the sync has written it yet. A
+  project that listed generated files one by one did not ignore
+  `data/title-report.json` after 0.8.0, and learned so only when a full sync
+  had exported everything and then failed its format check.
+
+### Changed
+
+- `@ctcstack/ctcdocs-sync` declares `prettier` 3 as a peer dependency. Every
+  project already installs it for its format check; validation now uses the
+  same copy, so the answer is the one the format check would give.
+
 ## 0.8.0
 
 ### Added
