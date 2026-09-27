@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 
 import {
   GENERATED_DIRECTORY_ALLOWLIST,
+  GENERATED_FILE_ALLOWLIST,
   isGeneratedPathAllowed,
   PROJECT_LAYOUT,
   type DeploymentVisibility,
@@ -240,6 +241,75 @@ async function validateSecretScanExemptions(
   return errors;
 }
 
+/**
+ * A file each generated directory holds, standing in for all of them. The sync
+ * writes nested paths — a folder per Drive folder, a directory per image — so
+ * the stand-in is nested too, and a rule that only matches the top level of a
+ * directory does not pass for one that covers it. The asset stands in as SVG
+ * because that is the one image format a Prettier plugin can format.
+ */
+const REPRESENTATIVE_GENERATED_FILES: Record<
+  (typeof GENERATED_DIRECTORY_ALLOWLIST)[number],
+  string
+> = {
+  [PROJECT_LAYOUT.generatedDocumentsDirectory]: 'folder/document.md',
+  [PROJECT_LAYOUT.generatedAssetsDirectory]: 'file/image.svg',
+  [PROJECT_LAYOUT.generatedSourceDirectory]: 'module.ts',
+};
+
+/** The ignore files `prettier --check .` reads from the directory it runs in. */
+const PRETTIER_IGNORE_FILES = ['.gitignore', '.prettierignore'] as const;
+
+/**
+ * The sync writes generated output byte for byte, and a project's verification
+ * runs `prettier --check .` over the whole repository. A generated path the
+ * formatter does not ignore fails that check the first time the sync writes it
+ * — after a complete export, and with nothing a project could have run locally
+ * to see it coming, since the file does not exist yet. So the question is put
+ * to Prettier itself, for every path the allowlist names, before any of them
+ * exists.
+ *
+ * Prettier is imported here rather than at the top of the module so that the
+ * commands that never ask it anything do not load it.
+ */
+async function validateFormatterIgnoresGeneratedPaths(
+  repositoryRoot: string,
+): Promise<string[]> {
+  const { getFileInfo } = await import('prettier');
+  const ignorePath = PRETTIER_IGNORE_FILES.map((file) =>
+    resolve(repositoryRoot, file),
+  );
+
+  const candidates = [
+    ...GENERATED_DIRECTORY_ALLOWLIST.map((directory) => ({
+      reported: `${directory}/`,
+      probe: `${directory}/${REPRESENTATIVE_GENERATED_FILES[directory]}`,
+    })),
+    ...GENERATED_FILE_ALLOWLIST.map((file) => ({
+      reported: file,
+      probe: file,
+    })),
+  ];
+
+  const formatted: string[] = [];
+  for (const { reported, probe } of candidates) {
+    const { ignored, inferredParser } = await getFileInfo(
+      resolve(repositoryRoot, probe),
+      { ignorePath },
+    );
+    if (!ignored && inferredParser !== null) {
+      formatted.push(reported);
+    }
+  }
+
+  if (formatted.length === 0) {
+    return [];
+  }
+  return [
+    `Prettier would format generated paths that the sync writes byte for byte, so \`prettier --check .\` fails once they are written: ${formatted.join(', ')}. Add them to .prettierignore.`,
+  ];
+}
+
 export async function validateRepositoryContent(
   context: SyncContext,
 ): Promise<ValidationResult> {
@@ -290,6 +360,11 @@ export async function validateRepositoryContent(
   }
 
   errors.push(...(await validateSecretScanExemptions(repositoryRoot)));
+  checkedFiles += 1;
+
+  errors.push(
+    ...(await validateFormatterIgnoresGeneratedPaths(repositoryRoot)),
+  );
   checkedFiles += 1;
 
   const hasCorpus = await pathExists(
