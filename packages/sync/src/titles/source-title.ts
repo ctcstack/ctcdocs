@@ -15,7 +15,7 @@ import { describeMixedScript } from '../name-scripts.js';
  * The shape of the facts below. Facts recorded by an earlier shape are
  * treated as not inspected, so the next export records them again.
  */
-export const SOURCE_FACTS_VERSION = 2;
+export const SOURCE_FACTS_VERSION = 3;
 
 /** The kind of a block at the top of a document, as an editor styled it. */
 export type SourceBlockKind =
@@ -55,12 +55,22 @@ export interface SourceTitleFacts {
   heading1Count: number;
   /** The Title paragraphs, which a title convention allows only once. */
   titles: SourceHeading[];
-  /** Headings of any level with a word that mixes alphabets (ADR-020). */
+  /**
+   * Headings of any level, in any tab and inside tables, with a word that
+   * mixes alphabets (ADR-020). `tabId` opens the tab the heading is in.
+   */
   mixedScriptHeadings: Array<{
     text: string;
     detail: string;
     headingId?: string;
+    tabId?: string;
   }>;
+}
+
+/** One tab of a document, for the headings read from every tab. */
+export interface SourceTab {
+  tabId?: string;
+  content: readonly SourceStructuralElement[];
 }
 
 /** The part of a Docs API structural element this module reads. */
@@ -82,7 +92,19 @@ export interface SourceStructuralElement {
           | undefined;
       }
     | undefined;
-  table?: unknown;
+  table?:
+    | {
+        tableRows?:
+          | Array<{
+              tableCells?:
+                | Array<{
+                    content?: readonly SourceStructuralElement[] | undefined;
+                  }>
+                | undefined;
+            }>
+          | undefined;
+      }
+    | undefined;
   tableOfContents?: unknown;
 }
 
@@ -126,12 +148,59 @@ function heading(
   };
 }
 
+/**
+ * Headings whose words mix alphabets, in every tab and inside tables. A
+ * heading inside a table cell is still a heading a reader sees: Google's
+ * export flattens a one-cell table used as a frame into the page around it.
+ */
+function findMixedScriptHeadings(
+  tabs: readonly SourceTab[],
+): SourceTitleFacts['mixedScriptHeadings'] {
+  const found: SourceTitleFacts['mixedScriptHeadings'] = [];
+  const visit = (
+    content: readonly SourceStructuralElement[],
+    tabId: string | undefined,
+  ): void => {
+    for (const element of content) {
+      if (element.paragraph) {
+        const style = element.paragraph.paragraphStyle?.namedStyleType ?? '';
+        const kind = PARAGRAPH_KINDS[style];
+        const text = paragraphText(element.paragraph);
+        const detail = kind && text ? describeMixedScript(text) : undefined;
+        const headingId =
+          element.paragraph.paragraphStyle?.headingId || undefined;
+        if (detail) {
+          found.push({
+            text: text.slice(0, MAX_TEXT_LENGTH),
+            detail,
+            ...(headingId ? { headingId } : {}),
+            ...(tabId ? { tabId } : {}),
+          });
+        }
+      }
+      for (const row of element.table?.tableRows ?? []) {
+        for (const cell of row.tableCells ?? []) {
+          visit(cell.content ?? [], tabId);
+        }
+      }
+    }
+  };
+  for (const tab of tabs) {
+    visit(tab.content, tab.tabId);
+  }
+  return found;
+}
+
+/**
+ * Reads how a document opens from its first tab's top-level blocks, and
+ * looks for mixed alphabets in the headings of `tabs`, every tab, when given.
+ */
 export function readSourceTitle(
   content: readonly SourceStructuralElement[],
+  tabs: readonly SourceTab[] = [{ content }],
 ): SourceTitleFacts {
   const firstBlocks: SourceBlockKind[] = [];
   const titles: SourceHeading[] = [];
-  const mixedScriptHeadings: SourceTitleFacts['mixedScriptHeadings'] = [];
   let firstHeading1: SourceHeading | undefined;
   let titleCount = 0;
   let heading1Count = 0;
@@ -170,16 +239,6 @@ export function readSourceTitle(
       heading1Count += 1;
       firstHeading1 ??= heading(text, headingId, blockIndex);
     }
-    if (HEADING_KINDS.has(kind)) {
-      const detail = describeMixedScript(text);
-      if (detail) {
-        mixedScriptHeadings.push({
-          text: text.slice(0, MAX_TEXT_LENGTH),
-          detail,
-          ...(headingId ? { headingId } : {}),
-        });
-      }
-    }
     if (firstBlocks.length < FIRST_BLOCK_COUNT) {
       firstBlocks.push(kind);
     }
@@ -199,18 +258,6 @@ export function readSourceTitle(
     titleCount,
     heading1Count,
     titles,
-    mixedScriptHeadings,
+    mixedScriptHeadings: findMixedScriptHeadings(tabs),
   };
 }
-
-/** Block kinds that are headings, whose text is checked for stray letters. */
-const HEADING_KINDS: ReadonlySet<SourceBlockKind> = new Set([
-  'title',
-  'subtitle',
-  'heading-1',
-  'heading-2',
-  'heading-3',
-  'heading-4',
-  'heading-5',
-  'heading-6',
-]);

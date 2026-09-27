@@ -19,8 +19,15 @@ const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{1,128}$/u;
  * what the title report is built from; tables and a table of contents are
  * asked only whether they are there.
  */
-const BODY_FIELDS =
-  'body(content(paragraph(paragraphStyle(namedStyleType,headingId),elements(textRun(content),inlineObjectElement(inlineObjectId))),table(columns),tableOfContents(content(startIndex))))';
+const PARAGRAPH_FIELDS =
+  'paragraph(paragraphStyle(namedStyleType,headingId),elements(textRun(content),inlineObjectElement(inlineObjectId)))';
+/*
+ * Two levels of tables are read, a table inside a table cell included: a
+ * one-cell table used as a frame holds headings like any page. A field mask
+ * cannot recurse, and a third level has not been seen.
+ */
+const CELL_FIELDS = `tableRows(tableCells(content(${PARAGRAPH_FIELDS},table(tableRows(tableCells(content(${PARAGRAPH_FIELDS})))))))`;
+const BODY_FIELDS = `body(content(${PARAGRAPH_FIELDS},table(columns,${CELL_FIELDS}),tableOfContents(content(startIndex))))`;
 const DOCUMENT_FIELDS = `tabs(tabProperties(tabId),documentTab(inlineObjects,positionedObjects,${BODY_FIELDS}),childTabs(tabProperties(tabId)))`;
 
 type Sleep = (milliseconds: number) => Promise<void>;
@@ -52,40 +59,80 @@ const positionedObjectSchema = z
   })
   .passthrough();
 
-const structuralElementSchema = z
+const paragraphSchema = z
   .object({
-    paragraph: z
+    paragraphStyle: z
       .object({
-        paragraphStyle: z
-          .object({
-            namedStyleType: z.string().optional(),
-            headingId: z.string().optional(),
-          })
-          .passthrough()
-          .optional(),
-        elements: z
-          .array(
-            z
-              .object({
-                textRun: z
-                  .object({ content: z.string().optional() })
-                  .passthrough()
-                  .optional(),
-                inlineObjectElement: z
-                  .object({ inlineObjectId: z.string().optional() })
-                  .passthrough()
-                  .optional(),
-              })
-              .passthrough(),
-          )
-          .optional(),
+        namedStyleType: z.string().optional(),
+        headingId: z.string().optional(),
       })
       .passthrough()
       .optional(),
-    table: z.object({}).passthrough().optional(),
-    tableOfContents: z.object({}).passthrough().optional(),
+    elements: z
+      .array(
+        z
+          .object({
+            textRun: z
+              .object({ content: z.string().optional() })
+              .passthrough()
+              .optional(),
+            inlineObjectElement: z
+              .object({ inlineObjectId: z.string().optional() })
+              .passthrough()
+              .optional(),
+          })
+          .passthrough(),
+      )
+      .optional(),
   })
   .passthrough();
+
+interface StructuralElement {
+  paragraph?: z.infer<typeof paragraphSchema> | undefined;
+  table?:
+    | {
+        tableRows?:
+          | Array<{
+              tableCells?:
+                | Array<{ content?: StructuralElement[] | undefined }>
+                | undefined;
+            }>
+          | undefined;
+      }
+    | undefined;
+  tableOfContents?: object | undefined;
+}
+
+const structuralElementSchema: z.ZodType<StructuralElement> = z.lazy(() =>
+  z
+    .object({
+      paragraph: paragraphSchema.optional(),
+      table: z
+        .object({
+          tableRows: z
+            .array(
+              z
+                .object({
+                  tableCells: z
+                    .array(
+                      z
+                        .object({
+                          content: z.array(structuralElementSchema).optional(),
+                        })
+                        .passthrough(),
+                    )
+                    .optional(),
+                })
+                .passthrough(),
+            )
+            .optional(),
+        })
+        .passthrough()
+        .optional(),
+      tableOfContents: z.object({}).passthrough().optional(),
+    })
+    .passthrough(),
+);
 
 const tabSchema = z
   .object({
@@ -219,6 +266,10 @@ export class GoogleDocsClient {
       tabCount: parsed.tabs.length,
       titleFacts: readSourceTitle(
         parsed.tabs[0]?.documentTab?.body?.content ?? [],
+        parsed.tabs.map((tab) => ({
+          tabId: tab.tabProperties.tabId,
+          content: tab.documentTab?.body?.content ?? [],
+        })),
       ),
     };
   }

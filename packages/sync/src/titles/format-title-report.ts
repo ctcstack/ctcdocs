@@ -8,9 +8,13 @@ function counts(values: Readonly<Record<string, number>>): string {
     .join(', ');
 }
 
-function googleDocsUrl(id: string, headingId?: string): string {
-  const url = `https://docs.google.com/document/d/${id}/edit`;
-  return headingId ? `${url}#heading=${headingId}` : url;
+function googleDocsUrl(
+  id: string,
+  issue?: { headingId?: string; tabId?: string },
+): string {
+  const tab = issue?.tabId ? `?tab=${issue.tabId}` : '';
+  const heading = issue?.headingId ? `#heading=${issue.headingId}` : '';
+  return `https://docs.google.com/document/d/${id}/edit${tab}${heading}`;
 }
 
 /**
@@ -82,7 +86,10 @@ export function formatTitleReport(
         }
       }
       lines.push(
-        `      ${googleDocsUrl(document.id, issues.find((issue) => issue.headingId)?.headingId)}`,
+        `      ${googleDocsUrl(
+          document.id,
+          issues.find((issue) => issue.headingId),
+        )}`,
       );
     }
   }

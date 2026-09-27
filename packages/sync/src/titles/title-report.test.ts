@@ -369,4 +369,36 @@ describe('the title report', () => {
       'https://docs.google.com/document/d/doc/edit#heading=h.c',
     );
   });
+
+  it('links to the tab a heading is in', () => {
+    const report = createTitleReport([
+      input({
+        source: readSourceTitle(
+          [],
+          [
+            {
+              tabId: 't.second',
+              content: [
+                {
+                  paragraph: {
+                    paragraphStyle: {
+                      namedStyleType: 'HEADING_2',
+                      headingId: 'h.next',
+                    },
+                    elements: [{ textRun: { content: 'Nеxt steps' } }],
+                  },
+                },
+              ],
+            },
+          ],
+        ),
+      }),
+    ]);
+
+    expect(
+      formatTitleReport(report, { list: true, path: 'report.json' }).join('\n'),
+    ).toContain(
+      'https://docs.google.com/document/d/doc/edit?tab=t.second#heading=h.next',
+    );
+  });
 });

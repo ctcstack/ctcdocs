@@ -2,6 +2,17 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Fixed
+
+- A heading that mixes alphabets is found in every tab of a document and
+  inside table cells, not only among the first tab's top-level paragraphs.
+  Google's export flattens a one-cell table used as a frame into the page, so
+  a heading inside one is published like any other and was missed. Its link
+  opens the tab it is in. The source facts move to version 3, so a full sync
+  after upgrading inspects every document again.
+
 ## 0.9.0
 
 ### Added

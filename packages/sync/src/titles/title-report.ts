@@ -58,6 +58,8 @@ interface ReportIssue {
   detail?: string;
   /** Opens Google Docs at the paragraph: `#heading=<ID>`. */
   headingId?: string;
+  /** The tab the paragraph is in, when that is known: `?tab=<ID>`. */
+  tabId?: string;
   /** The other document a check refers to. */
   related?: { slug: string; title: string };
 }
@@ -258,6 +260,7 @@ function findIssues(
         text: heading.text,
         detail: heading.detail,
         ...withHeadingId(heading.headingId),
+        ...(heading.tabId ? { tabId: heading.tabId } : {}),
       });
     }
 
@@ -475,6 +478,7 @@ const sourceTitleFactsSchema = z.object({
       text: z.string(),
       detail: z.string(),
       headingId: z.string().optional(),
+      tabId: z.string().optional(),
     }),
   ),
 });
@@ -521,6 +525,7 @@ export const titleReportSchema = z.object({
           text: z.string().optional(),
           detail: z.string().optional(),
           headingId: z.string().optional(),
+          tabId: z.string().optional(),
           related: z.object({ slug: z.string(), title: z.string() }).optional(),
         }),
       ),
