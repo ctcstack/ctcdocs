@@ -18,6 +18,10 @@ const ROUTES = [
     pattern: `/${PLATFORM_ROUTES.fullIndex}`,
   },
   {
+    entrypoint: '@ctcstack/ctcdocs/routes/content-health.astro',
+    pattern: `/${PLATFORM_ROUTES.contentHealth}`,
+  },
+  {
     entrypoint: '@ctcstack/ctcdocs/routes/[...slug]/index.md.ts',
     pattern: '/[...slug]/index.md',
   },

@@ -1,0 +1,444 @@
+---
+/**
+ * What editors have to fix, grouped by the action that fixes it (ADR-024).
+ *
+ * Every item links to the page on this site and to the document in Google
+ * Docs, at the paragraph concerned when the check is about one. Filters
+ * narrow the list to one section of the corpus or to whoever last edited a
+ * document, which is how the work is shared out. The page is rebuilt on every
+ * sync, so a fixed item disappears after the next one.
+ *
+ * It is not in the sidebar and not in search: it is an address people are
+ * sent to, not part of the documentation.
+ */
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { PLATFORM_ROUTE_HREFS } from '@ctcstack/ctcdocs-core';
+
+import {
+  googleDocsUrl,
+  loadHealthReport,
+  sectionOf,
+  type HealthDocument,
+  type HealthSeverity,
+} from '../lib/content-health';
+
+const report = loadHealthReport();
+
+const SEVERITIES: Array<{
+  severity: HealthSeverity;
+  heading: string;
+  lede: string;
+  open: boolean;
+}> = [
+  {
+    severity: 'fix',
+    heading: 'Fix',
+    lede: 'Mistakes a reader can run into. Each takes a minute.',
+    open: true,
+  },
+  {
+    severity: 'convention',
+    heading: 'Proposed convention: one Title line',
+    lede: "Every document opens with its name as one line in the Title style, and uses Heading 1 to 3 for its sections. The site will take a document's title from that line once the convention is agreed.",
+    open: true,
+  },
+  {
+    severity: 'note',
+    heading: 'Worth a look',
+    lede: 'Tidiness in Drive names. The site shows these names today.',
+    open: false,
+  },
+];
+
+const byName = (left: string, right: string) => left.localeCompare(right, 'en');
+const documents = report?.documents ?? [];
+const sections = [...new Set(documents.map(sectionOf))].sort(byName);
+const editors = [
+  ...new Set(
+    documents.flatMap((document) =>
+      document.lastEditedBy ? [document.lastEditedBy] : [],
+    ),
+  ),
+].sort(byName);
+
+const groups = (report?.checks ?? []).map((check) => ({
+  check,
+  documents: documents
+    .map((document) => ({
+      document,
+      issues: document.issues.filter((issue) => issue.check === check.code),
+    }))
+    .filter((entry) => entry.issues.length > 0),
+}));
+
+const trail = (document: HealthDocument) =>
+  document.folderPath.length > 0 ? document.folderPath.join(' › ') : 'General';
+const isFileNameCheck = (code: string) => code.startsWith('file-name-');
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Content health',
+    description:
+      'What to fix in Google Docs and Drive, with a link to each document.',
+    tableOfContents: false,
+    pagefind: false,
+    prev: false,
+    next: false,
+  }}
+>
+  <content-health data-pagefind-ignore>
+    {
+      !report ? (
+        <p>
+          The next sync writes the report this page is built from. Check back
+          after it has run.
+        </p>
+      ) : (
+        <>
+          <p>
+            Things to fix in Google Docs and Drive, grouped by what fixes them.
+            Each item links to the document, and where the check is about one
+            line, straight to that line. The list is rebuilt on every sync, so a
+            fixed item disappears after the next one.
+          </p>
+
+          <dl class="health-stats">
+            <div>
+              <dt>Documents to fix</dt>
+              <dd>{report.summary.severity.fix}</dd>
+            </div>
+            <div>
+              <dt>Following the proposed convention</dt>
+              <dd>
+                {report.summary.conforming}
+                <span> of {report.summary.inspected}</span>
+              </dd>
+            </div>
+            <div>
+              <dt>Worth a look</dt>
+              <dd>{report.summary.severity.note}</dd>
+            </div>
+          </dl>
+
+          {report.summary.inspected < report.summary.documents && (
+            <p class="health-notice">
+              {report.summary.documents - report.summary.inspected} documents
+              have not been inspected yet. A full sync inspects every document.
+            </p>
+          )}
+
+          <form class="health-filters" aria-label="Filter the list">
+            <label>
+              Section
+              <select name="section">
+                <option value="">All sections</option>
+                {sections.map((section) => (
+                  <option value={section}>{section}</option>
+                ))}
+              </select>
+            </label>
+            {editors.length > 0 && (
+              <label>
+                Last edited by
+                <select name="editor">
+                  <option value="">Anyone</option>
+                  {editors.map((editor) => (
+                    <option value={editor}>{editor}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <p class="health-filter-status" role="status" data-status />
+          </form>
+
+          {SEVERITIES.map(({ severity, heading, lede, open }) => {
+            const inSeverity = groups.filter(
+              (group) =>
+                group.check.severity === severity && group.documents.length > 0,
+            );
+            return (
+              <section class="health-severity" data-severity-section>
+                <h2>{heading}</h2>
+                <p class="health-lede">{lede}</p>
+                {inSeverity.length === 0 ? (
+                  <p class="health-empty">Nothing to do here.</p>
+                ) : (
+                  <p class="health-empty" data-filter-empty hidden>
+                    Nothing here for this filter.
+                  </p>
+                )}
+                {inSeverity.length > 0 &&
+                  inSeverity.map(({ check, documents: entries }) => (
+                    <details class="health-check" open={open} data-check>
+                      <summary>
+                        <span class="health-check-title">{check.title}</span>
+                        <span class="health-count" data-count>
+                          {entries.length}
+                        </span>
+                      </summary>
+                      <p class="health-instruction">{check.instruction}</p>
+                      <ul>
+                        {entries.map(({ document, issues }) => (
+                          <li
+                            data-section={sectionOf(document)}
+                            data-editor={document.lastEditedBy ?? ''}
+                          >
+                            <div class="health-item-head">
+                              <a href={`/${document.slug}/`}>
+                                {document.title}
+                              </a>
+                              <a
+                                class="health-source"
+                                href={googleDocsUrl(
+                                  document.id,
+                                  issues.find((issue) => issue.headingId)
+                                    ?.headingId,
+                                )}
+                                rel="noopener noreferrer"
+                                target="_blank"
+                              >
+                                Open in Google Docs
+                              </a>
+                            </div>
+                            <p class="health-meta">
+                              {trail(document)}
+                              {document.lastEditedBy &&
+                                ` · last edited by ${document.lastEditedBy}`}
+                            </p>
+                            {isFileNameCheck(check.code) && (
+                              <p class="health-detail">
+                                Drive name: “{document.name}”
+                              </p>
+                            )}
+                            {issues
+                              .filter((issue) => issue.text)
+                              .map((issue) => (
+                                <p class="health-detail">
+                                  {'Line: '}
+                                  {issue.headingId ? (
+                                    <a
+                                      href={googleDocsUrl(
+                                        document.id,
+                                        issue.headingId,
+                                      )}
+                                      rel="noopener noreferrer"
+                                      target="_blank"
+                                    >
+                                      “{issue.text}”
+                                    </a>
+                                  ) : (
+                                    <span>“{issue.text}”</span>
+                                  )}
+                                  {issue.detail && ` — ${issue.detail}`}
+                                  {issue.related && (
+                                    <>
+                                      {' — the title of '}
+                                      <a href={`/${issue.related.slug}/`}>
+                                        {issue.related.title}
+                                      </a>
+                                    </>
+                                  )}
+                                </p>
+                              ))}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  ))}
+              </section>
+            );
+          })}
+
+          <p class="health-footer">
+            Browse <a href={PLATFORM_ROUTE_HREFS.fullIndex}>all documents</a>.
+          </p>
+        </>
+      )
+    }
+  </content-health>
+</StarlightPage>
+
+<script>
+  /**
+   * Narrows the list to one section or one editor. Filtering runs in the
+   * browser over the rendered list: nothing is fetched, and without script the
+   * whole list stays visible.
+   */
+  class ContentHealth extends HTMLElement {
+    connectedCallback() {
+      const form = this.querySelector('form');
+      const status = this.querySelector<HTMLElement>('[data-status]');
+      if (!form || !status) return;
+      form.addEventListener('submit', (event) => event.preventDefault());
+      form.addEventListener('change', () => this.apply(form, status));
+    }
+
+    apply(form: HTMLFormElement, status: HTMLElement) {
+      const data = new FormData(form);
+      const section = String(data.get('section') ?? '');
+      const editor = String(data.get('editor') ?? '');
+      const shown = new Set<string>();
+
+      for (const check of this.querySelectorAll<HTMLElement>('[data-check]')) {
+        let visible = 0;
+        for (const item of check.querySelectorAll<HTMLElement>('li')) {
+          const match =
+            (!section || item.dataset.section === section) &&
+            (!editor || item.dataset.editor === editor);
+          item.hidden = !match;
+          if (match) {
+            visible += 1;
+            const link = item.querySelector('a');
+            if (link) shown.add(link.getAttribute('href') ?? '');
+          }
+        }
+        check.hidden = visible === 0;
+        const count = check.querySelector('[data-count]');
+        if (count) count.textContent = String(visible);
+      }
+      for (const note of this.querySelectorAll<HTMLElement>(
+        '[data-filter-empty]',
+      )) {
+        const block = note.closest('[data-severity-section]');
+        note.hidden = !!block?.querySelector('[data-check]:not([hidden])');
+      }
+      status.textContent =
+        section || editor
+          ? `Showing ${shown.size} documents${section ? ` in ${section}` : ''}${editor ? ` last edited by ${editor}` : ''}.`
+          : '';
+    }
+  }
+
+  customElements.define('content-health', ContentHealth);
+</script>
+
+<style>
+  @layer starlight.components {
+    content-health {
+      display: block;
+    }
+
+    .health-stats {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+      margin-block: 1.5rem;
+    }
+
+    .health-stats div {
+      border: 1px solid var(--sl-color-hairline);
+      border-radius: 0.5rem;
+      padding: 0.75rem 1rem;
+    }
+
+    .health-stats dt {
+      color: var(--sl-color-gray-3);
+      font-size: var(--sl-text-sm);
+    }
+
+    .health-stats dd {
+      color: var(--sl-color-white);
+      font-size: var(--sl-text-2xl);
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .health-stats dd span {
+      color: var(--sl-color-gray-3);
+      font-size: var(--sl-text-base);
+      font-weight: 400;
+    }
+
+    .health-notice,
+    .health-lede,
+    .health-empty,
+    .health-meta,
+    .health-filter-status {
+      color: var(--sl-color-gray-3);
+      font-size: var(--sl-text-sm);
+    }
+
+    .health-filters {
+      align-items: end;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-block: 1.5rem;
+    }
+
+    .health-filters label {
+      display: grid;
+      font-size: var(--sl-text-sm);
+      gap: 0.25rem;
+    }
+
+    .health-filters select {
+      background: var(--sl-color-bg);
+      border: 1px solid var(--sl-color-hairline);
+      border-radius: 0.375rem;
+      color: var(--sl-color-white);
+      font: inherit;
+      max-width: 100%;
+      padding: 0.375rem 0.5rem;
+    }
+
+    .health-check {
+      border-top: 1px solid var(--sl-color-hairline);
+      padding-block: 0.75rem;
+    }
+
+    .health-check summary {
+      cursor: pointer;
+      display: flex;
+      font-weight: 600;
+      gap: 0.75rem;
+      justify-content: space-between;
+    }
+
+    .health-check-title {
+      flex: 1;
+      text-align: start;
+    }
+
+    .health-count {
+      color: var(--sl-color-gray-3);
+      font-weight: 400;
+    }
+
+    .health-instruction {
+      margin-block: 0.5rem 0.75rem;
+    }
+
+    .health-check ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .health-check li {
+      border-top: 1px solid var(--sl-color-hairline);
+      padding-block: 0.625rem;
+    }
+
+    .health-item-head {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem 1rem;
+      justify-content: space-between;
+    }
+
+    .health-source {
+      font-size: var(--sl-text-sm);
+      white-space: nowrap;
+    }
+
+    .health-meta,
+    .health-detail {
+      margin-top: 0.25rem;
+    }
+
+    .health-detail {
+      font-size: var(--sl-text-sm);
+    }
+  }
+</style>

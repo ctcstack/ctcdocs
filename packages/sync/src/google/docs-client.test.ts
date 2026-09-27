@@ -103,7 +103,14 @@ describe('Google Docs structural client', () => {
       inlineObjectCount: 1,
       positionedObjectCount: 1,
       tabCount: 2,
-      titleFacts: { firstBlocks: [], titleCount: 0, heading1Count: 0 },
+      titleFacts: {
+        version: 2,
+        firstBlocks: [],
+        titleCount: 0,
+        heading1Count: 0,
+        titles: [],
+        mixedScriptHeadings: [],
+      },
     });
     expect(
       capturedRequests[0]?.url.searchParams.get('includeTabsContent'),
@@ -111,7 +118,7 @@ describe('Google Docs structural client', () => {
     // The title report needs a paragraph's style and text, and nothing of its
     // formatting: the export already carries the body itself.
     const fields = capturedRequests[0]?.url.searchParams.get('fields') ?? '';
-    expect(fields).toContain('paragraphStyle(namedStyleType)');
+    expect(fields).toContain('paragraphStyle(namedStyleType,headingId)');
     expect(fields).toContain('textRun(content)');
     expect(fields).not.toContain('textStyle');
     expect(capturedRequests[0]?.headers.get('authorization')).toBe(
@@ -120,9 +127,13 @@ describe('Google Docs structural client', () => {
   });
 
   it('reads how the first tab opens for the title report', async () => {
-    const paragraph = (namedStyleType: string, content: string) => ({
+    const paragraph = (
+      namedStyleType: string,
+      content: string,
+      headingId?: string,
+    ) => ({
       paragraph: {
-        paragraphStyle: { namedStyleType },
+        paragraphStyle: { namedStyleType, ...(headingId ? { headingId } : {}) },
         elements: [{ textRun: { content } }],
       },
     });
@@ -136,11 +147,12 @@ describe('Google Docs structural client', () => {
                 content: [
                   {},
                   paragraph('NORMAL_TEXT', '\n'),
-                  paragraph('TITLE', 'Pricing handbook\n'),
-                  paragraph('SUBTITLE', 'For the sales team\n'),
+                  paragraph('TITLE', 'Pricing handbook\n', 'h.title'),
+                  paragraph('SUBTITLE', 'For the sales team\n', 'h.sub'),
                   { table: { columns: 2 } },
-                  paragraph('HEADING_1', 'Rates\n'),
-                  paragraph('HEADING_1', 'Discounts\n'),
+                  paragraph('HEADING_1', 'Rates\n', 'h.rates'),
+                  paragraph('HEADING_1', 'Dіscounts\n', 'h.discounts'),
+                  paragraph('TITLE', 'Appendix\n', 'h.appendix'),
                 ],
               },
             },
@@ -157,10 +169,28 @@ describe('Google Docs structural client', () => {
     ).inspectDocument('doc-id');
 
     expect(result.titleFacts).toEqual({
+      version: 2,
       firstBlocks: ['title', 'subtitle', 'table'],
-      candidate: { style: 'title', text: 'Pricing handbook', blockIndex: 0 },
-      titleCount: 1,
+      candidate: {
+        style: 'title',
+        text: 'Pricing handbook',
+        headingId: 'h.title',
+        blockIndex: 0,
+      },
+      titleCount: 2,
       heading1Count: 2,
+      titles: [
+        { text: 'Pricing handbook', headingId: 'h.title', blockIndex: 0 },
+        { text: 'Appendix', headingId: 'h.appendix', blockIndex: 5 },
+      ],
+      // The second letter of `Dіscounts` is CYRILLIC SMALL LETTER BYELORUSSIAN-UKRAINIAN I.
+      mixedScriptHeadings: [
+        {
+          text: 'Dіscounts',
+          detail: 'U+0456 Cyrillic at character 2',
+          headingId: 'h.discounts',
+        },
+      ],
     });
   });
 

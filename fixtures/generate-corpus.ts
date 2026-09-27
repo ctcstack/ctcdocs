@@ -27,6 +27,7 @@ import {
   createInventoryReport,
   createSyncContext,
   parseSyncConfiguration,
+  readSourceTitle,
   runBasicMarkdownSync,
   StaticGoogleAccessTokenProvider,
   type DriveItem,
@@ -70,6 +71,12 @@ function folder(id: string, name: string, parent: string): DriveItem {
   };
 }
 
+/*
+ * Two synthetic editors, so the content health page has someone to filter
+ * by. The names are invented.
+ */
+const EDITORS = ['Avery Example', 'Robin Sample'] as const;
+
 function document(id: string, name: string, parent: string): DriveItem {
   return {
     id,
@@ -79,6 +86,7 @@ function document(id: string, name: string, parent: string): DriveItem {
     createdTime: CREATED_AT,
     modifiedTime: MODIFIED_AT.get(id) ?? CREATED_AT,
     trashed: false,
+    lastModifyingUser: { displayName: EDITORS[id.length % EDITORS.length] },
   };
 }
 
@@ -405,33 +413,30 @@ const encoder = new TextEncoder();
 /**
  * What the Docs API would say about how a synthetic document opens. Its
  * export is Markdown written to stand for Google's, so a `#` line stands for
- * a Heading 1 and anything else for body text.
+ * a heading of that level, with a heading ID, and anything else for body
+ * text. The facts come from the pipeline's own reader of that structure.
  */
-function syntheticTitleFacts(markdown: string) {
-  const blocks = markdown
-    .split(/\n{2,}/u)
-    .map((block) => block.trim())
-    .filter(Boolean);
-  const kinds = blocks.map((block) => {
-    const depth = /^(#{1,6}) /u.exec(block)?.[1]?.length;
-    return depth ? (`heading-${depth}` as const) : ('text' as const);
-  });
-  const candidateIndex = kinds.indexOf('heading-1');
-  const candidateBlock = blocks[candidateIndex];
-  return {
-    firstBlocks: kinds.slice(0, 3),
-    ...(candidateBlock
-      ? {
-          candidate: {
-            style: 'heading-1' as const,
-            text: candidateBlock.replace(/^# /u, ''),
-            blockIndex: candidateIndex,
+function syntheticTitleFacts(fileId: string, markdown: string) {
+  return readSourceTitle(
+    markdown
+      .split(/\n{2,}/u)
+      .map((block) => block.trim())
+      .filter(Boolean)
+      .map((block, index) => {
+        const depth = /^(#{1,6}) /u.exec(block)?.[1]?.length;
+        return {
+          paragraph: {
+            paragraphStyle: depth
+              ? {
+                  namedStyleType: `HEADING_${depth}`,
+                  headingId: `h.${fileId}-${index}`,
+                }
+              : { namedStyleType: 'NORMAL_TEXT' },
+            elements: [{ textRun: { content: block.replace(/^#+ /u, '') } }],
           },
-        }
-      : {}),
-    titleCount: 0,
-    heading1Count: kinds.filter((kind) => kind === 'heading-1').length,
-  };
+        };
+      }),
+  );
 }
 
 const dependencies = {
@@ -460,7 +465,10 @@ const dependencies = {
         inlineObjectCount: fileId === 'doc-screenshots' ? 1 : 0,
         positionedObjectCount: 0,
         tabCount: 1,
-        titleFacts: syntheticTitleFacts(markdownExports.get(fileId) ?? ''),
+        titleFacts: syntheticTitleFacts(
+          fileId,
+          markdownExports.get(fileId) ?? '',
+        ),
       }),
   },
   now: () => RUN_AT,

@@ -180,7 +180,9 @@ async function main(): Promise<void> {
         `${path} does not exist yet; it is written by the next sync.`,
       );
     }
-    const report = titleReportSchema.parse(JSON.parse(content)) as TitleReport;
+    const report = titleReportSchema.parse(
+      JSON.parse(content),
+    ) as unknown as TitleReport;
     for (const line of formatTitleReport(report, {
       list: options.list,
       path,

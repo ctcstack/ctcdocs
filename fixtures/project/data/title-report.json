@@ -1,8 +1,95 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "checks": [
+    {
+      "code": "heading-mixes-alphabets",
+      "severity": "fix",
+      "title": "A heading mixes alphabets",
+      "instruction": "A letter in the heading was typed on the other keyboard layout. It looks right, but search does not find the word. Open the heading and retype the letter named below."
+    },
+    {
+      "code": "heading-from-another-document",
+      "severity": "fix",
+      "title": "The document opens with another document's title",
+      "instruction": "The first heading is the title of a different document, most likely copied along with a template. Replace it with this document's own title."
+    },
+    {
+      "code": "empty-document",
+      "severity": "fix",
+      "title": "The document is empty",
+      "instruction": "Nothing in it can be published. Write the content, or move the document out of the published folders."
+    },
+    {
+      "code": "title-styled-as-heading-1",
+      "severity": "convention",
+      "title": "The title is styled as Heading 1",
+      "instruction": "The first line reads like the document's title. Select it and choose Format → Paragraph styles → Title."
+    },
+    {
+      "code": "title-missing",
+      "severity": "convention",
+      "title": "The document has no title line",
+      "instruction": "Type the document's name as its first line and choose Format → Paragraph styles → Title."
+    },
+    {
+      "code": "title-not-first",
+      "severity": "convention",
+      "title": "The title is not the first line",
+      "instruction": "Move the line in the Title style to the top of the document, above everything else."
+    },
+    {
+      "code": "title-style-on-section",
+      "severity": "convention",
+      "title": "The Title style is used for a section",
+      "instruction": "Only the document's name takes the Title style. Change the lines below to Format → Paragraph styles → Heading 1."
+    },
+    {
+      "code": "file-name-copy-of",
+      "severity": "note",
+      "title": "The file name starts with “Copy of”",
+      "instruction": "Google adds this when a file is copied. Rename the file in Drive without it."
+    },
+    {
+      "code": "file-name-extension",
+      "severity": "note",
+      "title": "The file name ends with a file extension",
+      "instruction": "Remove the extension, such as “.doc”, from the name in Drive. It is left over from an upload."
+    },
+    {
+      "code": "file-name-underscores",
+      "severity": "note",
+      "title": "The file name uses underscores",
+      "instruction": "The site shows the file name as the page title, underscores included. Use spaces instead, or “ — ” where Drive replaced a colon with “_”."
+    },
+    {
+      "code": "file-name-spaces",
+      "severity": "note",
+      "title": "The file name has extra spaces",
+      "instruction": "Remove the spaces at the start or end of the name, or doubled between words."
+    }
+  ],
   "summary": {
     "documents": 7,
     "inspected": 7,
+    "conforming": 0,
+    "severity": {
+      "fix": 0,
+      "convention": 7,
+      "note": 0
+    },
+    "checks": {
+      "heading-mixes-alphabets": 0,
+      "heading-from-another-document": 0,
+      "empty-document": 0,
+      "title-styled-as-heading-1": 6,
+      "title-missing": 1,
+      "title-not-first": 0,
+      "title-style-on-section": 0,
+      "file-name-copy-of": 0,
+      "file-name-extension": 0,
+      "file-name-underscores": 0,
+      "file-name-spaces": 0
+    },
     "firstBlock": {
       "title": 0,
       "subtitle": 0,
@@ -27,6 +114,7 @@
     "match": {
       "identical": 6,
       "normalized": 0,
+      "reordered": 0,
       "contains": 0,
       "contained": 0,
       "similar": 0,
@@ -35,14 +123,7 @@
     },
     "removedTitleHeading": 6,
     "severalTitles": 0,
-    "severalHeading1": 0,
-    "names": {
-      "orderPrefix": 1,
-      "underscorePrefix": 0,
-      "underscores": 0,
-      "fileExtension": 0
-    },
-    "mixedScriptHeadings": 0
+    "severalHeading1": 0
   },
   "documents": [
     {
@@ -50,7 +131,12 @@
       "slug": "handbook/overview",
       "name": "Overview",
       "title": "Overview",
+      "folderPath": [
+        "Handbook"
+      ],
+      "lastEditedBy": "Avery Example",
       "source": {
+        "version": 2,
         "firstBlocks": [
           "heading-1",
           "text",
@@ -59,10 +145,13 @@
         "candidate": {
           "style": "heading-1",
           "text": "Overview",
+          "headingId": "h.doc-overview-0",
           "blockIndex": 0
         },
         "titleCount": 0,
-        "heading1Count": 1
+        "heading1Count": 1,
+        "titles": [],
+        "mixedScriptHeadings": []
       },
       "removedTitleHeading": true,
       "match": "identical",
@@ -71,16 +160,27 @@
         "orderPrefix": false,
         "underscorePrefix": false,
         "underscores": false,
-        "fileExtension": false
+        "fileExtension": false,
+        "copyOf": false,
+        "extraSpaces": false
       },
-      "mixedScriptHeadings": []
+      "issues": [
+        {
+          "check": "title-missing"
+        }
+      ]
     },
     {
       "id": "doc-tables-and-code",
       "slug": "handbook/tables-and-code",
       "name": "01 - Tables and code",
       "title": "Tables and code",
+      "folderPath": [
+        "Handbook"
+      ],
+      "lastEditedBy": "Robin Sample",
       "source": {
+        "version": 2,
         "firstBlocks": [
           "heading-1",
           "text",
@@ -89,10 +189,13 @@
         "candidate": {
           "style": "heading-1",
           "text": "Tables and code",
+          "headingId": "h.doc-tables-and-code-0",
           "blockIndex": 0
         },
         "titleCount": 0,
-        "heading1Count": 1
+        "heading1Count": 1,
+        "titles": [],
+        "mixedScriptHeadings": []
       },
       "removedTitleHeading": true,
       "match": "identical",
@@ -101,16 +204,29 @@
         "orderPrefix": true,
         "underscorePrefix": false,
         "underscores": false,
-        "fileExtension": false
+        "fileExtension": false,
+        "copyOf": false,
+        "extraSpaces": false
       },
-      "mixedScriptHeadings": []
+      "issues": [
+        {
+          "check": "title-styled-as-heading-1",
+          "text": "Tables and code",
+          "headingId": "h.doc-tables-and-code-0"
+        }
+      ]
     },
     {
       "id": "doc-diagrams",
       "slug": "reference/diagrams",
       "name": "Diagrams",
       "title": "Diagrams",
+      "folderPath": [
+        "Reference"
+      ],
+      "lastEditedBy": "Avery Example",
       "source": {
+        "version": 2,
         "firstBlocks": [
           "heading-1",
           "text",
@@ -119,10 +235,13 @@
         "candidate": {
           "style": "heading-1",
           "text": "Diagrams",
+          "headingId": "h.doc-diagrams-0",
           "blockIndex": 0
         },
         "titleCount": 0,
-        "heading1Count": 1
+        "heading1Count": 1,
+        "titles": [],
+        "mixedScriptHeadings": []
       },
       "removedTitleHeading": true,
       "match": "identical",
@@ -131,16 +250,30 @@
         "orderPrefix": false,
         "underscorePrefix": false,
         "underscores": false,
-        "fileExtension": false
+        "fileExtension": false,
+        "copyOf": false,
+        "extraSpaces": false
       },
-      "mixedScriptHeadings": []
+      "issues": [
+        {
+          "check": "title-styled-as-heading-1",
+          "text": "Diagrams",
+          "headingId": "h.doc-diagrams-0"
+        }
+      ]
     },
     {
       "id": "doc-style-guide",
       "slug": "reference/guides/style-guide",
       "name": "Style guide",
       "title": "Style guide",
+      "folderPath": [
+        "Reference",
+        "Guides"
+      ],
+      "lastEditedBy": "Robin Sample",
       "source": {
+        "version": 2,
         "firstBlocks": [
           "heading-1",
           "text"
@@ -148,10 +281,13 @@
         "candidate": {
           "style": "heading-1",
           "text": "Style guide",
+          "headingId": "h.doc-style-guide-0",
           "blockIndex": 0
         },
         "titleCount": 0,
-        "heading1Count": 1
+        "heading1Count": 1,
+        "titles": [],
+        "mixedScriptHeadings": []
       },
       "removedTitleHeading": true,
       "match": "identical",
@@ -160,16 +296,29 @@
         "orderPrefix": false,
         "underscorePrefix": false,
         "underscores": false,
-        "fileExtension": false
+        "fileExtension": false,
+        "copyOf": false,
+        "extraSpaces": false
       },
-      "mixedScriptHeadings": []
+      "issues": [
+        {
+          "check": "title-styled-as-heading-1",
+          "text": "Style guide",
+          "headingId": "h.doc-style-guide-0"
+        }
+      ]
     },
     {
       "id": "doc-screenshots",
       "slug": "reference/screenshots",
       "name": "Screenshots",
       "title": "Screenshots",
+      "folderPath": [
+        "Reference"
+      ],
+      "lastEditedBy": "Robin Sample",
       "source": {
+        "version": 2,
         "firstBlocks": [
           "heading-1",
           "text"
@@ -177,10 +326,13 @@
         "candidate": {
           "style": "heading-1",
           "text": "Screenshots",
+          "headingId": "h.doc-screenshots-0",
           "blockIndex": 0
         },
         "titleCount": 0,
-        "heading1Count": 1
+        "heading1Count": 1,
+        "titles": [],
+        "mixedScriptHeadings": []
       },
       "removedTitleHeading": true,
       "match": "identical",
@@ -189,16 +341,27 @@
         "orderPrefix": false,
         "underscorePrefix": false,
         "underscores": false,
-        "fileExtension": false
+        "fileExtension": false,
+        "copyOf": false,
+        "extraSpaces": false
       },
-      "mixedScriptHeadings": []
+      "issues": [
+        {
+          "check": "title-styled-as-heading-1",
+          "text": "Screenshots",
+          "headingId": "h.doc-screenshots-0"
+        }
+      ]
     },
     {
       "id": "doc-getting-started",
       "slug": "start-here",
       "name": "Start here",
       "title": "Start here",
+      "folderPath": [],
+      "lastEditedBy": "Robin Sample",
       "source": {
+        "version": 2,
         "firstBlocks": [
           "heading-1",
           "text",
@@ -207,10 +370,13 @@
         "candidate": {
           "style": "heading-1",
           "text": "Getting started",
+          "headingId": "h.doc-getting-started-0",
           "blockIndex": 0
         },
         "titleCount": 0,
-        "heading1Count": 1
+        "heading1Count": 1,
+        "titles": [],
+        "mixedScriptHeadings": []
       },
       "removedTitleHeading": false,
       "match": "different",
@@ -219,16 +385,27 @@
         "orderPrefix": false,
         "underscorePrefix": false,
         "underscores": false,
-        "fileExtension": false
+        "fileExtension": false,
+        "copyOf": false,
+        "extraSpaces": false
       },
-      "mixedScriptHeadings": []
+      "issues": [
+        {
+          "check": "title-styled-as-heading-1",
+          "text": "Getting started",
+          "headingId": "h.doc-getting-started-0"
+        }
+      ]
     },
     {
       "id": "doc-cyrillic",
       "slug": "рабочие-заметки",
       "name": "Рабочие заметки",
       "title": "Рабочие заметки",
+      "folderPath": [],
+      "lastEditedBy": "Avery Example",
       "source": {
+        "version": 2,
         "firstBlocks": [
           "heading-1",
           "text",
@@ -237,10 +414,13 @@
         "candidate": {
           "style": "heading-1",
           "text": "Рабочие заметки",
+          "headingId": "h.doc-cyrillic-0",
           "blockIndex": 0
         },
         "titleCount": 0,
-        "heading1Count": 1
+        "heading1Count": 1,
+        "titles": [],
+        "mixedScriptHeadings": []
       },
       "removedTitleHeading": true,
       "match": "identical",
@@ -249,9 +429,17 @@
         "orderPrefix": false,
         "underscorePrefix": false,
         "underscores": false,
-        "fileExtension": false
+        "fileExtension": false,
+        "copyOf": false,
+        "extraSpaces": false
       },
-      "mixedScriptHeadings": []
+      "issues": [
+        {
+          "check": "title-styled-as-heading-1",
+          "text": "Рабочие заметки",
+          "headingId": "h.doc-cyrillic-0"
+        }
+      ]
     }
   ]
 }

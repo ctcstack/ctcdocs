@@ -250,3 +250,54 @@ export function documentLinkingAnother():
   }
   return undefined;
 }
+
+/**
+ * The title report behind the content health page, when the corpus has one
+ * in the shape the page reads (ADR-024): the first sync on a platform that
+ * writes it adds it.
+ */
+export function contentHealthReport():
+  | {
+      sections: string[];
+      issueCount: number;
+      linkedIssueCount: number;
+    }
+  | undefined {
+  let report: unknown;
+  try {
+    report = JSON.parse(
+      readFileSync(
+        resolve(repositoryRoot, PROJECT_LAYOUT.titleReportFile),
+        'utf8',
+      ),
+    );
+  } catch {
+    return undefined;
+  }
+  const typed = report as {
+    schemaVersion?: number;
+    documents?: Array<{
+      folderPath: string[];
+      issues: Array<{ headingId?: string }>;
+    }>;
+  };
+  if (typed.schemaVersion !== 2 || !typed.documents) {
+    return undefined;
+  }
+  return {
+    sections: [
+      ...new Set(
+        typed.documents.map((document) => document.folderPath[0] ?? 'General'),
+      ),
+    ],
+    issueCount: typed.documents.reduce(
+      (sum, document) => sum + document.issues.length,
+      0,
+    ),
+    linkedIssueCount: typed.documents.reduce(
+      (sum, document) =>
+        sum + document.issues.filter((issue) => issue.headingId).length,
+      0,
+    ),
+  };
+}

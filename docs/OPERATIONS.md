@@ -268,39 +268,45 @@ An overview document is not this page. It keeps its own address and appears in
 the listing like any other document. See
 [ADR-014](ADR/014-section-index-pages.md).
 
-## The title report
+## Content health
 
 Every sync writes `data/title-report.json`
-([ADR-023](ADR/023-title-report.md)). It records how each document opens,
-read from the paragraph styles in Google Docs:
+([ADR-023](ADR/023-title-report.md)), and the site publishes what it found at
+`/content-health/` ([ADR-024](ADR/024-content-health-page.md)). Send editors
+there. It is not in the sidebar or in search.
 
-- whether the document opens with a Title, a Heading 1 or body text;
-- the title candidate (the first Title paragraph, or else the first
-  Heading 1) and how it compares with the Drive name the page is titled by;
-- whether a leading Heading 1 was dropped as a copy of that name;
-- what the Drive name carries besides a title: order prefixes, underscores,
-  file extensions.
+The page groups issues by what fixes them:
 
-It changes nothing on the site. Read it with:
+- **Fix.** A heading that mixes alphabets, a document that opens with
+  another document's title, an empty document.
+- **Proposed convention: one Title line.** A document opens with its name as
+  one line in the Title style, and uses Heading 1 to 3 for sections.
+- **Worth a look.** Drive names with "Copy of", a file extension, underscores
+  or extra spaces.
+
+Each check says what to do. Each document links to its page and to Google
+Docs, straight to the line concerned when there is one, and shows its
+section and who last edited it. Filter by section, or by last editor, to hand
+out the work. The page is rebuilt on every sync, so a fixed item disappears
+after the next one.
+
+The job summary of every sync lists the same checks as counts, with a link to
+the page. It never names a document.
+
+At a terminal, the same report reads:
 
 ```bash
 pnpm exec ctcdocs-sync titles
 pnpm exec ctcdocs-sync titles --list
 ```
 
-The first prints counts only. `--list` names the documents behind each count
-and quotes their headings, so run it at a terminal, not in a CI log. A
-document not exported since the platform began writing the report is counted
-as not yet inspected. Run the sync once with `full` to inspect every
-document.
+The first prints counts only. `--list` names documents, quotes their headings
+and prints Google Docs links, so run it at a terminal, not in a CI log.
 
-The report also lists headings that mix alphabets inside a word, such as a
-Cyrillic `С` typed into `Contacts`. These do not stop a sync; the sync summary
-gives their count:
-
-```text
-Documents with a heading mixing alphabets: 1 (see data/title-report.json)
-```
+A document is inspected when a sync exports it. After upgrading to a platform
+that records more about each document, the page counts documents as not yet
+inspected until they are exported again. Run the sync once with `full` to
+inspect every document.
 
 ## Content lifecycle operations
 

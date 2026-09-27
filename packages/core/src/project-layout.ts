@@ -54,11 +54,17 @@ export const PLATFORM_ROUTES = {
    * docs/ADR/022-permanent-short-ids.md.
    */
   permanentLinks: 'd',
+  /**
+   * What editors have to fix, grouped by action. See
+   * docs/ADR/024-content-health-page.md.
+   */
+  contentHealth: 'content-health',
 } as const;
 
 /** Each platform route as the href a link uses. */
 export const PLATFORM_ROUTE_HREFS = {
   fullIndex: `/${PLATFORM_ROUTES.fullIndex}/`,
+  contentHealth: `/${PLATFORM_ROUTES.contentHealth}/`,
 } as const;
 
 export const RESERVED_SLUGS: readonly string[] = Object.freeze(
