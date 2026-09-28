@@ -386,11 +386,19 @@ export function folderLabels(selected: SelectedInventoryItem): string[] {
     .map((segment) => parseOrderedLabel(segment).label);
 }
 
+/**
+ * Opens the item in Drive. Drive's own link names the account that owns the
+ * file and how the link was made; neither belongs in a report, so both go.
+ */
 export function driveUrl(selected: SelectedInventoryItem): string {
-  return (
-    selected.item.webViewLink ??
-    `https://drive.google.com/open?id=${encodeURIComponent(selected.item.id)}`
-  );
+  const link = selected.item.webViewLink;
+  if (!link) {
+    return `https://drive.google.com/open?id=${encodeURIComponent(selected.item.id)}`;
+  }
+  const url = new URL(link);
+  url.searchParams.delete('ouid');
+  url.searchParams.delete('usp');
+  return url.toString();
 }
 
 /** Keys in the order the report schema lists them, for stable bytes. */

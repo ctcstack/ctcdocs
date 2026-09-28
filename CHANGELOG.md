@@ -2,6 +2,16 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Fixed
+
+- A PDF whose page was written by an earlier text extraction is read again
+  by a normal sync, as 0.11.0 said, and not only by a full one.
+- Links to files in Drive no longer carry the `ouid` and `usp` parameters
+  Drive adds, which name the account that owns a file and how the link was
+  made, in the sync report, the job summary and the content health page.
+
 ## 0.11.0
 
 ### Added

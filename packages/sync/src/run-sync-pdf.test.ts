@@ -225,15 +225,17 @@ describe('PDF files', () => {
     delete manifest.documents['pdf-handbook']?.pdfTextVersion;
     await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
-    await runBasicMarkdownSync(
+    // A normal sync, not a full one: nothing else about the PDF changed.
+    const again = await runBasicMarkdownSync(
       testSyncContext(root),
       configuration,
       tokenProvider,
-      { dryRun: false, full: true },
+      { dryRun: false, full: false },
       dependencies(extra, { 'pdf-handbook': handbook }, downloads),
     );
 
     expect(downloads).toEqual(['pdf-handbook', 'pdf-handbook']);
+    expect(again.report.summary.exported).toBe(1);
     expect(
       (await readManifest(root)).documents['pdf-handbook']?.pdfTextVersion,
     ).toBe(PDF_TEXT_VERSION);
