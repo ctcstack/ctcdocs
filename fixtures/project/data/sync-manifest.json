@@ -94,8 +94,8 @@
       "stableSlug": "reference/screenshots",
       "generatedMarkdownPath": "src/content/docs/_generated/doc-screenshots.md",
       "generatedAssetsDirectory": "src/assets/generated/doc-screenshots",
-      "contentHash": "sha256:e9e1d619ec3a0cecf75355c1f2a6dd861a1c6591e4ca7729be4642c463beb5b5",
-      "outputHash": "sha256:744f99a98f462b3c9ae6a04d07657befa84bf4bc8bc32cbd897b16f0b2c9bd41",
+      "contentHash": "sha256:98b32149fccbecef08945ca99a6c47077c8ddab47ad80ca5e7017d42cc9fb816",
+      "outputHash": "sha256:f77b2887cad3ce2497cfcc4e2b6eaec2bfedefb46d3848e19a5d16ea0ba4a9d9",
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "hybrid",
       "warnings": [
