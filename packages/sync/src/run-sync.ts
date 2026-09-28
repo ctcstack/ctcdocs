@@ -1,10 +1,13 @@
 import { readFile, readdir } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { posix, resolve } from 'node:path';
 
 import { PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
 
 import { extractSafeZipEntries, UnsafeZipError } from './archive/safe-zip.js';
-import { UnsafeAssetError } from './assets/validate-asset.js';
+import {
+  IMAGE_FILE_EXTENSIONS,
+  UnsafeAssetError,
+} from './assets/validate-asset.js';
 import type { SyncContext } from './project-context.js';
 import type { SyncConfiguration } from './config.js';
 import {
@@ -348,6 +351,35 @@ function generatedAssetsDirectory(fileId: string): string {
   return `${PROJECT_LAYOUT.generatedAssetsDirectory}/${fileId}`;
 }
 
+/**
+ * The record of a page that came out the same, brought up to date with what
+ * its conversion found that is not in the page: the export it came through,
+ * its warnings, and its image counts. Fields keep their places and the counts
+ * go last, as in the schema, so a record read back serializes the same.
+ */
+function withConversionFacts(
+  record: SyncedDocumentRecord,
+  converted: Pick<
+    ConvertedDocument,
+    'exportMode' | 'warnings' | 'undescribedImages' | 'croppedImages'
+  >,
+): SyncedDocumentRecord {
+  const updated: SyncedDocumentRecord = {
+    ...record,
+    exportMode: converted.exportMode,
+    warnings: converted.warnings,
+  };
+  delete updated.undescribedImages;
+  delete updated.croppedImages;
+  if (converted.undescribedImages !== undefined) {
+    updated.undescribedImages = converted.undescribedImages;
+  }
+  if (converted.croppedImages !== undefined) {
+    updated.croppedImages = converted.croppedImages;
+  }
+  return updated;
+}
+
 async function mapWithConcurrency<TInput, TOutput>(
   inputs: readonly TInput[],
   concurrency: number,
@@ -640,6 +672,8 @@ interface ConvertedDocument {
   pdf?: GeneratedPdfFacts;
   sourceChecksum?: string;
   pdfTextVersion?: number;
+  undescribedImages?: number;
+  croppedImages?: number;
 }
 
 export async function runBasicMarkdownSync(
@@ -1056,7 +1090,12 @@ async function synchronize(
                 existingOutputInvalid ||
                 // A PDF read by an earlier text extraction is read again.
                 (selected.item.mimeType === GOOGLE_DRIVE_PDF_MIME_TYPE &&
-                  existingRecord.pdfTextVersion !== PDF_TEXT_VERSION),
+                  existingRecord.pdfTextVersion !== PDF_TEXT_VERSION) ||
+                // Images converted before they were counted.
+                (existingRecord.exportMode === 'hybrid' &&
+                  (existingRecord.undescribedImages === undefined ||
+                    existingRecord.croppedImages === undefined) &&
+                  existingAssets.length > 0),
           added: existingRecord === undefined,
         };
       }),
@@ -1093,6 +1132,8 @@ async function synchronize(
     let assets: ExistingAsset[] = [];
     let exportMode: SyncedDocumentRecord['exportMode'] = 'markdown';
     let warnings: string[];
+    let undescribedImages: number | undefined;
+    let croppedImages: number | undefined;
     if (fallbackReasons.size > 0) {
       if (!exporter.exportHtmlZip) {
         throw new Error(
@@ -1120,6 +1161,7 @@ async function synchronize(
         repositoryPath: asset.repositoryPath,
       }));
       exportMode = 'hybrid';
+      ({ undescribedImages, croppedImages } = conversion);
       warnings = [
         ...[...fallbackReasons].sort().map((reason) => `fallback:${reason}`),
         ...conversion.warnings,
@@ -1140,6 +1182,8 @@ async function synchronize(
       exportMode,
       warnings: [...new Set([...warnings, ...rewritten.warnings])].sort(),
       titleFacts: structure.titleFacts ?? null,
+      ...(undescribedImages === undefined ? {} : { undescribedImages }),
+      ...(croppedImages === undefined ? {} : { croppedImages }),
     };
   };
 
@@ -1275,7 +1319,7 @@ async function synchronize(
       return {
         fileId: item.id,
         content: planned.existingContent,
-        record: planned.existingRecord,
+        record: withConversionFacts(planned.existingRecord, converted),
         folderPath,
         assets: planned.existingAssets,
         titleFacts: converted.titleFacts,
@@ -1325,6 +1369,12 @@ async function synchronize(
       ...(converted.pdfTextVersion
         ? { pdfTextVersion: converted.pdfTextVersion }
         : {}),
+      ...(converted.undescribedImages === undefined
+        ? {}
+        : { undescribedImages: converted.undescribedImages }),
+      ...(converted.croppedImages === undefined
+        ? {}
+        : { croppedImages: converted.croppedImages }),
     };
     return {
       fileId: item.id,
@@ -1573,7 +1623,31 @@ async function synchronize(
     ]),
     incomplete,
   );
-  const notes = createNotes(selection, candidateManifest);
+  /*
+   * The image files each page publishes, from the output itself, so a change
+   * of the limit reads as soon as the next run; a PDF's file sits in the same
+   * directory and is not an image.
+   */
+  const documentByAssetsDirectory = new Map(
+    Object.values(candidateManifest.documents).map((record) => [
+      record.generatedAssetsDirectory,
+      record.googleFileId,
+    ]),
+  );
+  const imageBytes = new Map<string, number[]>();
+  for (const [path, bytes] of output) {
+    const fileId = documentByAssetsDirectory.get(posix.dirname(path));
+    if (fileId && IMAGE_FILE_EXTENSIONS.has(posix.extname(path))) {
+      imageBytes.set(fileId, [
+        ...(imageBytes.get(fileId) ?? []),
+        typeof bytes === 'string' ? Buffer.byteLength(bytes) : bytes.byteLength,
+      ]);
+    }
+  }
+  const notes = createNotes(selection, candidateManifest, {
+    largeImageMegabytes: site.sync.largeImageMegabytes,
+    imageBytes,
+  });
   const pdfs = publishedRecords.filter(
     (record) => record.exportMode === 'pdf',
   ).length;

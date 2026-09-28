@@ -327,6 +327,30 @@ describe('parseSiteConfiguration', () => {
     );
   });
 
+  it('notes images over 2 MB unless a project sets its own limit', () => {
+    expect(
+      parseSiteConfiguration(validConfiguration()).sync.largeImageMegabytes,
+    ).toBe(2);
+
+    const raw = validConfiguration();
+    (raw.sync as Record<string, unknown>).largeImageMegabytes = 1.5;
+    expect(parseSiteConfiguration(raw).sync.largeImageMegabytes).toBe(1.5);
+  });
+
+  it.each<[unknown, string]>([
+    [0, 'a limit every image is over'],
+    [-1, 'a negative size'],
+    ['2', 'a number written as text'],
+    [Number.POSITIVE_INFINITY, 'no limit at all'],
+  ])('rejects %s as a large image limit (%s)', (value) => {
+    const raw = validConfiguration();
+    (raw.sync as Record<string, unknown>).largeImageMegabytes = value;
+
+    expect(() => parseSiteConfiguration(raw)).toThrow(
+      /sync\.largeImageMegabytes must be a number of megabytes above 0/u,
+    );
+  });
+
   it('lets a project keep the index off its home page', () => {
     const raw = validConfiguration();
     (raw.home as Record<string, unknown>).corpusIndex = false;

@@ -108,6 +108,95 @@ describe('createNotes', () => {
     });
   });
 
+  it('notes the images a page describes only by its document', () => {
+    const notes = createNotes(
+      corpus([
+        item('many', 'Plan', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('one', 'Brief', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('none', 'Guide', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('older', 'Notes', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+      ]),
+      manifestOf([
+        { ...record('many', 'team/plan'), undescribedImages: 3 },
+        { ...record('one', 'team/brief'), undescribedImages: 1 },
+        { ...record('none', 'team/guide'), undescribedImages: 0 },
+        // Converted before images were counted: nothing is known yet.
+        record('older', 'team/notes'),
+      ]),
+    );
+
+    expect(
+      notes.map(({ note, name, detail }) => ({ note, name, detail })),
+    ).toEqual([
+      { note: 'image-undescribed', name: 'Brief', detail: '1 image' },
+      { note: 'image-undescribed', name: 'Plan', detail: '3 images' },
+    ]);
+  });
+
+  it('notes the images cropped in Google Docs', () => {
+    const notes = createNotes(
+      corpus([
+        item('cropped', 'Plan', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('whole', 'Guide', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+      ]),
+      manifestOf([
+        {
+          ...record('cropped', 'team/plan'),
+          undescribedImages: 0,
+          croppedImages: 2,
+        },
+        {
+          ...record('whole', 'team/guide'),
+          undescribedImages: 0,
+          croppedImages: 0,
+        },
+      ]),
+    );
+
+    expect(
+      notes.map(({ note, name, detail }) => ({ note, name, detail })),
+    ).toEqual([{ note: 'image-cropped', name: 'Plan', detail: '2 images' }]);
+  });
+
+  it('notes images larger than the limit a project sets', () => {
+    const notes = createNotes(
+      corpus([
+        item('heavy', 'Plan', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('light', 'Guide', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('one', 'Brief', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+      ]),
+      manifestOf([
+        record('heavy', 'team/plan'),
+        record('light', 'team/guide'),
+        record('one', 'team/brief'),
+      ]),
+      {
+        largeImageMegabytes: 2,
+        imageBytes: new Map([
+          ['heavy', [4_330_000, 150_000, 2_100_000]],
+          // An image of exactly the limit is not over it.
+          ['light', [1_990_000, 2_000_000]],
+          ['one', [2_500_000]],
+        ]),
+      },
+    );
+
+    expect(
+      notes.map(({ note, name, detail }) => ({ note, name, detail })),
+    ).toEqual([
+      {
+        note: 'image-large',
+        name: 'Brief',
+        detail: '1 image over 2 MB: 2.5 MB',
+      },
+      {
+        note: 'image-large',
+        name: 'Plan',
+        detail: '2 images over 2 MB, the largest 4.3 MB',
+      },
+    ]);
+  });
+
   it('notes files in one folder the site cannot tell apart', () => {
     const notes = createNotes(
       corpus([

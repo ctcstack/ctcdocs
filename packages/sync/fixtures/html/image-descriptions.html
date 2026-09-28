@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Image description fixture</title>
+  </head>
+  <body>
+    <img src="images/image1.png" alt="Synthetic pixel, described" />
+    <p>An image the editor left without alt text, three ways.</p>
+    <img src="images/image1.png" alt="" />
+    <img src="images/image1.png" alt="   " />
+    <img src="images/image1.png" />
+    <table>
+      <tr>
+        <td><img src="images/image1.png" /></td>
+      </tr>
+    </table>
+    <p>An external image is removed, so it is not counted.</p>
+    <img src="https://example.invalid/remote.png" />
+  </body>
+</html>

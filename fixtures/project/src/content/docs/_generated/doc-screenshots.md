@@ -8,7 +8,7 @@
 "googleFileId": "doc-screenshots"
 "googleModifiedTime": "2026-02-08T12:20:00.000Z"
 "syncedAt": "2026-02-10T06:00:00.000Z"
-"contentHash": "sha256:5da73f5114704897dac879e0bd090c8b2f9c455e5141854ad08e305ea2d3ecae"
+"contentHash": "sha256:98b32149fccbecef08945ca99a6c47077c8ddab47ad80ca5e7017d42cc9fb816"
 "folderPath":
   - "Reference"
 "pagefind": true
@@ -20,3 +20,5 @@ A document whose media forces the HTML archive path, so the asset route and the 
 ![Two-tone reference panel](../../../assets/generated/doc-screenshots/image-001.png)
 
 The image above is a synthetic swatch, not a screenshot of anything.
+
+![](../../../assets/generated/doc-screenshots/image-001.png)

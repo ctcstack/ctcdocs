@@ -3,6 +3,7 @@ import {
   isPublishedFileType,
   type DriveItem,
 } from '../google/drive-types.js';
+import { plural } from '../plural.js';
 
 export type InventoryIssueCode =
   | 'cycle'
@@ -37,7 +38,7 @@ export class InventoryGraphError extends Error {
 
   constructor(readonly issues: InventoryIssue[]) {
     super(
-      `Google Drive inventory graph is invalid (${issues.length} issue${issues.length === 1 ? '' : 's'}).`,
+      `Google Drive inventory graph is invalid (${plural(issues.length, 'issue')}).`,
     );
   }
 }

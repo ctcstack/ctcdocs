@@ -56,6 +56,91 @@ describe('HTML archive conversion', () => {
     ).toHaveLength(2);
   });
 
+  it('publishes an image without alt text with an empty alt, and counts it', async () => {
+    const assets = [{ path: 'images/image1.png', bytes: pixel }];
+    const result = convertHtmlArchive(
+      await fixtureEntries('image-descriptions.html', assets),
+      options,
+    );
+    const image = '../../../assets/generated/synthetic-document/image-001.png';
+
+    // Blank, whitespace, missing, and inside a table; the removed one is not.
+    expect(result.undescribedImages).toBe(4);
+    expect(result.body).toContain(`![Synthetic pixel, described](${image})`);
+    expect(result.body.split(`![](${image})`)).toHaveLength(4);
+    expect(result.body).toContain(`<img alt="" src="${image}">`);
+    expect(result.body).not.toContain('Synthetic document');
+    expect(result.warnings).toContain('removed_unsafe_image');
+
+    const described = convertHtmlArchive(
+      await fixtureEntries('duplicate-image.html', assets),
+      options,
+    );
+    expect(described.undescribedImages).toBe(0);
+  });
+
+  it('takes the title of an image as its alt text when it has no other', async () => {
+    const result = convertHtmlArchive(
+      await fixtureEntries('google-image-export.html', [
+        { path: 'images/image1.png', bytes: pixel },
+      ]),
+      options,
+    );
+    const image = '../../../assets/generated/synthetic-document/image-001.png';
+
+    expect(result.body).toContain(
+      `![Synthetic chart, described](${image} "Synthetic title")`,
+    );
+    // The title is the description, said once.
+    expect(result.body).toContain(`![Synthetic title only](${image})\n`);
+    expect(result.body).toContain(`\n![](${image})\n`);
+    // A blank title is not carried into the page.
+    expect(result.body).toContain(`<img alt="" src="${image}">`);
+    expect(result.undescribedImages).toBe(2);
+  });
+
+  it('counts the images Google crops, and publishes them as before', async () => {
+    const assets = [{ path: 'images/image1.png', bytes: pixel }];
+    const result = convertHtmlArchive(
+      await fixtureEntries('google-image-crop.html', assets),
+      options,
+    );
+    const image = '../../../assets/generated/synthetic-document/image-001.png';
+
+    expect(result.croppedImages).toBe(2);
+    for (const alt of [
+      'Uncropped',
+      'Cropped at the right and the bottom',
+      'Cropped at the top',
+      'Not framed',
+    ]) {
+      expect(result.body).toContain(`![${alt}](${image})`);
+    }
+
+    const uncropped = convertHtmlArchive(
+      await fixtureEntries('google-image-export.html', assets),
+      options,
+    );
+    expect(uncropped.croppedImages).toBe(0);
+  });
+
+  it('publishes a heading that holds only an image as a paragraph', async () => {
+    const result = convertHtmlArchive(
+      await fixtureEntries('image-heading.html', [
+        { path: 'images/image1.png', bytes: pixel },
+      ]),
+      options,
+    );
+    const image = '../../../assets/generated/synthetic-document/image-001.png';
+
+    expect(result.body.startsWith(`![](${image})\n`)).toBe(true);
+    expect(result.body).toContain(`### Setup ![Gear icon](${image})`);
+    // An image says nothing to the summary of the page; the first words do.
+    expect(result.description).toBe(
+      'A heading style applied to a line that holds only a picture.',
+    );
+  });
+
   it('preserves a merged table as sanitized HTML', async () => {
     const result = convertHtmlArchive(
       await fixtureEntries('merged-table.html'),

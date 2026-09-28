@@ -2,6 +2,45 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Added
+
+- Notes: a page with images that have no alt text, and how many, with the
+  instruction to add alt text in Google Docs. See
+  [ADR-029](docs/ADR/029-say-when-an-image-has-no-alt-text.md).
+- Notes: a page with images cropped in Google Docs, and how many. The site
+  shows such an image whole, the part cropped away included; the note says to
+  check that part and to crop an image before inserting it. Publication is
+  unchanged. The manifest records the count as `croppedImages`. See
+  [ADR-030](docs/ADR/030-note-images-cropped-in-google-docs.md).
+- Notes: a page with images larger than a size the project sets, how many,
+  and the largest. The size is `sync.largeImageMegabytes` in
+  `site.config.json`, 2 MB unless set, read from the published files on
+  every sync, so changing it needs no export. Nothing about the images
+  changes.
+
+### Changed
+
+- An image without alt text is published with an empty alt instead of
+  "Image from" and the document's title, which read as a description to AI
+  agents and screen readers. A page that opens with such an image takes its
+  summary from its first words instead.
+- A heading that holds only an image is published as a paragraph, instead of
+  a heading with no words in the table of contents.
+- An image with a title and no alt text takes its title as its alt text,
+  and a blank title is no longer carried into the page.
+- The first sync after upgrading exports every document with images
+  converted through the HTML export once more, to count them, and rewrites
+  the pages the changes above reach: an image without alt text or with only a
+  title, a heading that holds only an image, an image inside a table, which
+  loses the blank title Google gives every image, and the section pages whose
+  summaries change. Other pages are left as they are; the manifest records
+  the count as `undescribedImages`.
+- A page that comes out the same keeps its page, and its manifest record now
+  follows what the conversion found: the export it came through and its
+  warnings, as well as the count.
+
 ## 0.11.1
 
 ### Fixed

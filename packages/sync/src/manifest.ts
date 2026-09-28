@@ -44,6 +44,18 @@ const manifestDocumentSchema = z.object({
    * so a better extraction reads every PDF again once.
    */
   pdfTextVersion: z.number().int().positive().optional(),
+  /**
+   * For a Google Doc converted through the HTML export, how many of its images
+   * have no alt text and are published with an empty one (ADR-029). A page
+   * with images converted before they were counted has none, and is exported
+   * again once to count them.
+   */
+  undescribedImages: z.number().int().nonnegative().optional(),
+  /**
+   * For the same documents, how many of their images are cropped in Google
+   * Docs and published whole (ADR-030). Counted by the same export.
+   */
+  croppedImages: z.number().int().nonnegative().optional(),
 });
 
 const legacyManifestFolderSchema = z.object({

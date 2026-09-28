@@ -22,10 +22,12 @@ import type {
   SelectedInventoryItem,
 } from '../inventory/inventory-graph.js';
 import type { SyncManifest } from '../manifest.js';
+import { plural } from '../plural.js';
 import { slugifySegment } from '../slug.js';
 import { describeFileType, driveUrl, folderLabels } from './unpublished.js';
 
 export type NoteCode =
+  | 'image-cropped'
   | 'duplicate-name'
   | 'duplicate-order'
   | 'several-landing-documents'
@@ -37,7 +39,9 @@ export type NoteCode =
   | 'table-merge-removed'
   | 'formatting-removed'
   | 'code-block-unclosed'
-  | 'pdf-text-truncated';
+  | 'pdf-text-truncated'
+  | 'image-undescribed'
+  | 'image-large';
 
 export interface NoteKind {
   code: NoteCode;
@@ -49,6 +53,13 @@ export interface NoteKind {
 
 /** In the order the page shows them: what readers notice first. */
 export const NOTE_KINDS: readonly NoteKind[] = [
+  {
+    code: 'image-cropped',
+    title: 'An image is cropped in Google Docs',
+    action: 'Check what was cropped away',
+    instruction:
+      'The site shows the image as it was inserted, without the crop made in Google Docs, so readers and AI agents see the part cropped away too. Check that nothing in that part should stay out of the documentation. To show only what you kept, crop the image before inserting it.',
+  },
   {
     code: 'duplicate-name',
     title: 'Files in one folder share a name',
@@ -106,6 +117,20 @@ export const NOTE_KINDS: readonly NoteKind[] = [
       'The PDF holds more text than the site indexes, a million characters, so search finds only its first part. The file itself is complete. Split it if all of it should be found.',
   },
   {
+    code: 'image-undescribed',
+    title: 'An image has no description',
+    action: 'Add alt text',
+    instruction:
+      'The image has no alt text, so people using a screen reader, and AI agents reading the page as text, learn nothing of what it shows. In Google Docs, right-click the image, choose Alt text, and describe it in a sentence.',
+  },
+  {
+    code: 'image-large',
+    title: 'An image is larger than this site expects',
+    action: 'Use a smaller image',
+    instruction:
+      'The image file is larger than the size this site notes, so it is slow to open, and an AI agent may be refused it: some AI services take images of a few megabytes at most. Insert a smaller one: a screenshot cropped to what matters before it is inserted, or a photo as JPEG.',
+  },
+  {
     code: 'duplicate-order',
     title: 'Two items share an order number',
     action: 'Renumber one',
@@ -154,6 +179,14 @@ const ISSUE_NOTES: Readonly<Record<string, NoteCode>> = {
   ignored_outside_root: 'ignored-folder-missing',
 };
 
+/** The sizes of the images each page publishes, and the size to note. */
+export interface PublishedImageSizes {
+  /** From the project configuration: `sync.largeImageMegabytes`. */
+  largeImageMegabytes: number;
+  /** Bytes of each image file a document publishes, by Google file ID. */
+  imageBytes: ReadonlyMap<string, readonly number[]>;
+}
+
 export interface ReportNote {
   id: string;
   name: string;
@@ -193,13 +226,35 @@ function noteFor(
 
 const quoted = (name: string) => `“${name}”`;
 
+/** One decimal, the way a file size reads: `4.3 MB`. */
+const megabytes = (bytes: number) => `${(bytes / 1_000_000).toFixed(1)} MB`;
+
+function largeImages(
+  bytes: readonly number[],
+  images: PublishedImageSizes,
+): string | undefined {
+  const over = bytes
+    .filter((size) => size > images.largeImageMegabytes * 1_000_000)
+    .sort((left, right) => right - left);
+  const [largest] = over;
+  if (largest === undefined) {
+    return undefined;
+  }
+  const limit = `${images.largeImageMegabytes} MB`;
+  return over.length === 1
+    ? `1 image over ${limit}: ${megabytes(largest)}`
+    : `${plural(over.length, 'image')} over ${limit}, the largest ${megabytes(largest)}`;
+}
+
 /**
  * The notes for the corpus as it is published: `selection` is the inventory
- * the run published from, `manifest` what it published.
+ * the run published from, `manifest` what it published, and `images` the
+ * sizes of the image files it published.
  */
 export function createNotes(
   selection: InventorySelection,
   manifest: SyncManifest,
+  images?: PublishedImageSizes,
 ): ReportNote[] {
   const itemsById = new Map<string, SelectedInventoryItem>(
     [...selection.folders, ...selection.documents].map((selected) => [
@@ -224,6 +279,34 @@ export function createNotes(
     );
     for (const code of codes) {
       notes.push(noteFor(selected, code, record.stableSlug));
+    }
+    const cropped = record.croppedImages ?? 0;
+    if (cropped > 0) {
+      notes.push(
+        noteFor(
+          selected,
+          'image-cropped',
+          record.stableSlug,
+          plural(cropped, 'image'),
+        ),
+      );
+    }
+    const undescribed = record.undescribedImages ?? 0;
+    if (undescribed > 0) {
+      notes.push(
+        noteFor(
+          selected,
+          'image-undescribed',
+          record.stableSlug,
+          plural(undescribed, 'image'),
+        ),
+      );
+    }
+    const large = images
+      ? largeImages(images.imageBytes.get(record.googleFileId) ?? [], images)
+      : undefined;
+    if (large) {
+      notes.push(noteFor(selected, 'image-large', record.stableSlug, large));
     }
   }
 
