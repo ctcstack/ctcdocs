@@ -23,7 +23,7 @@
       "markdown": 5,
       "html": 2
     },
-    "notes": 2
+    "notes": 3
   },
   "reasons": [
     {
@@ -263,6 +263,12 @@
       "instruction": "The PDF holds more text than the site indexes, a million characters, so search finds only its first part. The file itself is complete. Split it if all of it should be found."
     },
     {
+      "code": "image-undescribed",
+      "title": "An image has no description",
+      "action": "Add alt text",
+      "instruction": "The image has no alt text, so the page can say only which document it is from. People using a screen reader, and AI agents reading the page as text, learn nothing of what it shows. In Google Docs, right-click the image, choose Alt text, and describe it in a sentence."
+    },
+    {
       "code": "duplicate-order",
       "title": "Two items share an order number",
       "action": "Renumber one",
@@ -315,6 +321,19 @@
       "slug": "reference/guides/style-guide--244fde",
       "note": "duplicate-name",
       "detail": "Also in this folder: “Style guide” (Google Docs)"
+    },
+    {
+      "id": "doc-screenshots",
+      "name": "Screenshots",
+      "folderPath": [
+        "Reference"
+      ],
+      "type": "Google Docs",
+      "sourceUrl": "https://drive.google.com/open?id=doc-screenshots",
+      "lastEditedBy": "Robin Sample",
+      "slug": "reference/screenshots",
+      "note": "image-undescribed",
+      "detail": "1 image"
     }
   ]
 }

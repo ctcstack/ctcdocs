@@ -94,15 +94,16 @@
       "stableSlug": "reference/screenshots",
       "generatedMarkdownPath": "src/content/docs/_generated/doc-screenshots.md",
       "generatedAssetsDirectory": "src/assets/generated/doc-screenshots",
-      "contentHash": "sha256:5da73f5114704897dac879e0bd090c8b2f9c455e5141854ad08e305ea2d3ecae",
-      "outputHash": "sha256:2165aaa4044719e832d9f137f99a27646e068b0f07732a4588ed015df65c9de4",
+      "contentHash": "sha256:e9e1d619ec3a0cecf75355c1f2a6dd861a1c6591e4ca7729be4642c463beb5b5",
+      "outputHash": "sha256:744f99a98f462b3c9ae6a04d07657befa84bf4bc8bc32cbd897b16f0b2c9bd41",
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "hybrid",
       "warnings": [
         "fallback:image",
         "fallback:media_object"
       ],
-      "shortId": "d252ed"
+      "shortId": "d252ed",
+      "undescribedImages": 1
     },
     "doc-style-guide": {
       "googleFileId": "doc-style-guide",
@@ -142,7 +143,8 @@
       "warnings": [
         "fallback:table"
       ],
-      "shortId": "14062a"
+      "shortId": "14062a",
+      "undescribedImages": 0
     },
     "pdf-release-checklist": {
       "googleFileId": "pdf-release-checklist",

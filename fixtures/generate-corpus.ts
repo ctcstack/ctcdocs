@@ -478,6 +478,11 @@ const htmlArchives = new Map<string, Uint8Array>([
             '<img src="images/panel.png" alt="Two-tone reference panel">',
             '<p>The image above is a synthetic swatch, not a screenshot of',
             ' anything.</p>',
+            /*
+             * The same swatch without alt text, which the content health page
+             * notes as an image with no description (ADR-029).
+             */
+            '<img src="images/panel.png">',
           ].join(''),
           'utf8',
         ),
