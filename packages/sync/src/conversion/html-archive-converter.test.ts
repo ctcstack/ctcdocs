@@ -79,6 +79,26 @@ describe('HTML archive conversion', () => {
     expect(described.undescribedImages).toBe(0);
   });
 
+  it('takes the title of an image as its alt text when it has no other', async () => {
+    const result = convertHtmlArchive(
+      await fixtureEntries('google-image-export.html', [
+        { path: 'images/image1.png', bytes: pixel },
+      ]),
+      options,
+    );
+    const image = '../../../assets/generated/synthetic-document/image-001.png';
+
+    expect(result.body).toContain(
+      `![Synthetic chart, described](${image} "Synthetic title")`,
+    );
+    // The title is the description, said once.
+    expect(result.body).toContain(`![Synthetic title only](${image})\n`);
+    expect(result.body).toContain(`\n![](${image})\n`);
+    // A blank title is not carried into the page.
+    expect(result.body).toContain(`<img alt="" src="${image}">`);
+    expect(result.undescribedImages).toBe(2);
+  });
+
   it('publishes a heading that holds only an image as a paragraph', async () => {
     const result = convertHtmlArchive(
       await fixtureEntries('image-heading.html', [

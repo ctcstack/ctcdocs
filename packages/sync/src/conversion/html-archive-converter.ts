@@ -367,6 +367,17 @@ export function convertHtmlArchive(
     }
     $(element).attr('src', asset.markdownPath);
     /*
+     * Google writes the Description in the Alt text dialog as alt and its
+     * Title as title, each empty when left blank. A title alone is the
+     * description an editor gave, so it becomes the alt, said once.
+     */
+    const title = $(element).attr('title')?.trim() ?? '';
+    if (!title) {
+      $(element).removeAttr('title');
+    } else if (!$(element).attr('alt')?.trim()) {
+      $(element).attr('alt', title).removeAttr('title');
+    }
+    /*
      * An empty alt says there is no description. Text made up in its place
      * would read as one, to an agent deciding whether to open the image and
      * to the summary taken from the first words of a page (ADR-029).

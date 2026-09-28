@@ -18,6 +18,8 @@ All three packages share a version and are released together.
   summary from its first words instead.
 - A heading that holds only an image is published as a paragraph, instead of
   a heading with no words in the table of contents.
+- An image with a title and no alt text takes its title as its alt text,
+  and a blank title is no longer carried into the page.
 - The first sync after upgrading exports every document converted through
   the HTML export once more, to count its images, and rewrites the pages with
   an image without alt text. Other pages are left as they are; the manifest

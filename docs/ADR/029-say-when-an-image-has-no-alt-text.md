@@ -22,23 +22,31 @@ conversion left no warning, so the content health page could not say which
 pages need descriptions, and editors had no way to see the work or their
 progress on it.
 
+Google's HTML export writes the Alt text dialog's Description as an image's
+`alt` and its Title as `title`, each empty when the editor left it blank. The
+converter kept a title only as a Markdown title, so an image an editor gave
+only a title still received the made-up alt.
+
 The sync must not write descriptions itself. AGENTS.md rules out an LLM content
 transformation, and only the editor knows what an image is there to show.
 
 ## Decision
 
-**An image without alt text is published with an empty alt.** `![](…)` in the
-Markdown and `alt=""` in HTML say plainly that there is no description. A page
-takes its summary from its first words, not from an image.
+**An image with a title and no alt text takes its title as its alt**, said
+once rather than as both. A blank title is dropped.
+
+**An image without alt text or a title is published with an empty alt.**
+`![](…)` in the Markdown and `alt=""` in HTML say plainly that there is no
+description. A page takes its summary from its first words, not from an image.
 
 **A heading that holds only an image is published as a paragraph.** A heading
 style applied to a line with a picture would otherwise leave a heading with no
 words, nothing to show in the table of contents or to link to.
 
 **The converter counts the images it publishes without alt text.** Every
-image kept on the page whose alt is missing or blank counts, each time it
-appears, inside a table as well. An image removed as unsafe is not on the page
-and is not counted.
+image kept on the page whose alt and title are both missing or blank counts,
+each time it appears, inside a table as well. An image removed as unsafe is not
+on the page and is not counted.
 
 **The manifest records the count as `undescribedImages`** on every document
 converted through the HTML export, zero included. A document converted from
@@ -85,9 +93,6 @@ the one that writes the empty alt.
 
 ### Follow-up
 
-- Confirm on a sanitized real export how Google writes an image's alt text and
-  title into the HTML export, add it as a converter fixture, and use a title as
-  the alt when it is the only text an editor gave.
 - If a count per page proves too coarse, locate each image from the Docs API
   structure, whose embedded objects carry the alt text as `title` and
   `description`, next to the heading it sits under.
