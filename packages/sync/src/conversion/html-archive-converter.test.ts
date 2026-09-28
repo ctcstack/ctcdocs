@@ -56,6 +56,28 @@ describe('HTML archive conversion', () => {
     ).toHaveLength(2);
   });
 
+  it('counts the images that carry no description of their own', async () => {
+    const assets = [{ path: 'images/image1.png', bytes: pixel }];
+    const result = convertHtmlArchive(
+      await fixtureEntries('image-descriptions.html', assets),
+      options,
+    );
+
+    // Blank, whitespace, missing, and inside a table; the removed one is not.
+    expect(result.undescribedImages).toBe(4);
+    expect(result.body).toContain('![Synthetic pixel, described]');
+    expect(result.body.match(/Image from Synthetic document/gu)).toHaveLength(
+      4,
+    );
+    expect(result.warnings).toContain('removed_unsafe_image');
+
+    const described = convertHtmlArchive(
+      await fixtureEntries('duplicate-image.html', assets),
+      options,
+    );
+    expect(described.undescribedImages).toBe(0);
+  });
+
   it('preserves a merged table as sanitized HTML', async () => {
     const result = convertHtmlArchive(
       await fixtureEntries('merged-table.html'),

@@ -51,5 +51,6 @@ Rejected
 - ADR-026: hold back a document that cannot be exported, not the corpus.
 - ADR-027: publish PDF files from Drive. Supersedes ADR-020 in part.
 - ADR-028: make every sync legible, grouped by what to do.
+- ADR-029: note images that have no alt text.
 
 Create a new ADR by copying `000-template.md`.

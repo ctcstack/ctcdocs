@@ -348,6 +348,25 @@ function generatedAssetsDirectory(fileId: string): string {
   return `${PROJECT_LAYOUT.generatedAssetsDirectory}/${fileId}`;
 }
 
+/**
+ * A record with the count of images a conversion found without alt text, the
+ * last field as in the schema, so a record read back serializes the same.
+ */
+function withUndescribedImages(
+  record: SyncedDocumentRecord,
+  undescribedImages: number | undefined,
+): SyncedDocumentRecord {
+  if (record.undescribedImages === undescribedImages) {
+    return record;
+  }
+  const updated: SyncedDocumentRecord = { ...record };
+  delete updated.undescribedImages;
+  if (undescribedImages !== undefined) {
+    updated.undescribedImages = undescribedImages;
+  }
+  return updated;
+}
+
 async function mapWithConcurrency<TInput, TOutput>(
   inputs: readonly TInput[],
   concurrency: number,
@@ -640,6 +659,7 @@ interface ConvertedDocument {
   pdf?: GeneratedPdfFacts;
   sourceChecksum?: string;
   pdfTextVersion?: number;
+  undescribedImages?: number;
 }
 
 export async function runBasicMarkdownSync(
@@ -1056,7 +1076,10 @@ async function synchronize(
                 existingOutputInvalid ||
                 // A PDF read by an earlier text extraction is read again.
                 (selected.item.mimeType === GOOGLE_DRIVE_PDF_MIME_TYPE &&
-                  existingRecord.pdfTextVersion !== PDF_TEXT_VERSION),
+                  existingRecord.pdfTextVersion !== PDF_TEXT_VERSION) ||
+                // An HTML export converted before images were counted.
+                (existingRecord.exportMode === 'hybrid' &&
+                  existingRecord.undescribedImages === undefined),
           added: existingRecord === undefined,
         };
       }),
@@ -1093,6 +1116,7 @@ async function synchronize(
     let assets: ExistingAsset[] = [];
     let exportMode: SyncedDocumentRecord['exportMode'] = 'markdown';
     let warnings: string[];
+    let undescribedImages: number | undefined;
     if (fallbackReasons.size > 0) {
       if (!exporter.exportHtmlZip) {
         throw new Error(
@@ -1120,6 +1144,7 @@ async function synchronize(
         repositoryPath: asset.repositoryPath,
       }));
       exportMode = 'hybrid';
+      ({ undescribedImages } = conversion);
       warnings = [
         ...[...fallbackReasons].sort().map((reason) => `fallback:${reason}`),
         ...conversion.warnings,
@@ -1140,6 +1165,7 @@ async function synchronize(
       exportMode,
       warnings: [...new Set([...warnings, ...rewritten.warnings])].sort(),
       titleFacts: structure.titleFacts ?? null,
+      ...(undescribedImages === undefined ? {} : { undescribedImages }),
     };
   };
 
@@ -1275,7 +1301,11 @@ async function synchronize(
       return {
         fileId: item.id,
         content: planned.existingContent,
-        record: planned.existingRecord,
+        // The count is about the page, not in it: a new one leaves it as it is.
+        record: withUndescribedImages(
+          planned.existingRecord,
+          converted.undescribedImages,
+        ),
         folderPath,
         assets: planned.existingAssets,
         titleFacts: converted.titleFacts,
@@ -1325,6 +1355,9 @@ async function synchronize(
       ...(converted.pdfTextVersion
         ? { pdfTextVersion: converted.pdfTextVersion }
         : {}),
+      ...(converted.undescribedImages === undefined
+        ? {}
+        : { undescribedImages: converted.undescribedImages }),
     };
     return {
       fileId: item.id,

@@ -108,6 +108,31 @@ describe('createNotes', () => {
     });
   });
 
+  it('notes the images a page describes only by its document', () => {
+    const notes = createNotes(
+      corpus([
+        item('many', 'Plan', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('one', 'Brief', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('none', 'Guide', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('older', 'Notes', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+      ]),
+      manifestOf([
+        { ...record('many', 'team/plan'), undescribedImages: 3 },
+        { ...record('one', 'team/brief'), undescribedImages: 1 },
+        { ...record('none', 'team/guide'), undescribedImages: 0 },
+        // Converted before images were counted: nothing is known yet.
+        record('older', 'team/notes'),
+      ]),
+    );
+
+    expect(
+      notes.map(({ note, name, detail }) => ({ note, name, detail })),
+    ).toEqual([
+      { note: 'image-undescribed', name: 'Brief', detail: '1 image' },
+      { note: 'image-undescribed', name: 'Plan', detail: '3 images' },
+    ]);
+  });
+
   it('notes files in one folder the site cannot tell apart', () => {
     const notes = createNotes(
       corpus([

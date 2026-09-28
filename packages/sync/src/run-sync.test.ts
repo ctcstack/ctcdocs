@@ -658,6 +658,93 @@ describe('basic Markdown sync', () => {
     expect(second.outputChanged).toBe(false);
   });
 
+  it('counts images without a description, and once for a page written before', async () => {
+    const repository = await mkdtemp(resolve(tmpdir(), 'kb-sync-alt-'));
+    temporaryDirectories.push(repository);
+    const pixel = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      'base64',
+    );
+    const archive = createStoredZipFixture([
+      {
+        path: 'document.html',
+        bytes:
+          '<h1>Architecture</h1><p>Body with media.</p><img src="images/pixel.png" alt="Pixel"><img src="images/pixel.png">',
+      },
+      { path: 'images/pixel.png', bytes: pixel },
+    ]);
+    const run = (now: string) =>
+      runBasicMarkdownSync(
+        testSyncContext(repository),
+        configuration,
+        tokenProvider,
+        { dryRun: false, full: false },
+        {
+          inventoryResult: inventory(),
+          markdownExporter: {
+            exportMarkdown: () =>
+              Promise.resolve(
+                new TextEncoder().encode(
+                  '# Architecture\n\n![temporary](data:image/png;base64,fixture)\n',
+                ),
+              ),
+            exportHtmlZip: () => Promise.resolve(archive),
+          },
+          documentInspector: {
+            inspectDocument: () =>
+              Promise.resolve({
+                hasEmbeddedDrawings: false,
+                hasImages: true,
+                inlineObjectCount: 2,
+                positionedObjectCount: 0,
+                tabCount: 1,
+              }),
+          },
+          now: () => new Date(now),
+        },
+      );
+    const manifestPath = resolve(repository, 'data/sync-manifest.json');
+    const pagePath = resolve(
+      repository,
+      'src/content/docs/_generated/doc-one.md',
+    );
+    const readManifest = async () =>
+      JSON.parse(await readFile(manifestPath, 'utf8')) as {
+        documents: Record<string, { undescribedImages?: number }>;
+      };
+
+    const first = await run(firstTimestamp);
+    expect((await readManifest()).documents['doc-one']?.undescribedImages).toBe(
+      1,
+    );
+    expect(first.report.notes).toEqual([
+      expect.objectContaining({
+        id: 'doc-one',
+        note: 'image-undescribed',
+        detail: '1 image',
+      }),
+    ]);
+
+    // As a page written before images were counted records it.
+    const manifest = await readManifest();
+    delete manifest.documents['doc-one']?.undescribedImages;
+    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+    const page = await readFile(pagePath, 'utf8');
+
+    // A normal sync exports it again to count, and leaves the page as it was.
+    const again = await run(secondTimestamp);
+    expect(again.report.summary.exported).toBe(1);
+    expect(again.report.summary.changed).toBe(0);
+    await expect(readFile(pagePath, 'utf8')).resolves.toBe(page);
+    expect((await readManifest()).documents['doc-one']?.undescribedImages).toBe(
+      1,
+    );
+
+    const settled = await run(secondTimestamp);
+    expect(settled.report.summary.exported).toBe(0);
+    expect(settled.outputChanged).toBe(false);
+  });
+
   it('rewrites corpus links and restores an external link after target removal', async () => {
     const repository = await mkdtemp(resolve(tmpdir(), 'kb-sync-links-'));
     temporaryDirectories.push(repository);

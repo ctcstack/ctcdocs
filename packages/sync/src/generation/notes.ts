@@ -37,7 +37,8 @@ export type NoteCode =
   | 'table-merge-removed'
   | 'formatting-removed'
   | 'code-block-unclosed'
-  | 'pdf-text-truncated';
+  | 'pdf-text-truncated'
+  | 'image-undescribed';
 
 export interface NoteKind {
   code: NoteCode;
@@ -104,6 +105,13 @@ export const NOTE_KINDS: readonly NoteKind[] = [
     action: 'Split the PDF',
     instruction:
       'The PDF holds more text than the site indexes, a million characters, so search finds only its first part. The file itself is complete. Split it if all of it should be found.',
+  },
+  {
+    code: 'image-undescribed',
+    title: 'An image has no description',
+    action: 'Add alt text',
+    instruction:
+      'The image has no alt text, so the page can say only which document it is from. People using a screen reader, and AI agents reading the page as text, learn nothing of what it shows. In Google Docs, right-click the image, choose Alt text, and describe it in a sentence.',
   },
   {
     code: 'duplicate-order',
@@ -224,6 +232,17 @@ export function createNotes(
     );
     for (const code of codes) {
       notes.push(noteFor(selected, code, record.stableSlug));
+    }
+    const undescribed = record.undescribedImages ?? 0;
+    if (undescribed > 0) {
+      notes.push(
+        noteFor(
+          selected,
+          'image-undescribed',
+          record.stableSlug,
+          undescribed === 1 ? '1 image' : `${undescribed} images`,
+        ),
+      );
     }
   }
 

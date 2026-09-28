@@ -323,7 +323,9 @@ documents to fix — and when the site last changed
   - folders the site is configured to leave out.
 - **Notes**: pages that are on the site with something to know: what
   conversion left out (an image, a link, a merged cell, a link to a heading),
-  files in one folder the site cannot tell apart, order numbers used twice.
+  images with no alt text
+  ([ADR-029](ADR/029-note-images-without-alt-text.md)), files in one folder
+  the site cannot tell apart, order numbers used twice.
 
 A document held back
 ([ADR-026](ADR/026-hold-back-a-document-that-cannot-be-exported.md)) keeps

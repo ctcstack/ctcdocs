@@ -68,6 +68,8 @@ export interface HtmlArchiveConversion {
   description?: string;
   hasComplexTables: boolean;
   sanitizedHtml: string;
+  /** Images published with the document's title for want of alt text. */
+  undescribedImages: number;
   warnings: string[];
   removedTitleHeading: boolean;
 }
@@ -319,6 +321,7 @@ export function convertHtmlArchive(
 
   const assets: ConvertedArchiveAsset[] = [];
   const assetsByHash = new Map<string, ConvertedArchiveAsset>();
+  let undescribedImages = 0;
   $('body img').each((_, element) => {
     if (!(element instanceof Element)) {
       return;
@@ -365,6 +368,7 @@ export function convertHtmlArchive(
     $(element).attr('src', asset.markdownPath);
     if (!$(element).attr('alt')?.trim()) {
       $(element).attr('alt', `Image from ${options.documentTitle}`);
+      undescribedImages += 1;
     }
   });
 
@@ -387,6 +391,7 @@ export function convertHtmlArchive(
     ...(normalized.description ? { description: normalized.description } : {}),
     hasComplexTables,
     sanitizedHtml,
+    undescribedImages,
     warnings: [...new Set([...warnings, ...normalized.warnings])].sort(),
     removedTitleHeading: normalized.removedTitleHeading,
   };

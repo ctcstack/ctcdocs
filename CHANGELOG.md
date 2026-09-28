@@ -2,6 +2,23 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Added
+
+- Notes: a page with images that have no alt text, and how many. The page
+  describes such an image only by the document it is from, so readers using a
+  screen reader and AI agents reading the page as text learn nothing of what
+  it shows. The note says to add alt text in Google Docs. See
+  [ADR-029](docs/ADR/029-note-images-without-alt-text.md).
+
+### Changed
+
+- The first sync after upgrading exports every document converted through
+  the HTML export once more, to count its images. Pages that come out the
+  same are left as they are; the manifest records the count as
+  `undescribedImages`.
+
 ## 0.11.1
 
 ### Fixed
