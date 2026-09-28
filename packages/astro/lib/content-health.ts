@@ -1,9 +1,10 @@
 /**
- * The title report, shaped for the content health page (ADR-024).
+ * The reports behind the content health page (ADR-024, ADR-025).
  *
- * The sync writes `data/title-report.json`; the site only reads it, at build
- * time. The page needs a handful of its fields, typed here rather than
- * imported, so the site does not depend on the sync package.
+ * The sync writes `data/title-report.json` and `data/latest-sync-report.json`;
+ * the site only reads them, at build time. The page needs a handful of their
+ * fields, typed here rather than imported, so the site does not depend on the
+ * sync package.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -28,7 +29,7 @@ interface HealthIssue {
   related?: { slug: string; title: string };
 }
 
-export interface HealthDocument {
+interface HealthDocument {
   id: string;
   slug: string;
   name: string;
@@ -87,7 +88,63 @@ export function googleDocsUrl(
   return `https://docs.google.com/document/d/${encodeURIComponent(id)}/edit${tab}${heading}`;
 }
 
-/** The top-level folder a document is filed under, for the section filter. */
-export function sectionOf(document: HealthDocument): string {
-  return document.folderPath[0] ?? 'General';
+/** The top-level folder an item is filed under, for the section filter. */
+export function sectionOf(item: { folderPath: readonly string[] }): string {
+  return item.folderPath[0] ?? 'General';
+}
+
+type UnpublishedStatus = 'not-published' | 'out-of-date';
+
+interface UnpublishedReason {
+  code: string;
+  title: string;
+  instruction: string;
+}
+
+export interface UnpublishedItem {
+  id: string;
+  name: string;
+  folderPath: string[];
+  type: string;
+  status: UnpublishedStatus;
+  reason: string;
+  detail?: string;
+  sourceUrl: string;
+  lastEditedBy: string | null;
+  slug?: string;
+  publishedVersion?: string;
+}
+
+interface IgnoredFolder {
+  id: string;
+  name: string;
+  folderPath: string[];
+  items: number;
+}
+
+/** What the last sync left off the site, and why (ADR-025). */
+export interface UnpublishedReport {
+  reasons: UnpublishedReason[];
+  unpublished: UnpublishedItem[];
+  ignoredFolders: IgnoredFolder[];
+}
+
+/** The list, or `undefined` before a sync has written a report that has one. */
+export function loadUnpublishedReport(): UnpublishedReport | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(
+      readFileSync(
+        resolve(findProjectRoot(), PROJECT_LAYOUT.syncReportFile),
+        'utf8',
+      ),
+    );
+  } catch {
+    return undefined;
+  }
+  return typeof parsed === 'object' &&
+    parsed !== null &&
+    (parsed as { schemaVersion?: unknown }).schemaVersion === 2
+    ? (parsed as UnpublishedReport)
+    : undefined;
 }

@@ -385,6 +385,30 @@ describe('addresses that follow names', () => {
     ]);
   });
 
+  it('keeps a pinned document where it is when its folder moves', () => {
+    const allocation = allocateStableSlugs(
+      [root, folder('team', ['Published', 'Delivery'])],
+      [
+        document('file-a', ['Published', 'Delivery', 'Guide']),
+        document('file-b', ['Published', 'Delivery', 'Checklist']),
+      ],
+      manifestWith(
+        { 'file-a': 'team/guide', 'file-b': 'team/checklist' },
+        { team: 'team' },
+      ),
+      'follow-names',
+      new Set(['file-a']),
+    );
+
+    expect(allocation.folders.get('team')).toBe('delivery');
+    expect(allocation.documents.get('file-a')).toBe('team/guide');
+    expect(allocation.documents.get('file-b')).toBe('delivery/checklist');
+    expect(allocation.moves.map((move) => move.itemId)).toEqual([
+      'team',
+      'file-b',
+    ]);
+  });
+
   it('moves nothing when only the order prefix changes', () => {
     const allocation = allocateStableSlugs(
       [root, folder('team', ['Published', '07 - Team'])],

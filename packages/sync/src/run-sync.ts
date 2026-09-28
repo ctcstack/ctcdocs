@@ -3,10 +3,14 @@ import { resolve } from 'node:path';
 
 import { PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
 
-import { extractSafeZipEntries } from './archive/safe-zip.js';
+import { extractSafeZipEntries, UnsafeZipError } from './archive/safe-zip.js';
+import { UnsafeAssetError } from './assets/validate-asset.js';
 import type { SyncContext } from './project-context.js';
 import type { SyncConfiguration } from './config.js';
-import { convertHtmlArchive } from './conversion/html-archive-converter.js';
+import {
+  convertHtmlArchive,
+  HtmlArchiveConversionError,
+} from './conversion/html-archive-converter.js';
 import {
   createAiDocsIndex,
   serializeAiDocsIndex,
@@ -18,9 +22,17 @@ import {
 } from './generation/section-index.js';
 import { createSidebar, serializeSidebar } from './generation/sidebar.js';
 import {
+  recordedHeldDocuments,
+  reportsListTheSameItems,
   serializeSyncReport,
   type SyncReport,
 } from './generation/sync-report.js';
+import {
+  createIgnoredFolders,
+  createUnpublishedItems,
+  UNPUBLISHED_REASONS,
+  type HeldDocument,
+} from './generation/unpublished.js';
 import {
   createRedirectMap,
   serializeRedirectMap,
@@ -31,9 +43,12 @@ import {
   type GoogleDocumentStructure,
 } from './google/docs-client.js';
 import { GoogleDriveClient } from './google/drive-client.js';
-import type {
-  InventorySelection,
-  SelectedInventoryItem,
+import { GoogleApiError } from './google/google-api-error.js';
+import {
+  withDocumentsHeldBack,
+  type InventorySelection,
+  type RecordedPlacement,
+  type SelectedInventoryItem,
 } from './inventory/inventory-graph.js';
 import {
   runInventory,
@@ -48,7 +63,10 @@ import {
   sha256,
 } from './markdown/generated-document.js';
 import { detectMarkdownFallbackReasons } from './markdown/analyze-markdown.js';
-import { normalizeMarkdown } from './markdown/normalize-markdown.js';
+import {
+  MarkdownNormalizationError,
+  normalizeMarkdown,
+} from './markdown/normalize-markdown.js';
 import {
   rewriteInternalGoogleLinks,
   type InternalLinkTargets,
@@ -426,6 +444,74 @@ async function buildSectionIndexPages(
   return pages;
 }
 
+/**
+ * Why one document cannot be published, when the cause is the document itself
+ * and would stop it again on the next attempt: it is too large for Google to
+ * export, its owner turned off downloading, or it holds content conversion
+ * refuses. Such a document is held back and the rest of the corpus is
+ * published (ADR-026). Anything else — authentication, permission, rate
+ * limits, the network, a server error — says nothing about the document and
+ * still stops the run.
+ */
+function documentFailure(
+  error: unknown,
+  fileId: string,
+): HeldDocument | undefined {
+  if (error instanceof GoogleApiError) {
+    if (error.fileId !== fileId) {
+      return undefined;
+    }
+    if (error.category === 'export_size_limit') {
+      return { reason: 'export-too-large' };
+    }
+    if (error.category === 'download_restricted') {
+      return { reason: 'download-restricted' };
+    }
+    return undefined;
+  }
+  if (error instanceof MarkdownNormalizationError) {
+    return {
+      reason: 'content-rejected',
+      detail: `Markdown normalization: ${[...new Set(error.issues.map((issue) => issue.code))].sort().join(', ')}`,
+    };
+  }
+  // Their messages name a kind of problem, never document content.
+  if (
+    error instanceof UnsafeZipError ||
+    error instanceof UnsafeAssetError ||
+    error instanceof HtmlArchiveConversionError
+  ) {
+    return { reason: 'content-rejected', detail: error.message };
+  }
+  return undefined;
+}
+
+/**
+ * Answers a repeated request for a file from the first one. A run that holds a
+ * document back plans again without it, and the documents it had already
+ * exported are not fetched from Google a second time.
+ */
+function remember<TValue>(
+  load: (fileId: string) => Promise<TValue>,
+): (fileId: string) => Promise<TValue> {
+  const answers = new Map<string, Promise<TValue>>();
+  return (fileId) => {
+    let answer = answers.get(fileId);
+    if (!answer) {
+      answer = load(fileId);
+      answers.set(fileId, answer);
+    }
+    return answer;
+  };
+}
+
+interface ResolvedRun {
+  runTimestamp: string;
+  inventory: InventoryRunResult;
+  exporter: MarkdownExporter;
+  inspector: DocumentInspector;
+}
+
 export async function runBasicMarkdownSync(
   context: SyncContext,
   configuration: SyncConfiguration,
@@ -433,7 +519,6 @@ export async function runBasicMarkdownSync(
   options: RunSyncOptions,
   dependencies: RunSyncDependencies = {},
 ): Promise<SyncRunResult> {
-  const { markdownHeader, repositoryRoot, site, sourceHeader } = context;
   const runTimestamp = (dependencies.now ?? (() => new Date()))().toISOString();
   const inventory =
     dependencies.inventoryResult ??
@@ -481,6 +566,43 @@ export async function runBasicMarkdownSync(
             ? { baseUrl: dependencies.docsBaseUrl }
             : {}),
         }));
+  const exportHtmlZip = exporter.exportHtmlZip?.bind(exporter);
+  return synchronize(
+    context,
+    configuration,
+    options,
+    {
+      runTimestamp,
+      inventory,
+      exporter: {
+        exportMarkdown: remember((fileId) => exporter.exportMarkdown(fileId)),
+        ...(exportHtmlZip ? { exportHtmlZip: remember(exportHtmlZip) } : {}),
+      },
+      inspector: {
+        inspectDocument: remember((fileId) =>
+          inspector.inspectDocument(fileId),
+        ),
+      },
+    },
+    new Map(),
+  );
+}
+
+/**
+ * One pass over the corpus. `held` names the documents an earlier pass could
+ * not export: they are planned as the manifest last recorded them, or left out
+ * if it never did. A pass that meets a new such document starts over with it
+ * held as well, before anything is written.
+ */
+async function synchronize(
+  context: SyncContext,
+  configuration: SyncConfiguration,
+  options: RunSyncOptions,
+  run: ResolvedRun,
+  held: ReadonlyMap<string, HeldDocument>,
+): Promise<SyncRunResult> {
+  const { markdownHeader, repositoryRoot, site, sourceHeader } = context;
+  const { runTimestamp, inventory, exporter, inspector } = run;
   const existingManifest = await loadManifest(
     resolve(repositoryRoot, MANIFEST_PATH),
     configuration.GOOGLE_DRIVE_ID,
@@ -511,13 +633,40 @@ export async function runBasicMarkdownSync(
       'The requested Google file ID is not a document in the selected corpus.',
     );
   }
+  const replacements = new Map<string, RecordedPlacement>();
+  const removals = new Set<string>();
+  for (const fileId of held.keys()) {
+    const record = existingManifest.documents[fileId];
+    if (record?.googleParentId) {
+      replacements.set(fileId, {
+        name: record.googleName,
+        parentId: record.googleParentId,
+        modifiedTime: record.googleModifiedTime,
+      });
+    } else {
+      removals.add(fileId);
+    }
+  }
+  const heldBack = withDocumentsHeldBack(
+    inventory.selection,
+    replacements,
+    removals,
+  );
+  const { selection } = heldBack;
+  /** Held-back documents whose published version stays on the site. */
+  const kept = new Map(
+    [...heldBack.replaced].flatMap((fileId) => {
+      const record = existingManifest.documents[fileId];
+      return record ? [[fileId, record] as const] : [];
+    }),
+  );
   /*
    * A redirect leaves with its target (ADR-021). Only a run over the whole
    * corpus knows what left; a targeted run keeps every redirect it found.
    */
   const currentItemIds = new Set([
-    ...inventory.selection.folders.map((folder) => folder.item.id),
-    ...inventory.selection.documents.map((document) => document.item.id),
+    ...selection.folders.map((folder) => folder.item.id),
+    ...selection.documents.map((document) => document.item.id),
   ]);
   let redirects = Object.fromEntries(
     Object.entries(existingManifest.redirects)
@@ -534,10 +683,11 @@ export async function runBasicMarkdownSync(
    */
   const addressPolicy = targetedFileId ? 'stable' : site.navigation.addresses;
   const slugAllocation = allocateStableSlugs(
-    inventory.selection.folders,
-    inventory.selection.documents,
+    selection.folders,
+    selection.documents,
     { ...existingManifest, redirects },
     addressPolicy,
+    new Set(kept.keys()),
   );
   const stableSlugs = slugAllocation.documents;
   const folderSlugs = slugAllocation.folders;
@@ -550,15 +700,15 @@ export async function runBasicMarkdownSync(
     );
   }
   const shortIds = allocateShortIds(
-    inventory.selection.folders,
-    inventory.selection.documents,
+    selection.folders,
+    selection.documents,
     existingManifest,
-    inventory.selection.rootFolderId,
+    selection.rootFolderId,
   );
   let slugChange: SyncRunResult['slugChange'];
   if (options.reseedSlugFileId) {
     const existingRecord = existingManifest.documents[options.reseedSlugFileId];
-    const selected = inventory.selection.documents.find(
+    const selected = selection.documents.find(
       (document) => document.item.id === options.reseedSlugFileId,
     );
     if (!existingRecord || !selected) {
@@ -586,7 +736,7 @@ export async function runBasicMarkdownSync(
     slugChange = { oldSlug: existingRecord.stableSlug, newSlug };
   }
   const selectedDocumentIds = new Set(
-    inventory.selection.documents.map((document) => document.item.id),
+    selection.documents.map((document) => document.item.id),
   );
   const corpusChanged =
     selectedDocumentIds.size !==
@@ -594,7 +744,7 @@ export async function runBasicMarkdownSync(
     Object.keys(existingManifest.documents).some(
       (fileId) => !selectedDocumentIds.has(fileId),
     );
-  const selectedForPlan = inventory.selection.documents.filter(
+  const selectedForPlan = selection.documents.filter(
     (document) =>
       !targetedFileId ||
       document.item.id === targetedFileId ||
@@ -644,7 +794,7 @@ export async function runBasicMarkdownSync(
   };
   const sectionIndexPages = site.navigation.sectionIndexPages;
   const folders: Record<string, SyncedFolderRecord> = Object.fromEntries(
-    inventory.selection.folders
+    selection.folders
       .map((folder) => {
         const orderedLabel = parseOrderedLabel(folder.item.name);
         const stableSlug = folderSlugs.get(folder.item.id);
@@ -654,7 +804,7 @@ export async function runBasicMarkdownSync(
           {
             googleFolderId: folder.item.id,
             googleParentId:
-              folder.item.id === inventory.selection.rootFolderId
+              folder.item.id === selection.rootFolderId
                 ? null
                 : folder.parentId,
             googleName: folder.item.name,
@@ -721,169 +871,200 @@ export async function runBasicMarkdownSync(
           existingAssets,
           existingOutputInvalid,
           metadataChanged,
-          needsExport: targetedFileId
-            ? selected.item.id === targetedFileId
-            : forceFullExport ||
-              corpusChanged ||
-              existingRecord === undefined ||
-              existingRecord.stableSlug !== stableSlugs.get(selected.item.id) ||
-              existingRecord.shortId !== shortIds.get(selected.item.id) ||
-              metadataChanged ||
-              existingOutputInvalid,
+          // A held-back document keeps what it has; it is retried next run.
+          needsExport: kept.has(selected.item.id)
+            ? false
+            : targetedFileId
+              ? selected.item.id === targetedFileId
+              : forceFullExport ||
+                corpusChanged ||
+                existingRecord === undefined ||
+                existingRecord.stableSlug !==
+                  stableSlugs.get(selected.item.id) ||
+                existingRecord.shortId !== shortIds.get(selected.item.id) ||
+                metadataChanged ||
+                existingOutputInvalid,
           added: existingRecord === undefined,
         };
       }),
   );
 
-  const exportedDocuments = await mapWithConcurrency(
-    plannedDocuments.filter((document) => document.needsExport),
-    configuration.SYNC_CONCURRENCY,
-    async (planned) => {
-      const title = parseOrderedLabel(planned.selected.item.name).label;
-      const [markdownExport, structure] = await Promise.all([
-        exporter.exportMarkdown(planned.selected.item.id),
-        inspector.inspectDocument(planned.selected.item.id),
-      ]);
-      const fallbackReasons = new Set<string>(
-        detectMarkdownFallbackReasons(markdownExport),
-      );
-      if (structure.hasEmbeddedDrawings) {
-        fallbackReasons.add('embedded_drawing');
-      }
-      if (
-        structure.hasImages ||
-        structure.inlineObjectCount > 0 ||
-        structure.positionedObjectCount > 0
-      ) {
-        fallbackReasons.add('media_object');
-      }
+  const exportDocument = async (planned: PlannedDocument) => {
+    const title = parseOrderedLabel(planned.selected.item.name).label;
+    const [markdownExport, structure] = await Promise.all([
+      exporter.exportMarkdown(planned.selected.item.id),
+      inspector.inspectDocument(planned.selected.item.id),
+    ]);
+    const fallbackReasons = new Set<string>(
+      detectMarkdownFallbackReasons(markdownExport),
+    );
+    if (structure.hasEmbeddedDrawings) {
+      fallbackReasons.add('embedded_drawing');
+    }
+    if (
+      structure.hasImages ||
+      structure.inlineObjectCount > 0 ||
+      structure.positionedObjectCount > 0
+    ) {
+      fallbackReasons.add('media_object');
+    }
 
-      let normalized: {
-        body: string;
-        description?: string;
-        removedTitleHeading: boolean;
-      };
-      let assets: ExistingAsset[] = [];
-      let exportMode: SyncedDocumentRecord['exportMode'] = 'markdown';
-      let warnings: string[];
-      if (fallbackReasons.size > 0) {
-        if (!exporter.exportHtmlZip) {
-          throw new Error(
-            'HTML ZIP export is required for this document but is unavailable.',
-          );
-        }
-        const conversion = convertHtmlArchive(
-          extractSafeZipEntries(
-            await exporter.exportHtmlZip(planned.selected.item.id),
-          ),
-          {
-            documentId: planned.selected.item.id,
-            documentTitle: title,
-          },
+    let normalized: {
+      body: string;
+      description?: string;
+      removedTitleHeading: boolean;
+    };
+    let assets: ExistingAsset[] = [];
+    let exportMode: SyncedDocumentRecord['exportMode'] = 'markdown';
+    let warnings: string[];
+    if (fallbackReasons.size > 0) {
+      if (!exporter.exportHtmlZip) {
+        throw new Error(
+          'HTML ZIP export is required for this document but is unavailable.',
         );
-        normalized = {
-          body: conversion.body,
-          ...(conversion.description
-            ? { description: conversion.description }
-            : {}),
-          removedTitleHeading: conversion.removedTitleHeading,
-        };
-        assets = conversion.assets.map((asset) => ({
-          bytes: asset.bytes,
-          repositoryPath: asset.repositoryPath,
-        }));
-        exportMode = 'hybrid';
-        warnings = [
-          ...[...fallbackReasons].sort().map((reason) => `fallback:${reason}`),
-          ...conversion.warnings,
-        ];
-      } else {
-        const converted = normalizeMarkdown(markdownExport, title);
-        normalized = converted;
-        warnings = converted.warnings;
       }
-      const rewritten = rewriteInternalGoogleLinks(
-        normalized.body,
-        linkTargets,
-      );
-      normalized.body = rewritten.body;
-      warnings = [...new Set([...warnings, ...rewritten.warnings])].sort();
-      const folderPath = planned.selected.path
-        .slice(1, -1)
-        .map((segment) => parseOrderedLabel(segment).label);
-      const contentHash = computeGeneratedContentHash(normalized.body, assets);
-      if (
-        !versionChanged &&
-        !planned.metadataChanged &&
-        !planned.existingOutputInvalid &&
-        planned.existingRecord &&
-        planned.existingContent !== undefined &&
-        planned.existingRecord.stableSlug === planned.stableSlug &&
-        planned.existingRecord.shortId === planned.shortId &&
-        planned.existingRecord.contentHash === contentHash
-      ) {
-        return {
-          fileId: planned.selected.item.id,
-          content: planned.existingContent,
-          record: planned.existingRecord,
-          folderPath,
-          assets: planned.existingAssets,
-          titleFacts: structure.titleFacts ?? null,
-          removedTitleHeading: normalized.removedTitleHeading,
-        };
-      }
-      const content = generateMarkdownDocument(
-        {
-          title,
-          ...(normalized.description
-            ? { description: normalized.description }
-            : {}),
-          slug: planned.stableSlug,
-          shortId: planned.shortId,
-          sourceUrl: sourceUrl(planned.selected.item.id),
-          googleFileId: planned.selected.item.id,
-          googleModifiedTime: planned.selected.item.modifiedTime,
-          syncedAt: runTimestamp,
-          folderPath,
-          normalizedBody: normalized.body,
-          contentHash,
-        },
-        markdownHeader,
-      );
-      const record: SyncedDocumentRecord = {
-        googleFileId: planned.selected.item.id,
-        googleParentId: planned.selected.parentId,
-        googleName: planned.selected.item.name,
-        displayTitle: title,
-        ...(normalized.description
-          ? { description: normalized.description }
-          : {}),
-        googleModifiedTime: planned.selected.item.modifiedTime,
-        googleCreatedTime: planned.selected.item.createdTime,
-        sourceUrl: sourceUrl(planned.selected.item.id),
-        stableSlug: planned.stableSlug,
-        generatedMarkdownPath: generatedMarkdownPath(planned.selected.item.id),
-        generatedAssetsDirectory: generatedAssetsDirectory(
-          planned.selected.item.id,
+      const conversion = convertHtmlArchive(
+        extractSafeZipEntries(
+          await exporter.exportHtmlZip(planned.selected.item.id),
         ),
-        contentHash,
-        outputHash: sha256(content),
-        lastSuccessfulSyncAt: runTimestamp,
-        exportMode,
-        warnings,
-        shortId: planned.shortId,
+        {
+          documentId: planned.selected.item.id,
+          documentTitle: title,
+        },
+      );
+      normalized = {
+        body: conversion.body,
+        ...(conversion.description
+          ? { description: conversion.description }
+          : {}),
+        removedTitleHeading: conversion.removedTitleHeading,
       };
+      assets = conversion.assets.map((asset) => ({
+        bytes: asset.bytes,
+        repositoryPath: asset.repositoryPath,
+      }));
+      exportMode = 'hybrid';
+      warnings = [
+        ...[...fallbackReasons].sort().map((reason) => `fallback:${reason}`),
+        ...conversion.warnings,
+      ];
+    } else {
+      const converted = normalizeMarkdown(markdownExport, title);
+      normalized = converted;
+      warnings = converted.warnings;
+    }
+    const rewritten = rewriteInternalGoogleLinks(normalized.body, linkTargets);
+    normalized.body = rewritten.body;
+    warnings = [...new Set([...warnings, ...rewritten.warnings])].sort();
+    const folderPath = planned.selected.path
+      .slice(1, -1)
+      .map((segment) => parseOrderedLabel(segment).label);
+    const contentHash = computeGeneratedContentHash(normalized.body, assets);
+    if (
+      !versionChanged &&
+      !planned.metadataChanged &&
+      !planned.existingOutputInvalid &&
+      planned.existingRecord &&
+      planned.existingContent !== undefined &&
+      planned.existingRecord.stableSlug === planned.stableSlug &&
+      planned.existingRecord.shortId === planned.shortId &&
+      planned.existingRecord.contentHash === contentHash
+    ) {
       return {
         fileId: planned.selected.item.id,
-        content,
-        record,
+        content: planned.existingContent,
+        record: planned.existingRecord,
         folderPath,
-        assets,
+        assets: planned.existingAssets,
         titleFacts: structure.titleFacts ?? null,
         removedTitleHeading: normalized.removedTitleHeading,
       };
-    },
-  );
+    }
+    const content = generateMarkdownDocument(
+      {
+        title,
+        ...(normalized.description
+          ? { description: normalized.description }
+          : {}),
+        slug: planned.stableSlug,
+        shortId: planned.shortId,
+        sourceUrl: sourceUrl(planned.selected.item.id),
+        googleFileId: planned.selected.item.id,
+        googleModifiedTime: planned.selected.item.modifiedTime,
+        syncedAt: runTimestamp,
+        folderPath,
+        normalizedBody: normalized.body,
+        contentHash,
+      },
+      markdownHeader,
+    );
+    const record: SyncedDocumentRecord = {
+      googleFileId: planned.selected.item.id,
+      googleParentId: planned.selected.parentId,
+      googleName: planned.selected.item.name,
+      displayTitle: title,
+      ...(normalized.description
+        ? { description: normalized.description }
+        : {}),
+      googleModifiedTime: planned.selected.item.modifiedTime,
+      googleCreatedTime: planned.selected.item.createdTime,
+      sourceUrl: sourceUrl(planned.selected.item.id),
+      stableSlug: planned.stableSlug,
+      generatedMarkdownPath: generatedMarkdownPath(planned.selected.item.id),
+      generatedAssetsDirectory: generatedAssetsDirectory(
+        planned.selected.item.id,
+      ),
+      contentHash,
+      outputHash: sha256(content),
+      lastSuccessfulSyncAt: runTimestamp,
+      exportMode,
+      warnings,
+      shortId: planned.shortId,
+    };
+    return {
+      fileId: planned.selected.item.id,
+      content,
+      record,
+      folderPath,
+      assets,
+      titleFacts: structure.titleFacts ?? null,
+      removedTitleHeading: normalized.removedTitleHeading,
+    };
+  };
+  const failures = new Map<string, HeldDocument>();
+  const exportedDocuments = (
+    await mapWithConcurrency(
+      plannedDocuments.filter((document) => document.needsExport),
+      configuration.SYNC_CONCURRENCY,
+      async (planned) => {
+        try {
+          return await exportDocument(planned);
+        } catch (error: unknown) {
+          /*
+           * A targeted run was asked for this one document, so its failure is
+           * the answer and stops the run rather than being held back.
+           */
+          const failure = targetedFileId
+            ? undefined
+            : documentFailure(error, planned.selected.item.id);
+          if (!failure) {
+            throw error;
+          }
+          failures.set(planned.selected.item.id, failure);
+          return undefined;
+        }
+      },
+    )
+  ).filter((document) => document !== undefined);
+  if (failures.size > 0) {
+    return synchronize(
+      context,
+      configuration,
+      options,
+      run,
+      new Map([...held, ...failures]),
+    );
+  }
   const exportedById = new Map(
     exportedDocuments.map((document) => [document.fileId, document]),
   );
@@ -997,8 +1178,39 @@ export async function runBasicMarkdownSync(
   const removed = Object.keys(existingManifest.documents).filter(
     (fileId) => !currentIds.has(fileId),
   ).length;
+  /*
+   * A targeted run tried one document. What an earlier run held back among
+   * the others is still true as far as this run knows, and stays listed.
+   */
+  const carriedForward = new Map(
+    targetedFileId
+      ? [
+          ...recordedHeldDocuments(
+            await readOptionalFile(
+              resolve(repositoryRoot, PROJECT_LAYOUT.syncReportFile),
+            ),
+          ),
+        ].filter(
+          ([fileId, recorded]) =>
+            fileId !== targetedFileId &&
+            (!recorded.outOfDate ||
+              candidateManifest.documents[fileId] !== undefined),
+        )
+      : [],
+  );
+  const unpublished = createUnpublishedItems(
+    inventory.selection,
+    new Map([...carriedForward, ...held]),
+    new Map([
+      ...[...carriedForward].flatMap(([fileId, recorded]) => {
+        const record = candidateManifest.documents[fileId];
+        return recorded.outOfDate && record ? [[fileId, record] as const] : [];
+      }),
+      ...kept,
+    ]),
+  );
   const report: SyncReport = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt: candidateManifest.generatedAt,
     dryRun: options.dryRun,
     summary: {
@@ -1006,10 +1218,19 @@ export async function runBasicMarkdownSync(
       changed,
       unchanged,
       removed: targetedFileId ? 0 : removed,
-      folders: inventory.selection.folders.length,
-      unsupported: inventory.selection.unsupported.length,
-      warnings: inventory.selection.warnings.length,
+      folders: selection.folders.length,
+      unsupported: selection.unsupported.length,
+      warnings: selection.warnings.length,
+      notPublished: unpublished.filter(
+        (item) => item.status === 'not-published',
+      ).length,
+      outOfDate: unpublished.filter((item) => item.status === 'out-of-date')
+        .length,
+      ignored: selection.ignoredItemCount,
     },
+    reasons: [...UNPUBLISHED_REASONS],
+    unpublished,
+    ignoredFolders: createIgnoredFolders(selection),
   };
 
   output.set(MANIFEST_PATH, serializeManifest(candidateManifest));
@@ -1023,6 +1244,11 @@ export async function runBasicMarkdownSync(
       ),
     ),
   );
+  /*
+   * An unchanged corpus keeps the report it has, so a run that only
+   * re-exported writes no diff. What is missing from the site is not in the
+   * manifest, so a change to that list alone is enough to write a new one.
+   */
   const existingReport = manifestChanged
     ? undefined
     : await readOptionalFile(
@@ -1030,7 +1256,10 @@ export async function runBasicMarkdownSync(
       );
   output.set(
     PROJECT_LAYOUT.syncReportFile,
-    existingReport ?? serializeSyncReport(report),
+    existingReport !== undefined &&
+      reportsListTheSameItems(existingReport, report)
+      ? existingReport
+      : serializeSyncReport(report),
   );
   /*
    * A targeted run sees only part of the corpus when the manifest holds
@@ -1052,8 +1281,8 @@ export async function runBasicMarkdownSync(
     );
   }
   const sidebarSelection = targetedFileId
-    ? selectManagedInventory(inventory.selection, candidateManifest)
-    : inventory.selection;
+    ? selectManagedInventory(selection, candidateManifest)
+    : selection;
   output.set(
     SIDEBAR_PATH,
     existingSidebar ??
@@ -1088,10 +1317,7 @@ export async function runBasicMarkdownSync(
     ),
   );
   const inventoryItems = new Map(
-    inventory.selection.documents.map((document) => [
-      document.item.id,
-      document.item,
-    ]),
+    selection.documents.map((document) => [document.item.id, document.item]),
   );
   const titleReport = createTitleReport(
     Object.values(candidateManifest.documents).map((record) => {

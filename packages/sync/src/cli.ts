@@ -83,6 +83,25 @@ function printSyncSummary(
   console.log(`Documents removed: ${summary.removed}`);
   console.log(`Folders selected: ${summary.folders}`);
   console.log(`Unsupported items selected: ${summary.unsupported}`);
+  console.log(`Not on the site: ${summary.notPublished}`);
+  console.log(`Out of date on the site: ${summary.outOfDate}`);
+  /*
+   * Reasons as codes and counts. The files themselves are named in the job
+   * summary and on the content health page, not in the log (ADR-025).
+   */
+  const reasonCounts = new Map<string, number>();
+  for (const item of result.report.unpublished) {
+    const key = `${item.status}/${item.reason}`;
+    reasonCounts.set(key, (reasonCounts.get(key) ?? 0) + 1);
+  }
+  for (const [key, count] of [...reasonCounts].sort(([left], [right]) =>
+    left < right ? -1 : 1,
+  )) {
+    console.log(`  ${key}: ${count}`);
+  }
+  console.log(
+    `Ignored by configuration: ${summary.ignored} items in ${result.report.ignoredFolders.length} folders`,
+  );
   console.log(`Warnings: ${summary.warnings}`);
   console.log(
     dryRun

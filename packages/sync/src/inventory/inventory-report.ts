@@ -17,6 +17,10 @@ interface InventoryReportItem {
   size?: string;
 }
 
+interface InventoryReportIgnoredFolder extends InventoryReportItem {
+  itemCount: number;
+}
+
 interface InventoryReportFolder extends InventoryReportItem {
   childFolderIds: string[];
   documentIds: string[];
@@ -40,6 +44,7 @@ export interface InventoryReport {
     unsupported: number;
     warnings: number;
   };
+  ignoredFolders: InventoryReportIgnoredFolder[];
   folders: InventoryReportFolder[];
   documents: InventoryReportItem[];
   unsupported: InventoryReportItem[];
@@ -94,6 +99,10 @@ export function createInventoryReport(
       unsupported: selection.unsupported.length,
       warnings: selection.warnings.length,
     },
+    ignoredFolders: selection.ignoredFolders.map((folder) => ({
+      ...toReportItem(folder),
+      itemCount: folder.itemCount,
+    })),
     folders: selection.folders.map(toReportFolder),
     documents: selection.documents.map(toReportItem),
     unsupported: selection.unsupported.map(toReportItem),

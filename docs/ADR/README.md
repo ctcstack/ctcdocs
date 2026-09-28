@@ -47,5 +47,7 @@ Rejected
 - ADR-022: every page has a permanent short ID.
 - ADR-023: a report on how documents carry their titles.
 - ADR-024: a content health page that turns checks into work.
+- ADR-025: name every file the site leaves out, and why.
+- ADR-026: hold back a document that cannot be exported, not the corpus.
 
 Create a new ADR by copying `000-template.md`.

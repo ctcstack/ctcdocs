@@ -54,12 +54,20 @@ export interface InventoryFolderNode extends SelectedInventoryItem {
   unsupportedItemIds: string[];
 }
 
+/** A folder the configuration keeps off the site. */
+interface IgnoredInventoryFolder extends SelectedInventoryItem {
+  /** Files and folders below it, at any depth. */
+  itemCount: number;
+}
+
 export interface InventorySelection {
   rootFolderId: string;
   allItemCount: number;
   descendantCount: number;
   outsideRootCount: number;
   ignoredItemCount: number;
+  /** Configured ignored folders found under the root, in path order. */
+  ignoredFolders: IgnoredInventoryFolder[];
   folders: InventoryFolderNode[];
   documents: SelectedInventoryItem[];
   unsupported: SelectedInventoryItem[];
@@ -236,7 +244,23 @@ export function buildInventorySelection(
 
   const rootDescendants = collectDescendants(rootFolderId, childrenByParent);
   const ignoredItems = new Set<string>();
+  const ignoredFolders: IgnoredInventoryFolder[] = [];
   const warnings: InventoryIssue[] = [];
+
+  /** Names from the root down, whether or not the ancestors are selected. */
+  function pathFromRoot(itemId: string): string[] {
+    const names: string[] = [];
+    let current = itemsById.get(itemId);
+    while (current) {
+      names.unshift(current.name);
+      if (current.id === rootFolderId) {
+        break;
+      }
+      const parentId = current.parents[0];
+      current = parentId ? itemsById.get(parentId) : undefined;
+    }
+    return names;
+  }
 
   for (const ignoredFolderId of [...new Set(ignoredFolderIds)].sort(
     compareText,
@@ -265,13 +289,19 @@ export function buildInventorySelection(
       });
       continue;
     }
-    for (const itemId of collectDescendants(
-      ignoredFolderId,
-      childrenByParent,
-    )) {
+    const descendants = collectDescendants(ignoredFolderId, childrenByParent);
+    for (const itemId of descendants) {
       ignoredItems.add(itemId);
     }
+    const ignoredFolder = requireItem(itemsById, ignoredFolderId);
+    ignoredFolders.push({
+      item: ignoredFolder,
+      parentId: ignoredFolder.parents[0] ?? null,
+      path: pathFromRoot(ignoredFolderId),
+      itemCount: descendants.size - 1,
+    });
   }
+  ignoredFolders.sort(compareSelectedItems);
 
   const selectedIds = new Set(
     [...rootDescendants].filter((itemId) => !ignoredItems.has(itemId)),
@@ -352,9 +382,86 @@ export function buildInventorySelection(
     descendantCount: rootDescendants.size,
     outsideRootCount: itemsById.size - rootDescendants.size,
     ignoredItemCount: ignoredItems.size,
+    ignoredFolders,
     folders,
     documents,
     unsupported,
     warnings,
+  };
+}
+
+/** Where a held-back document stands in place of what Drive says now. */
+export interface RecordedPlacement {
+  name: string;
+  parentId: string;
+  modifiedTime: string;
+}
+
+/**
+ * The selection with some documents taken out and others put back as the
+ * manifest last recorded them: under their recorded parent, with their
+ * recorded name and edit time. A run uses it for documents it cannot export
+ * (ADR-026): one that was never published is left out, and one that was keeps
+ * the version, place and address the site already has. A replacement whose
+ * recorded parent is no longer a selected folder is left out as well.
+ */
+export function withDocumentsHeldBack(
+  selection: InventorySelection,
+  replacements: ReadonlyMap<string, RecordedPlacement>,
+  removals: ReadonlySet<string>,
+): { selection: InventorySelection; replaced: Set<string> } {
+  const foldersById = new Map(
+    selection.folders.map((folder) => [folder.item.id, folder]),
+  );
+  const replaced = new Set<string>();
+  const documents: SelectedInventoryItem[] = [];
+  for (const selected of selection.documents) {
+    if (removals.has(selected.item.id)) {
+      continue;
+    }
+    const placement = replacements.get(selected.item.id);
+    if (!placement) {
+      documents.push(selected);
+      continue;
+    }
+    const parent = foldersById.get(placement.parentId);
+    if (!parent) {
+      continue;
+    }
+    replaced.add(selected.item.id);
+    documents.push({
+      item: {
+        ...selected.item,
+        name: placement.name,
+        parents: [placement.parentId],
+        modifiedTime: placement.modifiedTime,
+      },
+      parentId: placement.parentId,
+      path: [...parent.path, placement.name],
+    });
+  }
+  documents.sort(compareSelectedItems);
+
+  const documentsById = new Map(
+    documents.map((document) => [document.item.id, document]),
+  );
+  const folders = selection.folders.map((folder) => ({
+    ...folder,
+    documentIds: documents
+      .filter((document) => document.parentId === folder.item.id)
+      .map((document) => document.item)
+      .sort(compareItems)
+      .map((item) => item.id),
+  }));
+  // Every document still selected is listed by exactly one folder.
+  if (
+    folders.reduce((count, folder) => count + folder.documentIds.length, 0) !==
+    documentsById.size
+  ) {
+    throw new Error('A held-back document has no selected parent folder.');
+  }
+  return {
+    selection: { ...selection, folders, documents },
+    replaced,
   };
 }

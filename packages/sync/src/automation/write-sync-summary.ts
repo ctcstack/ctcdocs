@@ -12,6 +12,7 @@ import { titleReportSchema, type TitleReport } from '../titles/title-report.js';
 import {
   renderContentHealthSummary,
   renderSyncJobSummary,
+  renderUnpublishedSummary,
 } from './sync-summary.js';
 
 export class SyncSummaryError extends Error {
@@ -39,9 +40,16 @@ export async function writeSyncSummary(
       ),
     ),
   );
+  const site = loadSiteConfiguration(repositoryRoot);
+  const contentHealthUrl = `${site.deployment.environments.production.url}${PLATFORM_ROUTE_HREFS.contentHealth}`;
   await appendFile(
     summaryPath,
     renderSyncJobSummary(report, environment.SYNC_OUTPUT_CHANGED === 'true'),
+    'utf8',
+  );
+  await appendFile(
+    summaryPath,
+    renderUnpublishedSummary(report, contentHealthUrl),
     'utf8',
   );
   const titleReport = titleReportSchema.safeParse(
@@ -53,12 +61,11 @@ export async function writeSyncSummary(
     ),
   );
   if (titleReport.success) {
-    const site = loadSiteConfiguration(repositoryRoot);
     await appendFile(
       summaryPath,
       renderContentHealthSummary(
         titleReport.data as unknown as TitleReport,
-        `${site.deployment.environments.production.url}${PLATFORM_ROUTE_HREFS.contentHealth}`,
+        contentHealthUrl,
       ),
       'utf8',
     );

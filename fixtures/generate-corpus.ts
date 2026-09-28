@@ -26,6 +26,7 @@ import {
   buildInventorySelection,
   createInventoryReport,
   createSyncContext,
+  GoogleApiError,
   parseSyncConfiguration,
   readSourceTitle,
   runBasicMarkdownSync,
@@ -39,6 +40,8 @@ const DOCUMENT = 'application/vnd.google-apps.document';
 
 const DRIVE_ID = 'fixture-drive';
 const ROOT_ID = 'folder-root';
+/** Kept off the site by configuration, so the report has one to name. */
+const IGNORED_FOLDER_ID = 'folder-drafts';
 
 /*
  * Fixed timestamps. A clock in the input would make an unchanged corpus
@@ -111,7 +114,30 @@ const items: DriveItem[] = [
   folder('folder-reference-guides', 'Guides', 'folder-reference'),
   folder('folder-reference-archive', 'Archive', 'folder-reference'),
   document('doc-style-guide', 'Style guide', 'folder-reference-guides'),
+  /*
+   * What the site does not publish, so the content health page lists each
+   * reason (ADR-025): a file of a kind it does not publish, a shortcut, a
+   * document too large for Google to export, and an ignored folder.
+   */
+  {
+    ...document('sheet-glossary', 'Glossary', 'folder-reference'),
+    mimeType: 'application/vnd.google-apps.spreadsheet',
+  },
+  {
+    ...document('shortcut-policies', 'Policies', 'folder-handbook'),
+    mimeType: 'application/vnd.google-apps.shortcut',
+    shortcutDetails: {
+      targetId: 'outside-the-corpus',
+      targetMimeType: DOCUMENT,
+    },
+  },
+  document('doc-brand-assets', 'Brand assets', 'folder-handbook'),
+  folder(IGNORED_FOLDER_ID, 'Drafts', ROOT_ID),
+  document('doc-draft', 'Unfinished draft', IGNORED_FOLDER_ID),
 ];
+
+/** Documents Google refuses to export, as it does anything over 10 MB. */
+const oversized = new Set(['doc-brand-assets']);
 
 /** Google's Markdown export, as the pipeline receives it. */
 const markdownExports = new Map<string, string>([
@@ -400,12 +426,12 @@ function inventory(driveItems: readonly DriveItem[]): InventoryRunResult {
   const selection = buildInventorySelection(
     [...driveItems],
     ROOT_ID,
-    [],
+    [IGNORED_FOLDER_ID],
     [DRIVE_ID],
   );
   return {
     selection,
-    report: createInventoryReport(selection, DRIVE_ID, []),
+    report: createInventoryReport(selection, DRIVE_ID, [IGNORED_FOLDER_ID]),
   };
 }
 
@@ -443,6 +469,17 @@ const dependencies = {
   inventoryResult: inventory(items),
   markdownExporter: {
     exportMarkdown: (fileId: string) => {
+      if (oversized.has(fileId)) {
+        return Promise.reject(
+          new GoogleApiError(
+            'Google Drive export exceeded the 10 MB limit.',
+            'export_size_limit',
+            403,
+            'unavailable',
+            { fileId },
+          ),
+        );
+      }
       const markdown = markdownExports.get(fileId);
       if (markdown === undefined) {
         throw new Error(`No synthetic export for ${fileId}.`);
@@ -496,6 +533,7 @@ const configuration = parseSyncConfiguration(
   {
     GOOGLE_DRIVE_ID: DRIVE_ID,
     GOOGLE_ROOT_FOLDER_ID: ROOT_ID,
+    GOOGLE_IGNORED_FOLDER_IDS: IGNORED_FOLDER_ID,
     SYNC_CONCURRENCY: '1',
   },
   site,

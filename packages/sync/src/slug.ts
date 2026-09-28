@@ -138,9 +138,20 @@ export function allocateStableSlugs(
   documents: readonly SelectedInventoryItem[],
   existingManifest: SyncManifest,
   policy: AddressPolicy = 'stable',
+  /**
+   * Documents that keep their recorded address whatever their path yields:
+   * the run could not export them, so the page at that address stays as it
+   * was (ADR-026).
+   */
+  pinnedDocumentIds: ReadonlySet<string> = new Set(),
 ): StableSlugAllocation {
   if (policy === 'follow-names') {
-    return allocateFollowingNames(folders, documents, existingManifest);
+    return allocateFollowingNames(
+      folders,
+      documents,
+      existingManifest,
+      pinnedDocumentIds,
+    );
   }
   const allocatedSlugs = new Set(Object.keys(existingManifest.redirects));
   const allocatedDocuments = new Map<string, string>();
@@ -193,7 +204,8 @@ interface RecordedItem {
  * item's current Drive path yields; nothing it was called before holds a claim
  * on it. In one pass over the one namespace folders and documents share:
  *
- * 1. Recorded items whose current path still yields their address keep it.
+ * 1. Recorded items whose current path still yields their address keep it,
+ *    and so does a pinned document whatever its path yields.
  * 2. The platform's own routes are reserved.
  * 3. Recorded items whose path now yields another address are placed, folders
  *    first, then by address and ID. An address one of them has just given up
@@ -209,6 +221,7 @@ function allocateFollowingNames(
   folders: readonly SelectedInventoryItem[],
   documents: readonly SelectedInventoryItem[],
   existingManifest: SyncManifest,
+  pinnedDocumentIds: ReadonlySet<string>,
 ): StableSlugAllocation {
   const recordedDocuments = new Map(
     Object.entries(existingManifest.documents).map(
@@ -241,8 +254,12 @@ function allocateFollowingNames(
   const resultFor = (kind: RecordedItem['kind']) =>
     kind === 'document' ? allocatedDocuments : allocatedFolders;
 
-  for (const { item, recordedSlug, derivedSlug, kind } of recorded) {
-    if (recordedSlug !== derivedSlug) {
+  const settled = ({ item, recordedSlug, derivedSlug, kind }: RecordedItem) =>
+    recordedSlug === derivedSlug ||
+    (kind === 'document' && pinnedDocumentIds.has(item.item.id));
+  for (const recordedEntry of recorded) {
+    const { item, recordedSlug, kind } = recordedEntry;
+    if (!settled(recordedEntry)) {
       continue;
     }
     if (claimed.has(recordedSlug)) {
@@ -257,7 +274,7 @@ function allocateFollowingNames(
 
   const moves: AddressMove[] = [];
   const unsettled = recorded
-    .filter(({ recordedSlug, derivedSlug }) => recordedSlug !== derivedSlug)
+    .filter((recordedEntry) => !settled(recordedEntry))
     .sort(
       (left, right) =>
         (left.kind === right.kind ? 0 : left.kind === 'folder' ? -1 : 1) ||
