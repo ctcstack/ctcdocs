@@ -324,7 +324,7 @@ documents to fix — and when the site last changed
 - **Notes**: pages that are on the site with something to know: what
   conversion left out (an image, a link, a merged cell, a link to a heading),
   images with no alt text
-  ([ADR-029](ADR/029-note-images-without-alt-text.md)), files in one folder
+  ([ADR-029](ADR/029-say-when-an-image-has-no-alt-text.md)), files in one folder
   the site cannot tell apart, order numbers used twice.
 
 A document held back

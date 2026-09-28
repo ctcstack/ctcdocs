@@ -56,19 +56,20 @@ describe('HTML archive conversion', () => {
     ).toHaveLength(2);
   });
 
-  it('counts the images that carry no description of their own', async () => {
+  it('publishes an image without alt text with an empty alt, and counts it', async () => {
     const assets = [{ path: 'images/image1.png', bytes: pixel }];
     const result = convertHtmlArchive(
       await fixtureEntries('image-descriptions.html', assets),
       options,
     );
+    const image = '../../../assets/generated/synthetic-document/image-001.png';
 
     // Blank, whitespace, missing, and inside a table; the removed one is not.
     expect(result.undescribedImages).toBe(4);
-    expect(result.body).toContain('![Synthetic pixel, described]');
-    expect(result.body.match(/Image from Synthetic document/gu)).toHaveLength(
-      4,
-    );
+    expect(result.body).toContain(`![Synthetic pixel, described](${image})`);
+    expect(result.body.split(`![](${image})`)).toHaveLength(4);
+    expect(result.body).toContain(`<img alt="" src="${image}">`);
+    expect(result.body).not.toContain('Synthetic document');
     expect(result.warnings).toContain('removed_unsafe_image');
 
     const described = convertHtmlArchive(
@@ -76,6 +77,23 @@ describe('HTML archive conversion', () => {
       options,
     );
     expect(described.undescribedImages).toBe(0);
+  });
+
+  it('publishes a heading that holds only an image as a paragraph', async () => {
+    const result = convertHtmlArchive(
+      await fixtureEntries('image-heading.html', [
+        { path: 'images/image1.png', bytes: pixel },
+      ]),
+      options,
+    );
+    const image = '../../../assets/generated/synthetic-document/image-001.png';
+
+    expect(result.body.startsWith(`![](${image})\n`)).toBe(true);
+    expect(result.body).toContain(`### Setup ![Gear icon](${image})`);
+    // An image says nothing to the summary of the page; the first words do.
+    expect(result.description).toBe(
+      'A heading style applied to a line that holds only a picture.',
+    );
   });
 
   it('preserves a merged table as sanitized HTML', async () => {

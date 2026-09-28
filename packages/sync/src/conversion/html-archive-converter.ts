@@ -68,7 +68,7 @@ export interface HtmlArchiveConversion {
   description?: string;
   hasComplexTables: boolean;
   sanitizedHtml: string;
-  /** Images published with the document's title for want of alt text. */
+  /** Images published with an empty alt, having no alt text in the source. */
   undescribedImages: number;
   warnings: string[];
   removedTitleHeading: boolean;
@@ -366,11 +366,32 @@ export function convertHtmlArchive(
       assetsByHash.set(hash, asset);
     }
     $(element).attr('src', asset.markdownPath);
+    /*
+     * An empty alt says there is no description. Text made up in its place
+     * would read as one, to an agent deciding whether to open the image and
+     * to the summary taken from the first words of a page (ADR-029).
+     */
     if (!$(element).attr('alt')?.trim()) {
-      $(element).attr('alt', `Image from ${options.documentTitle}`);
+      $(element).attr('alt', '');
       undescribedImages += 1;
     }
   });
+
+  /*
+   * A heading style applied to a line that holds only a picture leaves a
+   * heading with no words, nothing to show in the table of contents or to link
+   * to. It is published as a paragraph with the picture.
+   */
+  $('body')
+    .find('h1, h2, h3, h4, h5, h6')
+    .each((_, heading) => {
+      if (
+        $(heading).find('img').length > 0 &&
+        $(heading).text().trim().length === 0
+      ) {
+        $(heading).replaceWith($('<p></p>').append($(heading).contents()));
+      }
+    });
 
   sortAttributes($);
   const sanitizedHtml = $('body').html()?.trim() ?? '';

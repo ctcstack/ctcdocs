@@ -6,18 +6,22 @@ All three packages share a version and are released together.
 
 ### Added
 
-- Notes: a page with images that have no alt text, and how many. The page
-  describes such an image only by the document it is from, so readers using a
-  screen reader and AI agents reading the page as text learn nothing of what
-  it shows. The note says to add alt text in Google Docs. See
-  [ADR-029](docs/ADR/029-note-images-without-alt-text.md).
+- Notes: a page with images that have no alt text, and how many, with the
+  instruction to add alt text in Google Docs. See
+  [ADR-029](docs/ADR/029-say-when-an-image-has-no-alt-text.md).
 
 ### Changed
 
+- An image without alt text is published with an empty alt instead of
+  "Image from" and the document's title, which read as a description to AI
+  agents and screen readers. A page that opens with such an image takes its
+  summary from its first words instead.
+- A heading that holds only an image is published as a paragraph, instead of
+  a heading with no words in the table of contents.
 - The first sync after upgrading exports every document converted through
-  the HTML export once more, to count its images. Pages that come out the
-  same are left as they are; the manifest records the count as
-  `undescribedImages`.
+  the HTML export once more, to count its images, and rewrites the pages with
+  an image without alt text. Other pages are left as they are; the manifest
+  records the count as `undescribedImages`.
 
 ## 0.11.1
 
