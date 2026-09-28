@@ -11,8 +11,7 @@ import { syncReportSchema } from '../generation/sync-report.js';
 import { titleReportSchema, type TitleReport } from '../titles/title-report.js';
 import {
   renderContentHealthSummary,
-  renderSyncJobSummary,
-  renderUnpublishedSummary,
+  renderSiteSummary,
 } from './sync-summary.js';
 
 export class SyncSummaryError extends Error {
@@ -42,14 +41,13 @@ export async function writeSyncSummary(
   );
   const site = loadSiteConfiguration(repositoryRoot);
   const contentHealthUrl = `${site.deployment.environments.production.url}${PLATFORM_ROUTE_HREFS.contentHealth}`;
+  /*
+   * The state of the site. What this run changed is written by the sync step
+   * itself, which alone knows it (ADR-028).
+   */
   await appendFile(
     summaryPath,
-    renderSyncJobSummary(report, environment.SYNC_OUTPUT_CHANGED === 'true'),
-    'utf8',
-  );
-  await appendFile(
-    summaryPath,
-    renderUnpublishedSummary(report, contentHealthUrl),
+    renderSiteSummary(report, contentHealthUrl),
     'utf8',
   );
   const titleReport = titleReportSchema.safeParse(

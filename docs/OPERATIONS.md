@@ -306,25 +306,29 @@ Every sync writes `data/title-report.json`
 `/content-health/` ([ADR-024](ADR/024-content-health-page.md)). Send editors
 there. It is not in the sidebar or in search.
 
-The page opens with what is **not on the site**
-([ADR-025](ADR/025-name-every-file-left-off-the-site.md)): every file in the
-published folders that the site does not show, or shows in an earlier version,
-grouped by reason with what to do and a link to it in Drive.
+The page opens with an overview — pages on the site, files not on it, notes,
+documents to fix — and when the site last changed
+([ADR-028](ADR/028-legible-sync.md)). Then:
 
-- **Google cannot export the document** — it is over 10 MB.
-- **Downloading is turned off for the file.**
-- **The document holds something the site will not publish** — the detail
-  names what conversion refused.
-- **The site does not publish this kind of file** — sheets, slides, uploads.
-- **Shortcuts are not followed.**
-- **Folders the site is configured to leave out** — the ignored folders, with
-  the number of items in each.
+- **Not on the site**
+  ([ADR-025](ADR/025-name-every-file-left-off-the-site.md)): every file in the
+  published folders that the site does not show, shows in an earlier version,
+  or shows only in part. One table gives each group, how many files it holds,
+  where they are and what to do; the lists follow, each with its instruction:
+  - documents held back: a name in another alphabet, over 10 MB, downloading
+    turned off, content refused;
+  - PDFs with no readable text, or too large for the site;
+  - files by kind: Word and text files, presentations, archives, images,
+    diagrams, spreadsheets, video and audio, other files, shortcuts;
+  - folders the site is configured to leave out.
+- **Notes**: pages that are on the site with something to know: what
+  conversion left out (an image, a link, a merged cell, a link to a heading),
+  files in one folder the site cannot tell apart, order numbers used twice.
 
-A document in one of the first three groups is held back
-([ADR-026](ADR/026-hold-back-a-document-that-cannot-be-exported.md)): if it
-was published before, the site keeps that version and the page says when it
-was edited; if not, it stays off the site. Every other document is published
-as usual, and the held one is tried again on every sync.
+A document held back
+([ADR-026](ADR/026-hold-back-a-document-that-cannot-be-exported.md)) keeps
+its published version if it had one, and the page says when that version was
+edited. It is tried again on every sync.
 
 Then the checks, grouped by what fixes them:
 
@@ -341,11 +345,20 @@ section and who last edited it. Filter by section, or by last editor, to hand
 out the work. The page is rebuilt on every sync, so a fixed item disappears
 after the next one.
 
-The job summary of every sync lists the same checks as counts, with a link to
-the page, and never names a document there. The files that are not on the
-site are the exception: the summary lists each with its folder, name, type and
-reason, up to 200, because a file that never reached the site cannot be found
-on it. The run log prints only reason codes and counts.
+The job summary of every sync has three parts
+([ADR-028](ADR/028-legible-sync.md)):
+
+- **Sync run**, from the sync step: the pages the run added, changed and
+  removed, linked, and addresses that moved. A run that changed nothing says
+  so.
+- **Knowledge Base**, from the summary step: the overview, then "Not on the
+  site as it is in Drive" and "Notes" as on the page — a table per section and
+  a folded list per group, up to 100 rows each.
+- **Content health**: the title checks as counts, naming no document.
+
+A sync that fails writes **Sync failed** instead: what stopped it, what that
+means, what to do, and the log lines. The run log itself prints only codes and
+counts.
 
 At a terminal, the same report reads:
 

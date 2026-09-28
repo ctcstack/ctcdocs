@@ -5,7 +5,23 @@ import { unified } from 'unified';
 import { describe, expect, it } from 'vitest';
 
 import { createPdfFixture } from '../test-support/create-pdf-fixture.js';
-import { looksLikePdf, pdfTextToMarkdown, readPdfText } from './read-pdf.js';
+import {
+  looksLikePdf,
+  pdfTextToMarkdown,
+  readPdfText,
+  textFromItems,
+  type PositionedText,
+} from './read-pdf.js';
+
+function piece(
+  str: string,
+  x: number,
+  y: number,
+  width = str.length * 6,
+  hasEOL = false,
+): PositionedText {
+  return { str, x, y, width, fontSize: 12, hasEOL };
+}
 
 function parsed(markdown: string): { types: Set<string>; urls: string[] } {
   const tree = unified().use(remarkParse).use(remarkGfm).parse(markdown);
@@ -47,6 +63,33 @@ describe('readPdfText', () => {
     expect(result.pageCount).toBeNull();
     expect(result.pages).toEqual([]);
     expect(['damaged', 'unreadable']).toContain(result.unreadable);
+  });
+});
+
+describe('textFromItems', () => {
+  it('puts a space or a line break where the pieces sit apart', () => {
+    expect(
+      textFromItems([
+        piece('Our process in brief.', 72, 700),
+        // A label and its description, drawn as pieces of one row.
+        piece('PLANNING', 72, 650, 80),
+        piece('Scope, budget', 200, 650),
+        // Kerning splits a word into pieces that touch.
+        piece('Sched', 72, 636, 36),
+        piece('ule', 108, 636),
+      ]),
+    ).toBe('Our process in brief.\n\nPLANNING Scope, budget\nSchedule');
+  });
+
+  it('keeps the breaks PDF.js reports and adds none twice', () => {
+    expect(
+      textFromItems([
+        piece('First line', 72, 700, 60, true),
+        piece('', 72, 686, 0, true),
+        piece('Second line', 72, 686),
+        piece(' and more', 138, 686),
+      ]),
+    ).toBe('First line\nSecond line and more');
   });
 });
 
@@ -106,6 +149,31 @@ describe('pdfTextToMarkdown', () => {
     const result = pdfTextToMarkdown(['Only page.'], 'Title');
 
     expect(result.body).toBe('Only page.\n');
+  });
+
+  it('keeps each line in capitals apart, and never makes it the description', () => {
+    const result = pdfTextToMarkdown(
+      [
+        'QUARTERLY PLAN\n2026 OUTLOOK\nThe old process no longer fits the team\nWHY WE ARE CHANGING\nWe see this clearly:',
+      ],
+      'Quarterly plan',
+    );
+
+    expect(result.body).toBe(
+      [
+        'QUARTERLY PLAN',
+        '',
+        '2026 OUTLOOK',
+        '',
+        'The old process no longer fits the team',
+        '',
+        'WHY WE ARE CHANGING',
+        '',
+        'We see this clearly:',
+        '',
+      ].join('\n'),
+    );
+    expect(result.description).toBe('We see this clearly:');
   });
 
   it('reports a PDF with no text', () => {

@@ -3,6 +3,7 @@
 export const generatedRedirects = {
   "/d/14062a/": "/handbook/tables-and-code/",
   "/d/1a41cd/": "/handbook/",
+  "/d/244fde/": "/reference/guides/style-guide--244fde/",
   "/d/2a3aab/": "/handbook/scanned-form/",
   "/d/3865e9/": "/reference/",
   "/d/48b067/": "/reference/diagrams/",

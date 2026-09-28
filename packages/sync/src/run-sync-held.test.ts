@@ -618,7 +618,7 @@ describe('files not on the site', () => {
       ]),
     ).toEqual([
       ['shortcut-plan', 'Shortcut to Google Docs', 'shortcut', []],
-      ['sheet-budget', 'Google Sheets', 'unsupported-type', ['Team']],
+      ['sheet-budget', 'Google Sheets', 'spreadsheet-file', ['Team']],
     ]);
     expect(first.report.ignoredFolders).toEqual([
       { id: 'drafts', name: 'Drafts', folderPath: [], items: 2 },
@@ -657,5 +657,71 @@ describe('files not on the site', () => {
     expect(
       written.unpublished.find((entry) => entry.id === 'image-logo')?.type,
     ).toBe('Image (PNG)');
+  });
+});
+
+describe('what a run changed', () => {
+  it('counts pages that changed, not documents it exported again', async () => {
+    const root = await repository();
+    const items = [
+      document('doc-alpha', 'Alpha'),
+      document('doc-beta', 'Beta'),
+    ];
+    const run = (
+      bodies: Record<string, string>,
+      full: boolean,
+      timestamp: string,
+      inventory = items,
+    ) =>
+      runBasicMarkdownSync(
+        testSyncContext(root),
+        configuration,
+        tokenProvider,
+        { dryRun: false, full },
+        {
+          inventoryResult: inventoryOf(inventory),
+          markdownExporter: exporterOf(bodies),
+          now: () => new Date(timestamp),
+        },
+      );
+
+    const first = await run({}, false, firstTimestamp);
+    expect(first.changes.added.map((page) => page.slug)).toEqual([
+      'team/alpha',
+      'team/beta',
+    ]);
+
+    const again = await run({}, true, secondTimestamp);
+    expect(again.report.summary).toMatchObject({
+      exported: 2,
+      added: 0,
+      changed: 0,
+      unchanged: 2,
+    });
+    expect(again.changes).toEqual({
+      added: [],
+      changed: [],
+      removed: [],
+      moved: [],
+    });
+
+    const edited = await run(
+      { 'doc-beta': 'Beta, edited.\n' },
+      false,
+      secondTimestamp,
+      [
+        document('doc-alpha', 'Alpha'),
+        document('doc-beta', 'Beta', 'team', secondTimestamp),
+      ],
+    );
+    expect(edited.changes.changed).toEqual([
+      {
+        id: 'doc-beta',
+        title: 'Beta',
+        slug: 'team/beta',
+        format: 'google-doc',
+      },
+    ]);
+    expect(edited.report.summary).toMatchObject({ exported: 1, changed: 1 });
   });
 });

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readFile } from 'node:fs/promises';
+import { appendFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { loadEnvFile } from 'node:process';
 
@@ -22,6 +22,10 @@ import {
   SecretScanError,
 } from './automation/secret-scan.js';
 import { validateGeneratedDiff } from './automation/validate-generated-diff.js';
+import {
+  renderFailureSummary,
+  renderRunSummary,
+} from './automation/sync-summary.js';
 import {
   SyncSummaryError,
   writeSyncSummary,
@@ -64,6 +68,22 @@ function loadLocalEnvironment(): void {
       return;
     }
     throw error;
+  }
+}
+
+/**
+ * Adds to the workflow's job summary, when there is one. A summary helps an
+ * operator read the run; failing to write one must not fail the run.
+ */
+async function appendJobSummary(text: string): Promise<void> {
+  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+  if (!summaryPath) {
+    return;
+  }
+  try {
+    await appendFile(summaryPath, text, 'utf8');
+  } catch {
+    console.error('The job summary could not be written.');
   }
 }
 
@@ -271,13 +291,31 @@ async function main(): Promise<void> {
   } else {
     printSyncSummary(result, dryRun);
   }
+  // What this run changed, which only this step knows (ADR-028).
+  await appendJobSummary(
+    renderRunSummary(
+      {
+        changes: result.changes,
+        exported: result.report.summary.exported,
+        dryRun,
+        full: options.full,
+        outputChanged: result.outputChanged,
+      },
+      context.site.deployment.environments.production.url,
+    ),
+  );
 }
 
 try {
   await main();
 } catch (error: unknown) {
+  const reported: string[] = [];
+  const report = (line: string) => {
+    console.error(line);
+    reported.push(line);
+  };
   if (error instanceof GoogleAuthenticationConfigurationError) {
-    console.error(`ERROR [AUTHENTICATION]: ${error.message}`);
+    report(`ERROR [AUTHENTICATION]: ${error.message}`);
     process.exitCode = 2;
   } else if (error instanceof GoogleApiError) {
     const exitCode =
@@ -287,24 +325,24 @@ try {
             error.category === 'download_restricted'
           ? 3
           : 1;
-    console.error(
+    report(
       `ERROR [GOOGLE_${error.category.toUpperCase()}]: ${describeGoogleApiError(error)}`,
     );
     process.exitCode = exitCode;
   } else if (error instanceof InventoryGraphError) {
-    console.error(
+    report(
       `ERROR [INVENTORY_GRAPH]: ${error.issues.map((issue) => issue.code).join(',')}`,
     );
     for (const issue of error.issues) {
       if (issue.detail) {
-        console.error(
+        report(
           `ERROR [INVENTORY_GRAPH]: ${issue.code} itemId=${issue.itemId} ${issue.detail}`,
         );
       }
     }
     process.exitCode = 1;
   } else if (error instanceof MarkdownNormalizationError) {
-    console.error(
+    report(
       `ERROR [MARKDOWN_NORMALIZATION]: ${error.issues.map((issue) => issue.code).join(',')}`,
     );
     process.exitCode = 1;
@@ -312,44 +350,54 @@ try {
     error instanceof UnsafeZipError ||
     error instanceof HtmlArchiveConversionError
   ) {
-    console.error(`ERROR [CONTENT_CONVERSION]: ${error.message}`);
+    report(`ERROR [CONTENT_CONVERSION]: ${error.message}`);
     process.exitCode = 1;
   } else if (error instanceof GeneratedOutputValidationError) {
-    console.error(`ERROR [GENERATED_OUTPUT_VALIDATION]: ${error.message}`);
+    report(`ERROR [GENERATED_OUTPUT_VALIDATION]: ${error.message}`);
     process.exitCode = 4;
   } else if (error instanceof SyncSelectionError) {
-    console.error(`ERROR [SYNC_SELECTION]: ${error.message}`);
+    report(`ERROR [SYNC_SELECTION]: ${error.message}`);
     process.exitCode = 1;
   } else if (error instanceof ManifestError) {
-    console.error(`ERROR [MANIFEST]: ${error.message}`);
+    report(`ERROR [MANIFEST]: ${error.message}`);
     process.exitCode = 1;
   } else if (error instanceof AtomicWriteError) {
-    console.error(`ERROR [ATOMIC_WRITE]: ${error.message}`);
+    report(`ERROR [ATOMIC_WRITE]: ${error.message}`);
     process.exitCode = 1;
   } else if (error instanceof ZodError) {
-    console.error(
+    report(
       `ERROR [CONFIGURATION]: ${error.issues.map((issue) => issue.path.join('.') || 'environment').join(',')}`,
     );
     process.exitCode = 1;
   } else if (error instanceof GeneratedDiffValidationError) {
-    console.error(`ERROR [GENERATED_DIFF]: ${error.message}`);
+    report(`ERROR [GENERATED_DIFF]: ${error.message}`);
     process.exitCode = 1;
   } else if (error instanceof SecretFindingsError) {
     for (const finding of error.findings) {
-      console.error(`ERROR [SECRET_SCAN]: ${finding}`);
+      report(`ERROR [SECRET_SCAN]: ${finding}`);
     }
     process.exitCode = 5;
   } else if (error instanceof SecretScanError) {
-    console.error(`ERROR [SECRET_SCAN]: ${error.message}`);
+    report(`ERROR [SECRET_SCAN]: ${error.message}`);
     process.exitCode = 1;
   } else if (error instanceof SyncSummaryError) {
-    console.error(`ERROR [SYNC_SUMMARY]: ${error.message}`);
+    report(`ERROR [SYNC_SUMMARY]: ${error.message}`);
     process.exitCode = 1;
   } else if (error instanceof CliUsageError) {
-    console.error(`ERROR [USAGE]: ${error.message}`);
+    report(`ERROR [USAGE]: ${error.message}`);
     process.exitCode = 1;
   } else {
-    console.error('ERROR [UNEXPECTED]: The sync command failed.');
+    report('ERROR [UNEXPECTED]: The sync command failed.');
     process.exitCode = 1;
+  }
+  /*
+   * A sync that stops says why in the job summary too, where an operator
+   * reads the run, with what it means and what to do (ADR-028).
+   */
+  if (process.argv[2] === 'sync' && reported.length > 0) {
+    const label = /^ERROR \[([A-Z_]+)\]/u.exec(reported[0] ?? '')?.[1];
+    await appendJobSummary(
+      renderFailureSummary(label ?? 'UNEXPECTED', reported),
+    );
   }
 }

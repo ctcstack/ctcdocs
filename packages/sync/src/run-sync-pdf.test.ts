@@ -3,7 +3,7 @@
  * serve it, and its text for search and agents (ADR-027).
  */
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
@@ -20,6 +20,7 @@ import {
 import { buildInventorySelection } from './inventory/inventory-graph.js';
 import { createInventoryReport } from './inventory/inventory-report.js';
 import type { SyncManifest } from './manifest.js';
+import { PDF_TEXT_VERSION } from './pdf/read-pdf.js';
 import { runBasicMarkdownSync } from './run-sync.js';
 import { createPdfFixture } from './test-support/create-pdf-fixture.js';
 import {
@@ -205,6 +206,37 @@ describe('PDF files', () => {
     );
     expect(second.outputChanged).toBe(false);
     expect(downloads).toEqual(['pdf-handbook']);
+  });
+
+  it('reads a PDF again when its page came from an older text extraction', async () => {
+    const root = await repository();
+    const downloads: string[] = [];
+    const extra = [pdfItem('pdf-handbook', 'Handbook.pdf', handbook)];
+    await runBasicMarkdownSync(
+      testSyncContext(root),
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: false },
+      dependencies(extra, { 'pdf-handbook': handbook }, downloads),
+    );
+    // As a page written by 0.10.0 records it: without a text version.
+    const manifestPath = resolve(root, 'data/sync-manifest.json');
+    const manifest = await readManifest(root);
+    delete manifest.documents['pdf-handbook']?.pdfTextVersion;
+    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+    await runBasicMarkdownSync(
+      testSyncContext(root),
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: true },
+      dependencies(extra, { 'pdf-handbook': handbook }, downloads),
+    );
+
+    expect(downloads).toEqual(['pdf-handbook', 'pdf-handbook']);
+    expect(
+      (await readManifest(root)).documents['pdf-handbook']?.pdfTextVersion,
+    ).toBe(PDF_TEXT_VERSION);
   });
 
   it('moves the file with a rename without downloading it again', async () => {

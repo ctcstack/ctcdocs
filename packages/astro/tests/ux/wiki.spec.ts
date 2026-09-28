@@ -522,10 +522,41 @@ test('the content health page names what is not on the site', async ({
     await expect(entry).toHaveCount(1);
     await expect(entry).toContainText(item.name);
     if (item.slug) {
-      await expect(entry.locator(`a[href="/${item.slug}/"]`)).toBeVisible();
+      await expect(entry.locator(`a[href="/${item.slug}/"]`)).toBeAttached();
     }
   }
   await expectNoAccessibilityViolations(page);
+});
+
+test('the content health page sums up each group and opens it from its row', async ({
+  page,
+}) => {
+  const report = unpublishedReport();
+  test.skip(
+    !report || report.items.length + report.notes.length === 0,
+    'The corpus has nothing off the site and nothing to note.',
+  );
+
+  await page.goto('/content-health/');
+  const rows = page.locator('content-health .health-table tbody tr');
+  await expect(rows.first()).toBeVisible();
+  const link = rows.first().locator('a[data-open-group]');
+  const target = (await link.getAttribute('href')) ?? '';
+  const group = page.locator(`details${target}`);
+  await group.evaluate((element) => {
+    (element as HTMLDetailsElement).open = false;
+  });
+  await link.click();
+  await expect(group).toHaveAttribute('open', '');
+  await expectNoAccessibilityViolations(page);
+
+  const notes = page.locator('section:has(> h2#notes)');
+  await expect(notes.getByRole('heading', { level: 2 })).toHaveText('Notes');
+  for (const note of report?.notes ?? []) {
+    await expect(
+      notes.locator(`li:has(a[href="${note.sourceUrl}"])`).first(),
+    ).toContainText(note.name);
+  }
 });
 
 test('a PDF has a page with the file and its text', async ({

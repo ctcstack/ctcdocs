@@ -7,6 +7,8 @@
  * do about it, worded for the person who can act, the way the content health
  * checks are (ADR-024). The wording lives here, once, and travels in the sync
  * report, so the page, the job summary and the terminal say the same thing.
+ * Files the site does not publish are grouped by what an editor would do with
+ * them, a Word file apart from a video (ADR-028).
  *
  * The list is a pure function of the inventory and the run's export failures:
  * an unchanged Drive rewrites it byte for byte.
@@ -28,19 +30,30 @@ import { parseOrderedLabel } from '../ordered-label.js';
 export type UnpublishedStatus = 'not-published' | 'out-of-date' | 'incomplete';
 
 export type UnpublishedReasonCode =
-  | 'unsupported-type'
-  | 'shortcut'
   | 'name-script'
   | 'export-too-large'
   | 'download-restricted'
   | 'content-rejected'
+  | 'pdf-no-text'
   | 'pdf-over-site-limit'
   | 'pdf-too-large'
-  | 'pdf-no-text';
+  | 'word-file'
+  | 'presentation-file'
+  | 'archive-file'
+  | 'image-file'
+  | 'diagram-file'
+  | 'spreadsheet-file'
+  | 'media-file'
+  | 'unsupported-type'
+  | 'shortcut';
 
 export interface UnpublishedReason {
   code: UnpublishedReasonCode;
+  /** What the group is, as a heading and a table row say it. */
   title: string;
+  /** What to do, short enough for a table cell. */
+  action: string;
+  /** What to do, in full, for the person who can do it. */
   instruction: string;
 }
 
@@ -52,63 +65,203 @@ export const UNPUBLISHED_STATUS_LABELS: Readonly<
   incomplete: 'Incomplete on the site',
 };
 
-/** In the order the page shows them: what an editor can fix first. */
+/**
+ * In the order the page shows them: what stops a document first, then what is
+ * missing from a page, then kinds of file by how much there is to gain from
+ * them (ADR-028).
+ */
 export const UNPUBLISHED_REASONS: readonly UnpublishedReason[] = [
   {
     code: 'name-script',
     title: 'The name uses letters from another alphabet',
+    action: 'Retype the letters named',
     instruction:
       "A file's name becomes its address on the site, and the site writes its addresses in one alphabet. Retype the letters named below in Drive, or rename the file.",
   },
   {
     code: 'export-too-large',
     title: 'Google cannot export the document: it is over 10 MB',
+    action: 'Shrink images or split it',
     instruction:
       'Google refuses to export a document larger than 10 MB, and large images are the usual cause. Compress or crop the images, or split the document in two.',
   },
   {
     code: 'download-restricted',
     title: 'Downloading is turned off for the file',
+    action: 'Allow downloading',
     instruction:
       'The owner turned off downloading, printing and copying for viewers, so the sync cannot read the file. Turn it back on under Share → Settings, or ask the owner to.',
   },
   {
     code: 'content-rejected',
     title: 'The document holds something the site will not publish',
+    action: 'Remove the part named',
     instruction:
       'Conversion stopped on content it cannot publish safely, named under the document. Remove or replace that part of the document.',
   },
   {
     code: 'pdf-no-text',
     title: 'Search cannot read the PDF',
+    action: 'Replace with a PDF with text',
     instruction:
       'The PDF is on the site, but it has no text the site can read: most likely scanned pages, or a password. Search does not find what it says. Replace it with a PDF that has text: most scanning and PDF tools can recognize it (OCR).',
   },
   {
     code: 'pdf-over-site-limit',
     title: 'The PDF is too large for the site to serve',
+    action: 'Save a smaller copy',
     instruction:
       'The site serves files up to 25 MB, so the page shows the text of the PDF and links to it in Drive. To put the file itself on the site, save a smaller copy, with images at a lower resolution, and replace this one.',
   },
   {
     code: 'pdf-too-large',
     title: 'The PDF is too large to read',
+    action: 'Save a smaller copy',
     instruction:
       'The site does not download a PDF over 100 MB, so its page only links to Drive and search does not find its text. Save a smaller copy and replace this one.',
   },
   {
-    code: 'unsupported-type',
-    title: 'The site does not publish this kind of file',
+    code: 'word-file',
+    title: 'Word and text files',
+    action: 'Save as Google Docs',
     instruction:
-      'The site publishes Google Docs and PDF files. If this content belongs on the site, save it as a Google Doc or export it as a PDF, and remove the original, or link to the file from a document. If it does not, move it out of the published folders.',
+      'The site publishes Google Docs, not Word files. Open each one in Drive, choose File → Save as Google Docs, check the result and delete the original. The new document is published on the next sync.',
+  },
+  {
+    code: 'presentation-file',
+    title: 'Presentations',
+    action: 'Export as PDF',
+    instruction:
+      'The site publishes PDF files. Download the presentation as a PDF, upload it to the same folder, and move the original out of the published folders.',
+  },
+  {
+    code: 'archive-file',
+    title: 'Archives',
+    action: 'Unpack and upload the files',
+    instruction:
+      'The site does not open archives. Unpack it and upload what it holds: Google Docs and PDF files are published, and anything else is listed here with its own advice. Then delete the archive.',
+  },
+  {
+    code: 'image-file',
+    title: 'Images',
+    action: 'Insert into a document',
+    instruction:
+      'An image on its own has no page to show it. Insert it into the Google Doc it belongs to, then move the file out of the published folders.',
+  },
+  {
+    code: 'diagram-file',
+    title: 'Diagrams',
+    action: 'Export as PDF or image',
+    instruction:
+      'The site cannot draw diagram files. Export the diagram as a PDF, or as an image inserted into the document it explains.',
+  },
+  {
+    code: 'spreadsheet-file',
+    title: 'Spreadsheets',
+    action: 'Link from a document',
+    instruction:
+      'The site does not publish spreadsheets. Link to each one from the document that explains it, or paste a small table into that document. Move the ones nobody needs out of the published folders.',
+  },
+  {
+    code: 'media-file',
+    title: 'Video and audio',
+    action: 'Link from a document',
+    instruction:
+      'The site does not host video or audio. Link to each file from a document, for example one page that lists the video instructions of a section and says what each one shows.',
+  },
+  {
+    code: 'unsupported-type',
+    title: 'Other files the site does not publish',
+    action: 'Convert, link or move out',
+    instruction:
+      'The site publishes Google Docs and PDF files. If this content belongs on the site, save it as one of those. Otherwise link to it from a document, or move it out of the published folders.',
   },
   {
     code: 'shortcut',
-    title: 'Shortcuts are not followed',
+    title: 'Shortcuts',
+    action: 'Move the original here',
     instruction:
       'A shortcut points to a file kept somewhere else, and the sync does not follow it. Move the original into this folder, or link to it from a document instead.',
   },
 ];
+
+const WORD_TYPES = new Set([
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.oasis.opendocument.text',
+  'application/rtf',
+  'text/rtf',
+  'text/plain',
+  'text/markdown',
+]);
+const PRESENTATION_TYPES = new Set([
+  'application/vnd.google-apps.presentation',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.oasis.opendocument.presentation',
+  'application/vnd.apple.keynote',
+]);
+const SPREADSHEET_TYPES = new Set([
+  'application/vnd.google-apps.spreadsheet',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.oasis.opendocument.spreadsheet',
+  'text/csv',
+  'text/tab-separated-values',
+]);
+const ARCHIVE_TYPES = new Set([
+  'application/zip',
+  'application/x-zip-compressed',
+  'application/x-7z-compressed',
+  'application/vnd.rar',
+  'application/x-rar-compressed',
+  'application/x-tar',
+  'application/gzip',
+]);
+const DIAGRAM_TYPES = new Set([
+  'application/vnd.google-apps.drawing',
+  'application/vnd.jgraph.mxfile',
+  'application/vnd.visio',
+  'application/vnd.ms-visio.drawing.main+xml',
+]);
+const DIAGRAM_EXTENSIONS = /\.(?:drawio|dio|vsdx?)$/iu;
+
+/**
+ * The group a file the site does not publish belongs to: what an editor would
+ * do with it. The name decides where Drive does not know the type, as with a
+ * draw.io file, which Drive stores as bytes.
+ */
+export function unsupportedFileReason(
+  mimeType: string,
+  name: string,
+): UnpublishedReasonCode {
+  if (DIAGRAM_TYPES.has(mimeType) || DIAGRAM_EXTENSIONS.test(name)) {
+    return 'diagram-file';
+  }
+  if (WORD_TYPES.has(mimeType)) {
+    return 'word-file';
+  }
+  if (PRESENTATION_TYPES.has(mimeType)) {
+    return 'presentation-file';
+  }
+  if (SPREADSHEET_TYPES.has(mimeType)) {
+    return 'spreadsheet-file';
+  }
+  if (ARCHIVE_TYPES.has(mimeType)) {
+    return 'archive-file';
+  }
+  if (mimeType.startsWith('image/')) {
+    return 'image-file';
+  }
+  if (
+    mimeType.startsWith('video/') ||
+    mimeType.startsWith('audio/') ||
+    mimeType === 'application/vnd.google-apps.vid'
+  ) {
+    return 'media-file';
+  }
+  return 'unsupported-type';
+}
 
 export interface UnpublishedItem {
   id: string;
@@ -227,13 +380,13 @@ function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-function folderLabels(selected: SelectedInventoryItem): string[] {
+export function folderLabels(selected: SelectedInventoryItem): string[] {
   return selected.path
     .slice(1, -1)
     .map((segment) => parseOrderedLabel(segment).label);
 }
 
-function driveUrl(selected: SelectedInventoryItem): string {
+export function driveUrl(selected: SelectedInventoryItem): string {
   return (
     selected.item.webViewLink ??
     `https://drive.google.com/open?id=${encodeURIComponent(selected.item.id)}`
@@ -289,7 +442,7 @@ export function createUnpublishedItems(
       'not-published',
       selected.item.mimeType === GOOGLE_SHORTCUT_MIME_TYPE
         ? 'shortcut'
-        : 'unsupported-type',
+        : unsupportedFileReason(selected.item.mimeType, selected.item.name),
     ),
   );
   for (const selected of selection.documents) {

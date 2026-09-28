@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { describeFileType, UNPUBLISHED_REASONS } from './unpublished.js';
+import {
+  describeFileType,
+  UNPUBLISHED_REASONS,
+  unsupportedFileReason,
+} from './unpublished.js';
 
 describe('describeFileType', () => {
   it.each([
@@ -34,5 +38,29 @@ describe('UNPUBLISHED_REASONS', () => {
       expect(reason.title.length).toBeGreaterThan(0);
       expect(reason.instruction.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('unsupportedFileReason', () => {
+  it.each([
+    [
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'Guide.docx',
+      'word-file',
+    ],
+    ['text/plain', 'Notes.txt', 'word-file'],
+    ['application/vnd.google-apps.presentation', 'Deck', 'presentation-file'],
+    ['application/vnd.google-apps.spreadsheet', 'Budget', 'spreadsheet-file'],
+    ['text/csv', 'Import.csv', 'spreadsheet-file'],
+    ['video/quicktime', 'Demo.mov', 'media-file'],
+    ['application/vnd.google-apps.vid', 'Walkthrough', 'media-file'],
+    ['image/jpeg', 'Map.png', 'image-file'],
+    ['application/zip', 'Audit.zip', 'archive-file'],
+    // Drive does not know draw.io, so the name decides.
+    ['application/octet-stream', 'Flow.drawio', 'diagram-file'],
+    ['application/vnd.google-apps.drawing', 'Sketch', 'diagram-file'],
+    ['application/vnd.google-apps.form', 'Survey', 'unsupported-type'],
+  ])('puts %s (%s) under %s', (mimeType, name, expected) => {
+    expect(unsupportedFileReason(mimeType, name)).toBe(expected);
   });
 });

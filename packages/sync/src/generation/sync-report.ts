@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { NOTE_KINDS, type NoteCode } from './notes.js';
 import {
   UNPUBLISHED_REASONS,
   type HeldDocument,
@@ -10,12 +11,27 @@ const reasonCodes = UNPUBLISHED_REASONS.map((reason) => reason.code) as [
   UnpublishedReasonCode,
   ...UnpublishedReasonCode[],
 ];
+const noteCodes = NOTE_KINDS.map((kind) => kind.code) as [
+  NoteCode,
+  ...NoteCode[],
+];
+
+const catalogEntry = <TCode extends [string, ...string[]]>(codes: TCode) =>
+  z.object({
+    code: z.enum(codes),
+    title: z.string(),
+    action: z.string(),
+    instruction: z.string(),
+  });
 
 export const syncReportSchema = z.object({
-  schemaVersion: z.literal(2),
+  schemaVersion: z.literal(3),
   generatedAt: z.iso.datetime(),
   dryRun: z.boolean(),
   summary: z.object({
+    /** Documents fetched from Google and converted by the run. */
+    exported: z.number().int().nonnegative(),
+    /** Pages the run added, changed, left as they were and removed. */
     added: z.number().int().nonnegative(),
     changed: z.number().int().nonnegative(),
     unchanged: z.number().int().nonnegative(),
@@ -31,15 +47,21 @@ export const syncReportSchema = z.object({
     incomplete: z.number().int().nonnegative(),
     /** Items below the folders the configuration ignores. */
     ignored: z.number().int().nonnegative(),
+    /** Pages on the site, by what they publish. */
+    published: z.object({
+      googleDocs: z.number().int().nonnegative(),
+      pdfs: z.number().int().nonnegative(),
+    }),
+    /** How the Google Docs on the site were converted. */
+    conversion: z.object({
+      markdown: z.number().int().nonnegative(),
+      html: z.number().int().nonnegative(),
+    }),
+    /** Entries in `notes`. */
+    notes: z.number().int().nonnegative(),
   }),
   /** The reasons behind `unpublished`, in the order the page shows them. */
-  reasons: z.array(
-    z.object({
-      code: z.enum(reasonCodes),
-      title: z.string(),
-      instruction: z.string(),
-    }),
-  ),
+  reasons: z.array(catalogEntry(reasonCodes)),
   unpublished: z.array(
     z.object({
       id: z.string().min(1),
@@ -62,6 +84,21 @@ export const syncReportSchema = z.object({
       name: z.string(),
       folderPath: z.array(z.string()),
       items: z.number().int().nonnegative(),
+    }),
+  ),
+  /** The kinds behind `notes`, in the order the page shows them (ADR-028). */
+  noteKinds: z.array(catalogEntry(noteCodes)),
+  notes: z.array(
+    z.object({
+      id: z.string().min(1),
+      name: z.string(),
+      folderPath: z.array(z.string()),
+      type: z.string().min(1),
+      sourceUrl: z.url(),
+      lastEditedBy: z.string().nullable(),
+      slug: z.string().min(1).optional(),
+      note: z.enum(noteCodes),
+      detail: z.string().min(1).optional(),
     }),
   ),
 });
@@ -101,8 +138,16 @@ export function reportsListTheSameItems(
       previous.reasons,
       previous.unpublished,
       previous.ignoredFolders,
+      previous.noteKinds,
+      previous.notes,
     ]) ===
-    JSON.stringify([report.reasons, report.unpublished, report.ignoredFolders])
+    JSON.stringify([
+      report.reasons,
+      report.unpublished,
+      report.ignoredFolders,
+      report.noteKinds,
+      report.notes,
+    ])
   );
 }
 

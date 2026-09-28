@@ -39,6 +39,11 @@ const manifestDocumentSchema = z.object({
     .string()
     .regex(/^sha256:[a-f0-9]{64}$/u)
     .optional(),
+  /**
+   * For a PDF, the version of the text extraction its page was written with,
+   * so a better extraction reads every PDF again once.
+   */
+  pdfTextVersion: z.number().int().positive().optional(),
 });
 
 const legacyManifestFolderSchema = z.object({
