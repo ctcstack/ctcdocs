@@ -47,8 +47,8 @@ const manifestDocumentSchema = z.object({
   /**
    * For a Google Doc converted through the HTML export, how many of its images
    * have no alt text and are published with an empty one (ADR-029). A page
-   * converted before images were counted has none, and is exported again once
-   * to count them.
+   * with images converted before they were counted has none, and is exported
+   * again once to count them.
    */
   undescribedImages: z.number().int().nonnegative().optional(),
 });

@@ -57,13 +57,24 @@ the Markdown export has no images and carries no count, nor does a PDF.
 as its detail and the instruction to add alt text in Google Docs. It follows
 the notes about what conversion lost.
 
-**A page recorded before images were counted is exported once more** by a
-normal sync. A page with an image without alt text comes out with the empty
-alt and is written again; any other is left byte for byte as it is, and only
-its record gains the count. The converter version does not change: that would
-export every document and rewrite the synchronization time on every page. The
-count and the empty alt ship together, so the one export that counts is also
-the one that writes the empty alt.
+**A page with images recorded before they were counted is exported once
+more** by a normal sync. It is written again where the decisions above change
+it: an image without alt text or with only a title, a heading that holds only
+an image, an image inside a table, which loses the blank title Google gives
+every image. A section page is written again when a summary it lists changes.
+Any other page is left byte for byte as it is. A document without images has
+nothing to count and is not exported for it; it records its count, zero, the
+next time it is exported.
+
+**The record of a page left as it is follows its conversion.** The export it
+came through, its warnings and its count are taken from the conversion just
+made, not carried over, so a document whose export changes while its page does
+not is recorded as it now is, and not exported again on every run.
+
+The converter version does not change: that would export every document and
+rewrite the synchronization time on every page. The count and the empty alt
+ship together, so the one export that counts is also the one that writes the
+empty alt.
 
 ## Consequences
 
@@ -81,9 +92,9 @@ the one that writes the empty alt.
 
 - A screen reader skips an image with an empty alt, as it would a decorative
   one, so its user no longer hears that an image is there.
-- The first sync after upgrading exports every document converted through the
-  HTML export once more, which takes time and Google API quota, and rewrites
-  every page with an image without alt text.
+- The first sync after upgrading exports every document with images converted
+  through the HTML export once more, which takes time and Google API quota, and
+  rewrites the pages the decisions above change.
 - On a corpus where most images lack descriptions, the note is the longest
   group on the page, and a change in any count writes a new report.
 - The count is per page, not per image. The note cannot point to the image in

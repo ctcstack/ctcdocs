@@ -349,20 +349,27 @@ function generatedAssetsDirectory(fileId: string): string {
 }
 
 /**
- * A record with the count of images a conversion found without alt text, the
- * last field as in the schema, so a record read back serializes the same.
+ * The record of a page that came out the same, brought up to date with what
+ * its conversion found that is not in the page: the export it came through,
+ * its warnings, and its images without alt text. Fields keep their places and
+ * the count goes last, as in the schema, so a record read back serializes the
+ * same.
  */
-function withUndescribedImages(
+function withConversionFacts(
   record: SyncedDocumentRecord,
-  undescribedImages: number | undefined,
+  converted: Pick<
+    ConvertedDocument,
+    'exportMode' | 'warnings' | 'undescribedImages'
+  >,
 ): SyncedDocumentRecord {
-  if (record.undescribedImages === undescribedImages) {
-    return record;
-  }
-  const updated: SyncedDocumentRecord = { ...record };
+  const updated: SyncedDocumentRecord = {
+    ...record,
+    exportMode: converted.exportMode,
+    warnings: converted.warnings,
+  };
   delete updated.undescribedImages;
-  if (undescribedImages !== undefined) {
-    updated.undescribedImages = undescribedImages;
+  if (converted.undescribedImages !== undefined) {
+    updated.undescribedImages = converted.undescribedImages;
   }
   return updated;
 }
@@ -1077,9 +1084,10 @@ async function synchronize(
                 // A PDF read by an earlier text extraction is read again.
                 (selected.item.mimeType === GOOGLE_DRIVE_PDF_MIME_TYPE &&
                   existingRecord.pdfTextVersion !== PDF_TEXT_VERSION) ||
-                // An HTML export converted before images were counted.
+                // Images converted before they were counted.
                 (existingRecord.exportMode === 'hybrid' &&
-                  existingRecord.undescribedImages === undefined),
+                  existingRecord.undescribedImages === undefined &&
+                  existingAssets.length > 0),
           added: existingRecord === undefined,
         };
       }),
@@ -1301,11 +1309,7 @@ async function synchronize(
       return {
         fileId: item.id,
         content: planned.existingContent,
-        // The count is about the page, not in it: a new one leaves it as it is.
-        record: withUndescribedImages(
-          planned.existingRecord,
-          converted.undescribedImages,
-        ),
+        record: withConversionFacts(planned.existingRecord, converted),
         folderPath,
         assets: planned.existingAssets,
         titleFacts: converted.titleFacts,

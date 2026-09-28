@@ -20,10 +20,16 @@ All three packages share a version and are released together.
   a heading with no words in the table of contents.
 - An image with a title and no alt text takes its title as its alt text,
   and a blank title is no longer carried into the page.
-- The first sync after upgrading exports every document converted through
-  the HTML export once more, to count its images, and rewrites the pages with
-  an image without alt text. Other pages are left as they are; the manifest
-  records the count as `undescribedImages`.
+- The first sync after upgrading exports every document with images
+  converted through the HTML export once more, to count them, and rewrites
+  the pages the changes above reach: an image without alt text or with only a
+  title, a heading that holds only an image, an image inside a table, which
+  loses the blank title Google gives every image, and the section pages whose
+  summaries change. Other pages are left as they are; the manifest records
+  the count as `undescribedImages`.
+- A page that comes out the same keeps its page, and its manifest record now
+  follows what the conversion found: the export it came through and its
+  warnings, as well as the count.
 
 ## 0.11.1
 
