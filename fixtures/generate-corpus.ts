@@ -479,10 +479,14 @@ const htmlArchives = new Map<string, Uint8Array>([
             '<p>The image above is a synthetic swatch, not a screenshot of',
             ' anything.</p>',
             /*
-             * The same swatch without alt text, which the content health page
-             * notes as an image with no description (ADR-029).
+             * The same swatch without alt text and cropped to its left half,
+             * as Google's export frames a crop, so the content health page
+             * notes an image with no description (ADR-029) and a cropped one
+             * (ADR-030).
              */
-            '<img src="images/panel.png">',
+            '<span style="overflow: hidden; display: inline-block; width: 1.00px; height: 2.00px;">',
+            '<img src="images/panel.png" style="width: 2.00px; height: 2.00px; margin-left: 0.00px; margin-top: 0.00px;" title="">',
+            '</span>',
           ].join(''),
           'utf8',
         ),

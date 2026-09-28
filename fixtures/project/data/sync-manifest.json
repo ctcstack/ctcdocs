@@ -100,10 +100,12 @@
       "exportMode": "hybrid",
       "warnings": [
         "fallback:image",
-        "fallback:media_object"
+        "fallback:media_object",
+        "removed_unsafe_html_attribute"
       ],
       "shortId": "d252ed",
-      "undescribedImages": 1
+      "undescribedImages": 1,
+      "croppedImages": 1
     },
     "doc-style-guide": {
       "googleFileId": "doc-style-guide",
@@ -144,7 +146,8 @@
         "fallback:table"
       ],
       "shortId": "14062a",
-      "undescribedImages": 0
+      "undescribedImages": 0,
+      "croppedImages": 0
     },
     "pdf-release-checklist": {
       "googleFileId": "pdf-release-checklist",
