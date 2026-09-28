@@ -22,15 +22,21 @@ import { parseOrderedLabel } from '../ordered-label.js';
  * - `not-published`: nothing of the file is on the site.
  * - `out-of-date`: the site shows an earlier version, which it keeps until the
  *   current one can be published.
+ * - `incomplete`: the file has a page, but part of it is missing: a PDF too
+ *   large to serve, or one whose text cannot be read (ADR-027).
  */
-export type UnpublishedStatus = 'not-published' | 'out-of-date';
+export type UnpublishedStatus = 'not-published' | 'out-of-date' | 'incomplete';
 
 export type UnpublishedReasonCode =
   | 'unsupported-type'
   | 'shortcut'
+  | 'name-script'
   | 'export-too-large'
   | 'download-restricted'
-  | 'content-rejected';
+  | 'content-rejected'
+  | 'pdf-over-site-limit'
+  | 'pdf-too-large'
+  | 'pdf-no-text';
 
 export interface UnpublishedReason {
   code: UnpublishedReasonCode;
@@ -43,10 +49,17 @@ export const UNPUBLISHED_STATUS_LABELS: Readonly<
 > = {
   'not-published': 'Not on the site',
   'out-of-date': 'Out of date on the site',
+  incomplete: 'Incomplete on the site',
 };
 
 /** In the order the page shows them: what an editor can fix first. */
 export const UNPUBLISHED_REASONS: readonly UnpublishedReason[] = [
+  {
+    code: 'name-script',
+    title: 'The name uses letters from another alphabet',
+    instruction:
+      "A file's name becomes its address on the site, and the site writes its addresses in one alphabet. Retype the letters named below in Drive, or rename the file.",
+  },
   {
     code: 'export-too-large',
     title: 'Google cannot export the document: it is over 10 MB',
@@ -66,10 +79,28 @@ export const UNPUBLISHED_REASONS: readonly UnpublishedReason[] = [
       'Conversion stopped on content it cannot publish safely, named under the document. Remove or replace that part of the document.',
   },
   {
+    code: 'pdf-no-text',
+    title: 'Search cannot read the PDF',
+    instruction:
+      'The PDF is on the site, but it has no text the site can read: most likely scanned pages, or a password. Search does not find what it says. Replace it with a PDF that has text: most scanning and PDF tools can recognize it (OCR).',
+  },
+  {
+    code: 'pdf-over-site-limit',
+    title: 'The PDF is too large for the site to serve',
+    instruction:
+      'The site serves files up to 25 MB, so the page shows the text of the PDF and links to it in Drive. To put the file itself on the site, save a smaller copy, with images at a lower resolution, and replace this one.',
+  },
+  {
+    code: 'pdf-too-large',
+    title: 'The PDF is too large to read',
+    instruction:
+      'The site does not download a PDF over 100 MB, so its page only links to Drive and search does not find its text. Save a smaller copy and replace this one.',
+  },
+  {
     code: 'unsupported-type',
     title: 'The site does not publish this kind of file',
     instruction:
-      'The site publishes Google Docs. If this content belongs on the site, save it as a Google Doc and remove the original, or link to the file from a document. If it does not, move it out of the published folders.',
+      'The site publishes Google Docs and PDF files. If this content belongs on the site, save it as a Google Doc or export it as a PDF, and remove the original, or link to the file from a document. If it does not, move it out of the published folders.',
   },
   {
     code: 'shortcut',
@@ -115,6 +146,13 @@ export interface IgnoredFolder {
 export interface HeldDocument {
   reason: UnpublishedReasonCode;
   detail?: string;
+}
+
+/** A published document with part of it missing, and the record behind it. */
+export interface IncompleteDocument {
+  reason: UnpublishedReasonCode;
+  detail?: string;
+  record: SyncedDocumentRecord;
 }
 
 const GOOGLE_TYPES: Readonly<Record<string, string>> = {
@@ -243,6 +281,7 @@ export function createUnpublishedItems(
   selection: InventorySelection,
   held: ReadonlyMap<string, HeldDocument>,
   kept: ReadonlyMap<string, SyncedDocumentRecord>,
+  incomplete: ReadonlyMap<string, readonly IncompleteDocument[]> = new Map(),
 ): UnpublishedItem[] {
   const items: UnpublishedItem[] = selection.unsupported.map((selected) =>
     entryFor(
@@ -269,11 +308,32 @@ export function createUnpublishedItems(
       ),
     );
   }
+  for (const selected of selection.documents) {
+    if (held.has(selected.item.id)) {
+      continue;
+    }
+    for (const missing of incomplete.get(selected.item.id) ?? []) {
+      items.push(
+        entryFor(
+          selected,
+          'incomplete',
+          missing.reason,
+          missing.detail,
+          missing.record,
+        ),
+      );
+    }
+  }
+  const reasonOrder = new Map(
+    UNPUBLISHED_REASONS.map((reason, index) => [reason.code, index]),
+  );
   return items.sort(
     (left, right) =>
       compareText(left.folderPath.join('/'), right.folderPath.join('/')) ||
       compareText(left.name, right.name) ||
-      compareText(left.id, right.id),
+      compareText(left.id, right.id) ||
+      (reasonOrder.get(left.reason) ?? 0) -
+        (reasonOrder.get(right.reason) ?? 0),
   );
 }
 

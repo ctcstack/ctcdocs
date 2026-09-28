@@ -5,16 +5,22 @@
   "summary": {
     "added": 0,
     "changed": 1,
-    "unchanged": 6,
+    "unchanged": 8,
     "removed": 0,
     "folders": 5,
     "unsupported": 2,
     "warnings": 0,
     "notPublished": 3,
     "outOfDate": 0,
+    "incomplete": 1,
     "ignored": 2
   },
   "reasons": [
+    {
+      "code": "name-script",
+      "title": "The name uses letters from another alphabet",
+      "instruction": "A file's name becomes its address on the site, and the site writes its addresses in one alphabet. Retype the letters named below in Drive, or rename the file."
+    },
     {
       "code": "export-too-large",
       "title": "Google cannot export the document: it is over 10 MB",
@@ -31,9 +37,24 @@
       "instruction": "Conversion stopped on content it cannot publish safely, named under the document. Remove or replace that part of the document."
     },
     {
+      "code": "pdf-no-text",
+      "title": "Search cannot read the PDF",
+      "instruction": "The PDF is on the site, but it has no text the site can read: most likely scanned pages, or a password. Search does not find what it says. Replace it with a PDF that has text: most scanning and PDF tools can recognize it (OCR)."
+    },
+    {
+      "code": "pdf-over-site-limit",
+      "title": "The PDF is too large for the site to serve",
+      "instruction": "The site serves files up to 25 MB, so the page shows the text of the PDF and links to it in Drive. To put the file itself on the site, save a smaller copy, with images at a lower resolution, and replace this one."
+    },
+    {
+      "code": "pdf-too-large",
+      "title": "The PDF is too large to read",
+      "instruction": "The site does not download a PDF over 100 MB, so its page only links to Drive and search does not find its text. Save a smaller copy and replace this one."
+    },
+    {
       "code": "unsupported-type",
       "title": "The site does not publish this kind of file",
-      "instruction": "The site publishes Google Docs. If this content belongs on the site, save it as a Google Doc and remove the original, or link to the file from a document. If it does not, move it out of the published folders."
+      "instruction": "The site publishes Google Docs and PDF files. If this content belongs on the site, save it as a Google Doc or export it as a PDF, and remove the original, or link to the file from a document. If it does not, move it out of the published folders."
     },
     {
       "code": "shortcut",
@@ -67,6 +88,21 @@
       "reason": "shortcut",
       "sourceUrl": "https://drive.google.com/open?id=shortcut-policies",
       "lastEditedBy": "Robin Sample"
+    },
+    {
+      "id": "pdf-scanned-form",
+      "name": "Scanned form.pdf",
+      "folderPath": [
+        "Handbook"
+      ],
+      "type": "PDF",
+      "mimeType": "application/pdf",
+      "status": "incomplete",
+      "reason": "pdf-no-text",
+      "sourceUrl": "https://drive.google.com/open?id=pdf-scanned-form",
+      "lastEditedBy": "Avery Example",
+      "slug": "handbook/scanned-form",
+      "publishedVersion": "2026-01-05T09:00:00.000Z"
     },
     {
       "id": "sheet-glossary",

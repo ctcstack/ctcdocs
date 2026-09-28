@@ -14,8 +14,24 @@ All three packages share a version and are released together.
   summary lists the same files by folder, name, type and reason. See
   [ADR-025](docs/ADR/025-name-every-file-left-off-the-site.md).
 
+- PDF files in the published folders are published. Each gets a page like a
+  Google Doc: an address from its name without `.pdf`, a permanent link, a
+  `PDF` mark in the sidebar. The page shows the file in the browser's viewer,
+  with links to open and download it, and its text, which search indexes and
+  `index.md` serves. A PDF over 25 MB, the most the site can serve, is
+  published as its text with a link to Drive; one over 100 MB is only linked.
+  An unchanged PDF is not downloaded again. The content health page lists a
+  PDF with no readable text, or too large for the site, as incomplete. See
+  [ADR-027](docs/ADR/027-publish-pdf-files.md).
+- `data/docs-index.json` gives each document a `format`: `google-doc` or
+  `pdf`.
+
 ### Changed
 
+- A document named with a letter from another alphabet is held back and
+  listed with the letters to retype, instead of stopping the sync. A folder
+  named so still stops it. ADR-027 supersedes ADR-020 in this.
+- `@ctcstack/ctcdocs-sync` depends on `unpdf` to read the text of a PDF.
 - A document that cannot be exported for a reason of its own — over Google's
   10 MB export limit, downloading turned off, or content conversion refuses —
   no longer stops the sync. It is held back: a document already published

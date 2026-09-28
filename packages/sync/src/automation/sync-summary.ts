@@ -16,6 +16,7 @@ export function renderSyncJobSummary(
     ['Unsupported', report.summary.unsupported],
     ['Not on the site', report.summary.notPublished],
     ['Out of date on the site', report.summary.outOfDate],
+    ['Incomplete on the site', report.summary.incomplete],
     ['Ignored by configuration', report.summary.ignored],
     ['Warnings', report.summary.warnings],
   ] as const;
@@ -104,7 +105,7 @@ export function renderUnpublishedSummary(
     '',
     report.unpublished.length === 0
       ? '- Every file in the published folders is on the site.'
-      : `- Files not on the site: ${report.summary.notPublished}; documents out of date on the site: ${report.summary.outOfDate}`,
+      : `- Files not on the site: ${report.summary.notPublished}; out of date: ${report.summary.outOfDate}; incomplete: ${report.summary.incomplete}`,
     `- What to do about each: [content health page](${pageUrl}#not-on-the-site)`,
     '',
   ];

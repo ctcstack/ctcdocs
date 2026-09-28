@@ -1,6 +1,8 @@
 # ADR-020: A Drive name is written in one alphabet
 
-- Status: Proposed
+- Status: Proposed; superseded in part by
+  [ADR-027](027-publish-pdf-files.md), under which a document named so is held
+  back instead of stopping the run
 - Date: 2026-09-26
 - Owners: CTCDocs maintainers
 - Supersedes: none

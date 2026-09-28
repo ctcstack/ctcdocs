@@ -143,6 +143,47 @@
         "fallback:table"
       ],
       "shortId": "14062a"
+    },
+    "pdf-release-checklist": {
+      "googleFileId": "pdf-release-checklist",
+      "googleParentId": "folder-reference",
+      "googleName": "Release checklist.pdf",
+      "displayTitle": "Release checklist",
+      "description": "Every release follows the same steps, in this order.",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "googleCreatedTime": "2026-01-05T09:00:00.000Z",
+      "sourceUrl": "https://drive.google.com/file/d/pdf-release-checklist/view",
+      "stableSlug": "reference/release-checklist",
+      "generatedMarkdownPath": "src/content/docs/_generated/pdf-release-checklist.md",
+      "generatedAssetsDirectory": "src/assets/generated/pdf-release-checklist",
+      "contentHash": "sha256:219281f1e8f80129af6308fa8228e30959885c599ab4db5896f9b481ad3ce7ca",
+      "outputHash": "sha256:1c7688219d0dae263c3a8bb162f3b5275afe037660db447d2223ebe66447055a",
+      "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
+      "exportMode": "pdf",
+      "warnings": [],
+      "shortId": "eda7da",
+      "sourceChecksum": "sha256:c8c58dc6d6fd9f61f0164fd512fdc5e07bd8f121c6cc6392a832b3f1e2e50867"
+    },
+    "pdf-scanned-form": {
+      "googleFileId": "pdf-scanned-form",
+      "googleParentId": "folder-handbook",
+      "googleName": "Scanned form.pdf",
+      "displayTitle": "Scanned form",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "googleCreatedTime": "2026-01-05T09:00:00.000Z",
+      "sourceUrl": "https://drive.google.com/file/d/pdf-scanned-form/view",
+      "stableSlug": "handbook/scanned-form",
+      "generatedMarkdownPath": "src/content/docs/_generated/pdf-scanned-form.md",
+      "generatedAssetsDirectory": "src/assets/generated/pdf-scanned-form",
+      "contentHash": "sha256:269580f0026d4e0d3f0ef6b25e77713395448dc629345245c98f1b6ddc80de98",
+      "outputHash": "sha256:cf1894ecf44e71e96c69653a992dd17767d82cbc0e5d2b906de45470dcdeb202",
+      "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
+      "exportMode": "pdf",
+      "warnings": [
+        "pdf:no_text"
+      ],
+      "shortId": "2a3aab",
+      "sourceChecksum": "sha256:aa89a8a4d9205ce24edfac2453add7dc86d1ba534bf224d42938ed2bc4f0743e"
     }
   },
   "folders": {

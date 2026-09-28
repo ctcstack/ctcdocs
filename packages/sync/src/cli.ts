@@ -130,7 +130,9 @@ function printInventorySummary(
   console.log('Google Drive inventory dry-run passed.');
   console.log(`Items visible: ${summary.allItems}`);
   console.log(`Folders selected: ${summary.folders}`);
-  console.log(`Google Docs selected: ${summary.documents}`);
+  console.log(
+    `Documents selected (Google Docs and PDF files): ${summary.documents}`,
+  );
   console.log(`Unsupported items selected: ${summary.unsupported}`);
   console.log(`Ignored items: ${summary.ignored}`);
   console.log(`Warnings: ${summary.warnings}`);

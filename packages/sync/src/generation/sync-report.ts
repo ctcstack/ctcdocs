@@ -27,6 +27,8 @@ export const syncReportSchema = z.object({
     notPublished: z.number().int().nonnegative(),
     /** Documents whose earlier version stays on the site. */
     outOfDate: z.number().int().nonnegative(),
+    /** Entries for pages with part of their file missing, such as a PDF. */
+    incomplete: z.number().int().nonnegative(),
     /** Items below the folders the configuration ignores. */
     ignored: z.number().int().nonnegative(),
   }),
@@ -45,7 +47,7 @@ export const syncReportSchema = z.object({
       folderPath: z.array(z.string()),
       type: z.string().min(1),
       mimeType: z.string().min(1),
-      status: z.enum(['not-published', 'out-of-date']),
+      status: z.enum(['not-published', 'out-of-date', 'incomplete']),
       reason: z.enum(reasonCodes),
       detail: z.string().min(1).optional(),
       sourceUrl: z.url(),

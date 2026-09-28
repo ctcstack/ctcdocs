@@ -4,6 +4,30 @@ export const GOOGLE_DRIVE_FOLDER_MIME_TYPE =
   'application/vnd.google-apps.folder';
 export const GOOGLE_DRIVE_DOCUMENT_MIME_TYPE =
   'application/vnd.google-apps.document';
+export const GOOGLE_DRIVE_PDF_MIME_TYPE = 'application/pdf';
+
+/**
+ * What the site publishes as a page: Google Docs, and PDF files (ADR-027).
+ * Everything else under the root is listed as not on the site (ADR-025).
+ */
+export function isPublishedFileType(mimeType: string): boolean {
+  return (
+    mimeType === GOOGLE_DRIVE_DOCUMENT_MIME_TYPE ||
+    mimeType === GOOGLE_DRIVE_PDF_MIME_TYPE
+  );
+}
+
+/**
+ * The name a document is published under: its Drive name, without the
+ * `.pdf` a PDF carries from the computer it was uploaded from.
+ */
+export function documentName(item: { name: string; mimeType: string }): string {
+  if (item.mimeType !== GOOGLE_DRIVE_PDF_MIME_TYPE) {
+    return item.name;
+  }
+  const stripped = item.name.replace(/\.pdf\s*$/iu, '').trimEnd();
+  return stripped || item.name;
+}
 
 const googleDriveIdentifier = z
   .string()
@@ -25,6 +49,11 @@ export const driveItemSchema = z.object({
     })
     .optional(),
   size: z.string().regex(/^\d+$/u).optional(),
+  /** Present for files stored in Drive, such as PDFs; not for Google Docs. */
+  sha256Checksum: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/u)
+    .optional(),
   /**
    * Who last edited the file, by display name only: the content health page
    * uses it to show each editor what is theirs to fix (ADR-024).

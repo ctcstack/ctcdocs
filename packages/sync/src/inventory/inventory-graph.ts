@@ -1,6 +1,6 @@
 import {
-  GOOGLE_DRIVE_DOCUMENT_MIME_TYPE,
   GOOGLE_DRIVE_FOLDER_MIME_TYPE,
+  isPublishedFileType,
   type DriveItem,
 } from '../google/drive-types.js';
 
@@ -354,26 +354,25 @@ export function buildInventorySelection(
           .filter((item) => item.mimeType === GOOGLE_DRIVE_FOLDER_MIME_TYPE)
           .map((item) => item.id),
         documentIds: selectedChildren
-          .filter((item) => item.mimeType === GOOGLE_DRIVE_DOCUMENT_MIME_TYPE)
+          .filter((item) => isPublishedFileType(item.mimeType))
           .map((item) => item.id),
         unsupportedItemIds: selectedChildren
           .filter(
             (item) =>
               item.mimeType !== GOOGLE_DRIVE_FOLDER_MIME_TYPE &&
-              item.mimeType !== GOOGLE_DRIVE_DOCUMENT_MIME_TYPE,
+              !isPublishedFileType(item.mimeType),
           )
           .map((item) => item.id),
       };
     });
 
-  const documents = selectedItems.filter(
-    (selectedItem) =>
-      selectedItem.item.mimeType === GOOGLE_DRIVE_DOCUMENT_MIME_TYPE,
+  const documents = selectedItems.filter((selectedItem) =>
+    isPublishedFileType(selectedItem.item.mimeType),
   );
   const unsupported = selectedItems.filter(
     (selectedItem) =>
       selectedItem.item.mimeType !== GOOGLE_DRIVE_FOLDER_MIME_TYPE &&
-      selectedItem.item.mimeType !== GOOGLE_DRIVE_DOCUMENT_MIME_TYPE,
+      !isPublishedFileType(selectedItem.item.mimeType),
   );
 
   return {

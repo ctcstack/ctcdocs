@@ -3,7 +3,7 @@
 "slug": "reference"
 "shortId": "3865e9"
 "sourceType": "section-index"
-"contentHash": "sha256:8091104affd543ef06678f07592f56b06f6df4d7443cc82a1b59bb0cfd0ac093"
+"contentHash": "sha256:4effb2e1ca940d21bec71db481f7942a4eafbc5bd9fb830479e8328620b39ce0"
 "folderPath": []
 "entries":
   - "kind": "folder"
@@ -15,6 +15,8 @@
   - "kind": "document"
     "slug": "reference/diagrams"
   - "kind": "document"
+    "slug": "reference/release-checklist"
+  - "kind": "document"
     "slug": "reference/screenshots"
 "pagefind": false
 ---
@@ -23,4 +25,5 @@
 - [Archive](/reference/archive/)
 - [Guides](/reference/guides/)
 - [Diagrams](/reference/diagrams/) — A mermaid fence has to be claimed before the code-frame renderer sees it, or the diagram publishes as a listing of its own source.
+- [Release checklist](/reference/release-checklist/) — Every release follows the same steps, in this order.
 - [Screenshots](/reference/screenshots/) — A document whose media forces the HTML archive path, so the asset route and the image pipeline are exercised by the corpus.

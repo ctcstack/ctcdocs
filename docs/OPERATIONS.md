@@ -174,7 +174,7 @@ smoke test** workflow:
 Google Drive inventory dry-run passed.
 Items visible: <count>
 Folders selected: <count>
-Google Docs selected: <count>
+Documents selected (Google Docs and PDF files): <count>
 Unsupported items selected: <count>
 Ignored items: <count>
 Warnings: <count>
@@ -226,16 +226,22 @@ the item behind each one.
 
 A word in a Drive name uses letters of one alphabet
 ([ADR-020](ADR/020-letters-from-one-alphabet.md)). A Cyrillic `С` typed into
-`Company` looks right, but it would become part of the document's permanent
-address. So the sync stops at inventory, before anything is exported, whatever
-`SYNC_FAIL_ON_WARNING` says:
+`Company` looks right, but it would become part of the permanent address of
+the item and, for a folder, of everything in it.
+
+A document or PDF named so is held back
+([ADR-027](ADR/027-publish-pdf-files.md)): it is not published under that
+name, the rest of the sync goes on, and the content health page lists it under
+"The name uses letters from another alphabet" with the letters to retype. A
+folder named so stops the sync at inventory, before anything is exported,
+whatever `SYNC_FAIL_ON_WARNING` says:
 
 ```text
 ERROR [INVENTORY_GRAPH]: mixed_script_name
 ERROR [INVENTORY_GRAPH]: mixed_script_name itemId=<Google file ID> U+0421 Cyrillic at character 1
 ```
 
-Open the item by its ID, retype the letter at that position, and rerun the
+Open the folder by its ID, retype the letter at that position, and rerun the
 sync. Only Latin, Cyrillic and Greek are checked against each other, and words
 are split at spaces, hyphens and punctuation, so `SEO-продвижение` is accepted.
 
@@ -246,6 +252,29 @@ catches a whole word typed on the wrong layout.
 
 An item published before the rule keeps its address when its title is
 corrected. Changing the address is a slug reseed, below.
+
+## PDF files
+
+A PDF in a published folder is published
+([ADR-027](ADR/027-publish-pdf-files.md)). Its page shows the file in the
+browser's PDF viewer, with links to open and download it, and its text below,
+which is what search finds. Its title and address are its Drive name without
+`.pdf`, and the sidebar marks it `PDF`.
+
+The page carries what the file's size allows:
+
+| Size            | On the page                                  |
+| --------------- | -------------------------------------------- |
+| Up to 25 MB     | The file and its text                        |
+| 25 MB to 100 MB | The text, and a link to the file in Drive    |
+| Over 100 MB     | A link to the file in Drive; nothing is read |
+
+The content health page lists the last two, and a PDF with no text to read —
+scanned pages, a password — as "Incomplete on the site".
+
+A PDF is downloaded when it is new or its content changed; Drive's checksum
+says which, so a full sync does not download the others again. Every published
+version of a PDF stays in the repository's history.
 
 ## Linking to a section
 

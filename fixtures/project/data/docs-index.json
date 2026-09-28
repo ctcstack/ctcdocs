@@ -14,7 +14,23 @@
       "folderPath": [
         "Handbook"
       ],
-      "language": "en"
+      "language": "en",
+      "format": "google-doc"
+    },
+    {
+      "id": "pdf-scanned-form",
+      "title": "Scanned form",
+      "slug": "handbook/scanned-form",
+      "markdownPath": "src/content/docs/_generated/pdf-scanned-form.md",
+      "sourceUrl": "https://drive.google.com/file/d/pdf-scanned-form/view",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "syncedAt": "2026-02-10T06:00:00.000Z",
+      "contentHash": "sha256:269580f0026d4e0d3f0ef6b25e77713395448dc629345245c98f1b6ddc80de98",
+      "folderPath": [
+        "Handbook"
+      ],
+      "language": "en",
+      "format": "pdf"
     },
     {
       "id": "doc-tables-and-code",
@@ -28,7 +44,8 @@
       "folderPath": [
         "Handbook"
       ],
-      "language": "en"
+      "language": "en",
+      "format": "google-doc"
     },
     {
       "id": "doc-diagrams",
@@ -42,7 +59,8 @@
       "folderPath": [
         "Reference"
       ],
-      "language": "en"
+      "language": "en",
+      "format": "google-doc"
     },
     {
       "id": "doc-style-guide",
@@ -57,7 +75,23 @@
         "Reference",
         "Guides"
       ],
-      "language": "en"
+      "language": "en",
+      "format": "google-doc"
+    },
+    {
+      "id": "pdf-release-checklist",
+      "title": "Release checklist",
+      "slug": "reference/release-checklist",
+      "markdownPath": "src/content/docs/_generated/pdf-release-checklist.md",
+      "sourceUrl": "https://drive.google.com/file/d/pdf-release-checklist/view",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "syncedAt": "2026-02-10T06:00:00.000Z",
+      "contentHash": "sha256:219281f1e8f80129af6308fa8228e30959885c599ab4db5896f9b481ad3ce7ca",
+      "folderPath": [
+        "Reference"
+      ],
+      "language": "en",
+      "format": "pdf"
     },
     {
       "id": "doc-screenshots",
@@ -71,7 +105,8 @@
       "folderPath": [
         "Reference"
       ],
-      "language": "en"
+      "language": "en",
+      "format": "google-doc"
     },
     {
       "id": "doc-getting-started",
@@ -83,7 +118,8 @@
       "syncedAt": "2026-02-10T06:00:00.000Z",
       "contentHash": "sha256:bb2065bdabdd9332571d2c0f29c3eb306f3e2c500401c70c40d0b0e4e7755e2b",
       "folderPath": [],
-      "language": "en"
+      "language": "en",
+      "format": "google-doc"
     },
     {
       "id": "doc-cyrillic",
@@ -95,7 +131,8 @@
       "syncedAt": "2026-02-10T06:00:00.000Z",
       "contentHash": "sha256:1b9bc321c938fb8d7fa4bd3bfca72f30efa50b1a292a2122d3bd94e9f4d66ebd",
       "folderPath": [],
-      "language": "en"
+      "language": "en",
+      "format": "google-doc"
     }
   ]
 }

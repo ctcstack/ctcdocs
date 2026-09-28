@@ -48,17 +48,19 @@ export async function runInventory(
     [configuration.GOOGLE_DRIVE_ID],
   );
   /*
-   * A letter from the wrong alphabet is not a warning. The name becomes the
-   * document's permanent address on its first sync, and an address outlives
-   * the rename that corrects the title, so the run stops before anything is
-   * exported, whatever SYNC_FAIL_ON_WARNING says.
+   * A letter from the wrong alphabet is not a warning. A folder's name is part
+   * of the address of everything in it, and an address outlives the rename
+   * that corrects it, so a folder named so stops the run before anything is
+   * exported, whatever SYNC_FAIL_ON_WARNING says. A document named so is held
+   * back by the sync instead, and listed with its letters (ADR-027).
    */
-  const nameIssues = findNameScriptIssues(
+  const folderIds = new Set(graph.folders.map((folder) => folder.item.id));
+  const folderNameIssues = findNameScriptIssues(
     graph,
     context.site.navigation.nameScripts,
-  );
-  if (nameIssues.length > 0) {
-    throw new InventoryGraphError(nameIssues);
+  ).filter((issue) => folderIds.has(issue.itemId));
+  if (folderNameIssues.length > 0) {
+    throw new InventoryGraphError(folderNameIssues);
   }
   /*
    * How the corpus is named is reported on the same channel as how it is

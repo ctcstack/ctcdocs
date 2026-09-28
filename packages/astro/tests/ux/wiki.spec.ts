@@ -12,6 +12,7 @@ import {
   documentWithAsset,
   documentWithPermanentLink,
   documentWithTable,
+  pdfDocument,
   sectionWithSubfolder,
 } from '../support/corpus-fixtures.js';
 
@@ -523,6 +524,32 @@ test('the content health page names what is not on the site', async ({
     if (item.slug) {
       await expect(entry.locator(`a[href="/${item.slug}/"]`)).toBeVisible();
     }
+  }
+  await expectNoAccessibilityViolations(page);
+});
+
+test('a PDF has a page with the file and its text', async ({
+  page,
+  request,
+}) => {
+  const sample = pdfDocument();
+  test.skip(!sample, 'The corpus has no PDF files.');
+  const { document, fileUrl } = sample as NonNullable<typeof sample>;
+
+  await page.goto(`/${document.slug}/`);
+  await expect(
+    page.getByRole('heading', { level: 1, name: document.title }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Open in Google Drive' }),
+  ).toHaveAttribute('href', /^https:\/\/drive\.google\.com\/file\/d\//u);
+  if (fileUrl) {
+    await expect(
+      page.getByRole('link', { name: 'Open the PDF' }),
+    ).toHaveAttribute('href', fileUrl);
+    const file = await request.get(fileUrl);
+    expect(file.ok()).toBe(true);
+    expect(file.headers()['content-type']).toMatch(/^application\/pdf/u);
   }
   await expectNoAccessibilityViolations(page);
 });

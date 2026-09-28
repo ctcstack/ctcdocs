@@ -43,9 +43,9 @@ way Starlight does, because the consuming project's Astro build compiles them.
 
 ## Product invariants
 
-- Editorial source of truth: Google Docs in a Shared Drive. Technical source of
-  truth: the generated Markdown, assets, manifest, sidebar and index committed
-  to the project repository.
+- Editorial source of truth: Google Docs, and PDF files, in a Shared Drive.
+  Technical source of truth: the generated Markdown, assets, manifest, sidebar
+  and index committed to the project repository.
 - Synchronization is one way: Drive → Markdown → static site.
 - The target is Astro + Starlight + Pagefind on Cloudflare Workers Static
   Assets. A deployment is private behind Cloudflare Access or public, declared

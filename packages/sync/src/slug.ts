@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { RESERVED_SLUGS, type AddressPolicy } from '@ctcstack/ctcdocs-core';
 
+import { documentName } from './google/drive-types.js';
 import type { SelectedInventoryItem } from './inventory/inventory-graph.js';
 import type { SyncManifest } from './manifest.js';
 import { parseOrderedLabel } from './ordered-label.js';
@@ -23,6 +24,10 @@ export function slugifySegment(value: string): string {
 
 function proposedSlug(item: SelectedInventoryItem): string {
   const relativePath = item.path.slice(1);
+  // A PDF is addressed by its name without `.pdf`; the root has no address.
+  if (relativePath.length > 0) {
+    relativePath[relativePath.length - 1] = documentName(item.item);
+  }
   return relativePath.map(slugifySegment).join('/');
 }
 

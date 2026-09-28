@@ -2,6 +2,7 @@ import * as cheerio from 'cheerio';
 import { Element } from 'domhandler';
 
 import { isAllowedSvgReference } from '../conversion/url-policy.js';
+import { looksLikePdf, MAX_SITE_FILE_BYTES } from '../pdf/read-pdf.js';
 
 const SAFE_SVG_ELEMENTS = new Set([
   'circle',
@@ -153,4 +154,20 @@ export function validateImageAsset(
   throw new UnsafeAssetError(
     'Image MIME type does not match a supported extension.',
   );
+}
+
+/**
+ * A PDF the site can publish (ADR-027): a PDF, and no larger than Cloudflare
+ * Workers Static Assets serves. Its content is published as the file is, and
+ * browsers show it with their own sandboxed viewer.
+ */
+export function validatePdfAsset(bytes: Uint8Array): void {
+  if (!looksLikePdf(bytes)) {
+    throw new UnsafeAssetError('A published PDF is not a PDF.');
+  }
+  if (bytes.byteLength > MAX_SITE_FILE_BYTES) {
+    throw new UnsafeAssetError(
+      'A published PDF is larger than the site can serve.',
+    );
+  }
 }

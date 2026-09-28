@@ -137,7 +137,7 @@ describe('inventory orchestration', () => {
     });
   });
 
-  it('stops on a letter from the wrong alphabet even when warnings pass', async () => {
+  it('stops on a folder named with a letter from the wrong alphabet even when warnings pass', async () => {
     const responses = [
       jsonResponse({ id: 'drive-id' }),
       jsonResponse({
@@ -158,8 +158,18 @@ describe('inventory orchestration', () => {
             trashed: false,
           },
           {
-            id: 'document',
+            id: 'folder',
             name: 'Сompany handbook',
+            mimeType: 'application/vnd.google-apps.folder',
+            parents: ['published'],
+            modifiedTime: '2026-01-02T00:00:00.000Z',
+            createdTime: '2026-01-02T00:00:00.000Z',
+            trashed: false,
+          },
+          // A document named so is held back by the sync, not refused here.
+          {
+            id: 'document',
+            name: 'Сontacts',
             mimeType: 'application/vnd.google-apps.document',
             parents: ['published'],
             modifiedTime: '2026-01-02T00:00:00.000Z',
@@ -191,7 +201,7 @@ describe('inventory orchestration', () => {
       issues: [
         {
           code: 'mixed_script_name',
-          itemId: 'document',
+          itemId: 'folder',
           detail: 'U+0421 Cyrillic at character 1',
         },
       ],

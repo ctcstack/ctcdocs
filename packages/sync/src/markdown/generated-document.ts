@@ -15,6 +15,16 @@ export interface GeneratedDocumentInput {
   folderPath: string[];
   normalizedBody: string;
   contentHash?: string;
+  /** Present for a page that publishes a PDF (ADR-027). */
+  pdf?: GeneratedPdfFacts;
+}
+
+/** What the page of a PDF says about the file. */
+export interface GeneratedPdfFacts {
+  /** The published file's name in the document's asset directory. */
+  file?: string;
+  bytes: number;
+  pages: number | null;
 }
 
 export interface GeneratedAssetContent {
@@ -60,9 +70,8 @@ export function extractGeneratedDocumentBody(
     : content.slice(markerIndex + marker.length);
 }
 
-export function extractGeneratedFolderPath(
-  content: string,
-): string[] | undefined {
+/** The frontmatter of a generated file, or `undefined` if it has none. */
+export function extractGeneratedFrontmatter(content: string): unknown {
   const lines = content.split('\n');
   if (lines[0] !== '---') {
     return undefined;
@@ -71,12 +80,17 @@ export function extractGeneratedFolderPath(
   if (closingIndex < 0) {
     return undefined;
   }
-  let parsed: unknown;
   try {
-    parsed = parseYaml(lines.slice(1, closingIndex).join('\n'));
+    return parseYaml(lines.slice(1, closingIndex).join('\n')) as unknown;
   } catch {
     return undefined;
   }
+}
+
+export function extractGeneratedFolderPath(
+  content: string,
+): string[] | undefined {
+  const parsed = extractGeneratedFrontmatter(content);
   if (
     typeof parsed !== 'object' ||
     parsed === null ||
@@ -102,13 +116,18 @@ export function generateMarkdownDocument(
       slug: input.slug,
       shortId: input.shortId,
       editUrl: input.sourceUrl,
-      sourceType: 'google-doc',
+      sourceType: input.pdf ? 'drive-pdf' : 'google-doc',
       googleFileId: input.googleFileId,
       googleModifiedTime: input.googleModifiedTime,
       syncedAt: input.syncedAt,
       contentHash,
       folderPath: input.folderPath,
       pagefind: true,
+      /*
+       * A PDF's text has a heading per page, which would make a table of
+       * contents as long as the document.
+       */
+      ...(input.pdf ? { tableOfContents: false, pdf: input.pdf } : {}),
     },
     {
       defaultStringType: 'QUOTE_DOUBLE',

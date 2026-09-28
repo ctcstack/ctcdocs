@@ -25,6 +25,7 @@ function syncReport(overrides: Partial<SyncReport> = {}): SyncReport {
       warnings: 7,
       notPublished: 8,
       outOfDate: 9,
+      incomplete: 11,
       ignored: 10,
     },
     reasons: [...UNPUBLISHED_REASONS],

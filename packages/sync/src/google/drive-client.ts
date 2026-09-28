@@ -124,7 +124,7 @@ export class GoogleDriveClient {
           pageSize: '1000',
           q: 'trashed = false',
           fields:
-            'nextPageToken,incompleteSearch,files(id,name,mimeType,parents,modifiedTime,createdTime,trashed,webViewLink,shortcutDetails(targetId,targetMimeType),size,lastModifyingUser(displayName))',
+            'nextPageToken,incompleteSearch,files(id,name,mimeType,parents,modifiedTime,createdTime,trashed,webViewLink,shortcutDetails(targetId,targetMimeType),size,sha256Checksum,lastModifyingUser(displayName))',
           ...(pageToken ? { pageToken } : {}),
         },
         driveFileListResponseSchema,
@@ -154,6 +154,32 @@ export class GoogleDriveClient {
     return this.exportFile(fileId, 'application/zip');
   }
 
+  /**
+   * The content of a file stored in Drive, such as a PDF (ADR-027). This is a
+   * download, not an export, so Google's 10 MB export limit does not apply;
+   * `maxBytes` is the caller's own.
+   */
+  async downloadFile(fileId: string, maxBytes: number): Promise<Uint8Array> {
+    const response = await this.request(
+      `files/${encodeURIComponent(fileId)}`,
+      { alt: 'media', supportsAllDrives: 'true' },
+      'application/octet-stream',
+      fileId,
+    );
+    return this.readLimited(
+      response,
+      maxBytes,
+      () =>
+        new GoogleApiError(
+          'Google Drive download exceeded the size Drive reported.',
+          'invalid_response',
+          response.status,
+          this.safeRequestId(response),
+          { fileId },
+        ),
+    );
+  }
+
   private async exportFile(
     fileId: string,
     mimeType: 'application/zip' | 'text/markdown',
@@ -164,32 +190,40 @@ export class GoogleDriveClient {
       mimeType,
       fileId,
     );
-    const declaredLength = response.headers.get('content-length');
-    if (
-      declaredLength &&
-      /^\d+$/u.test(declaredLength) &&
-      Number.parseInt(declaredLength, 10) > MAX_GOOGLE_EXPORT_BYTES
-    ) {
-      throw new GoogleApiError(
-        'Google Drive export exceeded the 10 MB limit.',
-        'export_size_limit',
-        response.status,
-        this.safeRequestId(response),
-        { fileId },
-      );
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) {
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      if (bytes.byteLength > MAX_GOOGLE_EXPORT_BYTES) {
-        throw new GoogleApiError(
+    return this.readLimited(
+      response,
+      MAX_GOOGLE_EXPORT_BYTES,
+      () =>
+        new GoogleApiError(
           'Google Drive export exceeded the 10 MB limit.',
           'export_size_limit',
           response.status,
           this.safeRequestId(response),
           { fileId },
-        );
+        ),
+    );
+  }
+
+  /** Reads a response body, failing as soon as it passes `maxBytes`. */
+  private async readLimited(
+    response: Response,
+    maxBytes: number,
+    tooLarge: () => Error,
+  ): Promise<Uint8Array> {
+    const declaredLength = response.headers.get('content-length');
+    if (
+      declaredLength &&
+      /^\d+$/u.test(declaredLength) &&
+      Number.parseInt(declaredLength, 10) > maxBytes
+    ) {
+      throw tooLarge();
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.byteLength > maxBytes) {
+        throw tooLarge();
       }
       return bytes;
     }
@@ -202,15 +236,9 @@ export class GoogleDriveClient {
         break;
       }
       totalBytes += value.byteLength;
-      if (totalBytes > MAX_GOOGLE_EXPORT_BYTES) {
+      if (totalBytes > maxBytes) {
         await reader.cancel();
-        throw new GoogleApiError(
-          'Google Drive export exceeded the 10 MB limit.',
-          'export_size_limit',
-          response.status,
-          this.safeRequestId(response),
-          { fileId },
-        );
+        throw tooLarge();
       }
       chunks.push(value);
     }

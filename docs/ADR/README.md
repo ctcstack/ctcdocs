@@ -49,5 +49,6 @@ Rejected
 - ADR-024: a content health page that turns checks into work.
 - ADR-025: name every file the site leaves out, and why.
 - ADR-026: hold back a document that cannot be exported, not the corpus.
+- ADR-027: publish PDF files from Drive. Supersedes ADR-020 in part.
 
 Create a new ADR by copying `000-template.md`.
