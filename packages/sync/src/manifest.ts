@@ -51,6 +51,11 @@ const manifestDocumentSchema = z.object({
    * again once to count them.
    */
   undescribedImages: z.number().int().nonnegative().optional(),
+  /**
+   * For the same documents, how many of their images are cropped in Google
+   * Docs and published whole (ADR-030). Counted by the same export.
+   */
+  croppedImages: z.number().int().nonnegative().optional(),
 });
 
 const legacyManifestFolderSchema = z.object({

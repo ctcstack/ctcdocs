@@ -27,6 +27,7 @@ import { slugifySegment } from '../slug.js';
 import { describeFileType, driveUrl, folderLabels } from './unpublished.js';
 
 export type NoteCode =
+  | 'image-cropped'
   | 'duplicate-name'
   | 'duplicate-order'
   | 'several-landing-documents'
@@ -51,6 +52,13 @@ export interface NoteKind {
 
 /** In the order the page shows them: what readers notice first. */
 export const NOTE_KINDS: readonly NoteKind[] = [
+  {
+    code: 'image-cropped',
+    title: 'An image is cropped in Google Docs',
+    action: 'Check what was cropped away',
+    instruction:
+      'The site shows the image as it was inserted, without the crop made in Google Docs, so readers and AI agents see the part cropped away too. Check that nothing in that part should stay out of the documentation. To show only what you kept, crop the image before inserting it.',
+  },
   {
     code: 'duplicate-name',
     title: 'Files in one folder share a name',
@@ -233,6 +241,17 @@ export function createNotes(
     );
     for (const code of codes) {
       notes.push(noteFor(selected, code, record.stableSlug));
+    }
+    const cropped = record.croppedImages ?? 0;
+    if (cropped > 0) {
+      notes.push(
+        noteFor(
+          selected,
+          'image-cropped',
+          record.stableSlug,
+          plural(cropped, 'image'),
+        ),
+      );
     }
     const undescribed = record.undescribedImages ?? 0;
     if (undescribed > 0) {

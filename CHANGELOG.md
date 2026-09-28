@@ -9,6 +9,11 @@ All three packages share a version and are released together.
 - Notes: a page with images that have no alt text, and how many, with the
   instruction to add alt text in Google Docs. See
   [ADR-029](docs/ADR/029-say-when-an-image-has-no-alt-text.md).
+- Notes: a page with images cropped in Google Docs, and how many. The site
+  shows such an image whole, the part cropped away included; the note says to
+  check that part and to crop an image before inserting it. Publication is
+  unchanged. The manifest records the count as `croppedImages`. See
+  [ADR-030](docs/ADR/030-note-images-cropped-in-google-docs.md).
 
 ### Changed
 

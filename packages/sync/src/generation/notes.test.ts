@@ -133,6 +133,31 @@ describe('createNotes', () => {
     ]);
   });
 
+  it('notes the images cropped in Google Docs', () => {
+    const notes = createNotes(
+      corpus([
+        item('cropped', 'Plan', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('whole', 'Guide', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+      ]),
+      manifestOf([
+        {
+          ...record('cropped', 'team/plan'),
+          undescribedImages: 0,
+          croppedImages: 2,
+        },
+        {
+          ...record('whole', 'team/guide'),
+          undescribedImages: 0,
+          croppedImages: 0,
+        },
+      ]),
+    );
+
+    expect(
+      notes.map(({ note, name, detail }) => ({ note, name, detail })),
+    ).toEqual([{ note: 'image-cropped', name: 'Plan', detail: '2 images' }]);
+  });
+
   it('notes files in one folder the site cannot tell apart', () => {
     const notes = createNotes(
       corpus([

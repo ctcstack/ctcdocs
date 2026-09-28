@@ -70,6 +70,8 @@ export interface HtmlArchiveConversion {
   sanitizedHtml: string;
   /** Images published with an empty alt, having no alt text in the source. */
   undescribedImages: number;
+  /** Images published whole, though cropped in Google Docs (ADR-030). */
+  croppedImages: number;
   warnings: string[];
   removedTitleHeading: boolean;
 }
@@ -237,6 +239,73 @@ function allowedAttributes(elementName: string): ReadonlySet<string> {
   return new Set();
 }
 
+/** The declarations of an inline style, by property name. */
+function styleDeclarations(style: string | undefined): Map<string, string> {
+  const declarations = new Map<string, string>();
+  for (const declaration of (style ?? '').split(';')) {
+    const colon = declaration.indexOf(':');
+    if (colon > 0) {
+      declarations.set(
+        declaration.slice(0, colon).trim().toLocaleLowerCase('en'),
+        declaration.slice(colon + 1).trim(),
+      );
+    }
+  }
+  return declarations;
+}
+
+function pixels(value: string | undefined): number | undefined {
+  if (!value?.endsWith('px')) {
+    return undefined;
+  }
+  const number = Number(value.slice(0, -2));
+  return Number.isFinite(number) ? number : undefined;
+}
+
+/** Google writes sizes to a hundredth of a pixel, rounded on both sides. */
+const CROP_TOLERANCE_PIXELS = 0.5;
+
+/**
+ * Whether Google's HTML export crops the image (ADR-030). The file is whole:
+ * the export frames it in a span with overflow hidden, draws it larger than
+ * the frame or moves it with a negative margin, and the part outside the frame
+ * is what the editor cropped away.
+ */
+function isCroppedImage(image: Element): boolean {
+  const frame = image.parent;
+  if (
+    !(frame instanceof Element) ||
+    frame.name.toLocaleLowerCase('en') !== 'span'
+  ) {
+    return false;
+  }
+  const frameStyle = styleDeclarations(frame.attribs.style);
+  if (frameStyle.get('overflow') !== 'hidden') {
+    return false;
+  }
+  const imageStyle = styleDeclarations(image.attribs.style);
+  const frameWidth = pixels(frameStyle.get('width'));
+  const frameHeight = pixels(frameStyle.get('height'));
+  const width = pixels(imageStyle.get('width'));
+  const height = pixels(imageStyle.get('height'));
+  const left = pixels(imageStyle.get('margin-left')) ?? 0;
+  const top = pixels(imageStyle.get('margin-top')) ?? 0;
+  if (
+    frameWidth === undefined ||
+    frameHeight === undefined ||
+    width === undefined ||
+    height === undefined
+  ) {
+    return false;
+  }
+  return (
+    left < -CROP_TOLERANCE_PIXELS ||
+    top < -CROP_TOLERANCE_PIXELS ||
+    left + width > frameWidth + CROP_TOLERANCE_PIXELS ||
+    top + height > frameHeight + CROP_TOLERANCE_PIXELS
+  );
+}
+
 function sortAttributes($: ReturnType<typeof cheerio.load>): void {
   $('body *').each((_, element) => {
     if (!(element instanceof Element)) {
@@ -267,6 +336,12 @@ export function convertHtmlArchive(
   const entriesByPath = new Map(entries.map((entry) => [entry.path, entry]));
   const $ = cheerio.load(source);
   const warnings = new Set<string>();
+  // Read before the styles that tell it are removed; the page is unchanged.
+  const cropped = new Set(
+    $('body img')
+      .toArray()
+      .filter((image) => image instanceof Element && isCroppedImage(image)),
+  );
 
   $('body *')
     .toArray()
@@ -322,6 +397,7 @@ export function convertHtmlArchive(
   const assets: ConvertedArchiveAsset[] = [];
   const assetsByHash = new Map<string, ConvertedArchiveAsset>();
   let undescribedImages = 0;
+  let croppedImages = 0;
   $('body img').each((_, element) => {
     if (!(element instanceof Element)) {
       return;
@@ -366,6 +442,9 @@ export function convertHtmlArchive(
       assetsByHash.set(hash, asset);
     }
     $(element).attr('src', asset.markdownPath);
+    if (cropped.has(element)) {
+      croppedImages += 1;
+    }
     /*
      * Google writes the Description in the Alt text dialog as alt and its
      * Title as title, each empty when left blank. A title alone is the
@@ -424,6 +503,7 @@ export function convertHtmlArchive(
     hasComplexTables,
     sanitizedHtml,
     undescribedImages,
+    croppedImages,
     warnings: [...new Set([...warnings, ...normalized.warnings])].sort(),
     removedTitleHeading: normalized.removedTitleHeading,
   };

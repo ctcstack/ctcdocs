@@ -351,15 +351,14 @@ function generatedAssetsDirectory(fileId: string): string {
 /**
  * The record of a page that came out the same, brought up to date with what
  * its conversion found that is not in the page: the export it came through,
- * its warnings, and its images without alt text. Fields keep their places and
- * the count goes last, as in the schema, so a record read back serializes the
- * same.
+ * its warnings, and its image counts. Fields keep their places and the counts
+ * go last, as in the schema, so a record read back serializes the same.
  */
 function withConversionFacts(
   record: SyncedDocumentRecord,
   converted: Pick<
     ConvertedDocument,
-    'exportMode' | 'warnings' | 'undescribedImages'
+    'exportMode' | 'warnings' | 'undescribedImages' | 'croppedImages'
   >,
 ): SyncedDocumentRecord {
   const updated: SyncedDocumentRecord = {
@@ -368,8 +367,12 @@ function withConversionFacts(
     warnings: converted.warnings,
   };
   delete updated.undescribedImages;
+  delete updated.croppedImages;
   if (converted.undescribedImages !== undefined) {
     updated.undescribedImages = converted.undescribedImages;
+  }
+  if (converted.croppedImages !== undefined) {
+    updated.croppedImages = converted.croppedImages;
   }
   return updated;
 }
@@ -667,6 +670,7 @@ interface ConvertedDocument {
   sourceChecksum?: string;
   pdfTextVersion?: number;
   undescribedImages?: number;
+  croppedImages?: number;
 }
 
 export async function runBasicMarkdownSync(
@@ -1086,7 +1090,8 @@ async function synchronize(
                   existingRecord.pdfTextVersion !== PDF_TEXT_VERSION) ||
                 // Images converted before they were counted.
                 (existingRecord.exportMode === 'hybrid' &&
-                  existingRecord.undescribedImages === undefined &&
+                  (existingRecord.undescribedImages === undefined ||
+                    existingRecord.croppedImages === undefined) &&
                   existingAssets.length > 0),
           added: existingRecord === undefined,
         };
@@ -1125,6 +1130,7 @@ async function synchronize(
     let exportMode: SyncedDocumentRecord['exportMode'] = 'markdown';
     let warnings: string[];
     let undescribedImages: number | undefined;
+    let croppedImages: number | undefined;
     if (fallbackReasons.size > 0) {
       if (!exporter.exportHtmlZip) {
         throw new Error(
@@ -1152,7 +1158,7 @@ async function synchronize(
         repositoryPath: asset.repositoryPath,
       }));
       exportMode = 'hybrid';
-      ({ undescribedImages } = conversion);
+      ({ undescribedImages, croppedImages } = conversion);
       warnings = [
         ...[...fallbackReasons].sort().map((reason) => `fallback:${reason}`),
         ...conversion.warnings,
@@ -1174,6 +1180,7 @@ async function synchronize(
       warnings: [...new Set([...warnings, ...rewritten.warnings])].sort(),
       titleFacts: structure.titleFacts ?? null,
       ...(undescribedImages === undefined ? {} : { undescribedImages }),
+      ...(croppedImages === undefined ? {} : { croppedImages }),
     };
   };
 
@@ -1362,6 +1369,9 @@ async function synchronize(
       ...(converted.undescribedImages === undefined
         ? {}
         : { undescribedImages: converted.undescribedImages }),
+      ...(converted.croppedImages === undefined
+        ? {}
+        : { croppedImages: converted.croppedImages }),
     };
     return {
       fileId: item.id,

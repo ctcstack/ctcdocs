@@ -710,13 +710,17 @@ describe('basic Markdown sync', () => {
     );
     const readManifest = async () =>
       JSON.parse(await readFile(manifestPath, 'utf8')) as {
-        documents: Record<string, { undescribedImages?: number }>;
+        documents: Record<
+          string,
+          { undescribedImages?: number; croppedImages?: number }
+        >;
       };
 
     const first = await run(firstTimestamp);
-    expect((await readManifest()).documents['doc-one']?.undescribedImages).toBe(
-      1,
-    );
+    expect((await readManifest()).documents['doc-one']).toMatchObject({
+      undescribedImages: 1,
+      croppedImages: 0,
+    });
     expect(first.report.notes).toEqual([
       expect.objectContaining({
         id: 'doc-one',

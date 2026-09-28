@@ -99,6 +99,31 @@ describe('HTML archive conversion', () => {
     expect(result.undescribedImages).toBe(2);
   });
 
+  it('counts the images Google crops, and publishes them as before', async () => {
+    const assets = [{ path: 'images/image1.png', bytes: pixel }];
+    const result = convertHtmlArchive(
+      await fixtureEntries('google-image-crop.html', assets),
+      options,
+    );
+    const image = '../../../assets/generated/synthetic-document/image-001.png';
+
+    expect(result.croppedImages).toBe(2);
+    for (const alt of [
+      'Uncropped',
+      'Cropped at the right and the bottom',
+      'Cropped at the top',
+      'Not framed',
+    ]) {
+      expect(result.body).toContain(`![${alt}](${image})`);
+    }
+
+    const uncropped = convertHtmlArchive(
+      await fixtureEntries('google-image-export.html', assets),
+      options,
+    );
+    expect(uncropped.croppedImages).toBe(0);
+  });
+
   it('publishes a heading that holds only an image as a paragraph', async () => {
     const result = convertHtmlArchive(
       await fixtureEntries('image-heading.html', [
