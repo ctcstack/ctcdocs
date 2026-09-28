@@ -14,6 +14,7 @@
  */
 import type { SyncReport } from '../generation/sync-report.js';
 import { UNPUBLISHED_STATUS_LABELS } from '../generation/unpublished.js';
+import { plural } from '../plural.js';
 import type { RunChanges } from '../run-sync.js';
 import { SEVERITY_LABELS } from '../titles/checks.js';
 import type { TitleReport } from '../titles/title-report.js';
@@ -43,10 +44,6 @@ function trail(folderPath: readonly string[]): string {
 
 function pageUrl(siteUrl: string, slug: string): string {
   return `${siteUrl}/${slug.split('/').map(encodeURIComponent).join('/')}/`;
-}
-
-function plural(count: number, one: string, many = `${one}s`): string {
-  return `${count} ${count === 1 ? one : many}`;
 }
 
 /** A collapsible block, which GitHub renders in a job summary. */

@@ -5,6 +5,7 @@ import remarkStringify from 'remark-stringify';
 import { unified } from 'unified';
 
 import { parseOrderedLabel } from '../ordered-label.js';
+import { plural } from '../plural.js';
 import { restoreCodeFences, restoreInlineCode } from './restore-code.js';
 
 const markdownProcessor = unified()
@@ -31,9 +32,7 @@ export class MarkdownNormalizationError extends Error {
   override readonly name = 'MarkdownNormalizationError';
 
   constructor(readonly issues: MarkdownIssue[]) {
-    super(
-      `Markdown normalization failed (${issues.length} issue${issues.length === 1 ? '' : 's'}).`,
-    );
+    super(`Markdown normalization failed (${plural(issues.length, 'issue')}).`);
   }
 }
 

@@ -22,6 +22,7 @@ import type {
   SelectedInventoryItem,
 } from '../inventory/inventory-graph.js';
 import type { SyncManifest } from '../manifest.js';
+import { plural } from '../plural.js';
 import { slugifySegment } from '../slug.js';
 import { describeFileType, driveUrl, folderLabels } from './unpublished.js';
 
@@ -240,7 +241,7 @@ export function createNotes(
           selected,
           'image-undescribed',
           record.stableSlug,
-          undescribed === 1 ? '1 image' : `${undescribed} images`,
+          plural(undescribed, 'image'),
         ),
       );
     }
