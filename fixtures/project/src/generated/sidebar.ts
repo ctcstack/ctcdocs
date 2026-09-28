@@ -42,6 +42,11 @@ export const generatedSidebar = [
           {
             "label": "Style guide",
             "slug": "reference/guides/style-guide"
+          },
+          {
+            "label": "Style guide",
+            "slug": "reference/guides/style-guide--244fde",
+            "badge": "PDF"
           }
         ]
       },

@@ -11,7 +11,7 @@
     "documentCount": 0
   - "kind": "folder"
     "slug": "reference/guides"
-    "documentCount": 1
+    "documentCount": 2
   - "kind": "document"
     "slug": "reference/diagrams"
   - "kind": "document"

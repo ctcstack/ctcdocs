@@ -1,0 +1,68 @@
+---
+/**
+ * The groups of one section of the content health page at a glance: what each
+ * is, how many items it holds, where they are and what to do (ADR-028). Each
+ * row links to its group's list further down the page.
+ *
+ * It is drawn as the tables in documents are, in the same scrolling frame, so
+ * it reads as one of them. The frame takes the keyboard focus a scrollable
+ * region needs.
+ */
+interface Row {
+  id: string;
+  title: string;
+  count: number;
+  where: string;
+  action: string;
+}
+
+interface Props {
+  label: string;
+  unit: string;
+  rows: Row[];
+}
+
+const { label, unit, rows } = Astro.props;
+---
+
+<div
+  class="kb-table health-table"
+  role="region"
+  aria-label={label}
+  tabindex="0"
+>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">What</th>
+        <th scope="col">{unit}</th>
+        <th scope="col">Where</th>
+        <th scope="col">What to do</th>
+      </tr>
+    </thead>
+    <tbody>
+      {
+        rows.map((row) => (
+          <tr>
+            <td>
+              <a href={`#${row.id}`} data-open-group>
+                {row.title}
+              </a>
+            </td>
+            <td>{row.count}</td>
+            <td>{row.where}</td>
+            <td>{row.action}</td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</div>
+
+<style>
+  @layer starlight.components {
+    .health-table {
+      margin-block: 1rem 1.5rem;
+    }
+  }
+</style>

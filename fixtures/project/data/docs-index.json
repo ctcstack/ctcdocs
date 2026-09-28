@@ -79,6 +79,22 @@
       "format": "google-doc"
     },
     {
+      "id": "pdf-style-guide",
+      "title": "Style guide",
+      "slug": "reference/guides/style-guide--244fde",
+      "markdownPath": "src/content/docs/_generated/pdf-style-guide.md",
+      "sourceUrl": "https://drive.google.com/file/d/pdf-style-guide/view",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "syncedAt": "2026-02-10T06:00:00.000Z",
+      "contentHash": "sha256:95606c93dee60c11bdf0140b98b3b8476f0a123a3516f7ca5ef4e1cfc4bd2228",
+      "folderPath": [
+        "Reference",
+        "Guides"
+      ],
+      "language": "en",
+      "format": "pdf"
+    },
+    {
       "id": "pdf-release-checklist",
       "title": "Release checklist",
       "slug": "reference/release-checklist",

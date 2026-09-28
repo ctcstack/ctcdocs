@@ -27,6 +27,7 @@ import {
   serializeSyncReport,
   type SyncReport,
 } from './generation/sync-report.js';
+import { createNotes, NOTE_KINDS } from './generation/notes.js';
 import {
   createIgnoredFolders,
   createUnpublishedItems,
@@ -96,6 +97,7 @@ import {
   looksLikePdf,
   MAX_READ_BYTES,
   MAX_SITE_FILE_BYTES,
+  PDF_TEXT_VERSION,
   pdfTextToMarkdown,
   readPdfText,
 } from './pdf/read-pdf.js';
@@ -146,8 +148,26 @@ export interface RunSyncDependencies extends InventoryRunDependencies {
   now?: () => Date;
 }
 
+/** A page a run added, changed or removed. */
+interface RunPage {
+  id: string;
+  title: string;
+  slug: string;
+  format: 'google-doc' | 'pdf';
+}
+
+/** What one run changed on the site, for the run's own summary (ADR-028). */
+export interface RunChanges {
+  added: RunPage[];
+  changed: RunPage[];
+  removed: RunPage[];
+  /** Addresses that moved, each keeping the old one as a redirect. */
+  moved: Array<{ title: string; from: string; to: string }>;
+}
+
 export interface SyncRunResult {
   report: SyncReport;
+  changes: RunChanges;
   outputChanged: boolean;
   slugChange?: {
     newSlug: string;
@@ -619,6 +639,7 @@ interface ConvertedDocument {
   titleFacts: NonNullable<GoogleDocumentStructure['titleFacts']> | null;
   pdf?: GeneratedPdfFacts;
   sourceChecksum?: string;
+  pdfTextVersion?: number;
 }
 
 export async function runBasicMarkdownSync(
@@ -1140,6 +1161,7 @@ async function synchronize(
       exportMode: 'pdf' as const,
       titleFacts: null,
       ...(sourceChecksum ? { sourceChecksum } : {}),
+      pdfTextVersion: PDF_TEXT_VERSION,
     };
 
     const recorded = planned.existingRecord;
@@ -1147,6 +1169,7 @@ async function synchronize(
       recorded?.exportMode === 'pdf' &&
       sourceChecksum !== undefined &&
       recorded.sourceChecksum === sourceChecksum &&
+      recorded.pdfTextVersion === PDF_TEXT_VERSION &&
       !planned.existingOutputInvalid &&
       planned.existingContent !== undefined
     ) {
@@ -1243,7 +1266,8 @@ async function synchronize(
       planned.existingRecord.stableSlug === planned.stableSlug &&
       planned.existingRecord.shortId === planned.shortId &&
       planned.existingRecord.contentHash === contentHash &&
-      planned.existingRecord.sourceChecksum === converted.sourceChecksum
+      planned.existingRecord.sourceChecksum === converted.sourceChecksum &&
+      planned.existingRecord.pdfTextVersion === converted.pdfTextVersion
     ) {
       return {
         fileId: item.id,
@@ -1294,6 +1318,9 @@ async function synchronize(
       shortId: planned.shortId,
       ...(converted.sourceChecksum
         ? { sourceChecksum: converted.sourceChecksum }
+        : {}),
+      ...(converted.pdfTextVersion
+        ? { pdfTextVersion: converted.pdfTextVersion }
         : {}),
     };
     return {
@@ -1442,17 +1469,67 @@ async function synchronize(
     candidateManifest.generatedAt = existingManifest.generatedAt;
   }
 
-  const added = plannedDocuments.filter((document) => document.added).length;
-  const changed = plannedDocuments.filter(
-    (document) => document.needsExport && !document.added,
-  ).length;
-  const unchanged = plannedDocuments.length - added - changed;
-  const currentIds = new Set(
-    plannedDocuments.map((document) => document.selected.item.id),
-  );
-  const removed = Object.keys(existingManifest.documents).filter(
-    (fileId) => !currentIds.has(fileId),
-  ).length;
+  /*
+   * What the run changed on the site, page by page. A document exported again
+   * to the same output is unchanged: `exported` counts the work, and these the
+   * effect (ADR-028).
+   */
+  const pageOf = (record: SyncedDocumentRecord): RunPage => ({
+    id: record.googleFileId,
+    title: record.displayTitle,
+    slug: record.stableSlug,
+    format: record.exportMode === 'pdf' ? 'pdf' : 'google-doc',
+  });
+  const bySlug = (left: { slug: string }, right: { slug: string }) =>
+    compareText(left.slug, right.slug);
+  const publishedRecords = Object.values(candidateManifest.documents);
+  const changes: RunChanges = {
+    added: publishedRecords
+      .filter((record) => !existingManifest.documents[record.googleFileId])
+      .map(pageOf)
+      .sort(bySlug),
+    changed: publishedRecords
+      .filter((record) => {
+        const before = existingManifest.documents[record.googleFileId];
+        return before !== undefined && before.outputHash !== record.outputHash;
+      })
+      .map(pageOf)
+      .sort(bySlug),
+    removed: targetedFileId
+      ? []
+      : Object.values(existingManifest.documents)
+          .filter((record) => !candidateManifest.documents[record.googleFileId])
+          .map(pageOf)
+          .sort(bySlug),
+    moved: [
+      ...slugAllocation.moves.map((move) => ({
+        title:
+          candidateManifest.documents[move.itemId]?.displayTitle ??
+          candidateManifest.folders[move.itemId]?.displayLabel ??
+          move.itemId,
+        from: move.oldSlug,
+        to: move.newSlug,
+      })),
+      ...(slugChange && targetedFileId
+        ? [
+            {
+              title:
+                candidateManifest.documents[targetedFileId]?.displayTitle ??
+                targetedFileId,
+              from: slugChange.oldSlug,
+              to: slugChange.newSlug,
+            },
+          ]
+        : []),
+    ].sort(
+      (left, right) =>
+        compareText(left.from, right.from) || compareText(left.to, right.to),
+    ),
+  };
+  const added = changes.added.length;
+  const changed = changes.changed.length;
+  const unchanged = publishedRecords.length - added - changed;
+  const removed = changes.removed.length;
   /*
    * A targeted run tried one document. What an earlier run held back among
    * the others is still true as far as this run knows, and stays listed.
@@ -1493,15 +1570,23 @@ async function synchronize(
     ]),
     incomplete,
   );
+  const notes = createNotes(selection, candidateManifest);
+  const pdfs = publishedRecords.filter(
+    (record) => record.exportMode === 'pdf',
+  ).length;
+  const markdown = publishedRecords.filter(
+    (record) => record.exportMode === 'markdown',
+  ).length;
   const report: SyncReport = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     generatedAt: candidateManifest.generatedAt,
     dryRun: options.dryRun,
     summary: {
+      exported: exportedDocuments.length,
       added,
       changed,
       unchanged,
-      removed: targetedFileId ? 0 : removed,
+      removed,
       folders: selection.folders.length,
       unsupported: selection.unsupported.length,
       warnings: selection.warnings.length,
@@ -1513,10 +1598,18 @@ async function synchronize(
       incomplete: unpublished.filter((item) => item.status === 'incomplete')
         .length,
       ignored: selection.ignoredItemCount,
+      published: { googleDocs: publishedRecords.length - pdfs, pdfs },
+      conversion: {
+        markdown,
+        html: publishedRecords.length - pdfs - markdown,
+      },
+      notes: notes.length,
     },
     reasons: [...UNPUBLISHED_REASONS],
     unpublished,
     ignoredFolders: createIgnoredFolders(selection),
+    noteKinds: [...NOTE_KINDS],
+    notes,
   };
 
   output.set(MANIFEST_PATH, serializeManifest(candidateManifest));
@@ -1643,6 +1736,7 @@ async function synchronize(
 
   return {
     report,
+    changes,
     outputChanged: writeResult.changed,
     ...(slugChange ? { slugChange } : {}),
     addressesMoved: slugAllocation.moves.length,

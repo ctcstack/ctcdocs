@@ -10,9 +10,15 @@
 import type { Heading, Paragraph, Root } from 'mdast';
 import remarkStringify from 'remark-stringify';
 import { unified } from 'unified';
-import { extractText, getDocumentProxy } from 'unpdf';
+import { extractTextItems, getDocumentProxy } from 'unpdf';
 
 import { truncateDescription } from '../markdown/normalize-markdown.js';
+
+/**
+ * The version of the text this module extracts. A PDF whose page was written
+ * by an earlier version is read again, even when the file has not changed.
+ */
+export const PDF_TEXT_VERSION = 2;
 
 /** The largest file Cloudflare Workers Static Assets serves. */
 export const MAX_SITE_FILE_BYTES = 25 * 1024 * 1024;
@@ -74,13 +80,8 @@ export async function readPdfText(bytes: Uint8Array): Promise<PdfText> {
     return { pageCount: null, pages: [], unreadable: describeFailure(error) };
   }
   try {
-    const { totalPages, text } = await extractText(document, {
-      mergePages: false,
-    });
-    return {
-      pageCount: totalPages,
-      pages: Array.isArray(text) ? text : [text],
-    };
+    const { totalPages, items } = await extractTextItems(document);
+    return { pageCount: totalPages, pages: items.map(textFromItems) };
   } catch (error: unknown) {
     return { pageCount: null, pages: [], unreadable: describeFailure(error) };
   } finally {
@@ -88,28 +89,91 @@ export async function readPdfText(bytes: Uint8Array): Promise<PdfText> {
   }
 }
 
+/** A piece of text where PDF.js found it on the page. */
+export interface PositionedText {
+  str: string;
+  x: number;
+  y: number;
+  width: number;
+  fontSize: number;
+  hasEOL: boolean;
+}
+
+/**
+ * A page's text from its pieces, in the order the PDF draws them. A PDF often
+ * draws a label, a table cell or a box on a slide as a piece of its own, with
+ * no space or line break around it, so where two pieces sit decides what goes
+ * between them: a line break when the second is on another line, a blank line
+ * when it is further down than the next line of text would be, and a space when
+ * it starts past the end of the first.
+ */
+export function textFromItems(items: readonly PositionedText[]): string {
+  let text = '';
+  let previous: PositionedText | undefined;
+  for (const item of items) {
+    if (item.str === '') {
+      if (item.hasEOL && text && !text.endsWith('\n')) {
+        text += '\n';
+      }
+      continue;
+    }
+    if (previous && text && !/^\s/u.test(item.str)) {
+      const size = Math.max(previous.fontSize, item.fontSize, 1);
+      const drop = Math.abs(item.y - previous.y);
+      if (drop > size * 0.5 && !text.endsWith('\n')) {
+        text += '\n';
+      }
+      if (drop > size * 1.6 && !text.endsWith('\n\n')) {
+        text += '\n';
+      }
+      if (
+        !/\s$/u.test(text) &&
+        (item.x - (previous.x + previous.width) > size * 0.1 ||
+          item.x < previous.x)
+      ) {
+        text += ' ';
+      }
+    }
+    text += item.str;
+    if (item.hasEOL) {
+      text += '\n';
+    }
+    previous = item;
+  }
+  return text;
+}
+
 const LIST_MARKER = /^(?:[•◦▪‣∙·–-]|\d{1,3}[.)])\s/u;
 const SENTENCE_END = /[.!?:;…]["'»”’)\]]?$/u;
 /** Shorter than a line of running text: most likely a heading. */
 const SHORT_LINE = 60;
 
+/** A line in capitals, as slides and forms set their headings. */
+function isCapitals(line: string): boolean {
+  return !/\p{Ll}/u.test(line) && (line.match(/\p{Lu}/gu)?.length ?? 0) >= 3;
+}
+
 /**
  * A page's lines as paragraphs. PDF text knows lines, not paragraphs, so a
  * paragraph ends at a blank line, at a line that ends a sentence, or before a
  * list item, and a short line on its own followed by a capital is taken for a
- * heading. A word broken by a hyphen at the end of a line is joined again,
+ * heading. A line in capitals is a paragraph of its own, as a heading or a
+ * label on a slide would be. A word
+ * broken by a hyphen at the end of a line is joined again,
  * hyphen kept: a broken word cannot be told from a compound one.
  */
 function paragraphsOf(pageText: string): string[] {
   const paragraphs: string[] = [];
   let current = '';
   let lineCount = 0;
+  let currentCapitals = false;
   const flush = () => {
     if (current) {
       paragraphs.push(current);
     }
     current = '';
     lineCount = 0;
+    currentCapitals = false;
   };
   for (const rawLine of pageText.split('\n')) {
     const line = rawLine.replace(/\s+/gu, ' ').trim();
@@ -117,14 +181,18 @@ function paragraphsOf(pageText: string): string[] {
       flush();
       continue;
     }
+    const capitals = isCapitals(line);
     if (
       LIST_MARKER.test(line) ||
-      (lineCount === 1 &&
+      (current && (capitals || currentCapitals)) ||
+      (!capitals &&
+        lineCount === 1 &&
         current.length < SHORT_LINE &&
         /^[\p{Lu}\p{N}]/u.test(line))
     ) {
       flush();
     }
+    currentCapitals = capitals;
     lineCount += 1;
     current = !current
       ? line
@@ -191,6 +259,7 @@ export function pdfTextToMarkdown(
         firstParagraph ??= paragraph;
         if (
           description === undefined &&
+          !isCapitals(paragraph) &&
           (SENTENCE_END.test(paragraph) || paragraph.length >= SHORT_LINE)
         ) {
           description = truncateDescription(paragraph);

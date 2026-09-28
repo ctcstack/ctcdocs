@@ -346,6 +346,7 @@ export function unpublishedReport():
   | {
       items: Array<{ name: string; sourceUrl: string; slug?: string }>;
       ignoredFolders: number;
+      notes: Array<{ name: string; sourceUrl: string; slug?: string }>;
     }
   | undefined {
   let report: unknown;
@@ -363,12 +364,14 @@ export function unpublishedReport():
     schemaVersion?: number;
     unpublished?: Array<{ name: string; sourceUrl: string; slug?: string }>;
     ignoredFolders?: unknown[];
+    notes?: Array<{ name: string; sourceUrl: string; slug?: string }>;
   };
-  if (typed.schemaVersion !== 2 || !typed.unpublished) {
+  if (typed.schemaVersion !== 3 || !typed.unpublished) {
     return undefined;
   }
   return {
     items: typed.unpublished,
     ignoredFolders: typed.ignoredFolders?.length ?? 0,
+    notes: typed.notes ?? [],
   };
 }

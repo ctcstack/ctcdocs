@@ -135,6 +135,19 @@ const items: DriveItem[] = [
     },
   },
   document('doc-brand-assets', 'Brand assets', 'folder-handbook'),
+  {
+    ...document(
+      'word-onboarding',
+      'Onboarding checklist.docx',
+      'folder-handbook',
+    ),
+    mimeType:
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  },
+  {
+    ...document('video-walkthrough', 'Walkthrough.mp4', 'folder-reference'),
+    mimeType: 'video/mp4',
+  },
   folder(IGNORED_FOLDER_ID, 'Drafts', ROOT_ID),
   document('doc-draft', 'Unfinished draft', IGNORED_FOLDER_ID),
 ];
@@ -163,6 +176,16 @@ const pdfFiles = new Map<string, Uint8Array>([
     ]),
   ],
   ['pdf-scanned-form', createPdfFixture([[]])],
+  /*
+   * A PDF saved from a document and kept next to it: two pages with one
+   * name, which the content health page notes (ADR-028).
+   */
+  [
+    'pdf-style-guide',
+    createPdfFixture([
+      ['STYLE GUIDE', 'Write in plain English and keep sentences short.'],
+    ]),
+  ],
 ]);
 
 function pdf(id: string, name: string, parent: string): DriveItem {
@@ -178,6 +201,7 @@ function pdf(id: string, name: string, parent: string): DriveItem {
 items.push(
   pdf('pdf-release-checklist', 'Release checklist.pdf', 'folder-reference'),
   pdf('pdf-scanned-form', 'Scanned form.pdf', 'folder-handbook'),
+  pdf('pdf-style-guide', 'Style guide.pdf', 'folder-reference-guides'),
 );
 
 /** Google's Markdown export, as the pipeline receives it. */

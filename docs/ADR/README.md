@@ -50,5 +50,6 @@ Rejected
 - ADR-025: name every file the site leaves out, and why.
 - ADR-026: hold back a document that cannot be exported, not the corpus.
 - ADR-027: publish PDF files from Drive. Supersedes ADR-020 in part.
+- ADR-028: make every sync legible, grouped by what to do.
 
 Create a new ADR by copying `000-template.md`.

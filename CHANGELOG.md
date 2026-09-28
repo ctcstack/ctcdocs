@@ -2,6 +2,41 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Added
+
+- The content health page opens with an overview: pages on the site by kind,
+  files not on it, notes and documents to fix, each linking to its section,
+  and when the site last changed. "Not on the site" opens with a table of its
+  groups — what, how many, where, what to do — before the lists. See
+  [ADR-028](docs/ADR/028-legible-sync.md).
+- Files the site does not publish are grouped by what to do with them: Word
+  and text files (save as Google Docs), presentations (export as PDF),
+  archives, images, diagrams, spreadsheets, video and audio, other files.
+- Notes: pages that are on the site with something to know — an image or a
+  link conversion left out, a link to a heading that now opens the top of a
+  page, a merged cell split, a code block never closed, files in one folder
+  with the same name, an order number used twice, an ignored folder that is
+  not there.
+- The job summary of a sync says what the run changed, page by page with
+  links, and what stopped a run that failed, with what it means and what to
+  do. The state of the site follows in the same grouped tables as the page.
+
+### Changed
+
+- The sync report moves to schema version 3: both catalogs, the notes, pages
+  by kind, and how the pages were made. A run counts pages it added, changed
+  and removed by their output, and documents it exported separately, so a
+  full sync over unchanged documents reports nothing changed.
+
+### Fixed
+
+- The text of a PDF no longer runs words together where a slide or a table
+  draws them as separate pieces, and a line in capitals is a paragraph of its
+  own instead of running into the sentence before it. Every published PDF is
+  read again once on the next sync.
+
 ## 0.10.0
 
 ### Added

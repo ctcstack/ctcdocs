@@ -162,7 +162,8 @@
       "exportMode": "pdf",
       "warnings": [],
       "shortId": "eda7da",
-      "sourceChecksum": "sha256:c8c58dc6d6fd9f61f0164fd512fdc5e07bd8f121c6cc6392a832b3f1e2e50867"
+      "sourceChecksum": "sha256:c8c58dc6d6fd9f61f0164fd512fdc5e07bd8f121c6cc6392a832b3f1e2e50867",
+      "pdfTextVersion": 2
     },
     "pdf-scanned-form": {
       "googleFileId": "pdf-scanned-form",
@@ -183,7 +184,29 @@
         "pdf:no_text"
       ],
       "shortId": "2a3aab",
-      "sourceChecksum": "sha256:aa89a8a4d9205ce24edfac2453add7dc86d1ba534bf224d42938ed2bc4f0743e"
+      "sourceChecksum": "sha256:aa89a8a4d9205ce24edfac2453add7dc86d1ba534bf224d42938ed2bc4f0743e",
+      "pdfTextVersion": 2
+    },
+    "pdf-style-guide": {
+      "googleFileId": "pdf-style-guide",
+      "googleParentId": "folder-reference-guides",
+      "googleName": "Style guide.pdf",
+      "displayTitle": "Style guide",
+      "description": "Write in plain English and keep sentences short.",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "googleCreatedTime": "2026-01-05T09:00:00.000Z",
+      "sourceUrl": "https://drive.google.com/file/d/pdf-style-guide/view",
+      "stableSlug": "reference/guides/style-guide--244fde",
+      "generatedMarkdownPath": "src/content/docs/_generated/pdf-style-guide.md",
+      "generatedAssetsDirectory": "src/assets/generated/pdf-style-guide",
+      "contentHash": "sha256:95606c93dee60c11bdf0140b98b3b8476f0a123a3516f7ca5ef4e1cfc4bd2228",
+      "outputHash": "sha256:df876005f8672a8f6965e899b539f38904eabd73df1b85b6352df74a2c7a0cb4",
+      "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
+      "exportMode": "pdf",
+      "warnings": [],
+      "shortId": "244fde",
+      "sourceChecksum": "sha256:ad9cdb7398395ff58f4985c92e210fd339a10995ec6dafdb647f110ab67e4e60",
+      "pdfTextVersion": 2
     }
   },
   "folders": {

@@ -1,64 +1,125 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "generatedAt": "2026-02-10T06:00:00.000Z",
   "dryRun": false,
   "summary": {
+    "exported": 1,
     "added": 0,
     "changed": 1,
-    "unchanged": 8,
+    "unchanged": 9,
     "removed": 0,
     "folders": 5,
-    "unsupported": 2,
+    "unsupported": 4,
     "warnings": 0,
-    "notPublished": 3,
+    "notPublished": 5,
     "outOfDate": 0,
     "incomplete": 1,
-    "ignored": 2
+    "ignored": 2,
+    "published": {
+      "googleDocs": 7,
+      "pdfs": 3
+    },
+    "conversion": {
+      "markdown": 5,
+      "html": 2
+    },
+    "notes": 2
   },
   "reasons": [
     {
       "code": "name-script",
       "title": "The name uses letters from another alphabet",
+      "action": "Retype the letters named",
       "instruction": "A file's name becomes its address on the site, and the site writes its addresses in one alphabet. Retype the letters named below in Drive, or rename the file."
     },
     {
       "code": "export-too-large",
       "title": "Google cannot export the document: it is over 10 MB",
+      "action": "Shrink images or split it",
       "instruction": "Google refuses to export a document larger than 10 MB, and large images are the usual cause. Compress or crop the images, or split the document in two."
     },
     {
       "code": "download-restricted",
       "title": "Downloading is turned off for the file",
+      "action": "Allow downloading",
       "instruction": "The owner turned off downloading, printing and copying for viewers, so the sync cannot read the file. Turn it back on under Share → Settings, or ask the owner to."
     },
     {
       "code": "content-rejected",
       "title": "The document holds something the site will not publish",
+      "action": "Remove the part named",
       "instruction": "Conversion stopped on content it cannot publish safely, named under the document. Remove or replace that part of the document."
     },
     {
       "code": "pdf-no-text",
       "title": "Search cannot read the PDF",
+      "action": "Replace with a PDF with text",
       "instruction": "The PDF is on the site, but it has no text the site can read: most likely scanned pages, or a password. Search does not find what it says. Replace it with a PDF that has text: most scanning and PDF tools can recognize it (OCR)."
     },
     {
       "code": "pdf-over-site-limit",
       "title": "The PDF is too large for the site to serve",
+      "action": "Save a smaller copy",
       "instruction": "The site serves files up to 25 MB, so the page shows the text of the PDF and links to it in Drive. To put the file itself on the site, save a smaller copy, with images at a lower resolution, and replace this one."
     },
     {
       "code": "pdf-too-large",
       "title": "The PDF is too large to read",
+      "action": "Save a smaller copy",
       "instruction": "The site does not download a PDF over 100 MB, so its page only links to Drive and search does not find its text. Save a smaller copy and replace this one."
     },
     {
+      "code": "word-file",
+      "title": "Word and text files",
+      "action": "Save as Google Docs",
+      "instruction": "The site publishes Google Docs, not Word files. Open each one in Drive, choose File → Save as Google Docs, check the result and delete the original. The new document is published on the next sync."
+    },
+    {
+      "code": "presentation-file",
+      "title": "Presentations",
+      "action": "Export as PDF",
+      "instruction": "The site publishes PDF files. Download the presentation as a PDF, upload it to the same folder, and move the original out of the published folders."
+    },
+    {
+      "code": "archive-file",
+      "title": "Archives",
+      "action": "Unpack and upload the files",
+      "instruction": "The site does not open archives. Unpack it and upload what it holds: Google Docs and PDF files are published, and anything else is listed here with its own advice. Then delete the archive."
+    },
+    {
+      "code": "image-file",
+      "title": "Images",
+      "action": "Insert into a document",
+      "instruction": "An image on its own has no page to show it. Insert it into the Google Doc it belongs to, then move the file out of the published folders."
+    },
+    {
+      "code": "diagram-file",
+      "title": "Diagrams",
+      "action": "Export as PDF or image",
+      "instruction": "The site cannot draw diagram files. Export the diagram as a PDF, or as an image inserted into the document it explains."
+    },
+    {
+      "code": "spreadsheet-file",
+      "title": "Spreadsheets",
+      "action": "Link from a document",
+      "instruction": "The site does not publish spreadsheets. Link to each one from the document that explains it, or paste a small table into that document. Move the ones nobody needs out of the published folders."
+    },
+    {
+      "code": "media-file",
+      "title": "Video and audio",
+      "action": "Link from a document",
+      "instruction": "The site does not host video or audio. Link to each file from a document, for example one page that lists the video instructions of a section and says what each one shows."
+    },
+    {
       "code": "unsupported-type",
-      "title": "The site does not publish this kind of file",
-      "instruction": "The site publishes Google Docs and PDF files. If this content belongs on the site, save it as a Google Doc or export it as a PDF, and remove the original, or link to the file from a document. If it does not, move it out of the published folders."
+      "title": "Other files the site does not publish",
+      "action": "Convert, link or move out",
+      "instruction": "The site publishes Google Docs and PDF files. If this content belongs on the site, save it as one of those. Otherwise link to it from a document, or move it out of the published folders."
     },
     {
       "code": "shortcut",
-      "title": "Shortcuts are not followed",
+      "title": "Shortcuts",
+      "action": "Move the original here",
       "instruction": "A shortcut points to a file kept somewhere else, and the sync does not follow it. Move the original into this folder, or link to it from a document instead."
     }
   ],
@@ -75,6 +136,19 @@
       "reason": "export-too-large",
       "sourceUrl": "https://drive.google.com/open?id=doc-brand-assets",
       "lastEditedBy": "Avery Example"
+    },
+    {
+      "id": "word-onboarding",
+      "name": "Onboarding checklist.docx",
+      "folderPath": [
+        "Handbook"
+      ],
+      "type": "Word document",
+      "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "status": "not-published",
+      "reason": "word-file",
+      "sourceUrl": "https://drive.google.com/open?id=word-onboarding",
+      "lastEditedBy": "Robin Sample"
     },
     {
       "id": "shortcut-policies",
@@ -113,9 +187,22 @@
       "type": "Google Sheets",
       "mimeType": "application/vnd.google-apps.spreadsheet",
       "status": "not-published",
-      "reason": "unsupported-type",
+      "reason": "spreadsheet-file",
       "sourceUrl": "https://drive.google.com/open?id=sheet-glossary",
       "lastEditedBy": "Avery Example"
+    },
+    {
+      "id": "video-walkthrough",
+      "name": "Walkthrough.mp4",
+      "folderPath": [
+        "Reference"
+      ],
+      "type": "Video (MP4)",
+      "mimeType": "video/mp4",
+      "status": "not-published",
+      "reason": "media-file",
+      "sourceUrl": "https://drive.google.com/open?id=video-walkthrough",
+      "lastEditedBy": "Robin Sample"
     }
   ],
   "ignoredFolders": [
@@ -124,6 +211,110 @@
       "name": "Drafts",
       "folderPath": [],
       "items": 1
+    }
+  ],
+  "noteKinds": [
+    {
+      "code": "duplicate-name",
+      "title": "Files in one folder share a name",
+      "action": "Rename one, or remove it",
+      "instruction": "Readers see two pages called the same, and the second has an address with a code on the end. If both belong on the site, rename one so they can be told apart; if one is a copy, such as a PDF exported from the document, move it out of the published folders."
+    },
+    {
+      "code": "image-removed",
+      "title": "An image was left out",
+      "action": "Insert the image again",
+      "instruction": "The export of the document named an image the sync could not find, so the page shows the text without it. Insert the image again in Google Docs."
+    },
+    {
+      "code": "link-removed",
+      "title": "A link was removed",
+      "action": "Fix the link",
+      "instruction": "A link pointed to an address the site does not publish, such as a local file or a script, so its text is on the page without the link. Point it to a web page, a Google Drive file or an email address."
+    },
+    {
+      "code": "heading-link-shortened",
+      "title": "A link to a heading opens the top of the page",
+      "action": "Nothing, or link the page",
+      "instruction": "A link pointed to a heading inside another document. The site links to that document, but not to the heading, so a reader lands at the top of the page."
+    },
+    {
+      "code": "table-merge-removed",
+      "title": "A merged table cell was split",
+      "action": "Check the table",
+      "instruction": "A merged cell in a table spanned a number of rows or columns the site cannot read, so it is shown unmerged. Check that the table still reads right, and merge the cells again in Google Docs if not."
+    },
+    {
+      "code": "formatting-removed",
+      "title": "Formatting the site does not show was removed",
+      "action": "Check the page",
+      "instruction": "The document held elements the site does not publish, such as an embedded frame, and they were left out. Check the page, and replace what is missing with a link."
+    },
+    {
+      "code": "code-block-unclosed",
+      "title": "A code block is never closed",
+      "action": "Close the code block",
+      "instruction": "A line of three backticks opens a code block and no second one closes it, so everything after it shows as code. Add a line of three backticks where the code ends."
+    },
+    {
+      "code": "pdf-text-truncated",
+      "title": "Only part of the PDF is searchable",
+      "action": "Split the PDF",
+      "instruction": "The PDF holds more text than the site indexes, a million characters, so search finds only its first part. The file itself is complete. Split it if all of it should be found."
+    },
+    {
+      "code": "duplicate-order",
+      "title": "Two items share an order number",
+      "action": "Renumber one",
+      "instruction": "Two items in a folder start with the same number, so their order on the site falls back to their names. Give each its own number in Drive."
+    },
+    {
+      "code": "several-landing-documents",
+      "title": "A folder has more than one landing document",
+      "action": "Rename all but one",
+      "instruction": "A folder may hold one document named like its landing page, such as Overview, which the site shows first. This one is another; rename it so the folder opens where it should."
+    },
+    {
+      "code": "unread-order-number",
+      "title": "A number in the name is not read as an order",
+      "action": "Write it as \"01 - Name\"",
+      "instruction": "The name starts with a number, but not in a form the site reads as an order, so the number shows in the title. Write it as \"01 - Name\" or \"[1] Name\", or remove it."
+    },
+    {
+      "code": "ignored-folder-missing",
+      "title": "A folder the configuration ignores is not there",
+      "action": "Update the configuration",
+      "instruction": "The site is configured to leave out a folder that is no longer in the published folders. Ask whoever maintains the site to remove it from GOOGLE_IGNORED_FOLDER_IDS."
+    }
+  ],
+  "notes": [
+    {
+      "id": "doc-style-guide",
+      "name": "Style guide",
+      "folderPath": [
+        "Reference",
+        "Guides"
+      ],
+      "type": "Google Docs",
+      "sourceUrl": "https://drive.google.com/open?id=doc-style-guide",
+      "lastEditedBy": "Robin Sample",
+      "slug": "reference/guides/style-guide",
+      "note": "duplicate-name",
+      "detail": "Also in this folder: “Style guide.pdf” (PDF)"
+    },
+    {
+      "id": "pdf-style-guide",
+      "name": "Style guide.pdf",
+      "folderPath": [
+        "Reference",
+        "Guides"
+      ],
+      "type": "PDF",
+      "sourceUrl": "https://drive.google.com/open?id=pdf-style-guide",
+      "lastEditedBy": "Robin Sample",
+      "slug": "reference/guides/style-guide--244fde",
+      "note": "duplicate-name",
+      "detail": "Also in this folder: “Style guide” (Google Docs)"
     }
   ]
 }

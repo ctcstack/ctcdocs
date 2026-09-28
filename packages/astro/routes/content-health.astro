@@ -15,17 +15,19 @@
 import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
 import { PLATFORM_ROUTE_HREFS } from '@ctcstack/ctcdocs-core';
 
+import HealthSummaryTable from '../components/HealthSummaryTable.astro';
 import {
   googleDocsUrl,
   loadHealthReport,
-  loadUnpublishedReport,
+  loadSyncState,
   sectionOf,
+  whereOf,
   type HealthSeverity,
   type UnpublishedItem,
 } from '../lib/content-health';
 
 const report = loadHealthReport();
-const unpublishedReport = loadUnpublishedReport();
+const state = loadSyncState();
 
 const SEVERITIES: Array<{
   severity: HealthSeverity;
@@ -53,20 +55,25 @@ const SEVERITIES: Array<{
   },
 ];
 
+/** A group this long starts folded; its row in the table says what it holds. */
+const OPEN_UP_TO = 20;
+
 const byName = (left: string, right: string) => left.localeCompare(right, 'en');
 const documents = report?.documents ?? [];
-const unpublished = unpublishedReport?.unpublished ?? [];
-const ignoredFolders = unpublishedReport?.ignoredFolders ?? [];
+const unpublished = state?.unpublished ?? [];
+const ignoredFolders = state?.ignoredFolders ?? [];
+const notes = state?.notes ?? [];
 const sections = [
   ...new Set([
     ...documents.map(sectionOf),
     ...unpublished.map(sectionOf),
     ...ignoredFolders.map(sectionOf),
+    ...notes.map(sectionOf),
   ]),
 ].sort(byName);
 const editors = [
   ...new Set(
-    [...documents, ...unpublished].flatMap((item) =>
+    [...documents, ...unpublished, ...notes].flatMap((item) =>
       item.lastEditedBy ? [item.lastEditedBy] : [],
     ),
   ),
@@ -81,13 +88,24 @@ const groups = (report?.checks ?? []).map((check) => ({
     }))
     .filter((entry) => entry.issues.length > 0),
 }));
-const unpublishedGroups = (unpublishedReport?.reasons ?? [])
+const unpublishedGroups = (state?.reasons ?? [])
   .map((reason) => ({
     reason,
     items: unpublished.filter((item) => item.reason === reason.code),
   }))
   .filter((group) => group.items.length > 0);
+const noteGroups = (state?.noteKinds ?? [])
+  .map((kind) => ({
+    kind,
+    items: notes.filter((note) => note.note === kind.code),
+  }))
+  .filter((group) => group.items.length > 0);
 
+const published = state
+  ? state.summary.published.googleDocs + state.summary.published.pdfs
+  : undefined;
+const plural = (count: number, one: string, many = `${one}s`) =>
+  `${count} ${count === 1 ? one : many}`;
 const trail = (item: { folderPath: readonly string[] }) =>
   item.folderPath.length > 0 ? item.folderPath.join(' › ') : 'General';
 const isFileNameCheck = (code: string) => code.startsWith('file-name-');
@@ -103,7 +121,7 @@ const status = (item: UnpublishedItem) =>
   frontmatter={{
     title: 'Content health',
     description:
-      'What to fix in Google Docs and Drive, with a link to each document.',
+      'What is on the site and what is not, and what to fix in Google Docs and Drive.',
     tableOfContents: false,
     pagefind: false,
     prev: false,
@@ -112,7 +130,7 @@ const status = (item: UnpublishedItem) =>
 >
   <content-health data-pagefind-ignore>
     {
-      !report && !unpublishedReport ? (
+      !report && !state ? (
         <p>
           The next sync writes the report this page is built from. Check back
           after it has run.
@@ -120,23 +138,44 @@ const status = (item: UnpublishedItem) =>
       ) : (
         <>
           <p>
-            Things to fix in Google Docs and Drive, grouped by what fixes them.
-            Each item links to the document, and where the check is about one
-            line, straight to that line. The list is rebuilt on every sync, so a
-            fixed item disappears after the next one.
+            What is on the site and what is not, and what to fix in Google Docs
+            and Drive, grouped by what fixes it. Each item links to its file in
+            Drive, and to its page when it has one. The page is rebuilt on every
+            sync, so a fixed item disappears after the next one.
           </p>
 
           <dl class="health-stats">
-            {unpublishedReport && (
-              <div>
-                <dt>Not on the site</dt>
-                <dd>{unpublished.length}</dd>
-              </div>
+            {state && published !== undefined && (
+              <>
+                <div>
+                  <dt>On the site</dt>
+                  <dd>
+                    {published}
+                    <span class="health-stat-detail">
+                      {`${plural(state.summary.published.googleDocs, 'Google Doc')}, ${plural(state.summary.published.pdfs, 'PDF')}`}
+                    </span>
+                  </dd>
+                </div>
+                <div>
+                  <dt>
+                    <a href="#not-on-the-site">Not on the site</a>
+                  </dt>
+                  <dd>{unpublished.length}</dd>
+                </div>
+                <div>
+                  <dt>
+                    <a href="#notes">Notes</a>
+                  </dt>
+                  <dd>{notes.length}</dd>
+                </div>
+              </>
             )}
             {report && (
               <>
                 <div>
-                  <dt>Documents to fix</dt>
+                  <dt>
+                    <a href="#fix">Documents to fix</a>
+                  </dt>
                   <dd>{report.summary.severity.fix}</dd>
                 </div>
                 <div>
@@ -146,14 +185,19 @@ const status = (item: UnpublishedItem) =>
                     <span> of {report.summary.inspected}</span>
                   </dd>
                 </div>
-                <div>
-                  <dt>Worth a look</dt>
-                  <dd>{report.summary.severity.note}</dd>
-                </div>
               </>
             )}
           </dl>
 
+          {state && (
+            <p class="health-notice">
+              The site last changed on{' '}
+              <time datetime={state.generatedAt}>
+                {state.generatedAt.slice(0, 16).replace('T', ' ')} UTC
+              </time>
+              .
+            </p>
+          )}
           {report && report.summary.inspected < report.summary.documents && (
             <p class="health-notice">
               {report.summary.documents - report.summary.inspected} documents
@@ -185,13 +229,13 @@ const status = (item: UnpublishedItem) =>
             <p class="health-filter-status" role="status" data-status />
           </form>
 
-          {unpublishedReport && (
+          {state && (
             <section class="health-severity" data-severity-section>
               <h2 id="not-on-the-site">Not on the site</h2>
               <p class="health-lede">
                 Files in the published folders that the site does not show,
-                shows in an earlier version, or shows only in part. Each needs
-                one change in Drive.
+                shows in an earlier version, or shows only in part, grouped by
+                what to do about them.
               </p>
               {unpublishedGroups.length === 0 && ignoredFolders.length === 0 ? (
                 <p class="health-empty">
@@ -202,8 +246,26 @@ const status = (item: UnpublishedItem) =>
                   Nothing here for this filter.
                 </p>
               )}
+              {unpublishedGroups.length > 0 && (
+                <HealthSummaryTable
+                  label="Files not on the site, by what to do"
+                  unit="Files"
+                  rows={unpublishedGroups.map(({ reason, items }) => ({
+                    id: `not-on-the-site-${reason.code}`,
+                    title: reason.title,
+                    count: items.length,
+                    where: whereOf(items),
+                    action: reason.action,
+                  }))}
+                />
+              )}
               {unpublishedGroups.map(({ reason, items }) => (
-                <details class="health-check" open data-check>
+                <details
+                  class="health-check"
+                  id={`not-on-the-site-${reason.code}`}
+                  open={items.length <= OPEN_UP_TO}
+                  data-check
+                >
                   <summary>
                     <span class="health-check-title">{reason.title}</span>
                     <span class="health-count" data-count>
@@ -278,6 +340,88 @@ const status = (item: UnpublishedItem) =>
             </section>
           )}
 
+          {state && (
+            <section class="health-severity" data-severity-section>
+              <h2 id="notes">Notes</h2>
+              <p class="health-lede">
+                Pages that are on the site, with something a reader would miss
+                or an editor should know: what conversion left out, and what in
+                Drive makes two pages hard to tell apart.
+              </p>
+              {noteGroups.length === 0 ? (
+                <p class="health-empty">
+                  Nothing to note: every published page came through conversion
+                  whole.
+                </p>
+              ) : (
+                <>
+                  <p class="health-empty" data-filter-empty hidden>
+                    Nothing here for this filter.
+                  </p>
+                  <HealthSummaryTable
+                    label="Notes, by what to do"
+                    unit="Items"
+                    rows={noteGroups.map(({ kind, items }) => ({
+                      id: `notes-${kind.code}`,
+                      title: kind.title,
+                      count: items.length,
+                      where: whereOf(items),
+                      action: kind.action,
+                    }))}
+                  />
+                </>
+              )}
+              {noteGroups.map(({ kind, items }) => (
+                <details
+                  class="health-check"
+                  id={`notes-${kind.code}`}
+                  open={items.length <= OPEN_UP_TO}
+                  data-check
+                >
+                  <summary>
+                    <span class="health-check-title">{kind.title}</span>
+                    <span class="health-count" data-count>
+                      {items.length}
+                    </span>
+                  </summary>
+                  <p class="health-instruction">{kind.instruction}</p>
+                  <ul>
+                    {items.map((note) => (
+                      <li
+                        data-section={sectionOf(note)}
+                        data-editor={note.lastEditedBy ?? ''}
+                      >
+                        <div class="health-item-head">
+                          {note.slug ? (
+                            <a href={`/${note.slug}/`}>{note.name}</a>
+                          ) : (
+                            <span class="health-item-name">{note.name}</span>
+                          )}
+                          <a
+                            class="health-source"
+                            href={note.sourceUrl}
+                            rel="noopener noreferrer"
+                            target="_blank"
+                          >
+                            Open in Google Drive
+                          </a>
+                        </div>
+                        <p class="health-meta">
+                          {trail(note)} · {note.type}
+                          {note.lastEditedBy &&
+                            ` · last edited by ${note.lastEditedBy}`}
+                        </p>
+                        {note.detail && (
+                          <p class="health-detail">{note.detail}</p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ))}
+            </section>
+          )}
+
           {report ? (
             SEVERITIES.map(({ severity, heading, lede, open }) => {
               const inSeverity = groups.filter(
@@ -287,7 +431,7 @@ const status = (item: UnpublishedItem) =>
               );
               return (
                 <section class="health-severity" data-severity-section>
-                  <h2>{heading}</h2>
+                  <h2 id={severity}>{heading}</h2>
                   <p class="health-lede">{lede}</p>
                   {inSeverity.length === 0 ? (
                     <p class="health-empty">Nothing to do here.</p>
@@ -380,6 +524,16 @@ const status = (item: UnpublishedItem) =>
             </p>
           )}
 
+          {state && (
+            <p class="health-footer">
+              How the pages were made:{' '}
+              {plural(state.summary.conversion.markdown, 'Google Doc')} from
+              Google's Markdown export, {state.summary.conversion.html} through
+              its HTML export for images, tables or drawings, and{' '}
+              {plural(state.summary.published.pdfs, 'PDF')} published as files
+              with their text.
+            </p>
+          )}
           <p class="health-footer">
             Browse <a href={PLATFORM_ROUTE_HREFS.fullIndex}>all documents</a>.
           </p>
@@ -397,6 +551,28 @@ const status = (item: UnpublishedItem) =>
    */
   class ContentHealth extends HTMLElement {
     connectedCallback() {
+      /*
+       * A long group starts folded. Following its row in a summary table, or
+       * a link to it, opens it.
+       */
+      const openTarget = (id: string) => {
+        const target = id ? document.getElementById(id) : null;
+        if (target instanceof HTMLDetailsElement) {
+          target.open = true;
+        }
+      };
+      openTarget(decodeURIComponent(location.hash.slice(1)));
+      window.addEventListener('hashchange', () =>
+        openTarget(decodeURIComponent(location.hash.slice(1))),
+      );
+      for (const link of this.querySelectorAll<HTMLAnchorElement>(
+        '[data-open-group]',
+      )) {
+        link.addEventListener('click', () =>
+          openTarget(decodeURIComponent(link.hash.slice(1))),
+        );
+      }
+
       const form = this.querySelector('form');
       const status = this.querySelector<HTMLElement>('[data-status]');
       if (!form || !status) return;
@@ -472,6 +648,15 @@ const status = (item: UnpublishedItem) =>
       font-size: var(--sl-text-2xl);
       font-weight: 600;
       margin: 0;
+    }
+
+    .health-stats dt a {
+      color: inherit;
+    }
+
+    .health-stats .health-stat-detail {
+      display: block;
+      font-size: var(--sl-text-xs);
     }
 
     .health-stats dd span {

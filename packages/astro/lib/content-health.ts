@@ -95,9 +95,11 @@ export function sectionOf(item: { folderPath: readonly string[] }): string {
 
 type UnpublishedStatus = 'not-published' | 'out-of-date' | 'incomplete';
 
-interface UnpublishedReason {
+/** A reason or a note kind: what it is, and what to do about it. */
+interface CatalogEntry {
   code: string;
   title: string;
+  action: string;
   instruction: string;
 }
 
@@ -115,6 +117,18 @@ export interface UnpublishedItem {
   publishedVersion?: string;
 }
 
+interface ReportNote {
+  id: string;
+  name: string;
+  folderPath: string[];
+  type: string;
+  sourceUrl: string;
+  lastEditedBy: string | null;
+  slug?: string;
+  note: string;
+  detail?: string;
+}
+
 interface IgnoredFolder {
   id: string;
   name: string;
@@ -122,15 +136,52 @@ interface IgnoredFolder {
   items: number;
 }
 
-/** What the last sync left off the site, and why (ADR-025). */
-export interface UnpublishedReport {
-  reasons: UnpublishedReason[];
+/**
+ * What the last sync that changed the site recorded about it: what is on it,
+ * what is not and why, and what to know (ADR-025, ADR-028).
+ */
+export interface SyncState {
+  generatedAt: string;
+  summary: {
+    published: { googleDocs: number; pdfs: number };
+    conversion: { markdown: number; html: number };
+    notPublished: number;
+    outOfDate: number;
+    incomplete: number;
+    notes: number;
+  };
+  reasons: CatalogEntry[];
   unpublished: UnpublishedItem[];
   ignoredFolders: IgnoredFolder[];
+  noteKinds: CatalogEntry[];
+  notes: ReportNote[];
 }
 
-/** The list, or `undefined` before a sync has written a report that has one. */
-export function loadUnpublishedReport(): UnpublishedReport | undefined {
+/**
+ * Where a group's items are, by top-level section, most first:
+ * `Teams (4), General (1)`.
+ */
+export function whereOf(
+  items: ReadonlyArray<{ folderPath: readonly string[] }>,
+): string {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    const section = sectionOf(item);
+    counts.set(section, (counts.get(section) ?? 0) + 1);
+  }
+  const sections = [...counts]
+    .sort(
+      ([leftName, left], [rightName, right]) =>
+        right - left || leftName.localeCompare(rightName, 'en'),
+    )
+    .map(([name, count]) => `${name} (${count})`);
+  return sections.length > 3
+    ? `${sections.slice(0, 3).join(', ')} and ${sections.length - 3} more`
+    : sections.join(', ');
+}
+
+/** The state, or `undefined` before a sync has written a report that has it. */
+export function loadSyncState(): SyncState | undefined {
   let parsed: unknown;
   try {
     parsed = JSON.parse(
@@ -144,7 +195,7 @@ export function loadUnpublishedReport(): UnpublishedReport | undefined {
   }
   return typeof parsed === 'object' &&
     parsed !== null &&
-    (parsed as { schemaVersion?: unknown }).schemaVersion === 2
-    ? (parsed as UnpublishedReport)
+    (parsed as { schemaVersion?: unknown }).schemaVersion === 3
+    ? (parsed as SyncState)
     : undefined;
 }
