@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   describeFileType,
+  driveUrl,
   UNPUBLISHED_REASONS,
   unsupportedFileReason,
 } from './unpublished.js';
@@ -62,5 +63,45 @@ describe('unsupportedFileReason', () => {
     ['application/vnd.google-apps.form', 'Survey', 'unsupported-type'],
   ])('puts %s (%s) under %s', (mimeType, name, expected) => {
     expect(unsupportedFileReason(mimeType, name)).toBe(expected);
+  });
+});
+
+describe('driveUrl', () => {
+  const selected = (webViewLink?: string) => ({
+    item: {
+      id: 'file-one',
+      name: 'Guide.docx',
+      mimeType: 'application/msword',
+      parents: ['team'],
+      modifiedTime: '2026-01-01T00:00:00.000Z',
+      createdTime: '2026-01-01T00:00:00.000Z',
+      trashed: false,
+      ...(webViewLink ? { webViewLink } : {}),
+    },
+    parentId: 'team',
+    path: ['Published', 'Team', 'Guide.docx'],
+  });
+
+  it('drops the owner and the link source Drive adds, and keeps the rest', () => {
+    expect(
+      driveUrl(
+        selected(
+          'https://docs.google.com/document/d/file-one/edit?usp=drivesdk&ouid=1234567890&rtpof=true&sd=true',
+        ),
+      ),
+    ).toBe(
+      'https://docs.google.com/document/d/file-one/edit?rtpof=true&sd=true',
+    );
+    expect(
+      driveUrl(
+        selected('https://drive.google.com/file/d/file-one/view?usp=drivesdk'),
+      ),
+    ).toBe('https://drive.google.com/file/d/file-one/view');
+  });
+
+  it('falls back to the file ID', () => {
+    expect(driveUrl(selected())).toBe(
+      'https://drive.google.com/open?id=file-one',
+    );
   });
 });

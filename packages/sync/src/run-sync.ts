@@ -1053,7 +1053,10 @@ async function synchronize(
                   stableSlugs.get(selected.item.id) ||
                 existingRecord.shortId !== shortIds.get(selected.item.id) ||
                 metadataChanged ||
-                existingOutputInvalid,
+                existingOutputInvalid ||
+                // A PDF read by an earlier text extraction is read again.
+                (selected.item.mimeType === GOOGLE_DRIVE_PDF_MIME_TYPE &&
+                  existingRecord.pdfTextVersion !== PDF_TEXT_VERSION),
           added: existingRecord === undefined,
         };
       }),
