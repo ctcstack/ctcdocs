@@ -326,8 +326,9 @@ documents to fix — and when the site last changed
   images with no alt text
   ([ADR-029](ADR/029-say-when-an-image-has-no-alt-text.md)), images cropped in
   Google Docs, which the site shows whole
-  ([ADR-030](ADR/030-note-images-cropped-in-google-docs.md)), files in one
-  folder the site cannot tell apart, order numbers used twice.
+  ([ADR-030](ADR/030-note-images-cropped-in-google-docs.md)), images larger
+  than `sync.largeImageMegabytes` (2 MB unless the project sets it), files in
+  one folder the site cannot tell apart, order numbers used twice.
 
 A document held back
 ([ADR-026](ADR/026-hold-back-a-document-that-cannot-be-exported.md)) keeps

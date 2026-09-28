@@ -111,6 +111,12 @@ export interface SyncConfigurationDefaults {
   readonly commitBotName: string;
   /** Locale assumed for documents whose language cannot be determined. */
   readonly defaultLocale: string;
+  /**
+   * The size, in megabytes of a million bytes, above which the sync report
+   * notes a published image. What is too large is not settled yet, so a
+   * project sets the line it wants numbers for. Defaults to 2.
+   */
+  readonly largeImageMegabytes: number;
 }
 
 export interface NavigationConfiguration {
@@ -322,6 +328,23 @@ function optionalCount(
   return value;
 }
 
+/** A size above zero, in megabytes; a fraction such as 1.5 is allowed. */
+function optionalMegabytes(
+  source: Record<string, unknown>,
+  key: string,
+  path: string,
+  fallback: number,
+): number {
+  const value = source[key];
+  if (value === undefined) {
+    return fallback;
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    fail(path, 'must be a number of megabytes above 0');
+  }
+  return value;
+}
+
 function optionalAddressPolicy(
   source: Record<string, unknown>,
   key: string,
@@ -485,6 +508,12 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
       commitBotName: text(syncSource, 'commitBotName', 'sync.commitBotName'),
       defaultLocale,
       generatedBy,
+      largeImageMegabytes: optionalMegabytes(
+        syncSource,
+        'largeImageMegabytes',
+        'sync.largeImageMegabytes',
+        2,
+      ),
     },
   };
 }

@@ -158,6 +158,45 @@ describe('createNotes', () => {
     ).toEqual([{ note: 'image-cropped', name: 'Plan', detail: '2 images' }]);
   });
 
+  it('notes images larger than the limit a project sets', () => {
+    const notes = createNotes(
+      corpus([
+        item('heavy', 'Plan', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('light', 'Guide', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('one', 'Brief', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+      ]),
+      manifestOf([
+        record('heavy', 'team/plan'),
+        record('light', 'team/guide'),
+        record('one', 'team/brief'),
+      ]),
+      {
+        largeImageMegabytes: 2,
+        imageBytes: new Map([
+          ['heavy', [4_330_000, 150_000, 2_100_000]],
+          // An image of exactly the limit is not over it.
+          ['light', [1_990_000, 2_000_000]],
+          ['one', [2_500_000]],
+        ]),
+      },
+    );
+
+    expect(
+      notes.map(({ note, name, detail }) => ({ note, name, detail })),
+    ).toEqual([
+      {
+        note: 'image-large',
+        name: 'Brief',
+        detail: '1 image over 2 MB: 2.5 MB',
+      },
+      {
+        note: 'image-large',
+        name: 'Plan',
+        detail: '2 images over 2 MB, the largest 4.3 MB',
+      },
+    ]);
+  });
+
   it('notes files in one folder the site cannot tell apart', () => {
     const notes = createNotes(
       corpus([

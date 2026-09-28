@@ -1,10 +1,13 @@
 import { readFile, readdir } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { posix, resolve } from 'node:path';
 
 import { PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
 
 import { extractSafeZipEntries, UnsafeZipError } from './archive/safe-zip.js';
-import { UnsafeAssetError } from './assets/validate-asset.js';
+import {
+  IMAGE_FILE_EXTENSIONS,
+  UnsafeAssetError,
+} from './assets/validate-asset.js';
 import type { SyncContext } from './project-context.js';
 import type { SyncConfiguration } from './config.js';
 import {
@@ -1620,7 +1623,31 @@ async function synchronize(
     ]),
     incomplete,
   );
-  const notes = createNotes(selection, candidateManifest);
+  /*
+   * The image files each page publishes, from the output itself, so a change
+   * of the limit reads as soon as the next run; a PDF's file sits in the same
+   * directory and is not an image.
+   */
+  const documentByAssetsDirectory = new Map(
+    Object.values(candidateManifest.documents).map((record) => [
+      record.generatedAssetsDirectory,
+      record.googleFileId,
+    ]),
+  );
+  const imageBytes = new Map<string, number[]>();
+  for (const [path, bytes] of output) {
+    const fileId = documentByAssetsDirectory.get(posix.dirname(path));
+    if (fileId && IMAGE_FILE_EXTENSIONS.has(posix.extname(path))) {
+      imageBytes.set(fileId, [
+        ...(imageBytes.get(fileId) ?? []),
+        typeof bytes === 'string' ? Buffer.byteLength(bytes) : bytes.byteLength,
+      ]);
+    }
+  }
+  const notes = createNotes(selection, candidateManifest, {
+    largeImageMegabytes: site.sync.largeImageMegabytes,
+    imageBytes,
+  });
   const pdfs = publishedRecords.filter(
     (record) => record.exportMode === 'pdf',
   ).length;

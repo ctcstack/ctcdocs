@@ -28,6 +28,15 @@ const SAFE_SVG_ELEMENTS = new Set([
   'use',
 ]);
 
+/** The extensions an image the sync publishes is written with. */
+export const IMAGE_FILE_EXTENSIONS: ReadonlySet<string> = new Set([
+  '.gif',
+  '.jpg',
+  '.png',
+  '.svg',
+  '.webp',
+]);
+
 export interface ValidatedAsset {
   bytes: Uint8Array;
   extension: 'gif' | 'jpg' | 'png' | 'svg' | 'webp';

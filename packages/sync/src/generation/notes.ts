@@ -40,7 +40,8 @@ export type NoteCode =
   | 'formatting-removed'
   | 'code-block-unclosed'
   | 'pdf-text-truncated'
-  | 'image-undescribed';
+  | 'image-undescribed'
+  | 'image-large';
 
 export interface NoteKind {
   code: NoteCode;
@@ -123,6 +124,13 @@ export const NOTE_KINDS: readonly NoteKind[] = [
       'The image has no alt text, so people using a screen reader, and AI agents reading the page as text, learn nothing of what it shows. In Google Docs, right-click the image, choose Alt text, and describe it in a sentence.',
   },
   {
+    code: 'image-large',
+    title: 'An image is larger than this site expects',
+    action: 'Use a smaller image',
+    instruction:
+      'The image file is larger than the size this site notes, so it is slow to open, and an AI agent may be refused it: some AI services take images of a few megabytes at most. Insert a smaller one: a screenshot cropped to what matters before it is inserted, or a photo as JPEG.',
+  },
+  {
     code: 'duplicate-order',
     title: 'Two items share an order number',
     action: 'Renumber one',
@@ -171,6 +179,14 @@ const ISSUE_NOTES: Readonly<Record<string, NoteCode>> = {
   ignored_outside_root: 'ignored-folder-missing',
 };
 
+/** The sizes of the images each page publishes, and the size to note. */
+export interface PublishedImageSizes {
+  /** From the project configuration: `sync.largeImageMegabytes`. */
+  largeImageMegabytes: number;
+  /** Bytes of each image file a document publishes, by Google file ID. */
+  imageBytes: ReadonlyMap<string, readonly number[]>;
+}
+
 export interface ReportNote {
   id: string;
   name: string;
@@ -210,13 +226,35 @@ function noteFor(
 
 const quoted = (name: string) => `“${name}”`;
 
+/** One decimal, the way a file size reads: `4.3 MB`. */
+const megabytes = (bytes: number) => `${(bytes / 1_000_000).toFixed(1)} MB`;
+
+function largeImages(
+  bytes: readonly number[],
+  images: PublishedImageSizes,
+): string | undefined {
+  const over = bytes
+    .filter((size) => size > images.largeImageMegabytes * 1_000_000)
+    .sort((left, right) => right - left);
+  const [largest] = over;
+  if (largest === undefined) {
+    return undefined;
+  }
+  const limit = `${images.largeImageMegabytes} MB`;
+  return over.length === 1
+    ? `1 image over ${limit}: ${megabytes(largest)}`
+    : `${plural(over.length, 'image')} over ${limit}, the largest ${megabytes(largest)}`;
+}
+
 /**
  * The notes for the corpus as it is published: `selection` is the inventory
- * the run published from, `manifest` what it published.
+ * the run published from, `manifest` what it published, and `images` the
+ * sizes of the image files it published.
  */
 export function createNotes(
   selection: InventorySelection,
   manifest: SyncManifest,
+  images?: PublishedImageSizes,
 ): ReportNote[] {
   const itemsById = new Map<string, SelectedInventoryItem>(
     [...selection.folders, ...selection.documents].map((selected) => [
@@ -263,6 +301,12 @@ export function createNotes(
           plural(undescribed, 'image'),
         ),
       );
+    }
+    const large = images
+      ? largeImages(images.imageBytes.get(record.googleFileId) ?? [], images)
+      : undefined;
+    if (large) {
+      notes.push(noteFor(selected, 'image-large', record.stableSlug, large));
     }
   }
 

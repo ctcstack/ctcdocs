@@ -37,7 +37,8 @@ name of its own; they read this file. The rationale is recorded in
   "sync": {
     "generatedBy": "CTCDOCS SYNC",
     "commitBotName": "ctcdocs-sync[bot]",
-    "defaultLocale": "en"
+    "defaultLocale": "en",
+    "largeImageMegabytes": 2
   }
 }
 ```
@@ -61,6 +62,7 @@ name of its own; they read this file. The rationale is recorded in
 | `sync.generatedBy`                     | The ownership marker stamped into every generated Markdown and TypeScript file.                                                          |
 | `sync.commitBotName`                   | Git author the sync workflow commits generated output as.                                                                                |
 | `sync.defaultLocale`                   | Fallback locale for documents whose language cannot be determined.                                                                       |
+| `sync.largeImageMegabytes`             | Optional. Megabytes (a million bytes each) above which the content health page notes an image. Above 0; defaults to 2.                   |
 
 ## Who may read the deployment
 

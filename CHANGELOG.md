@@ -14,6 +14,11 @@ All three packages share a version and are released together.
   check that part and to crop an image before inserting it. Publication is
   unchanged. The manifest records the count as `croppedImages`. See
   [ADR-030](docs/ADR/030-note-images-cropped-in-google-docs.md).
+- Notes: a page with images larger than a size the project sets, how many,
+  and the largest. The size is `sync.largeImageMegabytes` in
+  `site.config.json`, 2 MB unless set, read from the published files on
+  every sync, so changing it needs no export. Nothing about the images
+  changes.
 
 ### Changed
 

@@ -911,6 +911,74 @@ describe('basic Markdown sync', () => {
     expect(settled.outputChanged).toBe(false);
   });
 
+  it('notes an image over the size the project sets, from the file itself', async () => {
+    const repository = await mkdtemp(resolve(tmpdir(), 'kb-sync-large-'));
+    temporaryDirectories.push(repository);
+    // A PNG signature is all the asset check reads; the rest is the size.
+    const heavy = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.alloc(2_100_000),
+    ]);
+    const archive = createStoredZipFixture([
+      {
+        path: 'document.html',
+        bytes:
+          '<h1>Architecture</h1><p>Body with media.</p><img src="images/heavy.png" alt="A heavy image">',
+      },
+      { path: 'images/heavy.png', bytes: heavy },
+    ]);
+    const run = (largeImageMegabytes?: number) =>
+      runBasicMarkdownSync(
+        largeImageMegabytes === undefined
+          ? testSyncContext(repository)
+          : createSyncContext(repository, {
+              ...testSiteConfiguration,
+              sync: { ...testSiteConfiguration.sync, largeImageMegabytes },
+            }),
+        configuration,
+        tokenProvider,
+        { dryRun: false, full: false },
+        {
+          inventoryResult: inventory(),
+          markdownExporter: {
+            exportMarkdown: () =>
+              Promise.resolve(
+                new TextEncoder().encode(
+                  '# Architecture\n\n![temporary](data:image/png;base64,fixture)\n',
+                ),
+              ),
+            exportHtmlZip: () => Promise.resolve(archive),
+          },
+          documentInspector: {
+            inspectDocument: () =>
+              Promise.resolve({
+                hasEmbeddedDrawings: false,
+                hasImages: true,
+                inlineObjectCount: 1,
+                positionedObjectCount: 0,
+                tabCount: 1,
+              }),
+          },
+          now: () => new Date(firstTimestamp),
+        },
+      );
+    const large = (result: Awaited<ReturnType<typeof run>>) =>
+      result.report.notes.filter((note) => note.note === 'image-large');
+
+    // Over the 2 MB a project gets unless it sets its own.
+    expect(large(await run())).toEqual([
+      expect.objectContaining({
+        id: 'doc-one',
+        detail: '1 image over 2 MB: 2.1 MB',
+      }),
+    ]);
+
+    // A higher limit reads on the next run, without exporting anything again.
+    const raised = await run(3);
+    expect(raised.report.summary.exported).toBe(0);
+    expect(large(raised)).toEqual([]);
+  });
+
   it('rewrites corpus links and restores an external link after target removal', async () => {
     const repository = await mkdtemp(resolve(tmpdir(), 'kb-sync-links-'));
     temporaryDirectories.push(repository);
