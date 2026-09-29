@@ -241,6 +241,23 @@ describe('cropPng', () => {
     ]);
   });
 
+  it('refuses image data that inflates beyond what its header allows', () => {
+    const header = Buffer.alloc(13);
+    header.writeUInt32BE(10, 0);
+    header.writeUInt32BE(10, 4);
+    header[8] = 8;
+    header[9] = 6;
+    // 10 by 10 RGBA needs 410 bytes; this stream holds ten million.
+    const bomb = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      chunk('IHDR', header),
+      chunk('IDAT', deflateSync(Buffer.alloc(10_000_000))),
+      chunk('IEND', new Uint8Array()),
+    ]);
+
+    expect(cropPng(bomb, rightAndBottom)).toBeUndefined();
+  });
+
   it('refuses a file too large to decode before decoding it', () => {
     const header = Buffer.alloc(13);
     header.writeUInt32BE(100_000, 0);

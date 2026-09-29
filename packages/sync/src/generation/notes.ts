@@ -58,7 +58,7 @@ export const NOTE_KINDS: readonly NoteKind[] = [
     title: 'A cropped image is shown whole',
     action: 'Check what was cropped away',
     instruction:
-      'The image is cropped in Google Docs in a way the site cannot repeat: it is not a PNG, or it is also rotated. So the site shows it as it was inserted, the part cropped away included, to readers and to AI agents. Check that nothing in that part should stay out of the documentation. To show only what you kept, crop the image before inserting it, or insert it as a PNG.',
+      'The image is cropped in Google Docs in a way the site cannot repeat: it is not a PNG, it is also rotated, or its frame cannot be read. So the site shows it as it was inserted, the part cropped away included, to readers and to AI agents. Check that nothing in that part should stay out of the documentation. To show only what you kept, crop the image before inserting it, or insert it as a PNG.',
   },
   {
     code: 'duplicate-name',

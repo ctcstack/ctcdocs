@@ -53,8 +53,8 @@ const manifestDocumentSchema = z.object({
   undescribedImages: z.number().int().nonnegative().optional(),
   /**
    * For the same documents, how many of their images are cropped in Google
-   * Docs (ADR-030): published cropped, or left out where the crop cannot be
-   * applied (ADR-031). Counted by the same export.
+   * Docs (ADR-030): published cropped, or as they are, with a note, where the
+   * crop cannot be applied (ADR-031). Counted by the same export.
    */
   croppedImages: z.number().int().nonnegative().optional(),
   /**

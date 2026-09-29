@@ -116,13 +116,20 @@ describe('HTML archive conversion', () => {
     const image = (index: number) =>
       `../../../assets/generated/synthetic-document/image-00${index}.png`;
 
-    expect(result.croppedImages).toBe(4);
+    // Two crops, the linked one, the rotated one and the GIF; not the frame
+    // in points, which may or may not crop.
+    expect(result.croppedImages).toBe(5);
     expect(result.body).toContain(`![Uncropped](${image(1)})`);
     expect(result.body).toContain(`![Not framed](${image(1)})`);
     expect(result.body).toContain(
       `![Cropped at the right and the bottom](${image(2)})`,
     );
     expect(result.body).toContain(`![Cropped at the top](${image(3)})`);
+    // Found through its link, and the same bytes as the first crop.
+    expect(result.body).toContain(
+      `[![Cropped and linked](${image(2)})](https://example.invalid/linked)`,
+    );
+    expect(result.body).toContain(`![Framed in points](${image(1)})`);
     expect(result.assets).toHaveLength(4);
     expect(result.assets[0]?.bytes).toEqual(grid);
     // 427 of 624 and 258 of 333 CSS pixels of a 64 by 32 file.
@@ -153,6 +160,23 @@ describe('HTML archive conversion', () => {
       options,
     );
     expect(uncropped.croppedImages).toBe(0);
+
+    // A frame the site cannot read is said, not counted as a crop.
+    const inPoints = convertHtmlArchive(
+      [
+        {
+          path: 'document.html',
+          bytes: Buffer.from(
+            '<p><span style="overflow: hidden; width: 300pt; height: 200pt;"><img alt="Framed" src="images/image1.png" style="width: 468pt; height: 250pt;"></span></p>',
+          ),
+        },
+        { path: 'images/image1.png', bytes: grid },
+      ],
+      options,
+    );
+    expect(inPoints.croppedImages).toBe(0);
+    expect(inPoints.warnings).toContain('image_crop_not_applied');
+    expect(inPoints.assets[0]?.bytes).toEqual(grid);
     expect(uncropped.warnings).not.toContain('image_crop_not_applied');
   });
 

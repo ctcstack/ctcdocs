@@ -44,8 +44,9 @@ is published; upstream is at 10.
 ## Decision
 
 **The converter applies the crop to the file.** It reads the frame as ADR-030
-does and turns the window the frame shows into the file's pixels, rounding each
-edge inward so that no pixel cropped away is published. It decodes the image,
+does, through any inline element that wraps the image, such as a link, and
+turns the window the frame shows into the file's pixels, rounding each edge
+inward so that no pixel cropped away is published. It decodes the image,
 keeps those pixels, and encodes them again in the same channels and bit depth
 at deflate level 9. A palette image is cut as the colors it shows. The color
 chunks (`iCCP`, `sRGB`, `gAMA`, `cHRM`), and the transparent color of an image
@@ -58,12 +59,14 @@ for a second dependency built in 2024. `fast-png` writes a palette's
 transparency one entry out of place; the sync never writes a palette.
 
 **A crop the site cannot apply publishes the image as it is, and is a
-note:** a file other than a PNG, an image also rotated, grayscale packed below
-eight bits, a file above 4096 × 4096 pixels, or one that does not decode.
-Leaving the image out would lose what the editor meant to show; the note says
-where the part cropped away is still shown. The note kind
-`image-crop-not-applied`, "A cropped image is shown whole", comes first among
-the notes and replaces `image-cropped`: a crop applied leaves nothing to check.
+note:** a file other than a PNG, an image also rotated, a frame whose sizes
+are not in pixels, grayscale packed below eight bits, a file above 4096 × 4096
+pixels, image data that inflates beyond what its header describes, or a file
+that does not decode or encode. Leaving the image out would lose what the
+editor meant to show; the note says where the part cropped away is still
+shown. The note kind `image-crop-not-applied`, "A cropped image is shown
+whole", comes first among the notes and replaces `image-cropped`: a crop
+applied leaves nothing to check.
 
 **An image is named by the bytes published,** so one image cropped two ways
 is two files.
@@ -92,8 +95,9 @@ now 1. A normal sync exports again, once, a document with a crop and an older
 - The sync gains a production dependency, `fast-png`, with `fflate` and
   `iobuffer`. A new `fflate` may compress the same pixels differently, and so
   rewrite cropped images once.
-- The sync decodes untrusted PNG files. The pixel limit bounds the memory that
-  takes, and the decoder is JavaScript.
+- The sync decodes untrusted PNG files. The decoder sets no limit on how far
+  image data inflates, so the sync inflates it first, up to what the header
+  describes, and the pixel limit bounds the rest.
 - How Google's export writes a rotated image has still not been seen; a
   rotated image that is also cropped is shown whole, with the note.
 

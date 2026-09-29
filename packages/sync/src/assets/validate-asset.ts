@@ -28,6 +28,11 @@ const SAFE_SVG_ELEMENTS = new Set([
   'use',
 ]);
 
+/** The eight bytes every PNG file starts with. */
+export const PNG_SIGNATURE: readonly number[] = [
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+];
+
 /** The extensions an image the sync publishes is written with. */
 export const IMAGE_FILE_EXTENSIONS: ReadonlySet<string> = new Set([
   '.gif',
@@ -127,10 +132,7 @@ export function validateImageAsset(
   bytes: Uint8Array,
 ): ValidatedAsset {
   const extension = archivePath.split('.').at(-1)?.toLocaleLowerCase('en');
-  if (
-    extension === 'png' &&
-    startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
-  ) {
+  if (extension === 'png' && startsWith(bytes, PNG_SIGNATURE)) {
     return { bytes, extension: 'png', mimeType: 'image/png' };
   }
   if (

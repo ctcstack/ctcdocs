@@ -1074,6 +1074,95 @@ describe('basic Markdown sync', () => {
     expect(settled.outputChanged).toBe(false);
   });
 
+  it('exports once, and keeps, a crop it cannot apply', async () => {
+    const repository = await mkdtemp(resolve(tmpdir(), 'kb-sync-jpeg-'));
+    temporaryDirectories.push(repository);
+    // A JPEG signature is all the asset check reads.
+    const photo = Buffer.concat([
+      Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
+      Buffer.from('synthetic photo'),
+    ]);
+    const archive = createStoredZipFixture([
+      {
+        path: 'document.html',
+        bytes:
+          '<h1>Architecture</h1><p>Body with media.</p><span style="overflow: hidden; display: inline-block; width: 312.00px; height: 333.00px;"><img alt="Photo" src="images/photo.jpg" style="width: 624.00px; height: 333.00px; margin-left: 0.00px; margin-top: 0.00px;"></span>',
+      },
+      { path: 'images/photo.jpg', bytes: photo },
+    ]);
+    const run = () =>
+      runBasicMarkdownSync(
+        testSyncContext(repository),
+        configuration,
+        tokenProvider,
+        { dryRun: false, full: false },
+        {
+          inventoryResult: inventory(),
+          markdownExporter: {
+            exportMarkdown: () =>
+              Promise.resolve(
+                new TextEncoder().encode(
+                  '# Architecture\n\n![temporary](data:image/png;base64,fixture)\n',
+                ),
+              ),
+            exportHtmlZip: () => Promise.resolve(archive),
+          },
+          documentInspector: {
+            inspectDocument: () =>
+              Promise.resolve({
+                hasEmbeddedDrawings: false,
+                hasImages: true,
+                inlineObjectCount: 1,
+                positionedObjectCount: 0,
+                tabCount: 1,
+              }),
+          },
+          now: () => new Date(firstTimestamp),
+        },
+      );
+    const manifestPath = resolve(repository, 'data/sync-manifest.json');
+    type Recorded = {
+      documents: Record<
+        string,
+        { croppedImages?: number; imageVersion?: number }
+      >;
+    };
+
+    const first = await run();
+    // The photo is published as it is, and the report says so.
+    await expect(
+      readFile(
+        resolve(repository, 'src/assets/generated/doc-one/image-001.jpg'),
+      ),
+    ).resolves.toEqual(photo);
+    expect(first.report.notes).toEqual([
+      expect.objectContaining({
+        id: 'doc-one',
+        note: 'image-crop-not-applied',
+      }),
+    ]);
+
+    // As 0.12.0 recorded it: the crop counted, no image version.
+    const manifest = JSON.parse(
+      await readFile(manifestPath, 'utf8'),
+    ) as Recorded;
+    delete manifest.documents['doc-one']?.imageVersion;
+    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+    const upgraded = await run();
+    expect(upgraded.report.summary.exported).toBe(1);
+    expect(upgraded.report.summary.changed).toBe(0);
+    expect(
+      (JSON.parse(await readFile(manifestPath, 'utf8')) as Recorded).documents[
+        'doc-one'
+      ],
+    ).toMatchObject({ croppedImages: 1, imageVersion: 1 });
+
+    const settled = await run();
+    expect(settled.report.summary.exported).toBe(0);
+    expect(settled.outputChanged).toBe(false);
+  });
+
   it('rewrites corpus links and restores an external link after target removal', async () => {
     const repository = await mkdtemp(resolve(tmpdir(), 'kb-sync-links-'));
     temporaryDirectories.push(repository);
