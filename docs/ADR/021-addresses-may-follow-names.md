@@ -1,6 +1,8 @@
 # ADR-021: Addresses may follow Drive names
 
-- Status: Proposed
+- Status: Proposed; superseded in part by
+  [ADR-032](032-search-a-missing-address-by-its-name.md), under which a missing
+  address is searched by its name, not its whole path
 - Date: 2026-09-26
 - Owners: CTCDocs maintainers
 - Supersedes: none

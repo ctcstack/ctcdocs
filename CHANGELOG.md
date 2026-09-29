@@ -2,6 +2,21 @@
 
 All three packages share a version and are released together.
 
+## 0.13.1
+
+### Fixed
+
+- The 404 page offers the page a missing address named when that page is in
+  a folder. It searched the whole address first, and the words of the folders
+  are not indexed on a page but are on the home page, which names every
+  folder: the home page was offered instead, and the browser suite failed for
+  a project whose first document sits two folders deep. The page now searches
+  the last segment of the address, then each of its words, and the folders
+  only when the last segment has no word to search for. See
+  [ADR-032](docs/ADR/032-search-a-missing-address-by-its-name.md).
+- The browser suite checks the 404 page with the document deepest in folders
+  instead of the first document of the corpus.
+
 ## 0.13.0
 
 ### Changed
