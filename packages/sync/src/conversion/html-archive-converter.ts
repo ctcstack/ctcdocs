@@ -6,6 +6,7 @@ import { Element } from 'domhandler';
 import TurndownService from 'turndown';
 
 import type { ExtractedZipEntry } from '../archive/safe-zip.js';
+import { cropPng, type CropFrame } from '../assets/crop-png.js';
 import {
   UnsafeAssetError,
   validateImageAsset,
@@ -70,7 +71,10 @@ export interface HtmlArchiveConversion {
   sanitizedHtml: string;
   /** Images published with an empty alt, having no alt text in the source. */
   undescribedImages: number;
-  /** Images published whole, though cropped in Google Docs (ADR-030). */
+  /**
+   * Images cropped in Google Docs: published cropped, or as they are where the
+   * crop cannot be applied (ADR-031).
+   */
   croppedImages: number;
   warnings: string[];
   removedTitleHeading: boolean;
@@ -266,44 +270,67 @@ function pixels(value: string | undefined): number | undefined {
 const CROP_TOLERANCE_PIXELS = 0.5;
 
 /**
- * Whether Google's HTML export crops the image (ADR-030). The file is whole:
- * the export frames it in a span with overflow hidden, draws it larger than
- * the frame or moves it with a negative margin, and the part outside the frame
- * is what the editor cropped away.
+ * The angle of `rotate(<angle>rad)` in a transform, 0 when there is none, and
+ * `NaN` when it is written in a unit this does not read.
  */
-function isCroppedImage(image: Element): boolean {
+function rotation(transform: string | undefined): number {
+  const start = transform?.indexOf('rotate(') ?? -1;
+  if (transform === undefined || start < 0) {
+    return 0;
+  }
+  const end = transform.indexOf(')', start);
+  const angle = transform.slice(start + 'rotate('.length, end).trim();
+  return angle.endsWith('rad') ? Number(angle.slice(0, -3)) : Number.NaN;
+}
+
+/**
+ * How Google's HTML export crops the image, if it does (ADR-030, ADR-031).
+ * The file is whole: the export frames it in a span with overflow hidden,
+ * draws it larger than the frame or moves it with a negative margin, and the
+ * part outside the frame is what the editor cropped away. `rotated` when the
+ * image is also turned, which the crop's frame then does not describe.
+ */
+function readCrop(image: Element): CropFrame | 'rotated' | undefined {
   const frame = image.parent;
   if (
     !(frame instanceof Element) ||
     frame.name.toLocaleLowerCase('en') !== 'span'
   ) {
-    return false;
+    return undefined;
   }
   const frameStyle = styleDeclarations(frame.attribs.style);
   if (frameStyle.get('overflow') !== 'hidden') {
-    return false;
+    return undefined;
   }
   const imageStyle = styleDeclarations(image.attribs.style);
   const frameWidth = pixels(frameStyle.get('width'));
   const frameHeight = pixels(frameStyle.get('height'));
-  const width = pixels(imageStyle.get('width'));
-  const height = pixels(imageStyle.get('height'));
+  const imageWidth = pixels(imageStyle.get('width'));
+  const imageHeight = pixels(imageStyle.get('height'));
   const left = pixels(imageStyle.get('margin-left')) ?? 0;
   const top = pixels(imageStyle.get('margin-top')) ?? 0;
   if (
     frameWidth === undefined ||
     frameHeight === undefined ||
-    width === undefined ||
-    height === undefined
+    imageWidth === undefined ||
+    imageHeight === undefined
   ) {
-    return false;
+    return undefined;
   }
-  return (
+  const cropped =
     left < -CROP_TOLERANCE_PIXELS ||
     top < -CROP_TOLERANCE_PIXELS ||
-    left + width > frameWidth + CROP_TOLERANCE_PIXELS ||
-    top + height > frameHeight + CROP_TOLERANCE_PIXELS
+    left + imageWidth > frameWidth + CROP_TOLERANCE_PIXELS ||
+    top + imageHeight > frameHeight + CROP_TOLERANCE_PIXELS;
+  if (!cropped) {
+    return undefined;
+  }
+  const turned = [imageStyle, frameStyle].some(
+    (style) => rotation(style.get('transform')) !== 0,
   );
+  return turned
+    ? 'rotated'
+    : { frameWidth, frameHeight, imageWidth, imageHeight, left, top };
 }
 
 function sortAttributes($: ReturnType<typeof cheerio.load>): void {
@@ -336,11 +363,14 @@ export function convertHtmlArchive(
   const entriesByPath = new Map(entries.map((entry) => [entry.path, entry]));
   const $ = cheerio.load(source);
   const warnings = new Set<string>();
-  // Read before the styles that tell it are removed; the page is unchanged.
-  const cropped = new Set(
+  // Read before the styles that tell it are removed.
+  const crops = new Map(
     $('body img')
       .toArray()
-      .filter((image) => image instanceof Element && isCroppedImage(image)),
+      .flatMap((image) => {
+        const crop = image instanceof Element ? readCrop(image) : undefined;
+        return crop ? [[image, crop] as const] : [];
+      }),
   );
 
   $('body *')
@@ -427,6 +457,26 @@ export function convertHtmlArchive(
       }
       throw error;
     }
+    /*
+     * A crop is applied to the file, so no pixel cropped away is published
+     * (ADR-031). One the site cannot reproduce, on a file other than a PNG or
+     * an image also rotated, publishes the image as it is and says so: an
+     * image left out would be information lost.
+     */
+    const crop = crops.get(element);
+    if (crop) {
+      croppedImages += 1;
+      const bytes =
+        crop !== 'rotated' && validated.extension === 'png'
+          ? cropPng(validated.bytes, crop)
+          : undefined;
+      if (bytes) {
+        validated = { ...validated, bytes };
+      } else {
+        warnings.add('image_crop_not_applied');
+      }
+    }
+    // Named by what is published: one image cropped two ways is two files.
     const hash = sha256(validated.bytes);
     let asset = assetsByHash.get(hash);
     if (!asset) {
@@ -442,9 +492,6 @@ export function convertHtmlArchive(
       assetsByHash.set(hash, asset);
     }
     $(element).attr('src', asset.markdownPath);
-    if (cropped.has(element)) {
-      croppedImages += 1;
-    }
     /*
      * Google writes the Description in the Alt text dialog as alt and its
      * Title as title, each empty when left blank. A title alone is the

@@ -53,9 +53,16 @@ const manifestDocumentSchema = z.object({
   undescribedImages: z.number().int().nonnegative().optional(),
   /**
    * For the same documents, how many of their images are cropped in Google
-   * Docs and published whole (ADR-030). Counted by the same export.
+   * Docs (ADR-030): published cropped, or left out where the crop cannot be
+   * applied (ADR-031). Counted by the same export.
    */
   croppedImages: z.number().int().nonnegative().optional(),
+  /**
+   * For the same documents, the version of image processing their images were
+   * published with, so a page whose crop an earlier version published whole
+   * is exported again once (ADR-031).
+   */
+  imageVersion: z.number().int().positive().optional(),
 });
 
 const legacyManifestFolderSchema = z.object({

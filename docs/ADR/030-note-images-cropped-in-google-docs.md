@@ -1,6 +1,8 @@
 # ADR-030: Note images cropped in Google Docs
 
-- Status: Proposed
+- Status: Proposed; superseded in part by
+  [ADR-031](031-apply-the-crop-google-docs-makes.md), under which a cropped
+  image is published cropped and noted only when the site cannot crop it
 - Date: 2026-09-28
 - Owners: CTCDocs maintainers
 - Supersedes: none

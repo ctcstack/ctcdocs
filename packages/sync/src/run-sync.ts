@@ -4,6 +4,7 @@ import { posix, resolve } from 'node:path';
 import { PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
 
 import { extractSafeZipEntries, UnsafeZipError } from './archive/safe-zip.js';
+import { IMAGE_VERSION } from './assets/crop-png.js';
 import {
   IMAGE_FILE_EXTENSIONS,
   UnsafeAssetError,
@@ -361,7 +362,11 @@ function withConversionFacts(
   record: SyncedDocumentRecord,
   converted: Pick<
     ConvertedDocument,
-    'exportMode' | 'warnings' | 'undescribedImages' | 'croppedImages'
+    | 'exportMode'
+    | 'warnings'
+    | 'undescribedImages'
+    | 'croppedImages'
+    | 'imageVersion'
   >,
 ): SyncedDocumentRecord {
   const updated: SyncedDocumentRecord = {
@@ -371,11 +376,15 @@ function withConversionFacts(
   };
   delete updated.undescribedImages;
   delete updated.croppedImages;
+  delete updated.imageVersion;
   if (converted.undescribedImages !== undefined) {
     updated.undescribedImages = converted.undescribedImages;
   }
   if (converted.croppedImages !== undefined) {
     updated.croppedImages = converted.croppedImages;
+  }
+  if (converted.imageVersion !== undefined) {
+    updated.imageVersion = converted.imageVersion;
   }
   return updated;
 }
@@ -674,6 +683,7 @@ interface ConvertedDocument {
   pdfTextVersion?: number;
   undescribedImages?: number;
   croppedImages?: number;
+  imageVersion?: number;
 }
 
 export async function runBasicMarkdownSync(
@@ -1091,11 +1101,14 @@ async function synchronize(
                 // A PDF read by an earlier text extraction is read again.
                 (selected.item.mimeType === GOOGLE_DRIVE_PDF_MIME_TYPE &&
                   existingRecord.pdfTextVersion !== PDF_TEXT_VERSION) ||
-                // Images converted before they were counted.
+                // Images converted before they were counted, or cropped
+                // before crops were applied (ADR-031).
                 (existingRecord.exportMode === 'hybrid' &&
+                  existingAssets.length > 0 &&
                   (existingRecord.undescribedImages === undefined ||
-                    existingRecord.croppedImages === undefined) &&
-                  existingAssets.length > 0),
+                    existingRecord.croppedImages === undefined ||
+                    ((existingRecord.croppedImages ?? 0) > 0 &&
+                      existingRecord.imageVersion !== IMAGE_VERSION))),
           added: existingRecord === undefined,
         };
       }),
@@ -1184,6 +1197,7 @@ async function synchronize(
       titleFacts: structure.titleFacts ?? null,
       ...(undescribedImages === undefined ? {} : { undescribedImages }),
       ...(croppedImages === undefined ? {} : { croppedImages }),
+      ...(exportMode === 'hybrid' ? { imageVersion: IMAGE_VERSION } : {}),
     };
   };
 
@@ -1375,6 +1389,9 @@ async function synchronize(
       ...(converted.croppedImages === undefined
         ? {}
         : { croppedImages: converted.croppedImages }),
+      ...(converted.imageVersion === undefined
+        ? {}
+        : { imageVersion: converted.imageVersion }),
     };
     return {
       fileId: item.id,
