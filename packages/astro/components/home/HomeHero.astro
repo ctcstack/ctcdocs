@@ -109,7 +109,7 @@ const { corpus } = Astro.props;
 <style>
   @layer starlight.components {
     .hero-lede {
-      color: var(--sl-color-gray-3);
+      color: var(--kb-gray-3);
       margin-top: 0.5rem;
       max-width: 52ch;
     }
@@ -120,10 +120,10 @@ const { corpus } = Astro.props;
      */
     .hero-search {
       align-items: center;
-      background: var(--sl-color-bg);
+      background: var(--kb-ground);
       border: 1px solid var(--kb-border-strong);
       border-radius: 0.5rem;
-      color: var(--sl-color-gray-3);
+      color: var(--kb-gray-3);
       cursor: pointer;
       display: flex;
       font: inherit;
@@ -136,16 +136,16 @@ const { corpus } = Astro.props;
 
     .hero-search:hover {
       background: var(--kb-surface-sunken);
-      border-color: var(--sl-color-accent);
+      border-color: var(--kb-accent);
     }
 
     .hero-search:focus-visible {
-      outline: 2px solid var(--sl-color-text-accent);
+      outline: 2px solid var(--kb-text-accent);
       outline-offset: 2px;
     }
 
     .hero-search-icon {
-      color: var(--sl-color-gray-3);
+      color: var(--kb-gray-3);
       flex-shrink: 0;
       height: 1.125em;
       width: 1.125em;
@@ -159,10 +159,10 @@ const { corpus } = Astro.props;
       background: var(--kb-surface-sunken);
       border: 1px solid var(--kb-border-strong);
       border-radius: 0.25rem;
-      color: var(--sl-color-gray-3);
+      color: var(--kb-gray-3);
       flex-shrink: 0;
-      font-family: var(--__sl-font-mono);
-      font-size: var(--sl-text-xs);
+      font-family: var(--kb-font-mono);
+      font-size: var(--kb-text-xs);
       padding: 0.15em 0.45em;
     }
 
@@ -177,18 +177,18 @@ const { corpus } = Astro.props;
     }
 
     .hero-band p {
-      color: var(--sl-color-gray-3);
-      font-size: var(--sl-text-sm);
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-sm);
       font-variant-numeric: tabular-nums;
       margin: 0;
     }
 
     .hero-stat strong {
-      color: var(--sl-color-white);
+      color: var(--kb-ink);
     }
 
     .hero-onboarding a {
-      color: var(--sl-color-text-accent);
+      color: var(--kb-text-accent);
     }
   }
 </style>

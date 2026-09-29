@@ -73,17 +73,17 @@ const showBreadcrumb = entry.data.template !== 'splash';
      * and a bare `h1` loses to it on specificity.
      */
     :global(.sl-container) > h1 {
-      color: var(--sl-color-white);
-      font-size: var(--sl-text-h1);
+      color: var(--kb-ink);
+      font-size: var(--kb-text-h1);
       font-weight: 600;
       letter-spacing: -0.025em;
-      line-height: var(--sl-line-height-headings);
+      line-height: var(--kb-line-height-headings);
       margin-top: 0.5rem;
       text-wrap: balance;
     }
 
     .doc-breadcrumb {
-      font-size: var(--sl-text-sm);
+      font-size: var(--kb-text-sm);
     }
 
     .doc-breadcrumb ol {
@@ -101,7 +101,7 @@ const showBreadcrumb = entry.data.template !== 'splash';
      * contrast floor in the light theme.
      */
     .doc-breadcrumb li + li::before {
-      color: var(--sl-color-gray-3);
+      color: var(--kb-gray-3);
       content: '/';
       margin-inline-end: 0.5rem;
     }
@@ -112,12 +112,12 @@ const showBreadcrumb = entry.data.template !== 'splash';
      */
     .doc-breadcrumb a,
     .doc-breadcrumb span {
-      color: var(--sl-color-gray-3);
+      color: var(--kb-gray-3);
       text-decoration: none;
     }
 
     .doc-breadcrumb a:hover {
-      color: var(--sl-color-text-accent);
+      color: var(--kb-text-accent);
       text-decoration: underline;
       text-underline-offset: 0.2em;
     }

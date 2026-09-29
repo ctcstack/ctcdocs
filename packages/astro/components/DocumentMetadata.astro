@@ -306,12 +306,12 @@ const showSectionLink = sourceType === 'section-index' && permanentPath;
      */
     .doc-meta {
       align-items: center;
-      border-bottom: 1px solid var(--sl-color-hairline);
-      color: var(--sl-color-gray-3);
+      border-bottom: 1px solid var(--kb-hairline);
+      color: var(--kb-gray-3);
       column-gap: 1rem;
       display: flex;
       flex-wrap: wrap;
-      font-size: var(--sl-text-sm);
+      font-size: var(--kb-text-sm);
       padding-bottom: 0.75rem;
       row-gap: 0.5rem;
     }
@@ -323,7 +323,7 @@ const showSectionLink = sourceType === 'section-index' && permanentPath;
      */
     .doc-meta-fact {
       align-items: center;
-      color: var(--sl-color-white);
+      color: var(--kb-ink);
       display: inline-flex;
       gap: 0.4rem;
       white-space: nowrap;
@@ -331,7 +331,7 @@ const showSectionLink = sourceType === 'section-index' && permanentPath;
 
     .doc-meta-divider {
       align-self: stretch;
-      border-inline-start: 1px solid var(--sl-color-hairline);
+      border-inline-start: 1px solid var(--kb-hairline);
       margin-inline: -0.25rem;
     }
 
@@ -345,7 +345,7 @@ const showSectionLink = sourceType === 'section-index' && permanentPath;
       align-items: center;
       background: none;
       border: 0;
-      color: var(--sl-color-gray-3);
+      color: var(--kb-gray-3);
       cursor: pointer;
       display: inline-flex;
       font: inherit;
@@ -356,14 +356,14 @@ const showSectionLink = sourceType === 'section-index' && permanentPath;
     }
 
     .doc-meta-action:hover {
-      color: var(--sl-color-text-accent);
+      color: var(--kb-text-accent);
       text-decoration: underline;
       text-underline-offset: 0.2em;
     }
 
     .doc-meta-action:focus-visible {
       border-radius: 0.25rem;
-      outline: 2px solid var(--sl-color-text-accent);
+      outline: 2px solid var(--kb-text-accent);
       outline-offset: 3px;
     }
 
@@ -376,12 +376,12 @@ const showSectionLink = sourceType === 'section-index' && permanentPath;
 
     copy-markdown[data-state='copied'] .doc-meta-action,
     copy-link[data-state='copied'] .doc-meta-action {
-      color: var(--sl-color-text-accent);
+      color: var(--kb-text-accent);
     }
 
     copy-markdown[data-state='failed'] .doc-meta-action,
     copy-link[data-state='failed'] .doc-meta-action {
-      color: var(--sl-color-red-high);
+      color: var(--kb-danger);
     }
 
     /*
