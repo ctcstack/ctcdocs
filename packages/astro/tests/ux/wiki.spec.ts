@@ -6,6 +6,7 @@ import { siteConfiguration } from '../../lib/project.js';
 import {
   anyDocument,
   contentHealthReport,
+  deepestDocument,
   unpublishedReport,
   documentInFolder,
   documentLinkingAnother,
@@ -446,7 +447,11 @@ test('a link between documents goes straight to the current address', async ({
 });
 
 test('a missing address searches for the page it named', async ({ page }) => {
-  const document = anyDocument();
+  /*
+   * Deep in folders, because the home page names every folder: a search that
+   * took the folders' words would offer it instead of the page.
+   */
+  const document = deepestDocument();
 
   // The hexadecimal tail stands for an address a rename has since replaced.
   await page.goto(`/${document.slug}--0a0b0c/`);

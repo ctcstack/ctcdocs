@@ -103,6 +103,20 @@ export function documentInFolder(): CorpusFixture | undefined {
 }
 
 /**
+ * The document deepest in Drive folders, the first of them in index order.
+ * Its address carries the most words that are not its own name.
+ */
+export function deepestDocument(): CorpusFixture {
+  return documents.reduce(
+    (deepest, document) =>
+      (document.folderPath?.length ?? 0) > (deepest.folderPath?.length ?? 0)
+        ? document
+        : deepest,
+    anyDocument(),
+  );
+}
+
+/**
  * A document whose body carries a Markdown table.
  *
  * Which document that is depends on the corpus, so it is found by reading the

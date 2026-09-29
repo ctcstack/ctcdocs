@@ -418,7 +418,7 @@ because the order prefix is not part of an address. A sync targeted at one
 file keeps every address where it is.
 
 A reader who opens an address that no longer exists lands on the 404 page,
-which searches the site for the words of that address. Anyone who needs a
+which searches the site for the name in that address. Anyone who needs a
 link that lasts copies the page's permanent link instead (see below).
 
 Switch back to `stable` once people have started sharing addresses. The

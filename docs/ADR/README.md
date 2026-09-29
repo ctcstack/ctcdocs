@@ -55,5 +55,6 @@ Rejected
 - ADR-030: note images cropped in Google Docs.
 - ADR-031: apply the crop Google Docs makes to an image. Supersedes ADR-030 in
   part.
+- ADR-032: search a missing address by its name. Supersedes ADR-021 in part.
 
 Create a new ADR by copying `000-template.md`.

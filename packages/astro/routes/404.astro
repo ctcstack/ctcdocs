@@ -4,9 +4,9 @@
  *
  * While addresses follow names (ADR-021), an address copied from the browser
  * lasts until its page is renamed twice. The page it named usually still
- * exists under another address, and its words are still in the one that was
- * requested. So this page searches for them: `/sales/pricing-2025/` looks for
- * "sales pricing 2025", and the document is usually the first result.
+ * exists under another address, and its name is still in the one that was
+ * requested. So this page searches for it: `/sales/pricing-2025/` looks for
+ * "pricing 2025", and the document is usually the first result (ADR-032).
  *
  * Nothing is stored for this: the search runs in the browser against the
  * index every page already uses. A permanent link, `/d/<short ID>/`, carries
@@ -43,39 +43,7 @@ import { PLATFORM_ROUTE_HREFS } from '@ctcstack/ctcdocs-core';
 </StarlightPage>
 
 <script>
-  /** Words of one part of an address that are worth searching for. */
-  function wordsOf(segment: string): string[] {
-    return segment.split(/[^\p{Letter}\p{Number}]+/u).filter(
-      (word) =>
-        word.length >= 3 &&
-        // Short IDs and collision suffixes are hexadecimal, not words.
-        !/^[0-9a-f]{6,}$/u.test(word) &&
-        word !== 'index',
-    );
-  }
-
-  /**
-   * The searches to try for a missing address, most specific first. The
-   * index matches every word of a search, so a word the page never had, such
-   * as one a rename removed, would find nothing: the page's own name, the
-   * last segment, is tried next, then its words one at a time.
-   */
-  function searchesFor(pathname: string): string[] {
-    let decoded = pathname;
-    try {
-      decoded = decodeURIComponent(pathname);
-    } catch {
-      // An address that cannot be decoded is searched for as it is.
-    }
-    const segments = decoded.split('/').filter(Boolean);
-    const lastWords = wordsOf(segments.at(-1) ?? '');
-    const searches = [
-      wordsOf(decoded).join(' '),
-      lastWords.join(' '),
-      ...[...lastWords].sort((left, right) => right.length - left.length),
-    ].filter(Boolean);
-    return [...new Set(searches)];
-  }
+  import { searchesFor } from '../scripts/missing-page-searches';
 
   interface PagefindResultData {
     url: string;
