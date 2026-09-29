@@ -4,6 +4,11 @@ import { describe, expect, it } from 'vitest';
 
 import type { ExtractedZipEntry } from '../archive/safe-zip.js';
 import {
+  gridPng,
+  gridPositions,
+  gridRectangle,
+} from '../test-support/png-fixture.js';
+import {
   convertHtmlArchive,
   HtmlArchiveConversionError,
 } from './html-archive-converter.js';
@@ -99,29 +104,56 @@ describe('HTML archive conversion', () => {
     expect(result.undescribedImages).toBe(2);
   });
 
-  it('counts the images Google crops, and publishes them as before', async () => {
-    const assets = [{ path: 'images/image1.png', bytes: pixel }];
+  it('publishes an image cropped in Google Docs as Docs shows it', async () => {
+    const grid = gridPng(64, 32);
     const result = convertHtmlArchive(
-      await fixtureEntries('google-image-crop.html', assets),
+      await fixtureEntries('google-image-crop.html', [
+        { path: 'images/image1.png', bytes: grid },
+        { path: 'images/image2.gif', bytes: Buffer.from('GIF89a synthetic') },
+      ]),
       options,
     );
-    const image = '../../../assets/generated/synthetic-document/image-001.png';
+    const image = (index: number) =>
+      `../../../assets/generated/synthetic-document/image-00${index}.png`;
 
-    expect(result.croppedImages).toBe(2);
-    for (const alt of [
-      'Uncropped',
-      'Cropped at the right and the bottom',
-      'Cropped at the top',
-      'Not framed',
-    ]) {
-      expect(result.body).toContain(`![${alt}](${image})`);
-    }
+    expect(result.croppedImages).toBe(4);
+    expect(result.body).toContain(`![Uncropped](${image(1)})`);
+    expect(result.body).toContain(`![Not framed](${image(1)})`);
+    expect(result.body).toContain(
+      `![Cropped at the right and the bottom](${image(2)})`,
+    );
+    expect(result.body).toContain(`![Cropped at the top](${image(3)})`);
+    expect(result.assets).toHaveLength(4);
+    expect(result.assets[0]?.bytes).toEqual(grid);
+    // 427 of 624 and 258 of 333 CSS pixels of a 64 by 32 file.
+    expect(gridPositions(result.assets[1]?.bytes ?? grid)).toMatchObject({
+      width: 43,
+      height: 24,
+      positions: gridRectangle(0, 0, 43, 24),
+    });
+    // The frame starts 842 of 2048 CSS pixels down: row 14 of 32.
+    expect(gridPositions(result.assets[2]?.bytes ?? grid)).toMatchObject({
+      width: 64,
+      height: 18,
+      positions: gridRectangle(0, 14, 64, 18),
+    });
+
+    // A crop the site cannot apply publishes the image as it is, and says so.
+    expect(result.body).toContain(`![Cropped and rotated](${image(1)})`);
+    expect(result.body).toContain(
+      '![Cropped GIF](../../../assets/generated/synthetic-document/image-004.gif)',
+    );
+    expect(result.assets[3]?.bytes).toEqual(Buffer.from('GIF89a synthetic'));
+    expect(result.warnings).toContain('image_crop_not_applied');
 
     const uncropped = convertHtmlArchive(
-      await fixtureEntries('google-image-export.html', assets),
+      await fixtureEntries('google-image-export.html', [
+        { path: 'images/image1.png', bytes: pixel },
+      ]),
       options,
     );
     expect(uncropped.croppedImages).toBe(0);
+    expect(uncropped.warnings).not.toContain('image_crop_not_applied');
   });
 
   it('publishes a heading that holds only an image as a paragraph', async () => {

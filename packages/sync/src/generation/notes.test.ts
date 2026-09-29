@@ -133,29 +133,24 @@ describe('createNotes', () => {
     ]);
   });
 
-  it('notes the images cropped in Google Docs', () => {
+  it('notes a crop shown whole, and not one applied', () => {
     const notes = createNotes(
       corpus([
-        item('cropped', 'Plan', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
-        item('whole', 'Guide', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('whole', 'Plan', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('cropped', 'Guide', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
       ]),
       manifestOf([
         {
-          ...record('cropped', 'team/plan'),
-          undescribedImages: 0,
-          croppedImages: 2,
+          ...record('whole', 'team/plan', ['image_crop_not_applied']),
+          croppedImages: 1,
         },
-        {
-          ...record('whole', 'team/guide'),
-          undescribedImages: 0,
-          croppedImages: 0,
-        },
+        { ...record('cropped', 'team/guide'), croppedImages: 2 },
       ]),
     );
 
-    expect(
-      notes.map(({ note, name, detail }) => ({ note, name, detail })),
-    ).toEqual([{ note: 'image-cropped', name: 'Plan', detail: '2 images' }]);
+    expect(notes.map(({ note, name }) => ({ note, name }))).toEqual([
+      { note: 'image-crop-not-applied', name: 'Plan' },
+    ]);
   });
 
   it('notes images larger than the limit a project sets', () => {

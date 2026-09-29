@@ -24,6 +24,11 @@ import { runBasicMarkdownSync } from './run-sync.js';
 import { readSourceTitle } from './titles/source-title.js';
 import { createStoredZipFixture } from './test-support/create-zip-fixture.js';
 import {
+  gridPng,
+  gridPositions,
+  gridRectangle,
+} from './test-support/png-fixture.js';
+import {
   testSiteConfiguration,
   testSyncContext,
 } from './test-support/project-fixture.js';
@@ -977,6 +982,96 @@ describe('basic Markdown sync', () => {
     const raised = await run(3);
     expect(raised.report.summary.exported).toBe(0);
     expect(large(raised)).toEqual([]);
+  });
+
+  it('crops, once, an image an earlier version published whole', async () => {
+    const repository = await mkdtemp(resolve(tmpdir(), 'kb-sync-crop-'));
+    temporaryDirectories.push(repository);
+    const grid = gridPng(64, 32);
+    const archiveWith = (image: string) =>
+      createStoredZipFixture([
+        {
+          path: 'document.html',
+          bytes: `<h1>Architecture</h1><p>Body with media.</p>${image}`,
+        },
+        { path: 'images/grid.png', bytes: grid },
+      ]);
+    // The left half, framed as Google's export frames a crop.
+    const cropped =
+      '<span style="overflow: hidden; display: inline-block; width: 312.00px; height: 333.00px;"><img alt="Grid" src="images/grid.png" style="width: 624.00px; height: 333.00px; margin-left: 0.00px; margin-top: 0.00px;"></span>';
+    const run = (archive: Uint8Array) =>
+      runBasicMarkdownSync(
+        testSyncContext(repository),
+        configuration,
+        tokenProvider,
+        { dryRun: false, full: false },
+        {
+          inventoryResult: inventory(),
+          markdownExporter: {
+            exportMarkdown: () =>
+              Promise.resolve(
+                new TextEncoder().encode(
+                  '# Architecture\n\n![temporary](data:image/png;base64,fixture)\n',
+                ),
+              ),
+            exportHtmlZip: () => Promise.resolve(archive),
+          },
+          documentInspector: {
+            inspectDocument: () =>
+              Promise.resolve({
+                hasEmbeddedDrawings: false,
+                hasImages: true,
+                inlineObjectCount: 1,
+                positionedObjectCount: 0,
+                tabCount: 1,
+              }),
+          },
+          now: () => new Date(firstTimestamp),
+        },
+      );
+    const manifestPath = resolve(repository, 'data/sync-manifest.json');
+    const imagePath = resolve(
+      repository,
+      'src/assets/generated/doc-one/image-001.png',
+    );
+    type Recorded = {
+      documents: Record<
+        string,
+        { croppedImages?: number; imageVersion?: number }
+      >;
+    };
+
+    // What 0.12.0 left: the whole image, a counted crop, no image version.
+    await run(archiveWith('<img alt="Grid" src="images/grid.png">'));
+    const manifest = JSON.parse(
+      await readFile(manifestPath, 'utf8'),
+    ) as Recorded;
+    const recorded = manifest.documents['doc-one'];
+    if (recorded) {
+      recorded.croppedImages = 1;
+      delete recorded.imageVersion;
+    }
+    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+    expect(gridPositions(await readFile(imagePath)).width).toBe(64);
+
+    // Nothing changed in Drive; the crop is applied on the next sync.
+    const upgraded = await run(archiveWith(cropped));
+    expect(upgraded.report.summary.exported).toBe(1);
+    expect(upgraded.report.summary.changed).toBe(1);
+    expect(gridPositions(await readFile(imagePath))).toMatchObject({
+      width: 32,
+      height: 32,
+      positions: gridRectangle(0, 0, 32, 32),
+    });
+    expect(
+      (JSON.parse(await readFile(manifestPath, 'utf8')) as Recorded).documents[
+        'doc-one'
+      ],
+    ).toMatchObject({ croppedImages: 1, imageVersion: 1 });
+
+    const settled = await run(archiveWith(cropped));
+    expect(settled.report.summary.exported).toBe(0);
+    expect(settled.outputChanged).toBe(false);
   });
 
   it('rewrites corpus links and restores an external link after target removal', async () => {

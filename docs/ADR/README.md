@@ -53,5 +53,7 @@ Rejected
 - ADR-028: make every sync legible, grouped by what to do.
 - ADR-029: say when an image has no alt text.
 - ADR-030: note images cropped in Google Docs.
+- ADR-031: apply the crop Google Docs makes to an image. Supersedes ADR-030 in
+  part.
 
 Create a new ADR by copying `000-template.md`.

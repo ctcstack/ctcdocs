@@ -2,6 +2,23 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Changed
+
+- An image cropped in Google Docs is published cropped, as Docs shows it,
+  instead of whole with the part cropped away. The crop is applied to the
+  file without loss, with the image's color profile and none of its
+  metadata, by `fast-png`, a new dependency of the sync. See
+  [ADR-031](docs/ADR/031-apply-the-crop-google-docs-makes.md).
+- A cropped image the site cannot crop, a file other than a PNG or an image
+  also rotated, is published as it is, with the note "A cropped image is
+  shown whole". It replaces the note "An image is cropped in Google Docs",
+  which a crop applied no longer needs.
+- The first sync after upgrading exports once more every document whose
+  cropped images 0.12.0 published whole, and rewrites them cropped. The
+  manifest records the image processing as `imageVersion`.
+
 ## 0.12.0
 
 ### Added

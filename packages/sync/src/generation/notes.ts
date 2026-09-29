@@ -27,13 +27,13 @@ import { slugifySegment } from '../slug.js';
 import { describeFileType, driveUrl, folderLabels } from './unpublished.js';
 
 export type NoteCode =
-  | 'image-cropped'
   | 'duplicate-name'
   | 'duplicate-order'
   | 'several-landing-documents'
   | 'unread-order-number'
   | 'ignored-folder-missing'
   | 'image-removed'
+  | 'image-crop-not-applied'
   | 'link-removed'
   | 'heading-link-shortened'
   | 'table-merge-removed'
@@ -54,11 +54,11 @@ export interface NoteKind {
 /** In the order the page shows them: what readers notice first. */
 export const NOTE_KINDS: readonly NoteKind[] = [
   {
-    code: 'image-cropped',
-    title: 'An image is cropped in Google Docs',
+    code: 'image-crop-not-applied',
+    title: 'A cropped image is shown whole',
     action: 'Check what was cropped away',
     instruction:
-      'The site shows the image as it was inserted, without the crop made in Google Docs, so readers and AI agents see the part cropped away too. Check that nothing in that part should stay out of the documentation. To show only what you kept, crop the image before inserting it.',
+      'The image is cropped in Google Docs in a way the site cannot repeat: it is not a PNG, or it is also rotated. So the site shows it as it was inserted, the part cropped away included, to readers and to AI agents. Check that nothing in that part should stay out of the documentation. To show only what you kept, crop the image before inserting it, or insert it as a PNG.',
   },
   {
     code: 'duplicate-name',
@@ -163,6 +163,7 @@ export const NOTE_KINDS: readonly NoteKind[] = [
 /** What conversion recorded, by the note it is. Routine codes are absent. */
 const WARNING_NOTES: Readonly<Record<string, NoteCode>> = {
   removed_unsafe_image: 'image-removed',
+  image_crop_not_applied: 'image-crop-not-applied',
   removed_unsafe_link: 'link-removed',
   'link:removed_google_anchor': 'heading-link-shortened',
   removed_invalid_table_span: 'table-merge-removed',
@@ -279,17 +280,6 @@ export function createNotes(
     );
     for (const code of codes) {
       notes.push(noteFor(selected, code, record.stableSlug));
-    }
-    const cropped = record.croppedImages ?? 0;
-    if (cropped > 0) {
-      notes.push(
-        noteFor(
-          selected,
-          'image-cropped',
-          record.stableSlug,
-          plural(cropped, 'image'),
-        ),
-      );
     }
     const undescribed = record.undescribedImages ?? 0;
     if (undescribed > 0) {
