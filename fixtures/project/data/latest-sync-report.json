@@ -23,7 +23,7 @@
       "markdown": 5,
       "html": 2
     },
-    "notes": 4
+    "notes": 3
   },
   "reasons": [
     {
@@ -215,10 +215,10 @@
   ],
   "noteKinds": [
     {
-      "code": "image-cropped",
-      "title": "An image is cropped in Google Docs",
+      "code": "image-crop-not-applied",
+      "title": "A cropped image is shown whole",
       "action": "Check what was cropped away",
-      "instruction": "The site shows the image as it was inserted, without the crop made in Google Docs, so readers and AI agents see the part cropped away too. Check that nothing in that part should stay out of the documentation. To show only what you kept, crop the image before inserting it."
+      "instruction": "The image is cropped in Google Docs in a way the site cannot repeat: it is not a PNG, or it is also rotated. So the site shows it as it was inserted, the part cropped away included, to readers and to AI agents. Check that nothing in that part should stay out of the documentation. To show only what you kept, crop the image before inserting it, or insert it as a PNG."
     },
     {
       "code": "duplicate-name",
@@ -333,19 +333,6 @@
       "slug": "reference/guides/style-guide--244fde",
       "note": "duplicate-name",
       "detail": "Also in this folder: “Style guide” (Google Docs)"
-    },
-    {
-      "id": "doc-screenshots",
-      "name": "Screenshots",
-      "folderPath": [
-        "Reference"
-      ],
-      "type": "Google Docs",
-      "sourceUrl": "https://drive.google.com/open?id=doc-screenshots",
-      "lastEditedBy": "Robin Sample",
-      "slug": "reference/screenshots",
-      "note": "image-cropped",
-      "detail": "1 image"
     },
     {
       "id": "doc-screenshots",
