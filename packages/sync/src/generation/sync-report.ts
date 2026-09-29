@@ -176,7 +176,14 @@ export function recordedHeldDocuments(
   } catch {
     return recorded;
   }
-  const report = syncReportSchema.safeParse(parsed);
+  /*
+   * Only the list this reads is checked: a report an earlier version wrote
+   * may name a note kind since retired, which says nothing about what it held
+   * back.
+   */
+  const report = syncReportSchema
+    .pick({ schemaVersion: true, unpublished: true })
+    .safeParse(parsed);
   if (!report.success) {
     return recorded;
   }

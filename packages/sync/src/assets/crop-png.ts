@@ -8,7 +8,11 @@
  * codec is plain JavaScript, so a file comes out byte for byte the same on
  * any machine.
  */
+import { inflateSync } from 'node:zlib';
+
 import { convertIndexedToRgb, decode, encode } from 'fast-png';
+
+import { PNG_SIGNATURE } from './validate-asset.js';
 
 /** How the export draws a cropped image in its frame, in CSS pixels. */
 export interface CropFrame {
@@ -56,7 +60,50 @@ const COLOR_CHUNKS: ReadonlySet<string> = new Set([
 /** The deflate level the crop is encoded at: the smallest file. */
 const ZLIB_LEVEL = 9;
 
-const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+/** Samples per pixel, by PNG color type. */
+const SAMPLES_BY_COLOR_TYPE: Readonly<Record<number, number>> = {
+  0: 1,
+  2: 3,
+  3: 1,
+  4: 2,
+  6: 4,
+};
+
+/** Adam7's seven passes: the first pixel's x and y, then the steps between. */
+const ADAM7_PASSES = [
+  [0, 0, 8, 8],
+  [4, 0, 8, 8],
+  [0, 4, 4, 8],
+  [2, 0, 4, 4],
+  [0, 2, 2, 4],
+  [1, 0, 2, 2],
+  [0, 1, 1, 2],
+] as const;
+
+/**
+ * The bytes a PNG's image data inflates to, as its header describes it: a
+ * filter byte and the packed samples of each row, of each pass if interlaced.
+ */
+function inflatedSize(
+  width: number,
+  height: number,
+  bitsPerPixel: number,
+  interlaced: boolean,
+): number {
+  const rows = (columns: number, count: number) =>
+    columns <= 0 || count <= 0
+      ? 0
+      : count * (1 + Math.ceil((columns * bitsPerPixel) / 8));
+  if (!interlaced) {
+    return rows(width, height);
+  }
+  return ADAM7_PASSES.reduce(
+    (total, [x, y, stepX, stepY]) =>
+      total +
+      rows(Math.ceil((width - x) / stepX), Math.ceil((height - y) / stepY)),
+    0,
+  );
+}
 
 /**
  * The pixels of a file `fileWidth` by `fileHeight` that the frame shows.
@@ -157,7 +204,33 @@ export function cropPng(
   );
   const width = headerView.getUint32(8);
   const height = headerView.getUint32(12);
-  if (width * height > MAX_DECODED_PIXELS) {
+  const samples = SAMPLES_BY_COLOR_TYPE[header.bytes[17] ?? -1];
+  const bitDepth = header.bytes[16] ?? 0;
+  if (width * height > MAX_DECODED_PIXELS || samples === undefined) {
+    return undefined;
+  }
+  /*
+   * The decoder inflates the image data without a limit, so a small file
+   * could inflate to far more than its pixels. It is inflated here first, up
+   * to what the header describes, and refused beyond it.
+   */
+  try {
+    inflateSync(
+      Buffer.concat(
+        chunks
+          .filter((chunk) => chunk.type === 'IDAT')
+          .map((chunk) => chunk.bytes.subarray(8, chunk.bytes.length - 4)),
+      ),
+      {
+        maxOutputLength: inflatedSize(
+          width,
+          height,
+          samples * bitDepth,
+          header.bytes[20] === 1,
+        ),
+      },
+    );
+  } catch {
     return undefined;
   }
   const rectangle = visiblePixels(frame, width, height);
@@ -196,18 +269,23 @@ export function cropPng(
     pixels.set(source.subarray(from, from + rowLength), row * rowLength);
   }
 
-  const encoded = readChunks(
-    encode(
-      {
-        width: rectangle.width,
-        height: rectangle.height,
-        data: pixels,
-        channels,
-        depth: depth === 16 ? 16 : 8,
-      },
-      { zlib: { level: ZLIB_LEVEL } },
-    ),
-  );
+  let encoded: Chunk[] | undefined;
+  try {
+    encoded = readChunks(
+      encode(
+        {
+          width: rectangle.width,
+          height: rectangle.height,
+          data: pixels,
+          channels,
+          depth: depth === 16 ? 16 : 8,
+        },
+        { zlib: { level: ZLIB_LEVEL } },
+      ),
+    );
+  } catch {
+    return undefined;
+  }
   if (!encoded?.[0] || encoded[0].type !== 'IHDR') {
     return undefined;
   }

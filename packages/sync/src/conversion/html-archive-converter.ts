@@ -283,25 +283,56 @@ function rotation(transform: string | undefined): number {
   return angle.endsWith('rad') ? Number(angle.slice(0, -3)) : Number.NaN;
 }
 
+/** Inline elements that may stand between an image and the frame around it. */
+const INLINE_WRAPPERS: ReadonlySet<string> = new Set([
+  'a',
+  'code',
+  'del',
+  'em',
+  'span',
+  'strong',
+  'sub',
+  'sup',
+]);
+
+/**
+ * The span with overflow hidden that frames the image, through any inline
+ * element that wraps it, such as a link.
+ */
+function frameAround(image: Element): Element | undefined {
+  for (
+    let ancestor = image.parent;
+    ancestor instanceof Element &&
+    INLINE_WRAPPERS.has(ancestor.name.toLocaleLowerCase('en'));
+    ancestor = ancestor.parent
+  ) {
+    if (
+      ancestor.name.toLocaleLowerCase('en') === 'span' &&
+      styleDeclarations(ancestor.attribs.style).get('overflow') === 'hidden'
+    ) {
+      return ancestor;
+    }
+  }
+  return undefined;
+}
+
 /**
  * How Google's HTML export crops the image, if it does (ADR-030, ADR-031).
  * The file is whole: the export frames it in a span with overflow hidden,
  * draws it larger than the frame or moves it with a negative margin, and the
  * part outside the frame is what the editor cropped away. `rotated` when the
- * image is also turned, which the crop's frame then does not describe.
+ * image is also turned, which the crop's frame then does not describe;
+ * `unreadable` when the sizes are not in pixels, so whether it is cropped
+ * cannot be told.
  */
-function readCrop(image: Element): CropFrame | 'rotated' | undefined {
-  const frame = image.parent;
-  if (
-    !(frame instanceof Element) ||
-    frame.name.toLocaleLowerCase('en') !== 'span'
-  ) {
+function readCrop(
+  image: Element,
+): CropFrame | 'rotated' | 'unreadable' | undefined {
+  const frame = frameAround(image);
+  if (!frame) {
     return undefined;
   }
   const frameStyle = styleDeclarations(frame.attribs.style);
-  if (frameStyle.get('overflow') !== 'hidden') {
-    return undefined;
-  }
   const imageStyle = styleDeclarations(image.attribs.style);
   const frameWidth = pixels(frameStyle.get('width'));
   const frameHeight = pixels(frameStyle.get('height'));
@@ -315,7 +346,7 @@ function readCrop(image: Element): CropFrame | 'rotated' | undefined {
     imageWidth === undefined ||
     imageHeight === undefined
   ) {
-    return undefined;
+    return 'unreadable';
   }
   const cropped =
     left < -CROP_TOLERANCE_PIXELS ||
@@ -460,11 +491,13 @@ export function convertHtmlArchive(
     /*
      * A crop is applied to the file, so no pixel cropped away is published
      * (ADR-031). One the site cannot reproduce, on a file other than a PNG or
-     * an image also rotated, publishes the image as it is and says so: an
-     * image left out would be information lost.
+     * an image also rotated, or a frame it cannot read, publishes the image as
+     * it is and says so: an image left out would be information lost.
      */
     const crop = crops.get(element);
-    if (crop) {
+    if (crop === 'unreadable') {
+      warnings.add('image_crop_not_applied');
+    } else if (crop) {
       croppedImages += 1;
       const bytes =
         crop !== 'rotated' && validated.extension === 'png'

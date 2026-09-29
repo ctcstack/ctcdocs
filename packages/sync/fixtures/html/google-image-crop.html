@@ -64,6 +64,44 @@
       /></span>
     </p>
     <p class="c1"><img alt="Not framed" src="images/image1.png" /></p>
+    <!-- A crop framed around a link: the same crop, found through the link. -->
+    <p class="c1">
+      <span
+        style="
+          overflow: hidden;
+          display: inline-block;
+          width: 427px;
+          height: 258px;
+        "
+        ><a href="https://example.invalid/linked"
+          ><img
+            alt="Cropped and linked"
+            src="images/image1.png"
+            style="
+              width: 624px;
+              height: 333px;
+              margin-left: 0px;
+              margin-top: 0px;
+            "
+            title="" /></a
+      ></span>
+    </p>
+    <!-- A frame whose sizes are not in pixels: the site cannot tell. -->
+    <p class="c1">
+      <span
+        style="
+          overflow: hidden;
+          display: inline-block;
+          width: 300pt;
+          height: 200pt;
+        "
+        ><img
+          alt="Framed in points"
+          src="images/image1.png"
+          style="width: 468pt; height: 250pt; margin-left: 0pt; margin-top: 0pt"
+          title=""
+      /></span>
+    </p>
     <!--
       Crops the site cannot apply to the file: one also rotated, one not a PNG.
     -->
