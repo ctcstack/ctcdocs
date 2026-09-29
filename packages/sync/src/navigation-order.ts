@@ -58,6 +58,18 @@ function landingRank(
   return rank === -1 ? undefined : rank;
 }
 
+/**
+ * Whether a title is one of the project's landing titles, whatever its case.
+ * A folder with such a document opens with it; one without opens with its
+ * own page (ADR-035).
+ */
+export function isLandingTitle(
+  title: string,
+  landingTitles: readonly string[],
+): boolean {
+  return landingRank(title, landingTitles) !== undefined;
+}
+
 function sortKey(
   sibling: NavigationSibling,
   landingTitles: readonly string[],

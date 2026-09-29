@@ -1,6 +1,9 @@
 # ADR-014: Give every Drive folder an address
 
-- Status: Accepted
+- Status: Accepted; superseded in part by
+  [ADR-035](035-open-a-folder-with-its-page-when-it-has-no-landing-document.md),
+  under which the page opens its folder's sidebar group when the folder has
+  no landing document
 - Date: 2026-08-01
 - Owners: CTCDocs maintainers
 - Supersedes: none
