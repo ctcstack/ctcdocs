@@ -23,6 +23,14 @@ All three packages share a version and are released together.
   `tsconfig.platform.json`: the Markdown and asset routes, the `llms.txt`
   routes, the corpus and section helpers, and the content configuration.
   Nothing type-checked them before.
+- The content health page checks a Google Doc's headings: "A heading skips a
+  level", judged as the page shows it, and "Two headings say the same", both
+  under "Worth a look", with a link to the line in Google Docs. See
+  [ADR-034](docs/ADR/034-check-headings-summaries-and-outside-links.md).
+- Two notes: "The page has no summary", for a Google Doc with no paragraph of
+  plain text, and "A link leads to a Google file that is not on this site",
+  for a link to a Google Doc or Drive file outside the published folders.
+  Spreadsheets, slides and folders are not counted.
 
 ### Changed
 
@@ -50,6 +58,12 @@ All three packages share a version and are released together.
   phone widths, with the search dialog and its backdrop open, with the mobile
   menu open, across the first 25 keyboard focus stops, under the pointer on
   the first 20 links and controls of two pages, and in print.
+- A link to a Google Doc copied from a signed-in account
+  (`/document/u/<n>/d/…`) and a link to a Drive file (`/file/d/…`) now open
+  the site's page when the file is published, such as a PDF.
+- The source facts in `data/title-report.json` are version 4. The first normal
+  sync after upgrading exports every Google Doc once more to read them: it
+  takes as long as a full sync, and changes no page that did not change.
 
 ## 0.13.1
 

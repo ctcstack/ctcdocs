@@ -7,6 +7,7 @@ import {
   classifyTitleMatch,
   createTitleReport,
   nameFeatures,
+  outdatedTitleFacts,
   recordedTitleFacts,
   serializeTitleReport,
   similarity,
@@ -247,6 +248,76 @@ describe('the checks a document fails', () => {
     ]);
   });
 
+  it('reports a heading that skips a level, as the page shows it', () => {
+    const report = createTitleReport([
+      input({
+        source: source(
+          ['TITLE', 'Pricing', 'h.title'],
+          // The page shows a Heading 1 beside a Heading 2, so this is no skip.
+          ['HEADING_1', 'Rates', 'h.rates'],
+          ['HEADING_3', 'Discounts', 'h.discounts'],
+          ['HEADING_5', 'Seasonal', 'h.seasonal'],
+          ['HEADING_2', 'Terms', 'h.terms'],
+          ['HEADING_4', 'Notice', 'h.notice'],
+        ),
+      }),
+    ]);
+    expect(report.documents[0]?.issues).toEqual([
+      {
+        check: 'heading-skips-level',
+        text: 'Seasonal',
+        detail: 'Heading 5 after Heading 3',
+        headingId: 'h.seasonal',
+      },
+      {
+        check: 'heading-skips-level',
+        text: 'Notice',
+        detail: 'Heading 4 after Heading 2',
+        headingId: 'h.notice',
+      },
+    ]);
+  });
+
+  it('reads the title as the level above the first heading', () => {
+    const report = createTitleReport([
+      input({
+        source: source(
+          ['TITLE', 'Pricing', 'h.title'],
+          ['HEADING_3', 'Scope', 'h.scope'],
+        ),
+      }),
+    ]);
+    expect(report.documents[0]?.issues).toEqual([
+      {
+        check: 'heading-skips-level',
+        text: 'Scope',
+        detail: 'Heading 3 under the title',
+        headingId: 'h.scope',
+      },
+    ]);
+  });
+
+  it('reports a heading with the words of an earlier one', () => {
+    const report = createTitleReport([
+      input({
+        source: source(
+          ['TITLE', 'Pricing', 'h.title'],
+          ['HEADING_1', 'Setup', 'h.setup'],
+          ['HEADING_2', 'Steps', 'h.steps'],
+          ['HEADING_1', 'Upgrade', 'h.upgrade'],
+          ['HEADING_2', '  STEPS ', 'h.steps-again'],
+        ),
+      }),
+    ]);
+    expect(report.documents[0]?.issues).toEqual([
+      {
+        check: 'heading-repeated',
+        text: 'STEPS',
+        headingId: 'h.steps-again',
+      },
+    ]);
+  });
+
   it('reports an empty document and nothing about its title', () => {
     expect(checksOf({ source: source() })).toEqual(['empty-document']);
   });
@@ -307,6 +378,8 @@ describe('the title report', () => {
       'note',
       'note',
       'note',
+      'note',
+      'note',
     ]);
   });
 
@@ -343,6 +416,22 @@ describe('the title report', () => {
       removedTitleHeading: false,
       lastEditedBy: null,
     });
+  });
+
+  it('names the documents whose facts an earlier shape recorded', () => {
+    const current = serializeTitleReport(createTitleReport([input()]));
+    const earlier = JSON.stringify({
+      documents: [
+        { id: 'old', source: { version: 3, firstBlocks: [] } },
+        { id: 'never-inspected', source: null },
+        { id: 'unversioned', source: { firstBlocks: [] } },
+      ],
+    });
+
+    expect([...outdatedTitleFacts(earlier)]).toEqual(['old']);
+    expect(outdatedTitleFacts(current).size).toBe(0);
+    expect(outdatedTitleFacts(undefined).size).toBe(0);
+    expect(outdatedTitleFacts('not json').size).toBe(0);
   });
 
   it('prints counts, and names documents only when asked', () => {

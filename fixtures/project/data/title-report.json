@@ -44,6 +44,18 @@
       "instruction": "Only the document's name takes the Title style. Change the lines below to Format → Paragraph styles → Heading 1."
     },
     {
+      "code": "heading-skips-level",
+      "severity": "note",
+      "title": "A heading skips a level",
+      "instruction": "The heading is more than one level below the heading before it, such as a Heading 4 straight after a Heading 2. Screen readers, the contents list beside the page and AI agents take it for part of a section that is not there. Change it to the level in between, or add the heading it belongs under."
+    },
+    {
+      "code": "heading-repeated",
+      "severity": "note",
+      "title": "Two headings say the same",
+      "instruction": "An earlier heading in the document has the same words. A link to a section, the contents list beside the page and an AI agent quoting a section cannot tell the two apart. If they are different sections, name each for what it covers; if one repeats the other, merge them."
+    },
+    {
       "code": "file-name-copy-of",
       "severity": "note",
       "title": "The file name starts with “Copy of”",
@@ -69,22 +81,24 @@
     }
   ],
   "summary": {
-    "documents": 7,
-    "inspected": 7,
+    "documents": 8,
+    "inspected": 8,
     "conforming": 0,
     "severity": {
       "fix": 0,
-      "convention": 7,
-      "note": 0
+      "convention": 8,
+      "note": 1
     },
     "checks": {
       "heading-mixes-alphabets": 0,
       "heading-from-another-document": 0,
       "empty-document": 0,
-      "title-styled-as-heading-1": 6,
+      "title-styled-as-heading-1": 7,
       "title-missing": 1,
       "title-not-first": 0,
       "title-style-on-section": 0,
+      "heading-skips-level": 1,
+      "heading-repeated": 1,
       "file-name-copy-of": 0,
       "file-name-extension": 0,
       "file-name-underscores": 0,
@@ -93,7 +107,7 @@
     "firstBlock": {
       "title": 0,
       "subtitle": 0,
-      "heading-1": 7,
+      "heading-1": 8,
       "heading-2": 0,
       "heading-3": 0,
       "heading-4": 0,
@@ -107,12 +121,12 @@
     },
     "candidate": {
       "title": 0,
-      "heading-1": 7,
+      "heading-1": 8,
       "none": 0
     },
-    "candidateOpensDocument": 7,
+    "candidateOpensDocument": 8,
     "match": {
-      "identical": 6,
+      "identical": 7,
       "normalized": 0,
       "reordered": 0,
       "contains": 0,
@@ -121,11 +135,58 @@
       "different": 1,
       "none": 0
     },
-    "removedTitleHeading": 6,
+    "removedTitleHeading": 7,
     "severalTitles": 0,
     "severalHeading1": 0
   },
   "documents": [
+    {
+      "id": "doc-contacts",
+      "slug": "handbook/contacts",
+      "name": "Contacts",
+      "title": "Contacts",
+      "folderPath": [
+        "Handbook"
+      ],
+      "lastEditedBy": "Avery Example",
+      "source": {
+        "version": 4,
+        "firstBlocks": [
+          "heading-1",
+          "text"
+        ],
+        "candidate": {
+          "style": "heading-1",
+          "text": "Contacts",
+          "headingId": "h.doc-contacts-0",
+          "blockIndex": 0
+        },
+        "titleCount": 0,
+        "heading1Count": 1,
+        "titles": [],
+        "mixedScriptHeadings": [],
+        "skippedHeadings": [],
+        "repeatedHeadings": []
+      },
+      "removedTitleHeading": true,
+      "match": "identical",
+      "similarity": 1,
+      "nameFeatures": {
+        "orderPrefix": false,
+        "underscorePrefix": false,
+        "underscores": false,
+        "fileExtension": false,
+        "copyOf": false,
+        "extraSpaces": false
+      },
+      "issues": [
+        {
+          "check": "title-styled-as-heading-1",
+          "text": "Contacts",
+          "headingId": "h.doc-contacts-0"
+        }
+      ]
+    },
     {
       "id": "doc-overview",
       "slug": "handbook/overview",
@@ -136,7 +197,7 @@
       ],
       "lastEditedBy": "Avery Example",
       "source": {
-        "version": 3,
+        "version": 4,
         "firstBlocks": [
           "heading-1",
           "text",
@@ -151,7 +212,9 @@
         "titleCount": 0,
         "heading1Count": 1,
         "titles": [],
-        "mixedScriptHeadings": []
+        "mixedScriptHeadings": [],
+        "skippedHeadings": [],
+        "repeatedHeadings": []
       },
       "removedTitleHeading": true,
       "match": "identical",
@@ -180,7 +243,7 @@
       ],
       "lastEditedBy": "Robin Sample",
       "source": {
-        "version": 3,
+        "version": 4,
         "firstBlocks": [
           "heading-1",
           "text",
@@ -195,7 +258,9 @@
         "titleCount": 0,
         "heading1Count": 1,
         "titles": [],
-        "mixedScriptHeadings": []
+        "mixedScriptHeadings": [],
+        "skippedHeadings": [],
+        "repeatedHeadings": []
       },
       "removedTitleHeading": true,
       "match": "identical",
@@ -226,7 +291,7 @@
       ],
       "lastEditedBy": "Avery Example",
       "source": {
-        "version": 3,
+        "version": 4,
         "firstBlocks": [
           "heading-1",
           "text",
@@ -241,7 +306,20 @@
         "titleCount": 0,
         "heading1Count": 1,
         "titles": [],
-        "mixedScriptHeadings": []
+        "mixedScriptHeadings": [],
+        "skippedHeadings": [
+          {
+            "text": "Arrows",
+            "detail": "Heading 4 after Heading 2",
+            "headingId": "h.doc-diagrams-6"
+          }
+        ],
+        "repeatedHeadings": [
+          {
+            "text": "Reading the diagram",
+            "headingId": "h.doc-diagrams-8"
+          }
+        ]
       },
       "removedTitleHeading": true,
       "match": "identical",
@@ -255,6 +333,17 @@
         "extraSpaces": false
       },
       "issues": [
+        {
+          "check": "heading-skips-level",
+          "text": "Arrows",
+          "detail": "Heading 4 after Heading 2",
+          "headingId": "h.doc-diagrams-6"
+        },
+        {
+          "check": "heading-repeated",
+          "text": "Reading the diagram",
+          "headingId": "h.doc-diagrams-8"
+        },
         {
           "check": "title-styled-as-heading-1",
           "text": "Diagrams",
@@ -273,7 +362,7 @@
       ],
       "lastEditedBy": "Robin Sample",
       "source": {
-        "version": 3,
+        "version": 4,
         "firstBlocks": [
           "heading-1",
           "text"
@@ -287,7 +376,9 @@
         "titleCount": 0,
         "heading1Count": 1,
         "titles": [],
-        "mixedScriptHeadings": []
+        "mixedScriptHeadings": [],
+        "skippedHeadings": [],
+        "repeatedHeadings": []
       },
       "removedTitleHeading": true,
       "match": "identical",
@@ -318,7 +409,7 @@
       ],
       "lastEditedBy": "Robin Sample",
       "source": {
-        "version": 3,
+        "version": 4,
         "firstBlocks": [
           "heading-1",
           "text"
@@ -332,7 +423,9 @@
         "titleCount": 0,
         "heading1Count": 1,
         "titles": [],
-        "mixedScriptHeadings": []
+        "mixedScriptHeadings": [],
+        "skippedHeadings": [],
+        "repeatedHeadings": []
       },
       "removedTitleHeading": true,
       "match": "identical",
@@ -361,7 +454,7 @@
       "folderPath": [],
       "lastEditedBy": "Robin Sample",
       "source": {
-        "version": 3,
+        "version": 4,
         "firstBlocks": [
           "heading-1",
           "text",
@@ -376,7 +469,9 @@
         "titleCount": 0,
         "heading1Count": 1,
         "titles": [],
-        "mixedScriptHeadings": []
+        "mixedScriptHeadings": [],
+        "skippedHeadings": [],
+        "repeatedHeadings": []
       },
       "removedTitleHeading": false,
       "match": "different",
@@ -405,7 +500,7 @@
       "folderPath": [],
       "lastEditedBy": "Avery Example",
       "source": {
-        "version": 3,
+        "version": 4,
         "firstBlocks": [
           "heading-1",
           "text",
@@ -420,7 +515,9 @@
         "titleCount": 0,
         "heading1Count": 1,
         "titles": [],
-        "mixedScriptHeadings": []
+        "mixedScriptHeadings": [],
+        "skippedHeadings": [],
+        "repeatedHeadings": []
       },
       "removedTitleHeading": true,
       "match": "identical",

@@ -65,15 +65,22 @@ function parseGoogleDocumentLink(
 
   let fileId: string | null = null;
   if (url.hostname === 'docs.google.com') {
-    const match = /^\/document\/d\/([^/]+)\/(?:edit|view)\/?$/u.exec(
+    // `/u/<n>/` names the signed-in account a link was copied from.
+    const match =
+      /^\/document(?:\/u\/\d+)?\/d\/([^/]+)\/(?:edit|view)\/?$/u.exec(
+        url.pathname,
+      );
+    fileId = match?.[1] ?? null;
+  } else if (url.hostname === 'drive.google.com') {
+    // A Drive file, such as a PDF this site publishes (ADR-027).
+    const file = /^\/file\/d\/([^/]+)(?:\/(?:view|edit|preview))?\/?$/u.exec(
       url.pathname,
     );
-    fileId = match?.[1] ?? null;
-  } else if (
-    url.hostname === 'drive.google.com' &&
-    url.pathname.replace(/\/+$/u, '') === '/open'
-  ) {
-    fileId = url.searchParams.get('id');
+    fileId =
+      file?.[1] ??
+      (url.pathname.replace(/\/+$/u, '') === '/open'
+        ? url.searchParams.get('id')
+        : null);
   }
   if (!fileId || !GOOGLE_FILE_ID.test(fileId)) {
     return undefined;
@@ -150,10 +157,19 @@ function siteLinkTarget(
   return shortId ? { shortId, fragment: url.hash } : undefined;
 }
 
+interface RewrittenUrl {
+  url: string;
+  removedFragment: boolean;
+}
+
+/**
+ * What becomes of a link: rewritten to a page of the site, kept, or kept and
+ * noted as leading to a Google file the site does not publish (ADR-034).
+ */
 function rewriteUrl(
   value: string,
   targets: InternalLinkTargets,
-): { url: string; removedFragment: boolean } | undefined {
+): { rewritten?: RewrittenUrl; outsideSite: boolean } {
   /*
    * A Google redirect is unwrapped before anything else is decided about the
    * link. It is what makes a wrapped link between two documents in this corpus
@@ -170,22 +186,34 @@ function rewriteUrl(
   if (googleLink && shortId) {
     const fragment = safeFragment(googleLink.fragment);
     return {
-      url: `${permanentLinkPath(shortId)}${fragment.fragment}`,
-      removedFragment: fragment.removed,
+      rewritten: {
+        url: `${permanentLinkPath(shortId)}${fragment.fragment}`,
+        removedFragment: fragment.removed,
+      },
+      outsideSite: false,
     };
   }
 
   const siteLink = siteLinkTarget(target, targets);
   if (siteLink) {
     return {
-      url: `${permanentLinkPath(siteLink.shortId)}${siteLink.fragment}`,
-      removedFragment: false,
+      rewritten: {
+        url: `${permanentLinkPath(siteLink.shortId)}${siteLink.fragment}`,
+        removedFragment: false,
+      },
+      outsideSite: false,
     };
   }
 
   // Everything else keeps pointing where it pointed — at the real address
-  // rather than through Google.
-  return unwrapped ? { url: unwrapped, removedFragment: false } : undefined;
+  // rather than through Google. A Google Doc or Drive file that is not in the
+  // corpus is one a reader of the site, or an agent, cannot open from here.
+  return {
+    ...(unwrapped
+      ? { rewritten: { url: unwrapped, removedFragment: false } }
+      : {}),
+    outsideSite: googleLink !== undefined,
+  };
 }
 
 function walk(
@@ -210,7 +238,10 @@ export function rewriteInternalGoogleLinks(
   const warnings = new Set<string>();
   walk(tree, (node) => {
     if (node.type === 'link') {
-      const rewritten = rewriteUrl(node.url, targets);
+      const { rewritten, outsideSite } = rewriteUrl(node.url, targets);
+      if (outsideSite) {
+        warnings.add('link:outside_site');
+      }
       if (rewritten) {
         (node as Link).url = rewritten.url;
         if (rewritten.removedFragment) {
@@ -222,7 +253,13 @@ export function rewriteInternalGoogleLinks(
       let changed = false;
       $('a[href]').each((_, anchor) => {
         const href = $(anchor).attr('href');
-        const rewritten = href ? rewriteUrl(href, targets) : undefined;
+        if (!href) {
+          return;
+        }
+        const { rewritten, outsideSite } = rewriteUrl(href, targets);
+        if (outsideSite) {
+          warnings.add('link:outside_site');
+        }
         if (!rewritten) {
           return;
         }

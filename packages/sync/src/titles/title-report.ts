@@ -263,6 +263,23 @@ function findIssues(
         ...(heading.tabId ? { tabId: heading.tabId } : {}),
       });
     }
+    for (const heading of source.skippedHeadings) {
+      issues.push({
+        check: 'heading-skips-level',
+        text: heading.text,
+        detail: heading.detail,
+        ...withHeadingId(heading.headingId),
+        ...(heading.tabId ? { tabId: heading.tabId } : {}),
+      });
+    }
+    for (const heading of source.repeatedHeadings) {
+      issues.push({
+        check: 'heading-repeated',
+        text: heading.text,
+        ...withHeadingId(heading.headingId),
+        ...(heading.tabId ? { tabId: heading.tabId } : {}),
+      });
+    }
 
     const opening =
       source.candidate?.blockIndex === 0 ? source.candidate : undefined;
@@ -481,6 +498,21 @@ const sourceTitleFactsSchema = z.object({
       tabId: z.string().optional(),
     }),
   ),
+  skippedHeadings: z.array(
+    z.object({
+      text: z.string(),
+      detail: z.string(),
+      headingId: z.string().optional(),
+      tabId: z.string().optional(),
+    }),
+  ),
+  repeatedHeadings: z.array(
+    z.object({
+      text: z.string(),
+      headingId: z.string().optional(),
+      tabId: z.string().optional(),
+    }),
+  ),
 });
 
 const checkCodes = CHECKS.map((check) => check.code) as [
@@ -537,6 +569,39 @@ interface RecordedFacts {
   source: SourceTitleFacts | null;
   removedTitleHeading: boolean | null;
   lastEditedBy: string | null;
+}
+
+/**
+ * Documents whose recorded facts an earlier shape wrote. A normal sync exports
+ * them again, once, so a new check reaches every document without waiting for
+ * a full sync (ADR-034). A document with no facts at all is left alone: its
+ * inspection did not run, and forcing it would export it on every run.
+ */
+export function outdatedTitleFacts(content: string | undefined): Set<string> {
+  const outdated = new Set<string>();
+  if (content === undefined) {
+    return outdated;
+  }
+  let documents: unknown;
+  try {
+    documents = (JSON.parse(content) as { documents?: unknown }).documents;
+  } catch {
+    return outdated;
+  }
+  if (!Array.isArray(documents)) {
+    return outdated;
+  }
+  for (const document of documents as Array<Record<string, unknown>>) {
+    const version = (document.source as { version?: unknown } | null)?.version;
+    if (
+      typeof document.id === 'string' &&
+      typeof version === 'number' &&
+      version < SOURCE_FACTS_VERSION
+    ) {
+      outdated.add(document.id);
+    }
+  }
+  return outdated;
 }
 
 /**

@@ -8,7 +8,7 @@
 "googleFileId": "doc-diagrams"
 "googleModifiedTime": "2026-02-07T10:05:00.000Z"
 "syncedAt": "2026-02-10T06:00:00.000Z"
-"contentHash": "sha256:c47cf18d16d9c8b605f26a1058fe125e70632f8bb19b9f972c459806aedec9fb"
+"contentHash": "sha256:837d123de2af4978d0cbef2f80dad7769a7ee8a0bf25ebb19747c20e290d366e"
 "folderPath":
   - "Reference"
 "pagefind": true
@@ -27,3 +27,15 @@ flowchart LR
 
 The diagram above is the whole publication path, which is also the order
 the pipeline writes its output in.
+
+## Reading the diagram
+
+Each arrow is one step the pipeline takes on every run.
+
+#### Arrows
+
+An arrow points from what a step reads to what it writes.
+
+## Reading the diagram
+
+The same steps run for a single document and for the whole corpus.

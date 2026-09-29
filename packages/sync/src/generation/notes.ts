@@ -36,12 +36,14 @@ export type NoteCode =
   | 'image-crop-not-applied'
   | 'link-removed'
   | 'heading-link-shortened'
+  | 'link-outside-site'
   | 'table-merge-removed'
   | 'formatting-removed'
   | 'code-block-unclosed'
   | 'pdf-text-truncated'
   | 'image-undescribed'
-  | 'image-large';
+  | 'image-large'
+  | 'summary-missing';
 
 export interface NoteKind {
   code: NoteCode;
@@ -89,6 +91,13 @@ export const NOTE_KINDS: readonly NoteKind[] = [
       'A link pointed to a heading inside another document. The site links to that document, but not to the heading, so a reader lands at the top of the page.',
   },
   {
+    code: 'link-outside-site',
+    title: 'A link leads to a Google file that is not on this site',
+    action: 'Publish the file, or link a page',
+    instruction:
+      'A link points to a Google Doc or a Drive file outside the published folders. A colleague with access in Drive can open it, but the site cannot show it, and an AI agent reading the site cannot follow it. If the file belongs in the documentation, move it into the published folders; otherwise link to a page of this site where one covers it. Links to spreadsheets, slides and folders are not counted: the site does not publish them.',
+  },
+  {
     code: 'table-merge-removed',
     title: 'A merged table cell was split',
     action: 'Check the table',
@@ -131,6 +140,13 @@ export const NOTE_KINDS: readonly NoteKind[] = [
       'The image file is larger than the size this site notes, so it is slow to open, and an AI agent may be refused it: some AI services take images of a few megabytes at most. Insert a smaller one: a screenshot cropped to what matters before it is inserted, or a photo as JPEG.',
   },
   {
+    code: 'summary-missing',
+    title: 'The page has no summary',
+    action: 'Add an opening sentence',
+    instruction:
+      "The site takes a page's summary from its first paragraph of plain text. This document has none, only headings, lists or tables, so search results, the section page and the index AI agents read show its title alone. Add a sentence under the title that says what the document is for.",
+  },
+  {
     code: 'duplicate-order',
     title: 'Two items share an order number',
     action: 'Renumber one',
@@ -166,6 +182,7 @@ const WARNING_NOTES: Readonly<Record<string, NoteCode>> = {
   image_crop_not_applied: 'image-crop-not-applied',
   removed_unsafe_link: 'link-removed',
   'link:removed_google_anchor': 'heading-link-shortened',
+  'link:outside_site': 'link-outside-site',
   removed_invalid_table_span: 'table-merge-removed',
   removed_unsupported_html: 'formatting-removed',
   unterminated_code_fence: 'code-block-unclosed',
@@ -297,6 +314,10 @@ export function createNotes(
       : undefined;
     if (large) {
       notes.push(noteFor(selected, 'image-large', record.stableSlug, large));
+    }
+    // A PDF's summary is its extracted text, which an editor cannot write.
+    if (record.exportMode !== 'pdf' && !record.description) {
+      notes.push(noteFor(selected, 'summary-missing', record.stableSlug));
     }
   }
 

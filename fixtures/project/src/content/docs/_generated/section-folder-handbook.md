@@ -3,13 +3,15 @@
 "slug": "handbook"
 "shortId": "1a41cd"
 "sourceType": "section-index"
-"contentHash": "sha256:395f9620aaca0fd86e1399c7eed16dda47aabc4bbf34f704618eb8dabf0863bf"
+"contentHash": "sha256:b9643a632a639a72593402f8a7d36d43933fa9f91c1ace0f543ad9e89c808f6c"
 "folderPath": []
 "entries":
   - "kind": "document"
     "slug": "handbook/overview"
   - "kind": "document"
     "slug": "handbook/tables-and-code"
+  - "kind": "document"
+    "slug": "handbook/contacts"
   - "kind": "document"
     "slug": "handbook/scanned-form"
 "pagefind": false
@@ -18,4 +20,5 @@
 
 - [Overview](/handbook/overview/) — The handbook collects the working agreements a new joiner needs in their first week: how documents are published, where drafts live, and which sections are maintained by which team.
 - [Tables and code](/handbook/tables-and-code/) — Two things a documentation platform gets wrong quietly: wide tables that push a phone layout sideways, and code blocks that lose their language.
+- [Contacts](/handbook/contacts/)
 - [Scanned form](/handbook/scanned-form/)

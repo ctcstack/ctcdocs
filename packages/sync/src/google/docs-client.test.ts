@@ -104,12 +104,14 @@ describe('Google Docs structural client', () => {
       positionedObjectCount: 1,
       tabCount: 2,
       titleFacts: {
-        version: 3,
+        version: 4,
         firstBlocks: [],
         titleCount: 0,
         heading1Count: 0,
         titles: [],
         mixedScriptHeadings: [],
+        skippedHeadings: [],
+        repeatedHeadings: [],
       },
     });
     expect(
@@ -183,6 +185,8 @@ describe('Google Docs structural client', () => {
                 content: [
                   paragraph('TITLE', 'Second tab\n'),
                   paragraph('HEADING_2', 'Nеxt steps\n', 'h.next'),
+                  paragraph('HEADING_4', 'Contacts\n', 'h.contacts'),
+                  paragraph('HEADING_2', 'contacts \n', 'h.contacts-again'),
                 ],
               },
             },
@@ -193,7 +197,7 @@ describe('Google Docs structural client', () => {
     ).inspectDocument('doc-id');
 
     expect(result.titleFacts).toEqual({
-      version: 3,
+      version: 4,
       firstBlocks: ['title', 'subtitle', 'table'],
       candidate: {
         style: 'title',
@@ -228,6 +232,22 @@ describe('Google Docs structural client', () => {
           headingId: 'h.next',
           tabId: 'second',
         },
+      ],
+      /*
+       * Each tab is read as a page of its own, from its top-level headings.
+       * A Heading 1 sits at the page's second level, beside a Heading 2, so
+       * the first tab skips nothing; the second goes from 2 to 4.
+       */
+      skippedHeadings: [
+        {
+          text: 'Contacts',
+          detail: 'Heading 4 after Heading 2',
+          headingId: 'h.contacts',
+          tabId: 'second',
+        },
+      ],
+      repeatedHeadings: [
+        { text: 'contacts', headingId: 'h.contacts-again', tabId: 'second' },
       ],
     });
   });
