@@ -98,7 +98,7 @@ test('preflight requires Access denial and service-token admission', async () =>
     },
   });
 
-  assert.equal(calls.length, 6);
+  assert.equal(calls.length, 7);
   assert.deepEqual(calls.at(-1).headers, {
     'CF-Access-Client-Id': 'client-id',
     'CF-Access-Client-Secret': 'client-secret',
@@ -156,6 +156,12 @@ const deployedProduction = ({ missingPaths = () => false } = {}) => {
         headers: { 'content-type': 'text/markdown; charset=utf-8' },
       });
     }
+    if (path === '/llms.txt') {
+      return new Response(
+        '# Example\n\n## Section\n\n- [Guide](/section/guide/index.md)\n',
+        { headers: { 'content-type': 'text/plain; charset=utf-8' } },
+      );
+    }
     if (path === '/favicon.svg') {
       return new Response('<svg/>', {
         headers: { 'content-type': 'image/svg+xml' },
@@ -183,8 +189,61 @@ const postDeployOptions = (fetchImplementation, overrides = {}) => ({
 });
 
 test('post-deploy verifies protected content, search, assets, robots, and 404', async () => {
-  const { fetchImplementation } = deployedProduction();
+  const { fetchImplementation, requested } = deployedProduction();
   await verifyPostDeploy(postDeployOptions(fetchImplementation));
+  assert.ok(requested.includes('/llms.txt'));
+});
+
+test('post-deploy reads an agent index larger than a page', async () => {
+  const { fetchImplementation: deployed } = deployedProduction();
+  const filler = `- [Other](/other/index.md): ${'x'.repeat(80)}\n`.repeat(
+    20_000,
+  );
+  await verifyPostDeploy(
+    postDeployOptions(async (url, init) =>
+      init.headers && new URL(url).pathname === '/llms.txt'
+        ? new Response(`${filler}- [Guide](/section/guide/index.md)\n`, {
+            headers: { 'content-type': 'text/plain; charset=utf-8' },
+          })
+        : deployed(url, init),
+    ),
+  );
+});
+
+test('post-deploy rejects an agent index served without its charset', async () => {
+  const { fetchImplementation: deployed } = deployedProduction();
+  await assert.rejects(
+    verifyPostDeploy(
+      postDeployOptions(
+        async (url, init) =>
+          init.headers && new URL(url).pathname === '/llms.txt'
+            ? new Response('- [Guide](/section/guide/index.md)\n', {
+                headers: { 'content-type': 'text/plain' },
+              })
+            : deployed(url, init),
+        { propagationTimeoutMs: 0 },
+      ),
+    ),
+    /Unexpected content type for \/llms\.txt/u,
+  );
+});
+
+test('post-deploy rejects an agent index that does not list the document', async () => {
+  const { fetchImplementation: deployed } = deployedProduction();
+  await assert.rejects(
+    verifyPostDeploy(
+      postDeployOptions(
+        async (url, init) =>
+          init.headers && new URL(url).pathname === '/llms.txt'
+            ? new Response('# Example\n', {
+                headers: { 'content-type': 'text/plain; charset=utf-8' },
+              })
+            : deployed(url, init),
+        { propagationTimeoutMs: 0 },
+      ),
+    ),
+    /Expected marker was missing from \/llms\.txt/u,
+  );
 });
 
 test('post-deploy waits for a route the new deployment has just added', async () => {
@@ -286,7 +345,7 @@ test('a public portal must answer anonymous readers', async () => {
   });
 
   // No service token is asked for, and none is needed: there is no boundary.
-  assert.equal(requested.length, 5);
+  assert.equal(requested.length, 6);
 });
 
 test('a public portal behind an identity boundary is a defect', async () => {

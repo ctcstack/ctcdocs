@@ -1,6 +1,8 @@
 # ADR-010: Publish a static Markdown web projection
 
-- Status: Accepted
+- Status: Accepted; superseded in part by
+  [ADR-033](033-publish-llms-txt-indexes.md), under which the protected
+  `llms.txt` index is published without waiting for usage evidence
 - Date: 2026-07-31
 - Owners: CTCDocs maintainers
 - Supersedes: none

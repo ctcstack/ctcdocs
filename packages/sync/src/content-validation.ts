@@ -76,7 +76,16 @@ function wranglerConfigurationSchema(site: SiteConfiguration) {
  * can index is a portal nobody finds — so the check inverts rather than
  * disappearing.
  */
-const CONTENT_SURFACES = ['/*.md', '/assets/generated/*'] as const;
+/**
+ * Paths that serve document content. The `llms.txt` indexes carry every
+ * document's title and description (ADR-033), so they are content too.
+ */
+const CONTENT_SURFACES = [
+  '/*.md',
+  '/llms.txt',
+  '/*/llms.txt',
+  '/assets/generated/*',
+] as const;
 
 export interface ValidationResult {
   errors: string[];

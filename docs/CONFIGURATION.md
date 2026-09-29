@@ -69,12 +69,12 @@ name of its own; they read this file. The rationale is recorded in
 `visibility` decides what the platform asserts about an environment, and it
 defaults to `private` — an omission fails in the recoverable direction.
 
-|                                                        | `private`                                                             | `public`                                                 |
-| ------------------------------------------------------ | --------------------------------------------------------------------- | -------------------------------------------------------- |
-| `public/robots.txt`                                    | must disallow every crawler                                           | must not disallow every crawler                          |
-| `public/_headers` on `/*.md` and `/assets/generated/*` | `Cache-Control: private` and an `X-Robots-Tag`                        | must not carry `noindex`                                 |
-| every page                                             | carries `<meta name="robots" content="noindex, nofollow, noarchive">` | carries no robots meta                                   |
-| `ctcdocs-access-smoke`                                 | anonymous requests must be denied and a service token admitted        | anonymous requests must succeed; no service token needed |
+|                                                                                    | `private`                                                             | `public`                                                 |
+| ---------------------------------------------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------- |
+| `public/robots.txt`                                                                | must disallow every crawler                                           | must not disallow every crawler                          |
+| `public/_headers` on `/*.md`, `/llms.txt`, `/*/llms.txt` and `/assets/generated/*` | `Cache-Control: private` and an `X-Robots-Tag`                        | must not carry `noindex`                                 |
+| every page                                                                         | carries `<meta name="robots" content="noindex, nofollow, noarchive">` | carries no robots meta                                   |
+| `ctcdocs-access-smoke`                                                             | anonymous requests must be denied and a service token admitted        | anonymous requests must succeed; no service token needed |
 
 Two scoping rules:
 
@@ -88,6 +88,13 @@ What visibility does not change: `workers.dev` and preview URLs stay disabled,
 an environment binds exactly one custom domain, and `wrangler.jsonc` is still
 checked against this file. A public portal wants one predictable address as much
 as a private wiki does.
+
+The `/*.md` and `llms.txt` rules also declare
+`Content-Type: text/markdown; charset=utf-8` and
+`Content-Type: text/plain; charset=utf-8`, whatever the visibility: a static
+build discards the type an endpoint sets, and without the charset a browser or
+an agent decodes every non-ASCII title wrongly. The access smoke test checks
+both after a deployment. See [ADR-033](ADR/033-publish-llms-txt-indexes.md).
 
 See [ADR-016](ADR/016-deployment-visibility.md).
 

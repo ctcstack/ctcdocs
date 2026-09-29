@@ -21,9 +21,10 @@ zone.
 The wiki, static assets, Pagefind index, `robots.txt`, and 404 page share one
 authorization boundary. There is no public application origin.
 
-Generated document Markdown at `/<stable-slug>/index.md` and its original
-images under `/assets/generated/` are part of the same boundary. They must never
-be exposed through a separate hostname or Access bypass.
+Generated document Markdown at `/<stable-slug>/index.md`, its original images
+under `/assets/generated/`, and the `llms.txt` indexes at `/llms.txt` and
+`/<section>/llms.txt` are part of the same boundary. They must never be exposed
+through a separate hostname or Access bypass.
 
 ## Worker configuration
 

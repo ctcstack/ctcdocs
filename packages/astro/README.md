@@ -79,7 +79,9 @@ because losing them is silent — the site keeps building:
   re-declare the platform's alongside it; they are importable individually from
   `@ctcstack/ctcdocs/components/*`.
 - `astro.integrations` replaces the preset's, which include the route injection
-  that serves the Markdown projection and the folder pages.
+  that serves the Markdown projection, the `llms.txt` indexes and the folder
+  pages. Every page's head still links to `/llms.txt`, so a project that drops
+  the injection must serve that file itself or accept the dangling link.
 
 Everything else — `title`, `head`, `customCss`, `markdown`, `redirects` — is
 either a scalar or a list where replacing is what you meant.

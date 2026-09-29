@@ -1,0 +1,18 @@
+{
+  // The platform's build-time modules that read `astro:content` or the
+  // navigation module. The platform package cannot type-check them, because
+  // those types are generated inside a project, so this project does, against
+  // its real generated types. `config.ts` is left out: it pulls in
+  // Starlight's own sources, which do not type-check outside Starlight.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true },
+  "include": [
+    ".astro/types.d.ts",
+    "../../packages/astro/lib/virtual-modules.d.ts",
+    "../../packages/astro/content.ts",
+    "../../packages/astro/lib/agent-index-source.ts",
+    "../../packages/astro/lib/corpus.ts",
+    "../../packages/astro/lib/sections.ts",
+    "../../packages/astro/routes/**/*.ts"
+  ]
+}

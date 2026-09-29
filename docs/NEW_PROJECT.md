@@ -140,17 +140,17 @@ fails the gate for a reason that has nothing to do with what you are testing.
 
 ### 4. The rest of the files
 
-| File                   | What goes in it                                                                     |
-| ---------------------- | ----------------------------------------------------------------------------------- |
-| `public/favicon.svg`   | Your mark. Also probed by the access smoke test                                     |
-| `public/robots.txt`    | `Disallow: /` for a private deployment; anything else for a public one              |
-| `public/_headers`      | Cache and robots headers for `/*.md` and `/assets/generated/*`, matching visibility |
-| `src/styles/brand.css` | The accent triad per theme. See [DESIGN.md](DESIGN.md)                              |
-| `.gitleaks.toml`       | Secret-scanning rules; path exemptions cover only paths Git never tracks            |
-| `tsconfig.json`        | Extends `astro/tsconfigs/strict`, includes `.astro/types.d.ts`                      |
-| `eslint.config.js`     | `import { ctcdocsEslintConfig } from '@ctcstack/ctcdocs/eslint'` plus your ignores  |
-| `prettier.config.mjs`  | `export { default } from '@ctcstack/ctcdocs/prettier'`                              |
-| `.prettierignore`      | Every generated path, so the formatter never touches what the sync owns             |
+| File                   | What goes in it                                                                                                                                      |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `public/favicon.svg`   | Your mark. Also probed by the access smoke test                                                                                                      |
+| `public/robots.txt`    | `Disallow: /` for a private deployment; anything else for a public one                                                                               |
+| `public/_headers`      | Cache, robots and charset headers for `/*.md`, `/llms.txt`, `/*/llms.txt` and `/assets/generated/*`, matching visibility; copy the fixture project's |
+| `src/styles/brand.css` | The accent triad per theme. See [DESIGN.md](DESIGN.md)                                                                                               |
+| `.gitleaks.toml`       | Secret-scanning rules; path exemptions cover only paths Git never tracks                                                                             |
+| `tsconfig.json`        | Extends `astro/tsconfigs/strict`, includes `.astro/types.d.ts`                                                                                       |
+| `eslint.config.js`     | `import { ctcdocsEslintConfig } from '@ctcstack/ctcdocs/eslint'` plus your ignores                                                                   |
+| `prettier.config.mjs`  | `export { default } from '@ctcstack/ctcdocs/prettier'`                                                                                               |
+| `.prettierignore`      | Every generated path, so the formatter never touches what the sync owns                                                                              |
 
 `ctcdocs-sync validate` checks that `robots.txt`, `_headers` and `.gitleaks.toml`
 exist and agree with your configuration, so run it early and let it tell you what

@@ -24,9 +24,9 @@ choice:
 - **Readers get a static site.** Fast, searchable with Pagefind, keyboard- and
   screen-reader-accessible, and either private behind Cloudflare Access or open
   to the world — one setting, and the checks follow it.
-- **Machines get plain Markdown.** Every page is also served as `.md`, and the
-  corpus ships with a generated index, so an internal agent can read the
-  documentation without scraping HTML.
+- **Machines get plain Markdown.** Every page is also served as `.md`, and
+  `/llms.txt` lists every document in the reader's order, so an agent can find
+  and read the documentation without scraping HTML.
 - **Operators get a boring system.** Generated output is committed, so a bad
   sync is a revert. Two runs over unchanged input produce zero diff.
 

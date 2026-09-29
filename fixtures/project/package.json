@@ -8,7 +8,7 @@
     "dev": "astro dev",
     "build": "astro check && astro build",
     "preview": "astro preview",
-    "typecheck": "astro check",
+    "typecheck": "astro check && tsc --project tsconfig.platform.json",
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "validate": "ctcdocs-sync validate",

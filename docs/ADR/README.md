@@ -56,5 +56,7 @@ Rejected
 - ADR-031: apply the crop Google Docs makes to an image. Supersedes ADR-030 in
   part.
 - ADR-032: search a missing address by its name. Supersedes ADR-021 in part.
+- ADR-033: publish llms.txt indexes and describe pages for agents. Supersedes
+  ADR-010 in part.
 
 Create a new ADR by copying `000-template.md`.

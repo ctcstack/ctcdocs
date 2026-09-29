@@ -5,8 +5,8 @@
  * The product record treats AI agents as an equal class of consumer, but until
  * now nothing on the site told anyone the machine-readable surface existed.
  * Everything named here is served today and sits behind the same Cloudflare
- * Access boundary as the pages: the Markdown projection at `/<slug>/index.md`
- * and the clipboard action on every document.
+ * Access boundary as the pages: the `llms.txt` indexes (ADR-033), the Markdown
+ * projection at `/<slug>/index.md` and the clipboard action on every document.
  *
  * `data/docs-index.json` is deliberately not mentioned. It lives in the Git
  * repository and is not published, and naming an endpoint the site does not
@@ -24,6 +24,13 @@ const example = documents[0];
   <h2 class="section-title" id="home-agents">For AI agents</h2>
 
   <div class="agents-body">
+    <p>
+      Start at <a href="/llms.txt"><code>/llms.txt</code></a>: it lists every
+      document in the order the navigation shows them, with its description and
+      the address of its Markdown version. A top-level section with a page of
+      its own has an index of its own at the same name under that page.
+    </p>
+
     <p>
       Every document is served as clean Markdown at its own address plus
       <code>index.md</code>. The projection is generated from the same
@@ -89,9 +96,13 @@ const example = documents[0];
       padding: 0.1em 0.4em;
     }
 
-    .agents-pattern a {
+    .agents-body a {
       color: var(--sl-color-text-accent);
       overflow-wrap: anywhere;
+    }
+
+    .agents-body a code {
+      color: inherit;
     }
   }
 </style>
