@@ -6,7 +6,11 @@ import {
   type DriveItem,
 } from '../google/drive-types.js';
 import { buildInventorySelection } from '../inventory/inventory-graph.js';
-import { createEmptyManifest, type SyncedDocumentRecord } from '../manifest.js';
+import {
+  createEmptyManifest,
+  type SyncedDocumentRecord,
+  type SyncedFolderRecord,
+} from '../manifest.js';
 import { createSidebar, serializeSidebar } from './sidebar.js';
 import {
   TEST_SOURCE_HEADER,
@@ -50,6 +54,18 @@ function record(id: string, slug: string): SyncedDocumentRecord {
     lastSuccessfulSyncAt: timestamp,
     exportMode: 'markdown',
     warnings: [],
+  };
+}
+
+function folderRecord(id: string, slug: string): SyncedFolderRecord {
+  return {
+    googleFolderId: id,
+    googleParentId: 'root',
+    googleName: id,
+    displayLabel: id,
+    sortOrder: null,
+    stableSlug: slug,
+    generatedMarkdownPath: `src/content/docs/_generated/section-${id}.md`,
   };
 }
 
@@ -135,6 +151,111 @@ describe('generated sidebar', () => {
           { label: 'Guide', slug: 'team/guide' },
         ],
       },
+    ]);
+  });
+
+  it("opens a group with the folder's own page when no document can", () => {
+    const selection = buildInventorySelection(
+      [
+        item('root', 'Published', GOOGLE_DRIVE_FOLDER_MIME_TYPE, 'drive'),
+        item('team', '01 - Team', GOOGLE_DRIVE_FOLDER_MIME_TYPE, 'root'),
+        item('guide', '01 - Guide', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('ops', '02 - Operations', GOOGLE_DRIVE_FOLDER_MIME_TYPE, 'root'),
+        item('runbooks', 'Runbooks', GOOGLE_DRIVE_FOLDER_MIME_TYPE, 'ops'),
+        item('restart', 'Restart', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'runbooks'),
+      ],
+      'root',
+      [],
+      ['drive'],
+    );
+    const manifest = createEmptyManifest('drive', 'root', timestamp);
+    manifest.documents['guide'] = record('guide', 'team/guide');
+    manifest.documents['restart'] = record('restart', 'ops/runbooks/restart');
+    for (const [id, slug] of [
+      ['team', 'team'],
+      ['ops', 'ops'],
+      ['runbooks', 'ops/runbooks'],
+    ] as const) {
+      manifest.folders[id] = folderRecord(id, slug);
+    }
+
+    expect(createSidebar(selection, manifest, LANDING_TITLES)).toEqual([
+      {
+        label: 'Team',
+        items: [
+          // Named like the first landing title, since it stands in for one.
+          { label: 'Overview', slug: 'team' },
+          { label: 'Guide', slug: 'team/guide' },
+        ],
+      },
+      {
+        label: 'Operations',
+        items: [
+          // A folder that holds only folders opens with its page too.
+          { label: 'Overview', slug: 'ops' },
+          {
+            label: 'Runbooks',
+            items: [
+              { label: 'Overview', slug: 'ops/runbooks' },
+              { label: 'Restart', slug: 'ops/runbooks/restart' },
+            ],
+          },
+        ],
+      },
+    ]);
+  });
+
+  it.each([
+    ['Overview', 'the landing document'],
+    ['01 - Overview', 'a numbered one, which shows the same name'],
+    ['readme', 'another landing title, in any case'],
+  ])(
+    "leaves the folder's page out when a document is titled %s: %s",
+    (name) => {
+      const selection = buildInventorySelection(
+        [
+          item('root', 'Published', GOOGLE_DRIVE_FOLDER_MIME_TYPE, 'drive'),
+          item('team', 'Team', GOOGLE_DRIVE_FOLDER_MIME_TYPE, 'root'),
+          item('guide', 'Guide', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+          item('landing', name, GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        ],
+        'root',
+        [],
+        ['drive'],
+      );
+      const manifest = createEmptyManifest('drive', 'root', timestamp);
+      manifest.documents['guide'] = record('guide', 'team/guide');
+      manifest.documents['landing'] = record('landing', 'team/landing');
+      manifest.folders['team'] = folderRecord('team', 'team');
+
+      const [group] = createSidebar(selection, manifest, LANDING_TITLES);
+      expect(group?.items).not.toContainEqual(
+        expect.objectContaining({ slug: 'team' }),
+      );
+      expect(group?.items).toHaveLength(2);
+    },
+  );
+
+  it('shows no folder page when the project generates none', () => {
+    const selection = buildInventorySelection(
+      [
+        item('root', 'Published', GOOGLE_DRIVE_FOLDER_MIME_TYPE, 'drive'),
+        item('team', 'Team', GOOGLE_DRIVE_FOLDER_MIME_TYPE, 'root'),
+        item('guide', 'Guide', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+      ],
+      'root',
+      [],
+      ['drive'],
+    );
+    const manifest = createEmptyManifest('drive', 'root', timestamp);
+    manifest.documents['guide'] = record('guide', 'team/guide');
+    // An address, but no page: `navigation.sectionIndexPages` is off.
+    const addressOnly = folderRecord('team', 'team');
+    delete addressOnly.generatedMarkdownPath;
+    manifest.folders['team'] = addressOnly;
+
+    expect(createSidebar(selection, manifest, LANDING_TITLES)).toEqual([
+      { label: 'Team', items: [{ label: 'Guide', slug: 'team/guide' }] },
     ]);
   });
 

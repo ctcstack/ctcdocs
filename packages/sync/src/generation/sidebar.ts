@@ -10,6 +10,7 @@ import type {
 import type { SyncManifest } from '../manifest.js';
 import {
   compareNavigationSiblings,
+  isLandingTitle,
   type NavigationSibling,
 } from '../navigation-order.js';
 import { parseOrderedLabel } from '../ordered-label.js';
@@ -50,6 +51,34 @@ function documentLink(
       ? { badge: 'PDF' }
       : {}),
   };
+}
+
+/**
+ * A folder's own page, as the first item of its group, when nothing else in
+ * the folder can open it (ADR-035). A document titled like a landing page,
+ * such as Overview, already does, numbered or not, so the page stays out and
+ * the group never shows two entries with one name. Otherwise the page takes
+ * the first landing title as its label. There is no page to show when the
+ * project does not generate folder pages.
+ */
+function folderPage(
+  folder: InventoryFolderNode,
+  documents: readonly SelectedInventoryItem[],
+  manifest: SyncManifest,
+  landingTitles: readonly string[],
+): SidebarLink | undefined {
+  const record = manifest.folders[folder.item.id];
+  const [label] = landingTitles;
+  if (!record?.stableSlug || !record.generatedMarkdownPath || !label) {
+    return undefined;
+  }
+  const opensWithLanding = documents.some((document) =>
+    isLandingTitle(
+      parseOrderedLabel(documentName(document.item)).label,
+      landingTitles,
+    ),
+  );
+  return opensWithLanding ? undefined : { label, slug: record.stableSlug };
 }
 
 export function createSidebar(
@@ -95,9 +124,17 @@ export function createSidebar(
     if (items.length === 0) {
       return undefined;
     }
+    const page = folderPage(
+      folder,
+      children.flatMap((child) =>
+        child.kind === 'document' ? [child.item] : [],
+      ),
+      manifest,
+      landingTitles,
+    );
     return {
       label: parseOrderedLabel(folder.item.name).label,
-      items,
+      items: page ? [page, ...items] : items,
     };
   }
 

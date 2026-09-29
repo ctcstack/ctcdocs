@@ -59,5 +59,7 @@ Rejected
 - ADR-033: publish llms.txt indexes and describe pages for agents. Supersedes
   ADR-010 in part.
 - ADR-034: check headings, summaries and links that leave the site.
+- ADR-035: open a folder with its page when it has no landing document.
+  Supersedes ADR-014 in part.
 
 Create a new ADR by copying `000-template.md`.

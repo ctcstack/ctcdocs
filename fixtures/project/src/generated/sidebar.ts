@@ -41,8 +41,16 @@ export const generatedSidebar = [
     "label": "Reference",
     "items": [
       {
+        "label": "Overview",
+        "slug": "reference"
+      },
+      {
         "label": "Guides",
         "items": [
+          {
+            "label": "Overview",
+            "slug": "reference/guides"
+          },
           {
             "label": "Style guide",
             "slug": "reference/guides/style-guide"

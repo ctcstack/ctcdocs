@@ -16,6 +16,7 @@ import {
   documentWithAsset,
   documentWithPermanentLink,
   documentWithTable,
+  folderPageSlugs,
   pdfDocument,
   sectionWithSubfolder,
 } from '../support/corpus-fixtures.js';
@@ -41,6 +42,23 @@ function escapeRegExp(value: string): string {
 }
 
 async function expectNoAccessibilityViolations(page: Page): Promise<void> {
+  /*
+   * Audit the page once it has settled. Switching the theme changes a link's
+   * text at once and fades its background over 150ms, so a check in between
+   * measures a frame no reader stops on. Endless animations are not waited
+   * for, or the audit would never start.
+   */
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter(
+          (animation) =>
+            animation.effect?.getComputedTiming().endTime !== Infinity,
+        )
+        .map((animation) => animation.finished.catch(() => undefined)),
+    ),
+  );
   const results = await new AxeBuilder({ page }).analyze();
   expect(results.violations).toEqual([]);
 }
@@ -379,6 +397,29 @@ test('a section page tells its folders from its documents', async ({
       exact: true,
     }),
   ).toBeVisible();
+});
+
+test('a folder with no landing document opens with its own page', async ({
+  page,
+}) => {
+  const folders = folderPageSlugs();
+  test.skip(folders.length === 0, 'The project generates no folder pages.');
+  const [label] = siteConfiguration.navigation.landingDocumentTitles;
+
+  // A folder opened by a landing document keeps its page out of the sidebar;
+  // any other lists the page first, named like the first landing title.
+  let listed = 0;
+  for (const slug of folders.slice(0, 10)) {
+    await page.goto(`/${slug}/`);
+    const current = page.locator('#starlight__sidebar a[aria-current="page"]');
+    if ((await current.count()) === 0) {
+      continue;
+    }
+    await expect(current).toHaveText(label ?? '');
+    await expect(current).toHaveAttribute('href', `/${slug}/`);
+    listed += 1;
+  }
+  test.skip(listed === 0, 'Every folder here opens with a landing document.');
 });
 
 test('generated documents expose their protected Markdown projection', async ({
