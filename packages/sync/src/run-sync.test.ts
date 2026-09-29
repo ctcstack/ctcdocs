@@ -1803,6 +1803,24 @@ describe('basic Markdown sync', () => {
     const second = await run(secondTimestamp);
     expect(inspections).toBe(1);
     expect(second.outputChanged).toBe(false);
+
+    // Facts an earlier shape recorded are read again, once, by a normal sync.
+    const reportPath = resolve(repository, 'data/title-report.json');
+    const recorded = JSON.parse(await readFile(reportPath, 'utf8')) as {
+      documents: Array<{ source: { version: number } }>;
+    };
+    for (const entry of recorded.documents) {
+      entry.source.version = 3;
+    }
+    await writeFile(reportPath, `${JSON.stringify(recorded, null, 2)}\n`);
+    const upgraded = await run(secondTimestamp);
+    expect(inspections).toBe(2);
+    expect(upgraded.report.summary.exported).toBe(1);
+    expect(upgraded.report.summary.changed).toBe(0);
+
+    const settled = await run(secondTimestamp);
+    expect(inspections).toBe(2);
+    expect(settled.outputChanged).toBe(false);
   });
 
   it('blocks publication of a broken internal page link', async () => {

@@ -328,7 +328,10 @@ documents to fix — and when the site last changed
   the site could not crop and shows whole
   ([ADR-031](ADR/031-apply-the-crop-google-docs-makes.md)), images larger
   than `sync.largeImageMegabytes` (2 MB unless the project sets it), files in
-  one folder the site cannot tell apart, order numbers used twice.
+  one folder the site cannot tell apart, order numbers used twice, a page with
+  no summary because it has no paragraph of plain text, and a link to a Google
+  Doc or Drive file outside the published folders
+  ([ADR-034](ADR/034-check-headings-summaries-and-outside-links.md)).
 
 A document held back
 ([ADR-026](ADR/026-hold-back-a-document-that-cannot-be-exported.md)) keeps
@@ -341,14 +344,18 @@ Then the checks, grouped by what fixes them:
   another document's title, an empty document.
 - **Proposed convention: one Title line.** A document opens with its name as
   one line in the Title style, and uses Heading 1 to 3 for sections.
-- **Worth a look.** Drive names with "Copy of", a file extension, underscores
-  or extra spaces.
+- **Worth a look.** A heading that skips a level, as the page shows it, and a
+  heading with the words of an earlier one
+  ([ADR-034](ADR/034-check-headings-summaries-and-outside-links.md)); Drive
+  names with "Copy of", a file extension, underscores or extra spaces.
 
 Each check says what to do. Each document links to its page and to Google
 Docs, straight to the line concerned when there is one, and shows its
 section and who last edited it. Filter by section, or by last editor, to hand
 out the work. The page is rebuilt on every sync, so a fixed item disappears
-after the next one.
+after the next one. When a release adds a check read from the documents'
+structure, the next normal sync exports every Google Doc once more to read it;
+nothing else changes, and the sync after that is quick again.
 
 The job summary of every sync has three parts
 ([ADR-028](ADR/028-legible-sync.md)):

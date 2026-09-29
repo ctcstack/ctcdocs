@@ -311,6 +311,8 @@ export function contentHealthReport():
       sections: string[];
       issueCount: number;
       linkedIssueCount: number;
+      /** Titles of the checks at least one document fails. */
+      failedCheckTitles: string[];
     }
   | undefined {
   let report: unknown;
@@ -326,9 +328,10 @@ export function contentHealthReport():
   }
   const typed = report as {
     schemaVersion?: number;
+    checks?: Array<{ code: string; title: string }>;
     documents?: Array<{
       folderPath: string[];
-      issues: Array<{ headingId?: string }>;
+      issues: Array<{ check: string; headingId?: string }>;
     }>;
   };
   if (typed.schemaVersion !== 2 || !typed.documents) {
@@ -349,6 +352,13 @@ export function contentHealthReport():
         sum + document.issues.filter((issue) => issue.headingId).length,
       0,
     ),
+    failedCheckTitles: (typed.checks ?? [])
+      .filter((check) =>
+        typed.documents?.some((document) =>
+          document.issues.some((issue) => issue.check === check.code),
+        ),
+      )
+      .map((check) => check.title),
   };
 }
 
@@ -361,6 +371,8 @@ export function unpublishedReport():
       items: Array<{ name: string; sourceUrl: string; slug?: string }>;
       ignoredFolders: number;
       notes: Array<{ name: string; sourceUrl: string; slug?: string }>;
+      /** Titles of the kinds of note the report holds at least one of. */
+      noteTitles: string[];
     }
   | undefined {
   let report: unknown;
@@ -378,7 +390,13 @@ export function unpublishedReport():
     schemaVersion?: number;
     unpublished?: Array<{ name: string; sourceUrl: string; slug?: string }>;
     ignoredFolders?: unknown[];
-    notes?: Array<{ name: string; sourceUrl: string; slug?: string }>;
+    noteKinds?: Array<{ code: string; title: string }>;
+    notes?: Array<{
+      name: string;
+      sourceUrl: string;
+      slug?: string;
+      note: string;
+    }>;
   };
   if (typed.schemaVersion !== 3 || !typed.unpublished) {
     return undefined;
@@ -387,5 +405,8 @@ export function unpublishedReport():
     items: typed.unpublished,
     ignoredFolders: typed.ignoredFolders?.length ?? 0,
     notes: typed.notes ?? [],
+    noteTitles: (typed.noteKinds ?? [])
+      .filter((kind) => typed.notes?.some((note) => note.note === kind.code))
+      .map((kind) => kind.title),
   };
 }

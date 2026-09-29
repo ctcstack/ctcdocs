@@ -54,6 +54,7 @@ function record(
     contentHash: `sha256:${'0'.repeat(64)}`,
     outputHash: `sha256:${'1'.repeat(64)}`,
     lastSuccessfulSyncAt: timestamp,
+    description: 'What the document is for.',
     exportMode: 'hybrid',
     warnings,
   };
@@ -268,5 +269,36 @@ describe('NOTE_KINDS', () => {
       expect(kind.action.length).toBeGreaterThan(0);
       expect(kind.instruction.length).toBeGreaterThan(0);
     }
+  });
+
+  it('notes a page with no summary, but not a PDF, whose summary is its text', () => {
+    const withoutSummary = { ...record('doc-a', 'team/a') };
+    delete withoutSummary.description;
+    const pdf = {
+      ...withoutSummary,
+      googleFileId: 'pdf-b',
+      stableSlug: 'team/b',
+      exportMode: 'pdf' as const,
+    };
+    const notes = createNotes(
+      corpus([
+        item('doc-a', 'A', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('pdf-b', 'B.pdf', GOOGLE_DRIVE_PDF_MIME_TYPE, 'team'),
+      ]),
+      manifestOf([withoutSummary, pdf]),
+    );
+
+    expect(notes.map((note) => [note.id, note.note])).toEqual([
+      ['doc-a', 'summary-missing'],
+    ]);
+  });
+
+  it('notes a link to a Google file the site does not publish', () => {
+    const notes = createNotes(
+      corpus([item('doc-a', 'A', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team')]),
+      manifestOf([record('doc-a', 'team/a', ['link:outside_site'])]),
+    );
+
+    expect(notes.map((note) => note.note)).toEqual(['link-outside-site']);
   });
 });

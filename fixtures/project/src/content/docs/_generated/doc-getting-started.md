@@ -8,7 +8,7 @@
 "googleFileId": "doc-getting-started"
 "googleModifiedTime": "2026-02-02T11:30:00.000Z"
 "syncedAt": "2026-02-10T06:00:00.000Z"
-"contentHash": "sha256:bb2065bdabdd9332571d2c0f29c3eb306f3e2c500401c70c40d0b0e4e7755e2b"
+"contentHash": "sha256:130ada45306ffe8ee18990bb460c7bcdfba58a58fa6d1e81713b6169490f03bf"
 "folderPath": []
 "pagefind": true
 ---
@@ -22,3 +22,6 @@ checks without any real content being involved.
 
 Start with the [handbook overview](/d/76ff21/),
 which describes what each section holds.
+
+Team rotas live in the [on-call plan](https://docs.google.com/document/d/doc-outside-drive/edit),
+which is not part of this site.

@@ -3,6 +3,21 @@
   "generatedAt": "2026-02-10T06:00:00.000Z",
   "documents": [
     {
+      "id": "doc-contacts",
+      "title": "Contacts",
+      "slug": "handbook/contacts",
+      "markdownPath": "src/content/docs/_generated/doc-contacts.md",
+      "sourceUrl": "https://docs.google.com/document/d/doc-contacts/edit",
+      "googleModifiedTime": "2026-02-04T09:30:00.000Z",
+      "syncedAt": "2026-02-10T06:00:00.000Z",
+      "contentHash": "sha256:9a1119eeac2975375f999354755d4c8ab627172c4922e7dccf6f4c08563de568",
+      "folderPath": [
+        "Handbook"
+      ],
+      "language": "en",
+      "format": "google-doc"
+    },
+    {
       "id": "doc-overview",
       "title": "Overview",
       "slug": "handbook/overview",
@@ -55,7 +70,7 @@
       "sourceUrl": "https://docs.google.com/document/d/doc-diagrams/edit",
       "googleModifiedTime": "2026-02-07T10:05:00.000Z",
       "syncedAt": "2026-02-10T06:00:00.000Z",
-      "contentHash": "sha256:c47cf18d16d9c8b605f26a1058fe125e70632f8bb19b9f972c459806aedec9fb",
+      "contentHash": "sha256:837d123de2af4978d0cbef2f80dad7769a7ee8a0bf25ebb19747c20e290d366e",
       "folderPath": [
         "Reference"
       ],
@@ -132,7 +147,7 @@
       "sourceUrl": "https://docs.google.com/document/d/doc-getting-started/edit",
       "googleModifiedTime": "2026-02-02T11:30:00.000Z",
       "syncedAt": "2026-02-10T06:00:00.000Z",
-      "contentHash": "sha256:bb2065bdabdd9332571d2c0f29c3eb306f3e2c500401c70c40d0b0e4e7755e2b",
+      "contentHash": "sha256:130ada45306ffe8ee18990bb460c7bcdfba58a58fa6d1e81713b6169490f03bf",
       "folderPath": [],
       "language": "en",
       "format": "google-doc"

@@ -570,6 +570,24 @@ test('the content health page links each issue to its document', async ({
   }
 });
 
+test('the content health page names every check and note it has findings for', async ({
+  page,
+}) => {
+  const titles = [
+    ...(contentHealthReport()?.failedCheckTitles ?? []),
+    ...(unpublishedReport()?.noteTitles ?? []),
+  ];
+  test.skip(titles.length === 0, 'The corpus has nothing to check or note.');
+
+  await page.goto('/content-health/');
+  for (const title of titles) {
+    await expect(
+      page.locator('main').getByText(title, { exact: true }).first(),
+      title,
+    ).toBeAttached();
+  }
+});
+
 test('the content health page names what is not on the site', async ({
   page,
 }) => {

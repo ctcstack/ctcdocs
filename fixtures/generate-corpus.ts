@@ -60,6 +60,7 @@ const MODIFIED_AT = new Map([
   ['doc-diagrams', '2026-02-07T10:05:00.000Z'],
   ['doc-screenshots', '2026-02-08T12:20:00.000Z'],
   ['doc-cyrillic', '2026-02-09T07:40:00.000Z'],
+  ['doc-contacts', '2026-02-04T09:30:00.000Z'],
 ]);
 const RUN_AT = new Date('2026-02-10T06:00:00.000Z');
 
@@ -111,6 +112,7 @@ const items: DriveItem[] = [
   document('doc-getting-started', 'Getting started', ROOT_ID),
   document('doc-cyrillic', 'Рабочие заметки', ROOT_ID),
   document('doc-overview', 'Overview', 'folder-handbook'),
+  document('doc-contacts', 'Contacts', 'folder-handbook'),
   document('doc-tables-and-code', '01 - Tables and code', 'folder-handbook'),
   document('doc-diagrams', 'Diagrams', 'folder-reference'),
   document('doc-screenshots', 'Screenshots', 'folder-reference'),
@@ -207,6 +209,17 @@ items.push(
 /** Google's Markdown export, as the pipeline receives it. */
 const markdownExports = new Map<string, string>([
   [
+    // Only a list, so the page has no summary to show.
+    'doc-contacts',
+    [
+      '# Contacts',
+      '',
+      '- Platform team: platform@example.com',
+      '- Documentation desk: docs@example.com',
+      '',
+    ].join('\n'),
+  ],
+  [
     'doc-getting-started',
     [
       '# Getting started',
@@ -217,6 +230,13 @@ const markdownExports = new Map<string, string>([
       '',
       'Start with the [handbook overview](https://docs.google.com/document/d/doc-overview/edit),',
       'which describes what each section holds.',
+      '',
+      /*
+       * A Google Doc outside the published folders: the page keeps the link,
+       * and the content health page notes that the site cannot open it.
+       */
+      'Team rotas live in the [on-call plan](https://docs.google.com/document/d/doc-outside-drive/edit),',
+      'which is not part of this site.',
       '',
     ].join('\n'),
   ],
@@ -281,6 +301,19 @@ const markdownExports = new Map<string, string>([
       '',
       'The diagram above is the whole publication path, which is also the order',
       'the pipeline writes its output in.',
+      '',
+      // A level skipped, and a heading repeated, for the content health page.
+      '## Reading the diagram',
+      '',
+      'Each arrow is one step the pipeline takes on every run.',
+      '',
+      '#### Arrows',
+      '',
+      'An arrow points from what a step reads to what it writes.',
+      '',
+      '## Reading the diagram',
+      '',
+      'The same steps run for a single document and for the whole corpus.',
       '',
     ].join('\n'),
   ],

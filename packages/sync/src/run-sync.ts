@@ -109,6 +109,7 @@ import { validateGeneratedOutput } from './output/validate-generated-output.js';
 import { keepPreviousAddresses } from './redirect-history.js';
 import {
   createTitleReport,
+  outdatedTitleFacts,
   recordedTitleFacts,
   serializeTitleReport,
 } from './titles/title-report.js';
@@ -1007,6 +1008,15 @@ async function synchronize(
     ],
   };
   const sectionIndexPages = site.navigation.sectionIndexPages;
+  /*
+   * The title report, read once: its facts are reused for documents this run
+   * does not export, and a document whose facts an earlier shape recorded is
+   * exported again.
+   */
+  const existingTitleReport = await readOptionalFile(
+    resolve(repositoryRoot, PROJECT_LAYOUT.titleReportFile),
+  );
+  const outdatedFacts = outdatedTitleFacts(existingTitleReport);
   const folders: Record<string, SyncedFolderRecord> = Object.fromEntries(
     selection.folders
       .map((folder) => {
@@ -1108,7 +1118,9 @@ async function synchronize(
                   (existingRecord.undescribedImages === undefined ||
                     existingRecord.croppedImages === undefined ||
                     ((existingRecord.croppedImages ?? 0) > 0 &&
-                      existingRecord.imageVersion !== IMAGE_VERSION))),
+                      existingRecord.imageVersion !== IMAGE_VERSION))) ||
+                // Source facts an earlier shape recorded (ADR-034).
+                outdatedFacts.has(selected.item.id),
           added: existingRecord === undefined,
         };
       }),
@@ -1784,11 +1796,7 @@ async function synchronize(
    * reports what its source says now; any other keeps what the run that last
    * exported it recorded. Who last edited it comes from this run's inventory.
    */
-  const recordedTitles = recordedTitleFacts(
-    await readOptionalFile(
-      resolve(repositoryRoot, PROJECT_LAYOUT.titleReportFile),
-    ),
-  );
+  const recordedTitles = recordedTitleFacts(existingTitleReport);
   const inventoryItems = new Map(
     selection.documents.map((document) => [document.item.id, document.item]),
   );

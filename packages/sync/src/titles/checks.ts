@@ -16,6 +16,8 @@ export type CheckCode =
   | 'title-missing'
   | 'title-not-first'
   | 'title-style-on-section'
+  | 'heading-skips-level'
+  | 'heading-repeated'
   | 'file-name-copy-of'
   | 'file-name-extension'
   | 'file-name-underscores'
@@ -84,6 +86,20 @@ export const CHECKS: readonly Check[] = [
     title: 'The Title style is used for a section',
     instruction:
       "Only the document's name takes the Title style. Change the lines below to Format → Paragraph styles → Heading 1.",
+  },
+  {
+    code: 'heading-skips-level',
+    severity: 'note',
+    title: 'A heading skips a level',
+    instruction:
+      'The heading is more than one level below the heading before it, such as a Heading 4 straight after a Heading 2. Screen readers, the contents list beside the page and AI agents take it for part of a section that is not there. Change it to the level in between, or add the heading it belongs under.',
+  },
+  {
+    code: 'heading-repeated',
+    severity: 'note',
+    title: 'Two headings say the same',
+    instruction:
+      'An earlier heading in the document has the same words. A link to a section, the contents list beside the page and an AI agent quoting a section cannot tell the two apart. If they are different sections, name each for what it covers; if one repeats the other, merge them.',
   },
   {
     code: 'file-name-copy-of',

@@ -36,6 +36,48 @@ describe('internal Google link rewriting', () => {
     expect(result.warnings).toEqual([]);
   });
 
+  it('recognizes a link copied from a signed-in account, and a Drive file', () => {
+    const result = rewriteInternalGoogleLinks(
+      [
+        '[Account](https://docs.google.com/document/u/1/d/doc-one/edit)',
+        '[File](https://drive.google.com/file/d/doc-two/view?usp=sharing)',
+      ].join('\n\n'),
+      slugs,
+    );
+
+    expect(result.body).toContain('[Account](/d/a1b2c3/)');
+    expect(result.body).toContain('[File](/d/d4e5f6/)');
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('notes a link to a Google Doc or Drive file the site does not publish', () => {
+    const outside = (markdown: string) =>
+      rewriteInternalGoogleLinks(markdown, slugs).warnings;
+
+    expect(
+      outside('[Doc](https://docs.google.com/document/d/outside/edit)'),
+    ).toEqual(['link:outside_site']);
+    expect(
+      outside('[File](https://drive.google.com/file/d/outside-file/view)'),
+    ).toEqual(['link:outside_site']);
+    expect(
+      outside(
+        '<a href="https://docs.google.com/document/u/0/d/outside/edit">Doc</a>',
+      ),
+    ).toEqual(['link:outside_site']);
+    // The site does not publish spreadsheets or folders, so there is nothing
+    // an editor could move into the published folders.
+    expect(
+      outside(
+        [
+          '[Sheet](https://docs.google.com/spreadsheets/d/outside/edit)',
+          '[Folder](https://drive.google.com/drive/folders/outside)',
+          '[Web](https://example.invalid/path)',
+        ].join('\n\n'),
+      ),
+    ).toEqual([]);
+  });
+
   it('leaves external-corpus Google documents and unrelated links unchanged', () => {
     const input = [
       '[Outside](https://docs.google.com/document/d/outside/edit)',

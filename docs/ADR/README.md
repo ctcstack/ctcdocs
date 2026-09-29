@@ -58,5 +58,6 @@ Rejected
 - ADR-032: search a missing address by its name. Supersedes ADR-021 in part.
 - ADR-033: publish llms.txt indexes and describe pages for agents. Supersedes
   ADR-010 in part.
+- ADR-034: check headings, summaries and links that leave the site.
 
 Create a new ADR by copying `000-template.md`.

@@ -6,6 +6,24 @@
   "rootFolderId": "folder-root",
   "generatedAt": "2026-02-10T06:00:00.000Z",
   "documents": {
+    "doc-contacts": {
+      "googleFileId": "doc-contacts",
+      "googleParentId": "folder-handbook",
+      "googleName": "Contacts",
+      "displayTitle": "Contacts",
+      "googleModifiedTime": "2026-02-04T09:30:00.000Z",
+      "googleCreatedTime": "2026-01-05T09:00:00.000Z",
+      "sourceUrl": "https://docs.google.com/document/d/doc-contacts/edit",
+      "stableSlug": "handbook/contacts",
+      "generatedMarkdownPath": "src/content/docs/_generated/doc-contacts.md",
+      "generatedAssetsDirectory": "src/assets/generated/doc-contacts",
+      "contentHash": "sha256:9a1119eeac2975375f999354755d4c8ab627172c4922e7dccf6f4c08563de568",
+      "outputHash": "sha256:360d2273b94704aeaeee0f6fe393a665e40f9a3315a697f4a0e254baf890dd47",
+      "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
+      "exportMode": "markdown",
+      "warnings": [],
+      "shortId": "46b556"
+    },
     "doc-cyrillic": {
       "googleFileId": "doc-cyrillic",
       "googleParentId": "folder-root",
@@ -37,8 +55,8 @@
       "stableSlug": "reference/diagrams",
       "generatedMarkdownPath": "src/content/docs/_generated/doc-diagrams.md",
       "generatedAssetsDirectory": "src/assets/generated/doc-diagrams",
-      "contentHash": "sha256:c47cf18d16d9c8b605f26a1058fe125e70632f8bb19b9f972c459806aedec9fb",
-      "outputHash": "sha256:ff5fd9161bfbb8bd1a86a34e3ec4b9e8a48d591cda15c0257c6f0865008caf52",
+      "contentHash": "sha256:837d123de2af4978d0cbef2f80dad7769a7ee8a0bf25ebb19747c20e290d366e",
+      "outputHash": "sha256:a7ca5956d94e0d28d0b46d0e49223e3879125137f29a0d3cdfe5efc573de9575",
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "markdown",
       "warnings": [],
@@ -56,11 +74,13 @@
       "stableSlug": "start-here",
       "generatedMarkdownPath": "src/content/docs/_generated/doc-getting-started.md",
       "generatedAssetsDirectory": "src/assets/generated/doc-getting-started",
-      "contentHash": "sha256:bb2065bdabdd9332571d2c0f29c3eb306f3e2c500401c70c40d0b0e4e7755e2b",
-      "outputHash": "sha256:325a05963962fa46dde967e5027f7b748e6af44f2680d5e80b884cbb8c445384",
+      "contentHash": "sha256:130ada45306ffe8ee18990bb460c7bcdfba58a58fa6d1e81713b6169490f03bf",
+      "outputHash": "sha256:562993370910323bb2830a8e6b8ab9e83077a0c314319e5d97c8d2d7796c5e78",
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "markdown",
-      "warnings": [],
+      "warnings": [
+        "link:outside_site"
+      ],
       "shortId": "b970ca"
     },
     "doc-overview": {
