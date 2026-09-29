@@ -70,39 +70,39 @@
     "test": "vitest run --root ../.. && node --test bin/*.test.mjs"
   },
   "dependencies": {
-    "@astrojs/markdown-remark": "7.2.4",
-    "@axe-core/playwright": "4.12.1",
+    "@astrojs/markdown-remark": "7.3.1",
+    "@axe-core/playwright": "4.13.0",
     "@ctcstack/ctcdocs-core": "workspace:^",
     "@eslint/js": "10.0.1",
     "@fontsource-variable/inter": "5.3.0",
     "@fontsource-variable/jetbrains-mono": "5.3.0",
     "cheerio": "1.2.0",
     "eslint-config-prettier": "10.1.8",
-    "eslint-plugin-astro": "3.0.1",
-    "globals": "17.8.0",
+    "eslint-plugin-astro": "3.2.1",
+    "globals": "17.12.0",
     "mermaid": "11.16.1",
     "pagefind": "1.5.2",
     "prettier-plugin-astro": "0.14.1",
     "remark-gfm": "4.0.1",
     "remark-parse": "11.0.0",
     "remark-stringify": "11.0.0",
-    "typescript-eslint": "8.65.0",
+    "typescript-eslint": "8.70.1",
     "unified": "11.0.5"
   },
   "peerDependencies": {
     "@astrojs/starlight": "^0.41.5",
     "@playwright/test": "^1.62.0",
-    "astro": "^7.2.8",
+    "astro": "^7.2.10",
     "prettier": "^3.0.0",
     "sharp": "^0.35.4"
   },
   "devDependencies": {
     "@astrojs/starlight": "0.41.5",
-    "@playwright/test": "1.62.1",
+    "@playwright/test": "1.63.0",
     "@types/mdast": "4.0.4",
     "@types/node": "22.20.1",
-    "astro": "7.2.9",
-    "linkedom": "0.18.12",
+    "astro": "7.3.5",
+    "linkedom": "0.18.13",
     "typescript": "6.0.3",
     "vitest": "4.1.11"
   }

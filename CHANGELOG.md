@@ -18,6 +18,39 @@ All three packages share a version and are released together.
 - The first sync after upgrading exports once more every document whose
   cropped images 0.12.0 published whole, and rewrites them cropped. The
   manifest records the image processing as `imageVersion`.
+- Every dependency moves to its latest release within its major version, and
+  the lockfile is resolved again from nothing. The sync takes `smol-toml`
+  1.9.0, `yaml` 2.9.1 and `zod` 4.6.5. The site package takes
+  `@astrojs/markdown-remark` 7.3.1, `@axe-core/playwright` 4.13.0, whose
+  axe-core 4.13 runs the accessibility checks of the browser suite,
+  `eslint-plugin-astro` 3.2.1, `globals` 17.12.0 and `typescript-eslint`
+  8.70.1. The fixture project moves to `astro` 7.3.5, `sharp` 0.35.5,
+  `@playwright/test` 1.63.0 and `wrangler` 4.142.0, and the workspace to
+  `eslint` 10.11.0, `knip` 6.38.0 and `prettier` 3.9.9. Major releases are
+  left for changes of their own: TypeScript 7, which `typescript-eslint` does
+  not support yet, Vitest 5, Mermaid 12, Starlight 0.42, which the site
+  package takes as a peer, `prettier-plugin-astro` 1 and `domhandler` 6.
+- The site package now requires `astro` ^7.2.10. `astro` names the
+  `@astrojs/markdown-remark` it works with as a peer, exactly 7.2.4 up to
+  7.2.9 and ^7.3.0 from 7.2.10, and the site package builds its Markdown
+  processor with the same one. A project on `astro` 7.2.9 or earlier raises
+  it; the fixture is tested on 7.3.5.
+- The refresh takes the `undici` releases that fix GHSA-3wwx-pv8p-q78v, a
+  crash of its WebSocket client on a malformed compressed message (moderate):
+  7.30.0 under `cheerio`, which the sync and the site package use, and 8.11.2
+  under the font loader of `astro`. Neither path uses the WebSocket client,
+  and both already allowed the fixed releases, so a project clears the
+  advisories by refreshing `undici` in its own lockfile, with
+  `pnpm update undici`. With pnpm 11.9.0 such an update can leave a
+  package's platform binaries out of the lockfile, as it did here with
+  Rolldown's, and the build then fails; `pnpm install --fix-lockfile` puts
+  them back.
+- `undici` under the fixture project's `wrangler` is raised to 7.29.1 by a
+  workspace override. Miniflare pins 7.29.0 exactly in every `wrangler` up to
+  4.143.0. The override applies only while that pin stands and does not reach
+  projects. `pnpm audit` reports nothing at any severity.
+- The override that held `astro-eslint-parser` at 3.0.0 is removed: 3.2.0
+  parses every `.astro` component in this repository again.
 
 ## 0.12.0
 
