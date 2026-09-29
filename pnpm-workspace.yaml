@@ -20,10 +20,10 @@ minimumReleaseAgeExclude:
   - workerd@1.20260730.1
   - wrangler@4.116.0
 
-# `astro-eslint-parser` 3.1.0 cannot parse the components in this repository:
-# every `.astro` file fails with a parsing error, with or without the matching
-# `eslint-plugin-astro` 3.1.0. The parser reaches us through that plugin, so it
-# is held at the last version that reads our components. Drop this once the
-# parser can read them again.
 overrides:
-  astro-eslint-parser: 3.0.0
+  # Miniflare pins `undici` to exactly 7.29.0, which GHSA-3wwx-pv8p-q78v
+  # reports (moderate), in every `wrangler` up to 4.143.0. It reaches only the
+  # fixture project's tooling, and 7.29.1 is the fix on the same line. The key
+  # names the pinned version, so the override stops applying once Miniflare
+  # pins another; drop it then.
+  'miniflare>undici@7.29.0': 7.29.1

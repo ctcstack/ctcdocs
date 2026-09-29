@@ -20,13 +20,13 @@
     "@astrojs/starlight": "0.41.5",
     "@ctcstack/ctcdocs": "workspace:*",
     "@ctcstack/ctcdocs-sync": "workspace:*",
-    "astro": "7.2.9",
-    "sharp": "0.35.4"
+    "astro": "7.3.5",
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.10",
-    "@playwright/test": "1.62.1",
+    "@playwright/test": "1.63.0",
     "typescript": "6.0.3",
-    "wrangler": "4.131.2"
+    "wrangler": "4.142.0"
   }
 }
