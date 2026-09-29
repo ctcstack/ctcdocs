@@ -18,10 +18,70 @@ import Default from '@astrojs/starlight/components/Head.astro';
  * ahead of it. See lib/layer-order.ts.
  */
 import { STARLIGHT_LAYER_ORDER } from '../lib/layer-order';
+import { siteConfiguration } from '../lib/project';
+import {
+  hasMarkdownProjection,
+  markdownProjectionPath,
+} from '../lib/projection';
+import { structuredData, type StructuredPage } from '../lib/structured-data';
+
+/*
+ * What an agent reading the HTML needs to find the rest (ADR-033): the
+ * document's Markdown version, the index of the whole corpus, and what the
+ * page is in schema.org terms. Paths are taken under the site's base, so the
+ * links and the home page are found wherever the site is mounted.
+ */
+const { entry } = Astro.locals.starlightRoute;
+const { data } = entry;
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/u, '/');
+const withBase = (path: string) => `${base}${path.replace(/^\//u, '')}`;
+const markdownPath = hasMarkdownProjection(data.sourceType)
+  ? withBase(markdownProjectionPath(entry.id))
+  : undefined;
+
+const { pathname } = Astro.url;
+const isHome = pathname === base || `${pathname}/` === base;
+const page: StructuredPage | undefined = isHome
+  ? { kind: 'home' }
+  : markdownPath
+    ? {
+        kind: 'document',
+        title: data.title,
+        description: data.description,
+        modified: data.googleModifiedTime,
+        sourceUrl: typeof data.editUrl === 'string' ? data.editUrl : undefined,
+        markdownPath,
+      }
+    : data.sourceType === 'section-index'
+      ? { kind: 'section', title: data.title }
+      : undefined;
+const siteUrl = Astro.site ? new URL(base, Astro.site).href : undefined;
+const jsonLd =
+  page && siteUrl
+    ? structuredData(page, {
+        siteName: siteConfiguration.brand.siteTitle,
+        siteDescription: siteConfiguration.brand.siteDescription,
+        siteUrl,
+        pageUrl: new URL(pathname, siteUrl).href,
+      })
+    : undefined;
 ---
 
 <Default />
 <style is:inline set:html={STARLIGHT_LAYER_ORDER}></style>
+{
+  markdownPath && (
+    <link rel="alternate" type="text/markdown" href={markdownPath} />
+  )
+}
+<link
+  rel="alternate"
+  type="text/plain"
+  href={withBase('/llms.txt')}
+  title="llms.txt"
+/>
 <script>
   import '../scripts/mermaid-entry';
 </script>
+{jsonLd && <script type="application/ld+json" set:html={jsonLd} />}

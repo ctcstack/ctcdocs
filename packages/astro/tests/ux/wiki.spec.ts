@@ -1,5 +1,8 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import type { Root, RootContent } from 'mdast';
+import remarkParse from 'remark-parse';
+import { unified } from 'unified';
 
 import { folderAnchorId, folderTrail } from '../../lib/folder-anchor.js';
 import { siteConfiguration } from '../../lib/project.js';
@@ -16,6 +19,21 @@ import {
   pdfDocument,
   sectionWithSubfolder,
 } from '../support/corpus-fixtures.js';
+
+/** Every link destination in a Markdown document, read by a real parser. */
+function markdownLinks(markdown: string): string[] {
+  const urls: string[] = [];
+  const walk = (node: Root | RootContent): void => {
+    if (node.type === 'link') {
+      urls.push(node.url);
+    }
+    if ('children' in node) {
+      node.children.forEach(walk);
+    }
+  };
+  walk(unified().use(remarkParse).parse(markdown));
+  return urls;
+}
 
 /** Folder labels are Drive names, so they may carry pattern syntax. */
 function escapeRegExp(value: string): string {
@@ -385,6 +403,53 @@ test('generated documents expose their protected Markdown projection', async ({
   expect(source).toMatch(/^# .+$/mu);
   expect(source).not.toContain('AUTO-GENERATED');
   expect(source).not.toContain('googleFileId');
+});
+
+test('agents find every document through the llms.txt indexes', async ({
+  page,
+  request,
+}) => {
+  const document = anyDocument();
+
+  const response = await request.get('/llms.txt');
+  expect(response.ok()).toBe(true);
+  expect(response.headers()['content-type']).toContain('text/plain');
+  const index = await response.text();
+  expect(index).toMatch(/^# .+$/mu);
+  const links = markdownLinks(index);
+  expect(links).toContain(`/${document.slug}/index.md`);
+
+  // Every section index the site index links to is served and lists documents.
+  for (const path of links.filter((url) => url.endsWith('/llms.txt'))) {
+    const section = await request.get(path);
+    expect(section.ok(), path).toBe(true);
+    expect(
+      markdownLinks(await section.text()).some((url) =>
+        url.endsWith('/index.md'),
+      ),
+      path,
+    ).toBe(true);
+  }
+
+  // A document's page names its Markdown version and the index, and says what
+  // it is in terms an agent can read without the interface.
+  await page.goto(`/${document.slug}/`);
+  await expect(
+    page.locator('head link[rel="alternate"][type="text/markdown"]'),
+  ).toHaveAttribute('href', `/${document.slug}/index.md`);
+  await expect(
+    page.locator('head link[rel="alternate"][type="text/plain"]'),
+  ).toHaveAttribute('href', '/llms.txt');
+  const structured = JSON.parse(
+    (await page
+      .locator('head script[type="application/ld+json"]')
+      .textContent()) ?? '',
+  ) as Record<string, unknown>;
+  expect(structured).toMatchObject({
+    '@type': 'WebPage',
+    name: document.title,
+    encoding: { encodingFormat: 'text/markdown' },
+  });
 });
 
 test('generated images are served from the protected asset route', async ({

@@ -20,6 +20,22 @@
   X-Content-Type-Options: nosniff
   X-Robots-Tag: noindex, noarchive
 
+# The llms.txt indexes list every document's title and description and the
+# address of its Markdown version, so they are protected the same way. They are
+# served as .txt, and their charset has to be declared for the same reason as
+# the Markdown's. The two rules never overlap: the second needs a folder.
+/llms.txt
+  Cache-Control: private, max-age=60, must-revalidate
+  Content-Type: text/plain; charset=utf-8
+  X-Content-Type-Options: nosniff
+  X-Robots-Tag: noindex, noarchive
+
+/*/llms.txt
+  Cache-Control: private, max-age=60, must-revalidate
+  Content-Type: text/plain; charset=utf-8
+  X-Content-Type-Options: nosniff
+  X-Robots-Tag: noindex, noarchive
+
 /assets/generated/*
   Cache-Control: private, max-age=60, must-revalidate
   X-Content-Type-Options: nosniff

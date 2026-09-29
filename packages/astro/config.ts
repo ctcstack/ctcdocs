@@ -85,6 +85,8 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
     },
   ];
 
+  const generatedSidebar = normalizeSidebarLabels(options.sidebar);
+
   const starlightConfiguration: StarlightUserConfig = {
     title: brand.siteTitle,
     description: brand.siteDescription,
@@ -147,7 +149,7 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
     // The platform serves its own 404, which searches for the missing address.
     disable404Route: true,
     pagination: true,
-    sidebar: [...sidebarPrefix, ...normalizeSidebarLabels(options.sidebar)],
+    sidebar: [...sidebarPrefix, ...generatedSidebar],
     /*
      * A private deployment asks not to be indexed; a public one must not.
      * The built site is one artifact deployed to every environment, so the tag
@@ -199,7 +201,10 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
         ],
       }),
     },
-    integrations: [ctcdocsRoutes(), starlight(starlightConfiguration)],
+    integrations: [
+      ctcdocsRoutes({ navigation: generatedSidebar }),
+      starlight(starlightConfiguration),
+    ],
     ...options.astro,
   };
 }

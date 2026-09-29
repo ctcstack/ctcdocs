@@ -2,6 +2,39 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Added
+
+- `/llms.txt` lists every document that has a Markdown version, once, in the
+  order the sidebar shows it: a heading per folder, and per document its
+  title, the address of its Markdown version and its description. A PDF says
+  so in its link text. A top-level folder with a page of its own also gets
+  `/<its page>/llms.txt`, which the site index links to first. There is no
+  `llms-full.txt`. See
+  [ADR-033](docs/ADR/033-publish-llms-txt-indexes.md), which supersedes
+  ADR-010 in part.
+- Every page's head links to `/llms.txt`, a document's head to its Markdown
+  version, and the home page, documents and folder pages describe themselves
+  in JSON-LD: a document with its edit date, its source and its Markdown
+  version. The home page's "For AI agents" block starts at `/llms.txt`.
+- The fixture project's `typecheck` also type-checks the platform's
+  build-time routes and modules that read generated types, through
+  `tsconfig.platform.json`: the Markdown and asset routes, the `llms.txt`
+  routes, the corpus and section helpers, and the content configuration.
+  Nothing type-checked them before.
+
+### Changed
+
+- **Upgrade step:** a project's `public/_headers` needs rules for `/llms.txt`
+  and `/*/llms.txt`, with the policy of its `/*.md` rule and
+  `Content-Type: text/plain; charset=utf-8`; the fixture project's file shows
+  them. `ctcdocs-sync validate` requires both on a private deployment.
+- `ctcdocs-access-smoke` probes `/llms.txt`: denied to an anonymous request,
+  and served with its charset, listing the document it reads as Markdown, to
+  an admitted one. It reads the index up to 25 MiB, the largest file Workers
+  Static Assets serves.
+
 ## 0.13.1
 
 ### Fixed

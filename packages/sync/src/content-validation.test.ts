@@ -27,11 +27,25 @@ const temporaryDirectories: string[] = [];
 const PUBLIC_HEADERS = `/*.md
   Cache-Control: public, max-age=300
 
+/llms.txt
+  Cache-Control: public, max-age=300
+
+/*/llms.txt
+  Cache-Control: public, max-age=300
+
 /assets/generated/*
   Cache-Control: public, max-age=300
 `;
 
 const PROTECTED_HEADERS = `/*.md
+  Cache-Control: private, max-age=60, must-revalidate
+  X-Robots-Tag: noindex, noarchive
+
+/llms.txt
+  Cache-Control: private, max-age=60, must-revalidate
+  X-Robots-Tag: noindex, noarchive
+
+/*/llms.txt
   Cache-Control: private, max-age=60, must-revalidate
   X-Robots-Tag: noindex, noarchive
 
@@ -236,6 +250,8 @@ describe('repository content validation', () => {
 
     expect(result.errors).toEqual([
       expect.stringContaining('rule /*.md must set cache-control: private'),
+      expect.stringContaining('must carry a rule for /llms.txt'),
+      expect.stringContaining('must carry a rule for /*/llms.txt'),
       expect.stringContaining('must carry a rule for /assets/generated/*'),
     ]);
   });

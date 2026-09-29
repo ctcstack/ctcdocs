@@ -16,13 +16,15 @@
  */
 import { permanentLinkPath } from '@ctcstack/ctcdocs-core';
 
+import { markdownProjectionPath } from '../lib/projection';
+
 const { entry } = Astro.locals.starlightRoute;
 const { editUrl, googleModifiedTime, shortId, sourceType, syncedAt } =
   entry.data;
 const permanentPath = shortId ? permanentLinkPath(shortId) : undefined;
 
 const sourceUrl = typeof editUrl === 'string' ? editUrl : undefined;
-const markdownUrl = `/${entry.id}/index.md`;
+const markdownUrl = markdownProjectionPath(entry.id);
 
 function formatUtcDate(value: string): string {
   return new Date(value).toLocaleDateString('en', {

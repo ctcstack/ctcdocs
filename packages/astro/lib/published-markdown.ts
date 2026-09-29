@@ -5,6 +5,7 @@ import remarkParse from 'remark-parse';
 import remarkStringify from 'remark-stringify';
 import { unified } from 'unified';
 
+import { markdownProjectionPath } from './projection.js';
 import { resolvePermanentLink } from './remark-permanent-links.js';
 
 const processor = unified()
@@ -77,7 +78,7 @@ function markdownUrl(
   if (!stableSlugs.has(slug)) {
     return resolved;
   }
-  return `/${slug}/index.md${url.search}${url.hash}`;
+  return `${markdownProjectionPath(slug)}${url.search}${url.hash}`;
 }
 
 function rewriteInternalLinks(
@@ -132,7 +133,13 @@ function yamlString(value: string): string {
   return JSON.stringify(value);
 }
 
-function markdownHeading(value: string): string {
+/**
+ * One line of inline Markdown that reads as the text it was given: whitespace,
+ * newlines included, collapses to single spaces, and every character that
+ * would open emphasis, code, a link, HTML or a heading is escaped. Used for
+ * titles, which come from Drive names and may contain any of them.
+ */
+export function inlineMarkdown(value: string): string {
   return value
     .replace(/\s+/gu, ' ')
     .trim()
@@ -157,7 +164,7 @@ export function serializePublishedMarkdown(
     `content_hash: ${yamlString(input.contentHash)}`,
     '---',
     '',
-    `# ${markdownHeading(input.title)}`,
+    `# ${inlineMarkdown(input.title)}`,
     '',
     ...(body ? [body, ''] : []),
   ].join('\n');

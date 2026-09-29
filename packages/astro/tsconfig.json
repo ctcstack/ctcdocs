@@ -8,18 +8,21 @@
   },
   /*
    * Everything except the modules that consume Astro's virtual `astro:content`
-   * module. Those types are generated inside a project by `astro sync`, so they
-   * do not exist in a package that has no project of its own: the fixture
-   * project's `astro check` is what type-checks them, against the real
-   * generated types rather than a shim maintained here. `config.ts` is
-   * excluded for the same reason: importing Starlight pulls its own sources
-   * into the program, and they expect that generated environment too.
+   * module or the preset's navigation module. Those types are generated inside
+   * a project by `astro sync`, so they do not exist in a package that has no
+   * project of its own: the fixture project's `typecheck` checks these modules
+   * through its `tsconfig.platform.json`, against the real generated types
+   * rather than a shim maintained here. `config.ts` is excluded for the same
+   * reason: importing Starlight pulls its own sources into the program, and
+   * they expect that generated environment too. It is checked by nothing but
+   * the fixture's build.
    */
   "include": ["**/*.ts"],
   "exclude": [
     "node_modules",
     "config.ts",
     "content.ts",
+    "lib/agent-index-source.ts",
     "lib/corpus.ts",
     "lib/sections.ts",
     "routes/**"

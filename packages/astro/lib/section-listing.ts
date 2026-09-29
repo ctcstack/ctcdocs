@@ -9,6 +9,7 @@
  * Nothing here decides order: the pipeline already wrote the entries in the
  * order the sidebar uses. See docs/ADR/019-folders-before-documents.md.
  */
+import { oneLine } from './text.js';
 
 export type SectionEntry =
   | { kind: 'folder'; slug: string; documentCount: number }
@@ -68,12 +69,11 @@ export function sectionListingRows(
         documentCount: entry.documentCount,
       });
     } else {
-      const description = page.description?.replace(/\s+/gu, ' ').trim();
       rows.push({
         kind: 'document',
         href,
         label: page.title,
-        description: description ? description : undefined,
+        description: oneLine(page.description),
         modified: page.googleModifiedTime
           ? new Date(page.googleModifiedTime)
           : undefined,

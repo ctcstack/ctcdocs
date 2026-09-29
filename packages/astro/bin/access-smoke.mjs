@@ -11,6 +11,12 @@ import {
 } from '@ctcstack/ctcdocs-core';
 
 const MAX_RESPONSE_BYTES = 1_048_576;
+/*
+ * The llms.txt index grows with the corpus, so it is read up to the largest
+ * file Workers Static Assets serves, 25 MiB: a limit of its own could only
+ * fail a deployment that Cloudflare accepted.
+ */
+const MAX_INDEX_BYTES = 26_214_400;
 const REQUEST_TIMEOUT_MS = 15_000;
 // A Worker deployment becomes visible on every edge location a short while
 // after Wrangler reports success, so a route that this commit adds can still
@@ -106,12 +112,12 @@ function isAccessDenied(response) {
   );
 }
 
-async function readBoundedText(response) {
+async function readBoundedText(response, maxBytes = MAX_RESPONSE_BYTES) {
   const contentLength = response.headers.get('content-length');
   if (
     contentLength &&
     Number.isFinite(Number(contentLength)) &&
-    Number(contentLength) > MAX_RESPONSE_BYTES
+    Number(contentLength) > maxBytes
   ) {
     throw new AccessSmokeError('Response exceeded the smoke-test size limit.');
   }
@@ -128,7 +134,7 @@ async function readBoundedText(response) {
       break;
     }
     totalBytes += value.byteLength;
-    if (totalBytes > MAX_RESPONSE_BYTES) {
+    if (totalBytes > maxBytes) {
       await reader.cancel();
       throw new AccessSmokeError(
         'Response exceeded the smoke-test size limit.',
@@ -218,6 +224,7 @@ export async function verifyAccessPreflight({
     site.brand.faviconPath,
     '/pagefind/pagefind.js',
     markdownPath,
+    '/llms.txt',
     '/missing-access-boundary-probe',
   ].filter(Boolean);
 
@@ -333,6 +340,15 @@ export async function verifyPostDeploy({
       content: ['content_hash: "sha256:', '\n# '],
     },
     {
+      // The index lists the document the Markdown check reads, by the same
+      // address, so it proves the two agree as well as that the index is live.
+      path: '/llms.txt',
+      status: 200,
+      contentType: 'text/plain; charset=utf-8',
+      content: [`](${markdownPath})`],
+      maxBytes: MAX_INDEX_BYTES,
+    },
+    {
       path: site.brand.faviconPath,
       status: 200,
       contentType: 'image/',
@@ -378,7 +394,7 @@ export async function verifyPostDeploy({
             { retryable: true },
           );
         }
-        const body = await readBoundedText(response);
+        const body = await readBoundedText(response, check.maxBytes);
         for (const expected of check.content) {
           if (!body.includes(expected)) {
             throw new AccessSmokeError(

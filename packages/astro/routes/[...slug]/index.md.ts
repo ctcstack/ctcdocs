@@ -3,6 +3,7 @@ import type { APIRoute, GetStaticPaths } from 'astro';
 import { getCollection } from 'astro:content';
 
 import { markdownOwnershipHeader } from '../../lib/project.js';
+import { hasMarkdownProjection } from '../../lib/projection.js';
 import { serializePublishedMarkdown } from '../../lib/published-markdown.js';
 
 interface MarkdownPageProps {
@@ -18,9 +19,8 @@ function required(value: string | undefined, field: string): string {
 
 export const getStaticPaths = (async () => {
   const allEntries = await getCollection('docs');
-  const entries = allEntries.filter(
-    ({ data }) =>
-      data.sourceType === 'google-doc' || data.sourceType === 'drive-pdf',
+  const entries = allEntries.filter(({ data }) =>
+    hasMarkdownProjection(data.sourceType),
   );
   const stableSlugs = new Set(
     entries.map(({ id }) => required(id, 'route ID')),
