@@ -8,7 +8,7 @@
  *
  * The accent itself is the one project-specific part of the palette and lives
  * in brand.css, which Starlight loads before this file. Nothing here names a
- * brand color directly; every use goes through --sl-color-accent.
+ * brand color directly; every use goes through --kb-accent.
  *
  * Fonts are self-hosted and imported from src/components/Head.astro, where the
  * dependency stays traceable to the build. Per-subset unicode-range means an
@@ -18,6 +18,20 @@
 
 /* ---------------------------------------------------------------- tokens */
 
+/*
+ * The platform's own tokens, `--kb-*`, are the only names the rules below and
+ * the components use. Starlight reads its `--sl-*` tokens, so the adapter
+ * further down assigns those from these, in one place: the design language
+ * does not depend on Starlight's names, and a different shell would need a
+ * new adapter rather than edits across every component.
+ *
+ * Tokens Starlight defines and the platform only reads — its type steps, the
+ * header's geometry, its palette's red — are aliased the other way, from
+ * Starlight's values, in the same block. The accent triad is the brand
+ * contract a project's brand.css writes, under Starlight's names; the adapter
+ * reads it once, as `--kb-accent`.
+ */
+
 :root,
 ::backdrop {
   /*
@@ -26,55 +40,51 @@
    * ramp that is neutral in one theme and warm in the other is two systems.
    * The accent is the only place color appears.
    */
-  --sl-color-white: #f5f5f5;
-  --sl-color-gray-1: #ededed;
-  --sl-color-gray-2: #ededed;
-  --sl-color-gray-3: #a1a1a1;
-  --sl-color-gray-4: #6f6f6f;
-  --sl-color-gray-5: #3d3d3d;
-  --sl-color-gray-6: #333333;
-  --sl-color-black: #141414;
+  --kb-ink: #f5f5f5;
+  --kb-gray-1: #ededed;
+  --kb-gray-2: #ededed;
+  --kb-gray-3: #a1a1a1;
+  --kb-gray-4: #6f6f6f;
+  --kb-gray-5: #3d3d3d;
+  --kb-gray-6: #333333;
+  /* The page ground. Flat shell: header and sidebar share it. */
+  --kb-ground: #141414;
 
-  /* The accent triad for this theme is set in brand.css. */
-  --sl-color-text: var(--sl-color-gray-2);
-  --sl-color-text-accent: var(--sl-color-accent);
-  --sl-color-text-invert: #141414;
-
-  /* Flat shell: header and sidebar share the page ground. */
-  --sl-color-bg: var(--sl-color-black);
-  --sl-color-bg-nav: var(--sl-color-black);
-  --sl-color-bg-sidebar: var(--sl-color-black);
-  --sl-color-bg-inline-code: #232323;
-  --sl-color-bg-accent: var(--sl-color-accent);
+  --kb-text: var(--kb-gray-2);
+  --kb-text-accent: var(--kb-accent);
+  --kb-text-invert: #141414;
+  --kb-inline-code-bg: #232323;
 
   /*
    * A hairline is the only structural device in this system, so it is set
    * above the reference's own value: at #2a2a2a it sits at 1.29:1 on the dark
    * ground, which is the threshold of visibility rather than a rule.
    */
-  --sl-color-hairline: #333333;
-  --sl-color-hairline-light: #333333;
-  --sl-color-hairline-shade: #333333;
+  --kb-hairline: #333333;
 
-  /* Local roles the Starlight ramp has no name for. */
+  /* Roles the Starlight ramp has no name for. */
   --kb-surface-sunken: #0f0f0f;
   --kb-border-strong: #4a4a4a;
   --kb-nav-bg-translucent: rgb(20 20 20 / 80%);
 
   /* Documentation type scale: a tight hierarchy, not a marketing one. */
-  --sl-text-h1: 1.75rem;
-  --sl-text-h2: 1.3rem;
-  --sl-text-h3: 1.1rem;
-  --sl-text-h4: 1rem;
-  --sl-text-h5: 0.9375rem;
-  --sl-line-height-headings: 1.25;
-  --sl-line-height-table: 1.5;
+  --kb-text-h1: 1.75rem;
+  --kb-text-h2: 1.3rem;
+  --kb-text-h3: 1.1rem;
+  --kb-text-h4: 1rem;
+  --kb-text-h5: 0.9375rem;
+  --kb-line-height-headings: 1.25;
+  --kb-line-height-table: 1.5;
 
-  --sl-font: 'Inter Variable';
-  --sl-font-mono: 'JetBrains Mono Variable';
+  --kb-font: 'Inter Variable';
+  --kb-font-mono-family: 'JetBrains Mono Variable';
+  /* The stack code is set in: the family, then the system's own monospace. */
+  --kb-font-mono:
+    var(--kb-font-mono-family), ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, 'Liberation Mono', 'Courier New', monospace;
 
   /* Holds the prose measure at roughly 67 characters. */
-  --sl-content-width: 52rem;
+  --kb-content-width: 52rem;
 
   /* The index carries a date column, so it runs wider than prose. */
   --kb-index-width: 52rem;
@@ -85,28 +95,21 @@
 
 :root[data-theme='light'],
 [data-theme='light'] ::backdrop {
-  /* Neutral ramp, light. Starlight inverts the naming: white is the ink. */
-  --sl-color-white: #171717;
-  --sl-color-gray-1: #181818;
-  --sl-color-gray-2: #181818;
-  --sl-color-gray-3: #6b6b6b;
-  --sl-color-gray-4: #a3a3a3;
-  --sl-color-gray-5: #d6d6d6;
-  --sl-color-gray-6: #e4e4e4;
-  --sl-color-gray-7: #f7f7f7;
-  --sl-color-black: #fcfcfc;
+  /* Neutral ramp, light. gray-1 is the darkest here, as ink. */
+  --kb-ink: #171717;
+  --kb-gray-1: #181818;
+  --kb-gray-2: #181818;
+  --kb-gray-3: #6b6b6b;
+  --kb-gray-4: #a3a3a3;
+  --kb-gray-5: #d6d6d6;
+  --kb-gray-6: #e4e4e4;
+  --kb-gray-7: #f7f7f7;
+  --kb-ground: #fcfcfc;
 
-  --sl-color-text-accent: var(--sl-color-accent);
-  --sl-color-text-invert: #ffffff;
+  --kb-text-invert: #ffffff;
+  --kb-inline-code-bg: #f0f0f0;
 
-  --sl-color-bg-nav: var(--sl-color-black);
-  --sl-color-bg-sidebar: var(--sl-color-black);
-  --sl-color-bg-inline-code: #f0f0f0;
-  --sl-color-bg-accent: var(--sl-color-accent);
-
-  --sl-color-hairline: #e4e4e4;
-  --sl-color-hairline-light: #e4e4e4;
-  --sl-color-hairline-shade: #e4e4e4;
+  --kb-hairline: #e4e4e4;
 
   --kb-surface-sunken: #f7f7f7;
   --kb-border-strong: #d6d6d6;
@@ -120,11 +123,74 @@
 @media (min-width: 50em) {
   :root {
     --sl-nav-height: 3.5rem;
-    --sl-text-h1: 2.1875rem;
-    --sl-text-h2: 1.3rem;
-    --sl-text-h3: 1.1rem;
-    --sl-text-h4: 1rem;
+    --kb-text-h1: 2.1875rem;
+    --kb-text-h2: 1.3rem;
+    --kb-text-h3: 1.1rem;
+    --kb-text-h4: 1rem;
   }
+}
+
+/* --------------------------------------------------------------- adapter */
+
+/* Starlight's tokens, from the platform's, and the few read back from it. */
+:root,
+::backdrop {
+  --sl-color-white: var(--kb-ink);
+  --sl-color-gray-1: var(--kb-gray-1);
+  --sl-color-gray-2: var(--kb-gray-2);
+  --sl-color-gray-3: var(--kb-gray-3);
+  --sl-color-gray-4: var(--kb-gray-4);
+  --sl-color-gray-5: var(--kb-gray-5);
+  --sl-color-gray-6: var(--kb-gray-6);
+  --sl-color-black: var(--kb-ground);
+
+  --sl-color-text: var(--kb-text);
+  --sl-color-text-accent: var(--kb-text-accent);
+  --sl-color-text-invert: var(--kb-text-invert);
+
+  --sl-color-bg: var(--kb-ground);
+  --sl-color-bg-nav: var(--kb-ground);
+  --sl-color-bg-sidebar: var(--kb-ground);
+  --sl-color-bg-inline-code: var(--kb-inline-code-bg);
+  --sl-color-bg-accent: var(--kb-accent);
+
+  --sl-color-hairline: var(--kb-hairline);
+  --sl-color-hairline-light: var(--kb-hairline);
+  --sl-color-hairline-shade: var(--kb-hairline);
+
+  --sl-text-h1: var(--kb-text-h1);
+  --sl-text-h2: var(--kb-text-h2);
+  --sl-text-h3: var(--kb-text-h3);
+  --sl-text-h4: var(--kb-text-h4);
+  --sl-text-h5: var(--kb-text-h5);
+  --sl-line-height-headings: var(--kb-line-height-headings);
+  --sl-line-height-table: var(--kb-line-height-table);
+
+  --sl-font: var(--kb-font);
+  --sl-font-mono: var(--kb-font-mono-family);
+
+  --sl-content-width: var(--kb-content-width);
+
+  /* Read from brand.css and from Starlight. */
+  --kb-accent: var(--sl-color-accent);
+  /* The light ramp sets its own gray-7 below; the dark one keeps Starlight's. */
+  --kb-gray-7: var(--sl-color-gray-7);
+  --kb-danger: var(--sl-color-red-high);
+  --kb-text-xs: var(--sl-text-xs);
+  --kb-text-sm: var(--sl-text-sm);
+  --kb-text-base: var(--sl-text-base);
+  --kb-text-body: var(--sl-text-body);
+  --kb-text-2xl: var(--sl-text-2xl);
+  --kb-line-height: var(--sl-line-height);
+  --kb-nav-height: var(--sl-nav-height);
+  --kb-nav-pad-y: var(--sl-nav-pad-y);
+  --kb-nav-gap: var(--sl-nav-gap);
+}
+
+/* The light ramp has one more step, which the dark one leaves to Starlight. */
+:root[data-theme='light'],
+[data-theme='light'] ::backdrop {
+  --sl-color-gray-7: var(--kb-gray-7);
 }
 
 /* ------------------------------------------------------------ typography */
@@ -166,12 +232,12 @@
 header.header {
   backdrop-filter: blur(16px);
   background: var(--kb-nav-bg-translucent);
-  border-bottom: 1px solid var(--sl-color-hairline);
+  border-bottom: 1px solid var(--kb-hairline);
 }
 
 /* The wordmark is text; the accent belongs to the mark beside it. */
 .site-title {
-  color: var(--sl-color-white);
+  color: var(--kb-ink);
 }
 
 /*
@@ -188,11 +254,11 @@ header.header {
 
 /* The sidebar reads as the same sheet, divided by one rule. */
 #starlight__sidebar {
-  border-inline-end: 1px solid var(--sl-color-hairline);
+  border-inline-end: 1px solid var(--kb-hairline);
 }
 
 .sidebar-pane {
-  background: var(--sl-color-bg-sidebar);
+  background: var(--kb-ground);
   border-inline-end: 0;
 }
 
@@ -203,12 +269,12 @@ header.header {
  * quiet at rest still answers when reached for.
  */
 #starlight__sidebar summary .caret {
-  color: var(--sl-color-gray-4);
+  color: var(--kb-gray-4);
 }
 
 #starlight__sidebar summary:hover .caret,
 #starlight__sidebar summary:focus-visible .caret {
-  color: var(--sl-color-white);
+  color: var(--kb-ink);
 }
 
 /*
@@ -220,12 +286,12 @@ header.header {
  * read, present when you reach for them.
  */
 #starlight__sidebar a {
-  color: var(--sl-color-gray-3);
+  color: var(--kb-gray-3);
 }
 
 #starlight__sidebar a:hover,
 #starlight__sidebar a:focus {
-  color: var(--sl-color-white);
+  color: var(--kb-ink);
 }
 
 /*
@@ -260,7 +326,7 @@ header.header {
 #starlight__sidebar a[aria-current='page']:hover,
 #starlight__sidebar a[aria-current='page']:focus {
   background-color: var(--kb-surface-sunken);
-  color: var(--sl-color-text-accent);
+  color: var(--kb-text-accent);
   font-weight: 600;
 }
 
@@ -312,7 +378,7 @@ header.header {
   }
 
   .page:not(:has(#starlight__sidebar)) starlight-theme-select option {
-    color: var(--sl-color-white);
+    color: var(--kb-ink);
   }
 }
 
@@ -378,7 +444,7 @@ starlight-toc nav ul {
 }
 
 starlight-toc nav ul li a {
-  border-inline-start: 2px solid var(--sl-color-hairline);
+  border-inline-start: 2px solid var(--kb-hairline);
   border-radius: 0;
   line-height: 1.375;
   padding-block: 0.4375rem;
@@ -391,14 +457,14 @@ starlight-toc nav ul li a {
  * changes.
  */
 starlight-toc nav ul li a[aria-current='true'] {
-  border-inline-start-color: var(--sl-color-accent);
-  color: var(--sl-color-text-accent);
+  border-inline-start-color: var(--kb-accent);
+  color: var(--kb-text-accent);
   font-weight: 600;
 }
 
 /* The mobile collapsed rail keeps the flat treatment. */
 mobile-starlight-toc nav {
-  background: var(--sl-color-bg);
+  background: var(--kb-ground);
 }
 
 /*
@@ -426,7 +492,7 @@ div:has(> mobile-starlight-toc details > div > ul > li:only-child) {
  * because a collapsed border cannot be rounded.
  */
 .kb-table {
-  border: 1px solid var(--sl-color-hairline);
+  border: 1px solid var(--kb-hairline);
   border-radius: 0.5rem;
   margin-block: 1rem;
   overflow-x: auto;
@@ -444,7 +510,7 @@ div:has(> mobile-starlight-toc details > div > ul > li:only-child) {
 
 .sl-markdown-content :is(th, td) {
   border: 0;
-  border-bottom: 1px solid var(--sl-color-hairline);
+  border-bottom: 1px solid var(--kb-hairline);
   padding: 0.625rem 0.75rem;
   text-align: start;
   vertical-align: top;
@@ -456,15 +522,15 @@ div:has(> mobile-starlight-toc details > div > ul > li:only-child) {
  */
 .sl-markdown-content th {
   background: var(--kb-surface-sunken);
-  color: var(--sl-color-white);
-  font-size: var(--sl-text-sm);
+  color: var(--kb-ink);
+  font-size: var(--kb-text-sm);
   font-weight: 600;
-  line-height: var(--sl-line-height-headings);
+  line-height: var(--kb-line-height-headings);
 }
 
 .sl-markdown-content td {
   font-size: 0.9rem;
-  line-height: var(--sl-line-height-table);
+  line-height: var(--kb-line-height-table);
 }
 
 /*
@@ -487,15 +553,15 @@ div:has(> mobile-starlight-toc details > div > ul > li:only-child) {
   background: var(--kb-surface-sunken);
   border: 1px solid var(--kb-border-strong);
   border-radius: 0.25rem;
-  color: var(--sl-color-white);
-  font-family: var(--__sl-font-mono);
+  color: var(--kb-ink);
+  font-family: var(--kb-font-mono);
   font-size: 0.85em;
   font-weight: 500;
   padding: 0.1em 0.4em;
 }
 
 .sl-markdown-content :not(pre) > code {
-  border: 1px solid var(--sl-color-hairline);
+  border: 1px solid var(--kb-hairline);
   border-radius: 0.25rem;
 }
 
@@ -508,7 +574,7 @@ div:has(> mobile-starlight-toc details > div > ul > li:only-child) {
 .expressive-code .frame.has-title .header {
   backdrop-filter: none;
   background: transparent;
-  border-bottom: 1px solid var(--sl-color-hairline);
+  border-bottom: 1px solid var(--kb-hairline);
 }
 
 .expressive-code pre {
@@ -518,7 +584,7 @@ div:has(> mobile-starlight-toc details > div > ul > li:only-child) {
 /* Blockquotes carry the accent as a single hairline, never a slab. */
 .sl-markdown-content blockquote {
   border-inline-start: 1px solid var(--kb-border-strong);
-  color: var(--sl-color-gray-3);
+  color: var(--kb-gray-3);
 }
 
 /* ------------------------------------------------------------ pagination */
@@ -548,7 +614,7 @@ div:has(> mobile-starlight-toc details > div > ul > li:only-child) {
  * space above it belong to the links, not to the container that may hold none.
  */
 .pagination-links:has(a) {
-  border-top: 1px solid var(--sl-color-hairline);
+  border-top: 1px solid var(--kb-hairline);
   padding-top: 1.5rem;
 }
 
@@ -576,19 +642,19 @@ div:has(> mobile-starlight-toc details > div > ul > li:only-child) {
  * hover, so the label, the title and the mark answer as one control.
  */
 .pagination-links svg {
-  color: var(--sl-color-gray-4);
+  color: var(--kb-gray-4);
   flex-shrink: 0;
   font-size: 1.75rem;
 }
 
 .pagination-links a > span {
-  color: var(--sl-color-gray-3);
-  font-size: var(--sl-text-sm);
+  color: var(--kb-gray-3);
+  font-size: var(--kb-text-sm);
 }
 
 .pagination-links .link-title {
-  color: var(--sl-color-white);
-  font-size: var(--sl-text-body);
+  color: var(--kb-ink);
+  font-size: var(--kb-text-body);
   font-weight: 500;
 }
 
@@ -602,7 +668,7 @@ div:has(> mobile-starlight-toc details > div > ul > li:only-child) {
 
 .pagination-links a:hover svg,
 .pagination-links a:focus-visible svg {
-  color: var(--sl-color-white);
+  color: var(--kb-ink);
 }
 
 /* --------------------------------------------------------- mermaid blocks */
@@ -614,7 +680,7 @@ div:has(> mobile-starlight-toc details > div > ul > li:only-child) {
  */
 .kb-mermaid {
   background: var(--kb-surface-sunken);
-  border: 1px solid var(--sl-color-hairline);
+  border: 1px solid var(--kb-hairline);
   border-radius: 0.5rem;
   display: flex;
   justify-content: center;
@@ -637,22 +703,22 @@ div:has(> mobile-starlight-toc details > div > ul > li:only-child) {
  * source stays one disclosure away.
  */
 .kb-mermaid-error {
-  border: 1px solid var(--sl-color-hairline);
-  border-inline-start: 2px solid var(--sl-color-accent);
+  border: 1px solid var(--kb-hairline);
+  border-inline-start: 2px solid var(--kb-accent);
   border-radius: 0.5rem;
-  color: var(--sl-color-gray-3);
-  font-size: var(--sl-text-sm);
+  color: var(--kb-gray-3);
+  font-size: var(--kb-text-sm);
   padding: 1rem;
 }
 
 .kb-mermaid-error strong {
-  color: var(--sl-color-white);
+  color: var(--kb-ink);
   display: block;
   font-weight: 600;
 }
 
 .kb-mermaid-error details {
-  color: var(--sl-color-text);
+  color: var(--kb-text);
   margin-top: 0.75rem;
 }
 

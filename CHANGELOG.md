@@ -34,6 +34,22 @@ All three packages share a version and are released together.
   and served with its charset, listing the document it reads as Markdown, to
   an admitted one. It reads the index up to 25 MiB, the largest file Workers
   Static Assets serves.
+- The interface stylesheet and every component read the platform's own
+  `--kb-*` design tokens instead of Starlight's `--sl-*` ones. One adapter
+  block in `styles.css` assigns Starlight's tokens from the platform's, and
+  reads back the few Starlight owns, such as its type steps, so the design
+  language no longer depends on Starlight's names. A unit test keeps
+  Starlight's token names out of components, routes, scripts and `lib`, and
+  their reads out of `styles.css` outside the adapter. A project's
+  `brand.css` is unchanged and keeps writing the accent triad under
+  Starlight's names, and the Expressive Code overrides in the preset keep
+  Starlight's names too, so the code stylesheet and its address do not
+  change. Compared before and after on the fixture, 35 computed properties of
+  every element were identical on all 20 pages, the permanent-link redirects
+  aside, in both themes at desktop and
+  phone widths, with the search dialog and its backdrop open, with the mobile
+  menu open, across the first 25 keyboard focus stops, under the pointer on
+  the first 20 links and controls of two pages, and in print.
 
 ## 0.13.1
 

@@ -453,10 +453,18 @@ date remains.
 
 ### Do:
 
-- **Do** build new surfaces by overriding Starlight's `--sl-*` custom properties
-  plus the local `--kb-*` roles (`--kb-surface-sunken`, `--kb-border-strong`,
-  `--kb-nav-bg-translucent`, `--kb-index-width`). This system is a token override
-  of the framework, not a parallel stylesheet.
+- **Do** build new surfaces from the platform's own `--kb-*` tokens: the ramp
+  (`--kb-ink`, `--kb-gray-1` to `--kb-gray-7`, `--kb-ground`), `--kb-hairline`,
+  `--kb-accent`, the type steps and the local roles (`--kb-surface-sunken`,
+  `--kb-border-strong`, `--kb-nav-bg-translucent`, `--kb-index-width`). The
+  adapter block in `styles.css` is the one place Starlight's `--sl-*` tokens are
+  assigned, from these, and the few Starlight owns are read back as `--kb-*`
+  there too. A component that names `--sl-*` couples the design language to the
+  shell again, and `lib/token-boundary.test.ts` fails on it. The accent triad
+  stays under Starlight's names in a project's `brand.css`: that file is the
+  brand contract, and the adapter reads it once. The Expressive Code overrides
+  in `config.ts` also keep Starlight's names: they are Starlight's
+  configuration, and renaming them changes the code stylesheet's address.
 - **Do** define both theme values whenever a new token is added, and measure each
   against its own ground before shipping it.
 - **Do** separate regions with a single 1px hairline and recess surfaces with the

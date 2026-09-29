@@ -107,6 +107,12 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
      * different hash, so every page loads a 404 and code renders unstyled.
      * Starlight's own pair derives from the color tokens above, so the code
      * palette already follows this theme rather than importing one.
+     *
+     * These overrides keep Starlight's token names on purpose, where the rest
+     * of the interface reads the platform's (`--kb-*`, see styles.css): they
+     * are Starlight's configuration and would be rewritten with it, and any
+     * change to them changes the Expressive Code stylesheet's hash, which a
+     * project's cached content store would keep linking by its old name.
      */
     expressiveCode: {
       styleOverrides: {

@@ -15,9 +15,9 @@ let rendering = false;
 function themeVariables(): MermaidThemeVariables {
   const styles = getComputedStyle(document.documentElement);
   const token = (name: string): string => styles.getPropertyValue(name).trim();
-  const ground = token('--sl-color-bg');
+  const ground = token('--kb-ground');
   const surface = token('--kb-surface-sunken');
-  const hairline = token('--sl-color-hairline');
+  const hairline = token('--kb-hairline');
   const line = token('--kb-border-strong');
 
   return {
@@ -32,7 +32,7 @@ function themeVariables(): MermaidThemeVariables {
     mainBkg: surface,
     primaryColor: surface,
     primaryBorderColor: line,
-    primaryTextColor: token('--sl-color-white'),
+    primaryTextColor: token('--kb-ink'),
     secondaryColor: surface,
     secondaryBorderColor: line,
     tertiaryColor: ground,
@@ -41,11 +41,11 @@ function themeVariables(): MermaidThemeVariables {
     clusterBkg: ground,
     clusterBorder: hairline,
     lineColor: line,
-    textColor: token('--sl-color-text'),
-    nodeTextColor: token('--sl-color-white'),
-    titleColor: token('--sl-color-white'),
+    textColor: token('--kb-text'),
+    nodeTextColor: token('--kb-ink'),
+    titleColor: token('--kb-ink'),
     edgeLabelBackground: ground,
-    fontFamily: `${token('--sl-font')}, ui-sans-serif, system-ui, sans-serif`,
+    fontFamily: `${token('--kb-font')}, ui-sans-serif, system-ui, sans-serif`,
     fontSize: '14px',
   };
 }

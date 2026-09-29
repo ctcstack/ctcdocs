@@ -158,8 +158,8 @@ const PREVIEW_COUNT = 3;
      * would break the continuous ruling.
      */
     .category-grid {
-      background: var(--sl-color-hairline);
-      border: 1px solid var(--sl-color-hairline);
+      background: var(--kb-hairline);
+      border: 1px solid var(--kb-hairline);
       display: grid;
       gap: 1px;
       grid-template-columns: 1fr;
@@ -198,7 +198,7 @@ const PREVIEW_COUNT = 3;
     }
 
     .category-card {
-      background: var(--sl-color-bg);
+      background: var(--kb-ground);
       display: flex;
       flex: 1;
       flex-direction: column;
@@ -212,15 +212,15 @@ const PREVIEW_COUNT = 3;
     }
 
     .category-card:focus-visible {
-      outline: 2px solid var(--sl-color-text-accent);
+      outline: 2px solid var(--kb-text-accent);
       outline-offset: -2px;
     }
 
     .category-head {
       align-items: baseline;
-      color: var(--sl-color-gray-3);
+      color: var(--kb-gray-3);
       display: flex;
-      font-size: var(--sl-text-xs);
+      font-size: var(--kb-text-xs);
       font-variant-numeric: tabular-nums;
       gap: 1rem;
       justify-content: space-between;
@@ -234,12 +234,12 @@ const PREVIEW_COUNT = 3;
      * which is the claim this whole page makes.
      */
     .category-age[data-age='fresh'] {
-      color: var(--sl-color-white);
+      color: var(--kb-ink);
       font-weight: 500;
     }
 
     .category-age[data-age='recent'] {
-      color: var(--sl-color-gray-2);
+      color: var(--kb-gray-2);
     }
 
     /*
@@ -248,16 +248,16 @@ const PREVIEW_COUNT = 3;
      * read as a paragraph in a box.
      */
     .category-name {
-      color: var(--sl-color-white);
+      color: var(--kb-ink);
       font-size: 1.125rem;
       font-weight: 600;
       letter-spacing: -0.015em;
-      line-height: var(--sl-line-height-headings);
+      line-height: var(--kb-line-height-headings);
       margin: 0 0 0.625rem;
     }
 
     .category-card:hover .category-name {
-      color: var(--sl-color-text-accent);
+      color: var(--kb-text-accent);
     }
 
     /*
@@ -277,8 +277,8 @@ const PREVIEW_COUNT = 3;
      * grey they were decoration around a heading.
      */
     .category-description {
-      color: var(--sl-color-gray-3);
-      font-size: var(--sl-text-body);
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-body);
       line-height: 1.55;
       margin: 0;
       text-wrap: pretty;
@@ -294,7 +294,7 @@ const PREVIEW_COUNT = 3;
      * version is the one this page already rejected.
      */
     .category-preview {
-      font-size: var(--sl-text-sm);
+      font-size: var(--kb-text-sm);
       line-height: 1.5;
       list-style: none;
       margin: 0;
@@ -313,7 +313,7 @@ const PREVIEW_COUNT = 3;
      * stroke at the edge of visible in both themes.
      */
     .category-preview-icon {
-      color: var(--sl-color-gray-3);
+      color: var(--kb-gray-3);
       flex: none;
       height: 0.875rem;
       width: 0.875rem;
@@ -321,7 +321,7 @@ const PREVIEW_COUNT = 3;
 
     /* One line each: a truncated title still identifies the document. */
     .category-preview-title {
-      color: var(--sl-color-gray-2);
+      color: var(--kb-gray-2);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -334,9 +334,9 @@ const PREVIEW_COUNT = 3;
      */
     .category-foot {
       align-items: center;
-      color: var(--sl-color-text-accent);
+      color: var(--kb-text-accent);
       display: inline-flex;
-      font-size: var(--sl-text-sm);
+      font-size: var(--kb-text-sm);
       font-weight: 500;
       gap: 0.5rem;
       width: fit-content;
