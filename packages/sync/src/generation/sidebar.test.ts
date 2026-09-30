@@ -183,8 +183,13 @@ describe('generated sidebar', () => {
       {
         label: 'Team',
         items: [
-          // Named like the first landing title, since it stands in for one.
-          { label: 'Overview', slug: 'team' },
+          // Named like the first landing title, since it stands in for one,
+          // and naming its folder for screen readers and previous and next.
+          {
+            label: 'Overview',
+            slug: 'team',
+            attrs: { 'aria-label': 'Team: Overview' },
+          },
           { label: 'Guide', slug: 'team/guide' },
         ],
       },
@@ -192,11 +197,19 @@ describe('generated sidebar', () => {
         label: 'Operations',
         items: [
           // A folder that holds only folders opens with its page too.
-          { label: 'Overview', slug: 'ops' },
+          {
+            label: 'Overview',
+            slug: 'ops',
+            attrs: { 'aria-label': 'Operations: Overview' },
+          },
           {
             label: 'Runbooks',
             items: [
-              { label: 'Overview', slug: 'ops/runbooks' },
+              {
+                label: 'Overview',
+                slug: 'ops/runbooks',
+                attrs: { 'aria-label': 'Runbooks: Overview' },
+              },
               { label: 'Restart', slug: 'ops/runbooks/restart' },
             ],
           },
@@ -235,6 +248,66 @@ describe('generated sidebar', () => {
       expect(group?.items).toHaveLength(2);
     },
   );
+
+  it('leaves the page out beside a subfolder with its label', () => {
+    const selection = buildInventorySelection(
+      [
+        item('root', 'Published', GOOGLE_DRIVE_FOLDER_MIME_TYPE, 'drive'),
+        item('product', 'Product/', GOOGLE_DRIVE_FOLDER_MIME_TYPE, 'root'),
+        item('guide', 'Guide', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'product'),
+        item('intro', 'overview', GOOGLE_DRIVE_FOLDER_MIME_TYPE, 'product'),
+        item('tour', 'Tour', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'intro'),
+      ],
+      'root',
+      [],
+      ['drive'],
+    );
+    const manifest = createEmptyManifest('drive', 'root', timestamp);
+    manifest.documents['guide'] = record('guide', 'product/guide');
+    manifest.documents['tour'] = record('tour', 'product/overview/tour');
+    manifest.folders['product'] = folderRecord('product', 'product');
+    manifest.folders['intro'] = folderRecord('intro', 'product/overview');
+
+    const [product] = createSidebar(selection, manifest, LANDING_TITLES);
+    expect(product?.items.map((entry) => entry.label)).toEqual([
+      'overview',
+      'Guide',
+    ]);
+    // The subfolder's own page is still first in its group, and names the
+    // folder without the slash a Drive name can end with.
+    expect(product?.items[0]).toMatchObject({
+      items: [
+        {
+          slug: 'product/overview',
+          attrs: { 'aria-label': 'overview: Overview' },
+        },
+        { slug: 'product/overview/tour' },
+      ],
+    });
+  });
+
+  it('names a folder without the slash its Drive name ends with', () => {
+    const selection = buildInventorySelection(
+      [
+        item('root', 'Published', GOOGLE_DRIVE_FOLDER_MIME_TYPE, 'drive'),
+        item('team', '01 - Team/', GOOGLE_DRIVE_FOLDER_MIME_TYPE, 'root'),
+        item('guide', 'Guide', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+      ],
+      'root',
+      [],
+      ['drive'],
+    );
+    const manifest = createEmptyManifest('drive', 'root', timestamp);
+    manifest.documents['guide'] = record('guide', 'team/guide');
+    manifest.folders['team'] = folderRecord('team', 'team');
+
+    const [team] = createSidebar(selection, manifest, LANDING_TITLES);
+    expect(team?.items[0]).toEqual({
+      label: 'Overview',
+      slug: 'team',
+      attrs: { 'aria-label': 'Team: Overview' },
+    });
+  });
 
   it('shows no folder page when the project generates none', () => {
     const selection = buildInventorySelection(

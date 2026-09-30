@@ -20,6 +20,11 @@ interface SidebarLink {
   slug: string;
   /** Marks a page that presents a PDF rather than a document (ADR-027). */
   badge?: string;
+  /**
+   * A folder's page names its folder here, since its label names only what
+   * it is. Screen readers read it, and the previous and next links show it.
+   */
+  attrs?: { 'aria-label': string };
 }
 
 interface SidebarGroup {
@@ -54,16 +59,19 @@ function documentLink(
 }
 
 /**
- * A folder's own page, as the first item of its group, when nothing else in
- * the folder can open it (ADR-035). A document titled like a landing page,
- * such as Overview, already does, numbered or not, so the page stays out and
- * the group never shows two entries with one name. Otherwise the page takes
- * the first landing title as its label. There is no page to show when the
- * project does not generate folder pages.
+ * A folder's own page, as the first item of its group, when the folder holds
+ * no document with a landing title (ADR-035). Such a document, numbered or
+ * not, stands in for the page, so the page stays out and the group never
+ * shows two entries with one name; for the same reason it stays out beside a
+ * subfolder with its label. Otherwise the page takes the first landing title
+ * as its label, and names its folder for screen readers and for the previous
+ * and next links. There is no page to show when the project does not generate
+ * folder pages.
  */
 function folderPage(
   folder: InventoryFolderNode,
   documents: readonly SelectedInventoryItem[],
+  subfolderLabels: readonly string[],
   manifest: SyncManifest,
   landingTitles: readonly string[],
 ): SidebarLink | undefined {
@@ -72,13 +80,28 @@ function folderPage(
   if (!record?.stableSlug || !record.generatedMarkdownPath || !label) {
     return undefined;
   }
-  const opensWithLanding = documents.some((document) =>
+  const hasLandingDocument = documents.some((document) =>
     isLandingTitle(
       parseOrderedLabel(documentName(document.item)).label,
       landingTitles,
     ),
   );
-  return opensWithLanding ? undefined : { label, slug: record.stableSlug };
+  const hasNamesake = subfolderLabels.some((subfolder) =>
+    isLandingTitle(subfolder, [label]),
+  );
+  if (hasLandingDocument || hasNamesake) {
+    return undefined;
+  }
+  // Without the trailing slash a Drive folder name can carry, which the site
+  // drops from group labels where it shows them.
+  const folderLabel = parseOrderedLabel(folder.item.name)
+    .label.replace(/\/+$/u, '')
+    .trim();
+  return {
+    label,
+    slug: record.stableSlug,
+    attrs: { 'aria-label': `${folderLabel}: ${label}` },
+  };
 }
 
 export function createSidebar(
@@ -129,6 +152,7 @@ export function createSidebar(
       children.flatMap((child) =>
         child.kind === 'document' ? [child.item] : [],
       ),
+      items.flatMap((item) => ('items' in item ? [item.label] : [])),
       manifest,
       landingTitles,
     );

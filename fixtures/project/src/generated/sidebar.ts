@@ -42,14 +42,20 @@ export const generatedSidebar = [
     "items": [
       {
         "label": "Overview",
-        "slug": "reference"
+        "slug": "reference",
+        "attrs": {
+          "aria-label": "Reference: Overview"
+        }
       },
       {
         "label": "Guides",
         "items": [
           {
             "label": "Overview",
-            "slug": "reference/guides"
+            "slug": "reference/guides",
+            "attrs": {
+              "aria-label": "Guides: Overview"
+            }
           },
           {
             "label": "Style guide",

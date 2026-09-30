@@ -4,7 +4,11 @@ import type { Root, RootContent } from 'mdast';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 
-import { folderAnchorId, folderTrail } from '../../lib/folder-anchor.js';
+import {
+  folderAnchorId,
+  folderTrail,
+  normalizeFolderName,
+} from '../../lib/folder-anchor.js';
 import { siteConfiguration } from '../../lib/project.js';
 import {
   anyDocument,
@@ -16,7 +20,7 @@ import {
   documentWithAsset,
   documentWithPermanentLink,
   documentWithTable,
-  folderPageSlugs,
+  folderPages,
   pdfDocument,
   sectionWithSubfolder,
 } from '../support/corpus-fixtures.js';
@@ -45,19 +49,24 @@ async function expectNoAccessibilityViolations(page: Page): Promise<void> {
   /*
    * Audit the page once it has settled. Switching the theme changes a link's
    * text at once and fades its background over 150ms, so a check in between
-   * measures a frame no reader stops on. Endless animations are not waited
-   * for, or the audit would never start.
+   * measures a frame no reader stops on. Only running animations with an end
+   * are waited for, and for two seconds at most: an endless or paused one
+   * would otherwise keep the audit from ever starting.
    */
   await page.evaluate(() =>
-    Promise.all(
-      document
-        .getAnimations()
-        .filter(
-          (animation) =>
-            animation.effect?.getComputedTiming().endTime !== Infinity,
-        )
-        .map((animation) => animation.finished.catch(() => undefined)),
-    ),
+    Promise.race([
+      Promise.all(
+        document
+          .getAnimations()
+          .filter(
+            (animation) =>
+              animation.playState === 'running' &&
+              animation.effect?.getComputedTiming().endTime !== Infinity,
+          )
+          .map((animation) => animation.finished.catch(() => undefined)),
+      ),
+      new Promise((settled) => setTimeout(settled, 2000)),
+    ]),
   );
   const results = await new AxeBuilder({ page }).analyze();
   expect(results.violations).toEqual([]);
@@ -402,21 +411,33 @@ test('a section page tells its folders from its documents', async ({
 test('a folder with no landing document opens with its own page', async ({
   page,
 }) => {
-  const folders = folderPageSlugs();
+  const folders = folderPages();
   test.skip(folders.length === 0, 'The project generates no folder pages.');
   const [label] = siteConfiguration.navigation.landingDocumentTitles;
 
   // A folder opened by a landing document keeps its page out of the sidebar;
-  // any other lists the page first, named like the first landing title.
+  // any other lists the page first, named like the first landing title, and
+  // names its folder to screen readers.
   let listed = 0;
-  for (const slug of folders.slice(0, 10)) {
-    await page.goto(`/${slug}/`);
+  for (const folder of folders.slice(0, 10)) {
+    await page.goto(`/${folder.slug}/`);
     const current = page.locator('#starlight__sidebar a[aria-current="page"]');
     if ((await current.count()) === 0) {
       continue;
     }
     await expect(current).toHaveText(label ?? '');
-    await expect(current).toHaveAttribute('href', `/${slug}/`);
+    await expect(current).toHaveAttribute('href', `/${folder.slug}/`);
+    const named = `${normalizeFolderName(folder.label)}: ${label ?? ''}`;
+    await expect(current).toHaveAttribute('aria-label', named);
+
+    // The page before it links on to it by that name, not a bare label.
+    const previous = page.locator('.pagination-links a[rel="prev"]');
+    if (listed === 0 && (await previous.count()) > 0) {
+      await page.goto((await previous.getAttribute('href')) ?? '/');
+      await expect(
+        page.locator('.pagination-links a[rel="next"] .link-title'),
+      ).toHaveText(named);
+    }
     listed += 1;
   }
   test.skip(listed === 0, 'Every folder here opens with a landing document.');

@@ -60,8 +60,8 @@ function landingRank(
 
 /**
  * Whether a title is one of the project's landing titles, whatever its case.
- * A folder with such a document opens with it; one without opens with its
- * own page (ADR-035).
+ * A folder holding a document with such a title shows it in place of its own
+ * page (ADR-035).
  */
 export function isLandingTitle(
   title: string,

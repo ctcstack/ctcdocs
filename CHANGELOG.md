@@ -70,17 +70,18 @@ All three packages share a version and are released together.
   Google's export or the link handling now differ from when the page was last
   written.
 - A folder's page now opens its sidebar group, as "Overview", when the folder
-  holds no document titled like a landing page. A folder that does, numbered
-  or not, opens with that document as before, so a group never lists two
-  entries with one name. The label is the first of
-  `navigation.landingDocumentTitles`. The page is then highlighted in the
-  sidebar when open, and takes its place in previous and next. See
+  holds no document with a landing title, numbered or not, and no subfolder
+  labeled like it, so a group never lists two entries with one name. The
+  label is the first of `navigation.landingDocumentTitles`. The item names its
+  folder in `aria-label`, "Reference: Overview", which the previous and next
+  links now show in place of the sidebar label. The page is highlighted in
+  the sidebar when open, and takes its place in previous and next. See
   [ADR-035](docs/ADR/035-open-a-folder-with-its-page-when-it-has-no-landing-document.md),
   which supersedes ADR-014 in part. The sidebar changes on the next sync.
-- The browser suite runs its accessibility audits once the page's animations
-  have finished. Switching the theme fades a sidebar link's background over
-  150 ms while its text changes at once, and an audit in between failed on a
-  frame no reader stops on.
+- The browser suite runs its accessibility audits once the page's running
+  animations have finished, waiting two seconds at most. Switching the theme
+  fades a sidebar link's background over 150 ms while its text changes at
+  once, and an audit in between failed on a frame no reader stops on.
 
 ## 0.13.1
 
