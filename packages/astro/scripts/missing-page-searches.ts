@@ -27,8 +27,8 @@ function wordsOf(segment: string): string[] {
  * rename removed. The folders are searched only when the name has no word
  * to search for. A page does not index its folder trail, so a search that
  * adds the folders' words cannot find the page itself: it finds the pages
- * that list those folders, such as the home page, and they would be offered
- * instead.
+ * that name those folders — a folder's own page, or its heading in the full
+ * index — and they would be offered instead.
  */
 export function searchesFor(pathname: string): string[] {
   let decoded = pathname;

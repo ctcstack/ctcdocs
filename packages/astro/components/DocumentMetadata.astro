@@ -16,7 +16,6 @@
  */
 import { permanentLinkPath } from '@ctcstack/ctcdocs-core';
 
-import { VIEW_AS_MARKDOWN_LABEL } from '../lib/interface-text';
 import { markdownProjectionPath } from '../lib/projection';
 
 const { entry } = Astro.locals.starlightRoute;
@@ -55,7 +54,11 @@ const showSectionLink = sourceType === 'section-index' && permanentPath;
 
 {
   showMetadata && (
-    <div class="doc-meta" data-pagefind-ignore>
+    <div
+      class="doc-meta"
+      data-ctcdocs-unindexed="document-metadata"
+      data-pagefind-ignore
+    >
       <span class="doc-meta-fact">
         <svg
           aria-hidden="true"
@@ -139,7 +142,7 @@ const showSectionLink = sourceType === 'section-index' && permanentPath;
           <path d="M9 2H4.5A1.5 1.5 0 0 0 3 3.5v9A1.5 1.5 0 0 0 4.5 14h7a1.5 1.5 0 0 0 1.5-1.5V6z" />
           <path d="M9 2v4h4" />
         </svg>
-        {VIEW_AS_MARKDOWN_LABEL}
+        View as Markdown
       </a>
 
       <a
@@ -170,7 +173,11 @@ const showSectionLink = sourceType === 'section-index' && permanentPath;
 
 {
   showSectionLink && (
-    <div class="doc-meta" data-pagefind-ignore>
+    <div
+      class="doc-meta"
+      data-ctcdocs-unindexed="document-metadata"
+      data-pagefind-ignore
+    >
       <copy-link data-path={permanentPath}>
         <button class="doc-meta-action" type="button">
           <svg

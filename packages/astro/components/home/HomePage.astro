@@ -37,7 +37,7 @@ const corpus = await loadCorpus();
 const { home } = siteConfiguration;
 ---
 
-<div class="home-page" data-pagefind-ignore>
+<div class="home-page" data-ctcdocs-unindexed="home-page" data-pagefind-ignore>
   <HomeHero corpus={corpus} />
   <CategoryCards groups={corpus.groups} />
   <RecentUpdates documents={corpus.recent} limit={home.recentLimit} />

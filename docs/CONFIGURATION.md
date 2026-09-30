@@ -165,6 +165,12 @@ copy of it or links to it. Folder headings are addressable there —
 land when that folder has no page of its own. See
 [ADR-017](ADR/017-full-index-page.md).
 
+**Search finds the home page by its title alone.** Everything below the title,
+`home.lede` included, repeats what the documents hold or is interface text, so
+it is kept out of the index. A folder with no page of its own is found by its
+name at its heading in the full index. See
+[ADR-036](ADR/036-index-the-home-page-by-its-title-and-a-folder-where-it-has-its-address.md).
+
 Two consequences worth knowing:
 
 - `documents` is a reserved address. A new Drive folder or document named

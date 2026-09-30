@@ -40,7 +40,12 @@ const showBreadcrumb = entry.data.template !== 'splash';
 
 {
   showBreadcrumb && (
-    <nav aria-label="Breadcrumb" class="doc-breadcrumb" data-pagefind-ignore>
+    <nav
+      aria-label="Breadcrumb"
+      class="doc-breadcrumb"
+      data-ctcdocs-unindexed="breadcrumb"
+      data-pagefind-ignore
+    >
       <ol>
         <li>
           <a href="/">Home</a>

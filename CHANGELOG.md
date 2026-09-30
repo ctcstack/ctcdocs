@@ -85,20 +85,23 @@ All three packages share a version and are released together.
 
 ### Fixed
 
+- The home page is found in search by its title alone. Its folder cards,
+  recent documents and interface text were indexed, so it came back beside
+  nearly every document a search found, and the 404 page could offer it in
+  place of the page a stale address named. A folder with no page of its own is
+  now found by its name at its heading in the full index, which was the only
+  text naming it that the home page's exclusion would otherwise take away. See
+  [ADR-036](docs/ADR/036-index-the-home-page-by-its-title-and-a-folder-where-it-has-its-address.md),
+  which supersedes ADR-017 in part.
 - `ctcdocs-verify-search` checks again that interface text stays out of the
   search index. It searched for a sentence no component renders any more, so
-  the check passed on every build without testing anything. It now searches
-  for the "View as Markdown" label, which the component and the verifier read
-  from one constant, and fails when no built page renders that label inside
-  an element marked `data-pagefind-ignore`. A document whose own text uses the
-  label may still be found.
-- The home page is found in search by its title alone. Its folder cards,
-  recent documents and interface text were indexed, so the home page came back
-  beside nearly every document a search found, and the 404 page could offer it
-  in place of the page a stale address named. The whole block below the title
-  is marked `data-pagefind-ignore`, the way the full index already was, and
-  `ctcdocs-verify-search` also checks that the home page's "For AI agents"
-  heading is not in the index.
+  the check passed on every build without testing anything. Elements whose
+  text must stay out of the index are now marked `data-ctcdocs-unindexed`; the
+  check fails when a build marks nothing, and when any marked element on any
+  page lacks `data-pagefind-ignore`. Pagefind itself then confirms that a
+  marked page indexes the same as the page without its marked elements, and
+  that the home page indexes only its title. A project that replaces the
+  platform's components keeps the marks.
 
 ## 0.13.1
 

@@ -109,7 +109,8 @@ declarations.
 `defineAccessConfig()` takes its target from `CTCDOCS_BASE_URL`.
 
 Three binaries come with it: `ctcdocs-verify-search`, which proves the built
-Pagefind index finds the documents the corpus contains;
+Pagefind index finds the documents the corpus contains and holds none of the
+text the interface marks `data-ctcdocs-unindexed`;
 `ctcdocs-access-smoke`, which proves a deployment is reachable exactly by the
 audience it declares; and `ctcdocs-preview`, which serves the build with
 Astro's preview server and stays in the foreground where `astro preview` moves
