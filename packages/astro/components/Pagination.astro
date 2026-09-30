@@ -11,12 +11,22 @@
  * lost when the component is replaced. It is not reproduced here: the whole
  * arrangement of this block now lives in one place, under `pagination` in
  * src/styles/custom.css.
+ *
+ * Starlight titles each link with its sidebar label. A folder's page is
+ * labeled "Overview" in its own group, which says nothing out of it, so the
+ * link shows the name the sidebar gives it for screen readers, which names
+ * the folder too (ADR-035).
  */
 import { Icon } from '@astrojs/starlight/components';
 
 const { dir, pagination } = Astro.locals.starlightRoute;
 const { prev, next } = pagination;
 const isRtl = dir === 'rtl';
+
+function linkTitle(link: { label: string; attrs?: Record<string, unknown> }) {
+  const named = link.attrs?.['aria-label'];
+  return typeof named === 'string' && named ? named : link.label;
+}
 ---
 
 <div class="pagination-links print:hidden" dir={dir}>
@@ -27,7 +37,7 @@ const isRtl = dir === 'rtl';
         <span>
           {Astro.locals.t('page.previousLink')}
           <br />
-          <span class="link-title">{prev.label}</span>
+          <span class="link-title">{linkTitle(prev)}</span>
         </span>
       </a>
     )
@@ -39,7 +49,7 @@ const isRtl = dir === 'rtl';
         <span>
           {Astro.locals.t('page.nextLink')}
           <br />
-          <span class="link-title">{next.label}</span>
+          <span class="link-title">{linkTitle(next)}</span>
         </span>
       </a>
     )

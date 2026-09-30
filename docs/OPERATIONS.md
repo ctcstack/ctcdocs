@@ -289,9 +289,10 @@ same order the sidebar uses, each with the description it publishes. A folder
 with nothing in it still gets its page and says so.
 
 The page is absent from search. In the sidebar it opens its folder's group,
-labeled with the first of `navigation.landingDocumentTitles` ("Overview"),
-unless the folder holds a document with one of those titles, which opens the
-group instead; so a group never lists two entries with one name
+labeled with the first of `navigation.landingDocumentTitles` ("Overview") and
+named "Folder: Overview" for screen readers and in the previous and next links,
+unless the folder holds a document with one of those titles, or a subfolder
+labeled like the page; so a group never lists two entries with one name
 ([ADR-035](ADR/035-open-a-folder-with-its-page-when-it-has-no-landing-document.md)).
 It is also reached by its URL, by the folder cards on the home page, and by the
 breadcrumb above every document in it. Where a folder has no page, those two fall back to the

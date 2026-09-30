@@ -230,18 +230,20 @@ export function sectionWithSubfolder(): SectionFixture | undefined {
   return undefined;
 }
 
-/** Addresses of the folders that have a page, from the manifest, in order. */
-export function folderPageSlugs(): string[] {
+/** The folders that have a page, from the manifest, by address. */
+export function folderPages(): Array<{ slug: string; label: string }> {
   const manifest = JSON.parse(
     readFileSync(resolve(repositoryRoot, PROJECT_LAYOUT.manifestFile), 'utf8'),
   ) as { folders?: Record<string, ManifestFolder> };
   return Object.values(manifest.folders ?? {})
     .flatMap((folder) =>
       folder.generatedMarkdownPath && folder.stableSlug
-        ? [folder.stableSlug]
+        ? [{ slug: folder.stableSlug, label: folder.displayLabel }]
         : [],
     )
-    .sort();
+    .sort((left, right) =>
+      left.slug < right.slug ? -1 : left.slug > right.slug ? 1 : 0,
+    );
 }
 
 interface ManifestItem {
