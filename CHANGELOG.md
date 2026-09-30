@@ -83,6 +83,16 @@ All three packages share a version and are released together.
   fades a sidebar link's background over 150 ms while its text changes at
   once, and an audit in between failed on a frame no reader stops on.
 
+### Fixed
+
+- `ctcdocs-verify-search` checks again that interface text stays out of the
+  search index. It searched for a sentence no component renders any more, so
+  the check passed on every build without testing anything. It now searches
+  for the "View as Markdown" label, which the component and the verifier read
+  from one constant, and fails when no built page renders that label inside
+  an element marked `data-pagefind-ignore`. A document whose own text uses the
+  label may still be found.
+
 ## 0.13.1
 
 ### Fixed

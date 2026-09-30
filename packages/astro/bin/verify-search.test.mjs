@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
+import { join } from 'node:path';
 import test from 'node:test';
 
-import { buildSearchCases, resultPath } from './verify-search.mjs';
+import {
+  buildSearchCases,
+  phrasePlacement,
+  resultPath,
+  sitePathOf,
+} from './verify-search.mjs';
 
 const documentOf = (title, slug) => ({ title, slug });
 
@@ -99,4 +105,73 @@ test('a document with a non-ASCII slug is always searched for', () => {
   const cases = buildSearchCases(documents);
   assert.equal(cases.length, 5);
   assert.deepEqual(cases[0], ['Рабочие заметки', '/рабочие-заметки/']);
+});
+
+const page = (body) =>
+  `<html><body><header>Site header</header><main data-pagefind-body>${body}</main></body></html>`;
+
+test('a phrase only inside an ignored element is chrome', () => {
+  assert.equal(
+    phrasePlacement(
+      page(
+        '<h1>Runbook</h1><div data-pagefind-ignore><a href="index.md">\n  View   as\n Markdown\n</a></div>',
+      ),
+      'View as Markdown',
+    ),
+    'ignored',
+  );
+});
+
+test('a phrase the document itself contains is content', () => {
+  assert.equal(
+    phrasePlacement(
+      page(
+        '<div data-pagefind-ignore>View as Markdown</div><p>Choose view as Markdown to copy it.</p>',
+      ),
+      'View as Markdown',
+    ),
+    'content',
+  );
+});
+
+test('a phrase the index never reads is not a placement', () => {
+  /*
+   * Outside the indexed body, in a script, or on a page with no indexed body
+   * at all, the phrase is absent from the index whether or not exclusion
+   * works. Counting any of these would let the check pass without testing it.
+   */
+  assert.equal(
+    phrasePlacement(
+      '<html><body><header>View as Markdown</header><main data-pagefind-body><p>Body</p></main></body></html>',
+      'View as Markdown',
+    ),
+    undefined,
+  );
+  assert.equal(
+    phrasePlacement(
+      page('<p>Body</p><script>const label = "View as Markdown";</script>'),
+      'View as Markdown',
+    ),
+    undefined,
+  );
+  assert.equal(
+    phrasePlacement(
+      '<html><body><div data-pagefind-ignore>View as Markdown</div></body></html>',
+      'View as Markdown',
+    ),
+    undefined,
+  );
+});
+
+test('a built file maps to the path a Pagefind result reports', () => {
+  assert.equal(sitePathOf('index.html'), '/');
+  assert.equal(
+    sitePathOf(join('handbook', 'runbook', 'index.html')),
+    '/handbook/runbook/',
+  );
+  assert.equal(
+    sitePathOf(join('notes', 'заметки', 'index.html')),
+    '/notes/заметки/',
+  );
+  assert.equal(sitePathOf('404.html'), '/404.html');
 });

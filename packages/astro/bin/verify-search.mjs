@@ -3,6 +3,7 @@ import { realpathSync } from 'node:fs';
 import {
   mkdir,
   mkdtemp,
+  readdir,
   readFile,
   rm,
   stat,
@@ -14,7 +15,10 @@ import { dirname, extname, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { findProjectRoot, PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
+import * as cheerio from 'cheerio';
 import { close, createIndex } from 'pagefind';
+
+import { VIEW_AS_MARKDOWN_LABEL } from '../dist-node/lib/interface-text.js';
 
 const contentTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
@@ -234,26 +238,112 @@ async function searchCases() {
   return cases;
 }
 
+/**
+ * Interface text is not content. The label is rendered on every synchronized
+ * document, inside the metadata row marked `data-pagefind-ignore`, so a result
+ * for it means the index has swallowed chrome.
+ */
+const IGNORED_INTERFACE_PHRASE = VIEW_AS_MARKDOWN_LABEL;
+
+const collapseWhitespace = (text) => text.replace(/\s+/gu, ' ').trim();
+
+/**
+ * Where a built page puts `phrase` in the text Pagefind reads.
+ *
+ * Starlight marks the part of a page to index with `data-pagefind-body`, and
+ * Pagefind then skips any page without one. Within that body, `'content'` means
+ * the phrase survives with every `data-pagefind-ignore` element removed, so a
+ * search may rightly find the page; `'ignored'` means it appears only inside
+ * such elements, so a search must not. `undefined` means the indexed body never
+ * contains it. Scripts and styles are not text a reader or the index sees.
+ */
+export function phrasePlacement(html, phrase) {
+  const $ = cheerio.load(html);
+  const body = $('[data-pagefind-body]');
+  body.find('script, style, noscript, template').remove();
+  const needle = phrase.toLowerCase();
+  const holds = () =>
+    collapseWhitespace(body.text()).toLowerCase().includes(needle);
+  if (!holds()) {
+    return undefined;
+  }
+  body.find('[data-pagefind-ignore]').remove();
+  return holds() ? 'content' : 'ignored';
+}
+
+/** The site path Pagefind reports for a built HTML file. */
+export function sitePathOf(htmlPath) {
+  const path = `/${htmlPath.split(sep).join('/')}`;
+  return path.endsWith('/index.html')
+    ? path.slice(0, -'index.html'.length)
+    : path;
+}
+
+async function placementsOf(distRoot, phrase) {
+  const files = (await readdir(distRoot, { recursive: true }))
+    .filter((file) => file.endsWith('.html'))
+    .sort();
+  const placements = new Map();
+  for (const file of files) {
+    const placement = phrasePlacement(
+      await readFile(resolve(distRoot, file), 'utf8'),
+      phrase,
+    );
+    if (placement) {
+      placements.set(sitePathOf(file), placement);
+    }
+  }
+  return placements;
+}
+
+/**
+ * The check fails when it has nothing to test. It once searched for a sentence
+ * the interface had stopped rendering, and passed on every build while
+ * guarding nothing; a page that renders the phrase only as ignored chrome is
+ * what makes a zero-result search mean something. With the exclusion marker
+ * gone, the same label reads as content on every page, and that is reported
+ * as the leak it is.
+ *
+ * A document that itself mentions the label is content, and finding it is
+ * correct. Only a result for a page where the phrase is chrome alone is a leak.
+ */
+async function expectInterfaceTextIgnored(pagefind, phrase, placements) {
+  const chromePages = [...placements]
+    .filter(([, placement]) => placement === 'ignored')
+    .map(([path]) => path);
+  assert(
+    chromePages.length > 0,
+    placements.size === 0
+      ? `No built page under dist/ renders "${phrase}" in its indexed body, so the check that interface text stays out of the search index would test nothing. Point it at text the interface still renders inside an element marked data-pagefind-ignore.`
+      : `"${phrase}" is rendered on ${placements.size} built page(s) but never inside an element marked data-pagefind-ignore, so the interface text is indexed as content.`,
+  );
+  const search = await pagefind.search(`"${phrase}"`);
+  const results = await Promise.all(
+    search.results.map((result) => result.data()),
+  );
+  const leaked = results
+    .map((result) => resultPath(result.url))
+    .filter((path) => placements.get(path) !== 'content');
+  assert.deepEqual(
+    leaked,
+    [],
+    `Interface text "${phrase}" must not be included in the Pagefind index.`,
+  );
+}
+
 async function verifyBuiltIndex() {
-  const bundleRoot = resolve(findProjectRoot(), 'dist/pagefind');
+  const distRoot = resolve(findProjectRoot(), 'dist');
+  const bundleRoot = resolve(distRoot, 'pagefind');
   const cases = await searchCases();
   await withSearchIndex(bundleRoot, async (pagefind) => {
     for (const [query, expectedPath] of cases) {
       await expectResult(pagefind, query, expectedPath);
     }
 
-    /*
-     * Interface text is not content. The card strip on the home page repeats
-     * the same sentence on every deployment, so a hit for it would mean the
-     * index had swallowed navigation chrome.
-     */
-    const ignoredUi = await pagefind.search(
-      '"Browse the current top-level sections"',
-    );
-    assert.equal(
-      ignoredUi.results.length,
-      0,
-      'Navigation card text must not be included in the Pagefind index.',
+    await expectInterfaceTextIgnored(
+      pagefind,
+      IGNORED_INTERFACE_PHRASE,
+      await placementsOf(distRoot, IGNORED_INTERFACE_PHRASE),
     );
     return cases.length;
   });
