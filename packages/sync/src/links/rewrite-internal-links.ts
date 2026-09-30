@@ -51,7 +51,22 @@ export interface InternalLinkTargets {
 interface GoogleDocumentLink {
   fileId: string;
   fragment: string;
+  /**
+   * Whether the address says what the file is. `/document/` is a Google Doc
+   * and `/file/` a file Drive stores; `open?id=` could be anything, such as a
+   * spreadsheet the site does not publish.
+   */
+  typed: boolean;
 }
+
+/*
+ * A Google Doc's own views: edit, view, preview, the mobile and published
+ * views, or none. Not `/copy` or `/export`, which ask to make a copy or a
+ * download rather than to read the document.
+ */
+const GOOGLE_DOC_PATH =
+  /^\/document(?:\/u\/\d+)?\/d\/([^/]+)(?:\/(?:edit|view|preview|mobilebasic|pub))?\/?$/u;
+const DRIVE_FILE_PATH = /^\/file\/d\/([^/]+)(?:\/(?:view|edit|preview))?\/?$/u;
 
 function parseGoogleDocumentLink(
   value: string,
@@ -64,29 +79,23 @@ function parseGoogleDocumentLink(
   }
 
   let fileId: string | null = null;
+  let typed = true;
   if (url.hostname === 'docs.google.com') {
     // `/u/<n>/` names the signed-in account a link was copied from.
-    const match =
-      /^\/document(?:\/u\/\d+)?\/d\/([^/]+)\/(?:edit|view)\/?$/u.exec(
-        url.pathname,
-      );
-    fileId = match?.[1] ?? null;
+    fileId = GOOGLE_DOC_PATH.exec(url.pathname)?.[1] ?? null;
   } else if (url.hostname === 'drive.google.com') {
     // A Drive file, such as a PDF this site publishes (ADR-027).
-    const file = /^\/file\/d\/([^/]+)(?:\/(?:view|edit|preview))?\/?$/u.exec(
-      url.pathname,
-    );
-    fileId =
-      file?.[1] ??
-      (url.pathname.replace(/\/+$/u, '') === '/open'
-        ? url.searchParams.get('id')
-        : null);
+    fileId = DRIVE_FILE_PATH.exec(url.pathname)?.[1] ?? null;
+    if (!fileId && url.pathname.replace(/\/+$/u, '') === '/open') {
+      fileId = url.searchParams.get('id');
+      typed = false;
+    }
   }
   if (!fileId || !GOOGLE_FILE_ID.test(fileId)) {
     return undefined;
   }
 
-  return { fileId, fragment: url.hash };
+  return { fileId, fragment: url.hash, typed };
 }
 
 function safeFragment(fragment: string): {
@@ -212,7 +221,9 @@ function rewriteUrl(
     ...(unwrapped
       ? { rewritten: { url: unwrapped, removedFragment: false } }
       : {}),
-    outsideSite: googleLink !== undefined,
+    // Only when the address says what the file is: `open?id=` may well be a
+    // spreadsheet, which no editor could move onto the site.
+    outsideSite: googleLink?.typed === true,
   };
 }
 

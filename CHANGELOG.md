@@ -30,7 +30,8 @@ All three packages share a version and are released together.
 - Two notes: "The page has no summary", for a Google Doc with no paragraph of
   plain text, and "A link leads to a Google file that is not on this site",
   for a link to a Google Doc or Drive file outside the published folders.
-  Spreadsheets, slides and folders are not counted.
+  Spreadsheets, slides, folders and `open?id=` links, whose address does not
+  say what the file is, are not counted.
 
 ### Changed
 
@@ -59,11 +60,15 @@ All three packages share a version and are released together.
   menu open, across the first 25 keyboard focus stops, under the pointer on
   the first 20 links and controls of two pages, and in print.
 - A link to a Google Doc copied from a signed-in account
-  (`/document/u/<n>/d/…`) and a link to a Drive file (`/file/d/…`) now open
-  the site's page when the file is published, such as a PDF.
+  (`/document/u/<n>/d/…`), to a Google Doc's other views (none, `preview`,
+  `mobilebasic`, `pub`) and to a Drive file (`/file/d/…`) now opens the site's
+  page when the file is published, such as a PDF. A link asking for a copy or
+  a download stays as it is.
 - The source facts in `data/title-report.json` are version 4. The first normal
   sync after upgrading exports every Google Doc once more to read them: it
-  takes as long as a full sync, and changes no page that did not change.
+  takes as long as a full sync, and, like one, rewrites a page wherever
+  Google's export or the link handling now differ from when the page was last
+  written.
 
 ## 0.13.1
 

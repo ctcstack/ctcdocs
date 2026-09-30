@@ -278,22 +278,109 @@ describe('the checks a document fails', () => {
     ]);
   });
 
-  it('reads the title as the level above the first heading', () => {
-    const report = createTitleReport([
-      input({
-        source: source(
-          ['TITLE', 'Pricing', 'h.title'],
-          ['HEADING_3', 'Scope', 'h.scope'],
-        ),
-      }),
-    ]);
-    expect(report.documents[0]?.issues).toEqual([
+  it('judges the heading after the opening line by whether the page kept it', () => {
+    const opening = source(
+      ['TITLE', 'Pricing', 'h.title'],
+      ['NORMAL_TEXT', 'For the sales team.'],
+      ['HEADING_3', 'Scope', 'h.scope'],
+    );
+    const issuesWhen = (removedTitleHeading: boolean) =>
+      createTitleReport([input({ source: opening, removedTitleHeading })])
+        .documents[0]?.issues;
+
+    // Dropped as a copy of the name, the line leaves the page's title above.
+    expect(issuesWhen(true)).toEqual([
       {
         check: 'heading-skips-level',
         text: 'Scope',
         detail: 'Heading 3 under the title',
         headingId: 'h.scope',
       },
+    ]);
+    // Kept, it is a second-level heading, and a Heading 3 follows it fine.
+    expect(issuesWhen(false)).toEqual([]);
+  });
+
+  it('reads a Title line used as a section at the second level', () => {
+    const report = createTitleReport([
+      input({
+        source: source(
+          ['TITLE', 'Pricing', 'h.title'],
+          ['HEADING_3', 'Scope', 'h.scope'],
+          ['TITLE', 'Appendix', 'h.appendix'],
+          ['HEADING_5', 'Tables', 'h.tables'],
+        ),
+        removedTitleHeading: true,
+      }),
+    ]);
+    expect(
+      report.documents[0]?.issues.filter(
+        (issue) => issue.check === 'heading-skips-level',
+      ),
+    ).toEqual([
+      {
+        check: 'heading-skips-level',
+        text: 'Scope',
+        detail: 'Heading 3 under the title',
+        headingId: 'h.scope',
+      },
+      {
+        check: 'heading-skips-level',
+        text: 'Tables',
+        detail: 'Heading 5 after Title',
+        headingId: 'h.tables',
+      },
+    ]);
+  });
+
+  it('reads headings in a one-cell frame as part of the page', () => {
+    const paragraph = (
+      namedStyleType: string,
+      content: string,
+      id: string,
+    ) => ({
+      paragraph: {
+        paragraphStyle: { namedStyleType, headingId: id },
+        elements: [{ textRun: { content } }],
+      },
+    });
+    const facts = readSourceTitle([
+      paragraph('HEADING_2', 'Steps', 'h.steps'),
+      {
+        table: {
+          tableRows: [
+            {
+              tableCells: [
+                { content: [paragraph('HEADING_4', 'Steps:', 'h.framed')] },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        table: {
+          tableRows: [
+            {
+              tableCells: [
+                { content: [paragraph('HEADING_6', 'Cell', 'h.cell')] },
+                { content: [] },
+              ],
+            },
+          ],
+        },
+      },
+    ]);
+
+    expect(facts.skippedHeadings).toEqual([
+      {
+        text: 'Steps:',
+        detail: 'Heading 4 after Heading 2',
+        headingId: 'h.framed',
+      },
+    ]);
+    // "Steps:" repeats "Steps": punctuation is not a different name.
+    expect(facts.repeatedHeadings).toEqual([
+      { text: 'Steps:', headingId: 'h.framed' },
     ]);
   });
 
@@ -391,6 +478,7 @@ describe('the title report', () => {
 
     expect(carried).toEqual({
       source: input().source,
+      sourceVersion: 4,
       removedTitleHeading: true,
       lastEditedBy: 'Editor One',
     });
@@ -413,6 +501,7 @@ describe('the title report', () => {
     });
     expect(recordedTitleFacts(earlier).get('doc')).toEqual({
       source: null,
+      sourceVersion: null,
       removedTitleHeading: false,
       lastEditedBy: null,
     });
@@ -427,11 +516,13 @@ describe('the title report', () => {
         { id: 'unversioned', source: { firstBlocks: [] } },
       ],
     });
+    const outdated = (content: string | undefined) =>
+      outdatedTitleFacts(recordedTitleFacts(content));
 
-    expect([...outdatedTitleFacts(earlier)]).toEqual(['old']);
-    expect(outdatedTitleFacts(current).size).toBe(0);
-    expect(outdatedTitleFacts(undefined).size).toBe(0);
-    expect(outdatedTitleFacts('not json').size).toBe(0);
+    expect([...outdated(earlier)]).toEqual(['old']);
+    expect(outdated(current).size).toBe(0);
+    expect(outdated(undefined).size).toBe(0);
+    expect(outdated('not json').size).toBe(0);
   });
 
   it('prints counts, and names documents only when asked', () => {

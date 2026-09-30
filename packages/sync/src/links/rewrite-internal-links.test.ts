@@ -50,6 +50,27 @@ describe('internal Google link rewriting', () => {
     expect(result.warnings).toEqual([]);
   });
 
+  it("recognizes a Google Doc's own views, but not a request to copy it", () => {
+    const result = rewriteInternalGoogleLinks(
+      [
+        '[Bare](https://docs.google.com/document/d/doc-one)',
+        '[Preview](https://docs.google.com/document/d/doc-one/preview)',
+        '[Mobile](https://docs.google.com/document/d/doc-two/mobilebasic)',
+        '[Copy](https://docs.google.com/document/d/doc-one/copy)',
+      ].join('\n\n'),
+      slugs,
+    );
+
+    expect(result.body).toContain('[Bare](/d/a1b2c3/)');
+    expect(result.body).toContain('[Preview](/d/a1b2c3/)');
+    expect(result.body).toContain('[Mobile](/d/d4e5f6/)');
+    // Asking for a copy of a template is not reading it: the link stays.
+    expect(result.body).toContain(
+      '[Copy](https://docs.google.com/document/d/doc-one/copy)',
+    );
+    expect(result.warnings).toEqual([]);
+  });
+
   it('notes a link to a Google Doc or Drive file the site does not publish', () => {
     const outside = (markdown: string) =>
       rewriteInternalGoogleLinks(markdown, slugs).warnings;
@@ -66,12 +87,15 @@ describe('internal Google link rewriting', () => {
       ),
     ).toEqual(['link:outside_site']);
     // The site does not publish spreadsheets or folders, so there is nothing
-    // an editor could move into the published folders.
+    // an editor could move into the published folders; and `open?id=` does
+    // not say what the file is, so it may be either.
     expect(
       outside(
         [
           '[Sheet](https://docs.google.com/spreadsheets/d/outside/edit)',
           '[Folder](https://drive.google.com/drive/folders/outside)',
+          '[Open](https://drive.google.com/open?id=outside)',
+          '[Copy](https://docs.google.com/document/d/outside/copy)',
           '[Web](https://example.invalid/path)',
         ].join('\n\n'),
       ),
