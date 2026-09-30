@@ -18,7 +18,10 @@ import { findProjectRoot, PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
 import * as cheerio from 'cheerio';
 import { close, createIndex } from 'pagefind';
 
-import { VIEW_AS_MARKDOWN_LABEL } from '../dist-node/lib/interface-text.js';
+import {
+  AGENT_ACCESS_HEADING,
+  VIEW_AS_MARKDOWN_LABEL,
+} from '../dist-node/lib/interface-text.js';
 
 const contentTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
@@ -239,11 +242,15 @@ async function searchCases() {
 }
 
 /**
- * Interface text is not content. The label is rendered on every synchronized
- * document, inside the metadata row marked `data-pagefind-ignore`, so a result
- * for it means the index has swallowed chrome.
+ * Interface text is not content. Each label is rendered on every build inside
+ * an element marked `data-pagefind-ignore`, so a result for it means the index
+ * has swallowed chrome: the first on every synchronized document, the second
+ * on the home page, which is indexed by its title alone.
  */
-const IGNORED_INTERFACE_PHRASE = VIEW_AS_MARKDOWN_LABEL;
+const IGNORED_INTERFACE_PHRASES = [
+  VIEW_AS_MARKDOWN_LABEL,
+  AGENT_ACCESS_HEADING,
+];
 
 const collapseWhitespace = (text) => text.replace(/\s+/gu, ' ').trim();
 
@@ -340,11 +347,13 @@ async function verifyBuiltIndex() {
       await expectResult(pagefind, query, expectedPath);
     }
 
-    await expectInterfaceTextIgnored(
-      pagefind,
-      IGNORED_INTERFACE_PHRASE,
-      await placementsOf(distRoot, IGNORED_INTERFACE_PHRASE),
-    );
+    for (const phrase of IGNORED_INTERFACE_PHRASES) {
+      await expectInterfaceTextIgnored(
+        pagefind,
+        phrase,
+        await placementsOf(distRoot, phrase),
+      );
+    }
     return cases.length;
   });
   return cases.length;
@@ -433,6 +442,6 @@ if (invokedDirectly()) {
   const corpusCases = await verifyBuiltIndex();
   await verifyMultilingualSearch();
   console.log(
-    `Pagefind regression passed (${corpusCases + 3} acceptance cases).`,
+    `Pagefind regression passed (${corpusCases + IGNORED_INTERFACE_PHRASES.length + 2} acceptance cases).`,
   );
 }
