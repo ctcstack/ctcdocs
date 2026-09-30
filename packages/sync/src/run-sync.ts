@@ -1013,10 +1013,12 @@ async function synchronize(
    * does not export, and a document whose facts an earlier shape recorded is
    * exported again.
    */
-  const existingTitleReport = await readOptionalFile(
-    resolve(repositoryRoot, PROJECT_LAYOUT.titleReportFile),
+  const recordedTitles = recordedTitleFacts(
+    await readOptionalFile(
+      resolve(repositoryRoot, PROJECT_LAYOUT.titleReportFile),
+    ),
   );
-  const outdatedFacts = outdatedTitleFacts(existingTitleReport);
+  const outdatedFacts = outdatedTitleFacts(recordedTitles);
   const folders: Record<string, SyncedFolderRecord> = Object.fromEntries(
     selection.folders
       .map((folder) => {
@@ -1796,7 +1798,6 @@ async function synchronize(
    * reports what its source says now; any other keeps what the run that last
    * exported it recorded. Who last edited it comes from this run's inventory.
    */
-  const recordedTitles = recordedTitleFacts(existingTitleReport);
   const inventoryItems = new Map(
     selection.documents.map((document) => [document.item.id, document.item]),
   );

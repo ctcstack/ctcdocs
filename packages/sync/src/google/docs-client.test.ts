@@ -234,11 +234,20 @@ describe('Google Docs structural client', () => {
         },
       ],
       /*
-       * Each tab is read as a page of its own, from its top-level headings.
-       * A Heading 1 sits at the page's second level, beside a Heading 2, so
-       * the first tab skips nothing; the second goes from 2 to 4.
+       * Each tab is read as a page of its own, in the order it shows its
+       * headings. A Title line and a Heading 1 sit at the page's second
+       * level, beside a Heading 2; the second tab goes from 2 to 4.
        */
       skippedHeadings: [
+        {
+          // In a one-cell frame, which the page shows in line, right after
+          // the opening Title: a skip only if the page drops that line.
+          text: 'Сontent fields',
+          detail: 'Heading 3 under the title',
+          whenTitleRemoved: true,
+          headingId: 'h.cell',
+          tabId: 'first',
+        },
         {
           text: 'Contacts',
           detail: 'Heading 4 after Heading 2',

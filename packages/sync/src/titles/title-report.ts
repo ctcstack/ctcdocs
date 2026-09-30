@@ -11,6 +11,7 @@
 import { z } from 'zod';
 
 import { parseOrderedLabel } from '../ordered-label.js';
+import { comparable } from './comparable-text.js';
 import {
   CHECKS,
   looksLikeSection,
@@ -137,14 +138,6 @@ const MATCHES = [
 ] as const satisfies readonly TitleMatch[];
 const SEVERITIES: readonly CheckSeverity[] = ['fix', 'convention', 'note'];
 
-function comparable(value: string): string {
-  return value
-    .normalize('NFKC')
-    .toLocaleLowerCase('en')
-    .replace(/[\s_\-–—:;.,()[\]{}"'«»“”‘’/\\|&+]+/gu, ' ')
-    .trim();
-}
-
 function words(value: string): Set<string> {
   return new Set(comparable(value).split(' ').filter(Boolean));
 }
@@ -264,6 +257,10 @@ function findIssues(
       });
     }
     for (const heading of source.skippedHeadings) {
+      // Right after the opening line, a skip only if the page dropped it.
+      if (heading.whenTitleRemoved && input.removedTitleHeading !== true) {
+        continue;
+      }
       issues.push({
         check: 'heading-skips-level',
         text: heading.text,
@@ -502,6 +499,7 @@ const sourceTitleFactsSchema = z.object({
     z.object({
       text: z.string(),
       detail: z.string(),
+      whenTitleRemoved: z.literal(true).optional(),
       headingId: z.string().optional(),
       tabId: z.string().optional(),
     }),
@@ -565,8 +563,10 @@ export const titleReportSchema = z.object({
   ),
 });
 
-interface RecordedFacts {
+export interface RecordedFacts {
   source: SourceTitleFacts | null;
+  /** The shape the facts were recorded in, even one no longer read. */
+  sourceVersion: number | null;
   removedTitleHeading: boolean | null;
   lastEditedBy: string | null;
 }
@@ -577,31 +577,18 @@ interface RecordedFacts {
  * a full sync (ADR-034). A document with no facts at all is left alone: its
  * inspection did not run, and forcing it would export it on every run.
  */
-export function outdatedTitleFacts(content: string | undefined): Set<string> {
-  const outdated = new Set<string>();
-  if (content === undefined) {
-    return outdated;
-  }
-  let documents: unknown;
-  try {
-    documents = (JSON.parse(content) as { documents?: unknown }).documents;
-  } catch {
-    return outdated;
-  }
-  if (!Array.isArray(documents)) {
-    return outdated;
-  }
-  for (const document of documents as Array<Record<string, unknown>>) {
-    const version = (document.source as { version?: unknown } | null)?.version;
-    if (
-      typeof document.id === 'string' &&
-      typeof version === 'number' &&
-      version < SOURCE_FACTS_VERSION
-    ) {
-      outdated.add(document.id);
-    }
-  }
-  return outdated;
+export function outdatedTitleFacts(
+  recorded: ReadonlyMap<string, RecordedFacts>,
+): Set<string> {
+  return new Set(
+    [...recorded]
+      .filter(
+        ([, facts]) =>
+          facts.sourceVersion !== null &&
+          facts.sourceVersion < SOURCE_FACTS_VERSION,
+      )
+      .map(([id]) => id),
+  );
 }
 
 /**
@@ -632,10 +619,12 @@ export function recordedTitleFacts(
       continue;
     }
     const source = sourceTitleFactsSchema.safeParse(document.source);
+    const version = (document.source as { version?: unknown } | null)?.version;
     recorded.set(document.id, {
       // As recorded, not as parsed: the schema would reorder the keys, and an
       // unchanged corpus has to rewrite the report byte for byte.
       source: source.success ? (document.source as SourceTitleFacts) : null,
+      sourceVersion: typeof version === 'number' ? version : null,
       // From the normalizer, not the Docs API: it does not age with the facts.
       removedTitleHeading:
         typeof document.removedTitleHeading === 'boolean'

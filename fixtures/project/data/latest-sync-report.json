@@ -248,7 +248,7 @@
       "code": "link-outside-site",
       "title": "A link leads to a Google file that is not on this site",
       "action": "Publish the file, or link a page",
-      "instruction": "A link points to a Google Doc or a Drive file outside the published folders. A colleague with access in Drive can open it, but the site cannot show it, and an AI agent reading the site cannot follow it. If the file belongs in the documentation, move it into the published folders; otherwise link to a page of this site where one covers it. Links to spreadsheets, slides and folders are not counted: the site does not publish them."
+      "instruction": "A link points to a Google Doc or a Drive file outside the published folders. A colleague with access in Drive can open it, but the site cannot show it, and an AI agent reading the site cannot follow it. If the file belongs in the documentation, move it into the published folders; otherwise link to a page of this site where one covers it. Links to spreadsheets, slides and folders are not counted, because the site does not publish them, and neither are links whose address does not say what the file is."
     },
     {
       "code": "table-merge-removed",

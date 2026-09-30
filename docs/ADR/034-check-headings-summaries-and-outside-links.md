@@ -26,22 +26,34 @@ heading. A Heading 3 and below keep their level.
 
 ## Decision
 
-**The structure is read from the source, per tab.** The facts the Docs API
-gives each exported Google Doc (ADR-023) gain the headings that skip a level
-and the headings that repeat an earlier one, from each tab's top-level
-paragraphs, with the heading ID and tab that open Google Docs at the line, ten
-of each at most. Title paragraphs are left to the title checks. The facts' shape
-is now version 4.
+**The structure is read from the source, per tab, in the order the page
+shows it.** The facts the Docs API gives each exported Google Doc (ADR-023)
+gain the headings that skip a level and the headings that repeat an earlier
+one, with the heading ID and tab that open Google Docs at the line, ten of each
+at most. A tab's top-level paragraphs are read, and those of a one-cell table,
+which Google's export flattens into the page as a frame; a larger table's
+cells are not. The facts' shape is now version 4.
 
-**A skip is judged as the page shows it.** A heading skips a level when its
-level on the page is more than one below the previous heading's, or more than
-one below the page's title for the first heading. A Heading 1 followed by a
-Heading 3 is not a skip, because the page shows them one level apart; a
-Heading 2 followed by a Heading 4 is. The detail names both styles, such as
-"Heading 4 after Heading 2".
+**A skip is judged as the page shows it.** A Title line and a Heading 1 are
+shown at the page's second level, beside a Heading 2, and a Heading 3 and below
+keep theirs. A heading skips a level when its level on the page is more than
+one below the previous heading's, or more than one below the page's title for
+the first heading. A Heading 1 followed by a Heading 3 is not a skip; a Heading
+2 followed by a Heading 4 is. A Title line takes its place in the order but is
+not itself checked, since the title checks cover it. The detail names both
+styles, such as "Heading 4 after Heading 2".
 
-**A repeat is the same words.** Headings are compared after Unicode
-normalization, case folding and collapsing whitespace, within a tab.
+**The opening line is judged by what the page did with it.** The pipeline
+removes a document's first line from the page when it is a Title or Heading 1
+repeating the document's name, and the page's own title takes its place. A
+heading right after that line is a skip only if it is one below either: the
+facts mark a skip that depends on the removal, and the report keeps it only
+for a document whose opening line was removed.
+
+**A repeat is the same words.** Headings are compared the way the title report
+compares a title with a file name: after Unicode normalization and case
+folding, with punctuation, dashes and quotes read as spaces, so "Steps:"
+repeats "Steps". Title lines are not compared, within a tab.
 
 **Both are "Worth a look" checks** on the content health page:
 `heading-skips-level` and `heading-repeated`.
@@ -54,12 +66,15 @@ extracted text. `link-outside-site`: a link to a Google Doc or a Drive file
 that is not in the corpus, recorded as the conversion warning
 `link:outside_site` when the document is exported. Spreadsheets, slides and
 folders are not counted, because the site does not publish them and an editor
-could not move them onto it.
+could not move them onto it; nor is `drive.google.com/open?id=`, which does not
+say what the file is.
 
-**Two more link forms are recognized.** A Google Doc link copied from a
-signed-in account, `/document/u/<n>/d/<id>/`, and a Drive file link,
-`drive.google.com/file/d/<id>/`, now resolve to the site's page when the file is
-published, such as a PDF (ADR-027), and are noted when it is not.
+**More link forms are recognized.** A Google Doc link copied from a signed-in
+account, `/document/u/<n>/d/<id>/`, a Google Doc's own views (none, `edit`,
+`view`, `preview`, `mobilebasic`, `pub`) and a Drive file link,
+`drive.google.com/file/d/<id>/`, now resolve to the site's page when the file
+is published, such as a PDF (ADR-027), and are noted when it is not. A link
+that asks for a copy (`/copy`) or a download (`/export`) is left as it is.
 
 **A normal sync reads new facts once.** A document whose recorded facts an
 earlier shape wrote is exported again by the next normal sync, as images are
@@ -83,7 +98,9 @@ not forced, so an inspection that cannot run does not export it on every sync.
 ### Negative
 
 - The first normal sync after upgrading exports every Google Doc once, which
-  takes as long as a full sync and spends the same API quota.
+  takes as long as a full sync and spends the same API quota. Like a full
+  sync, it rewrites a page wherever Google's export or the link handling now
+  differ from when the page was last written.
 - An empty document is both a "Fix" check and a note without a summary.
 - A skip that the page flattens, such as Heading 1 to Heading 3, is not
   reported, although Google Docs' own outline shows it.

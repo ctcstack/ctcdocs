@@ -10,6 +10,7 @@
  * docs/ADR/024-content-health-page.md.
  */
 import { describeMixedScript } from '../name-scripts.js';
+import { comparable } from './comparable-text.js';
 
 /**
  * The shape of the facts below. Facts recorded by an earlier shape are
@@ -72,6 +73,11 @@ export interface SourceTitleFacts {
   skippedHeadings: Array<{
     text: string;
     detail: string;
+    /**
+     * A skip only if the document's opening line is removed from the page
+     * as a copy of its name, which the title report knows.
+     */
+    whenTitleRemoved?: true;
     headingId?: string;
     tabId?: string;
   }>;
@@ -220,36 +226,87 @@ const HEADING_LEVELS: Readonly<Record<string, number>> = {
 
 /*
  * The level a heading has on the site. The page's own title is its only
- * first-level heading, so the pipeline shows a Heading 1 at the second level,
- * beside a Heading 2; a Heading 3 and below keep theirs. A skip is judged
- * here, where readers, screen readers and agents meet it.
+ * first-level heading, so the pipeline shows a Title line and a Heading 1 at
+ * the second level, beside a Heading 2; a Heading 3 and below keep theirs. A
+ * skip is judged here, where readers, screen readers and agents meet it.
  */
-const pageLevel = (level: number) => Math.max(level, 2);
-
-/** The words of a heading, compared the way a reader would. */
-const comparableHeading = (text: string) =>
-  text.normalize('NFKC').toLocaleLowerCase('en').replace(/\s+/gu, ' ').trim();
+const TITLE_PAGE_LEVEL = 2;
+const pageLevel = (level: number) => Math.max(level, TITLE_PAGE_LEVEL);
 
 /**
- * Headings that skip a level and headings that repeat an earlier one, in each
- * tab's top-level paragraphs. A tab is read as a page of its own, and the
- * page's title stands above its first heading. Title paragraphs are left to
- * the title checks.
+ * A tab's paragraphs in the order the page shows them: its top-level ones,
+ * and those of a one-cell table, which Google's export flattens into the page
+ * as a frame around its content. A larger table keeps its cells, which hold
+ * no headings a reader navigates by.
+ */
+function* flowParagraphs(
+  content: readonly SourceStructuralElement[],
+): Generator<NonNullable<SourceStructuralElement['paragraph']>> {
+  for (const element of content) {
+    if (element.paragraph) {
+      yield element.paragraph;
+      continue;
+    }
+    const rows = element.table?.tableRows ?? [];
+    const cells = rows[0]?.tableCells ?? [];
+    if (rows.length === 1 && cells.length === 1) {
+      yield* flowParagraphs(cells[0]?.content ?? []);
+    }
+  }
+}
+
+/**
+ * The document's opening line when it could be the copy of its name that the
+ * pipeline removes from the page (ADR-023): a Title line or a Heading 1 that
+ * is the first thing in the first tab. Whether it was removed is known only
+ * when the page is written, so a skip that depends on it says so.
+ */
+function openingLine(
+  firstTab: readonly SourceStructuralElement[],
+): SourceStructuralElement['paragraph'] {
+  const first = firstTab.find((element) =>
+    element.paragraph
+      ? paragraphText(element.paragraph).length > 0 ||
+        (element.paragraph.elements ?? []).some(
+          (paragraphElement) => paragraphElement.inlineObjectElement,
+        )
+      : element.table !== undefined || element.tableOfContents !== undefined,
+  );
+  const style = first?.paragraph?.paragraphStyle?.namedStyleType;
+  return style === 'TITLE' || style === 'HEADING_1'
+    ? first?.paragraph
+    : undefined;
+}
+
+/**
+ * Headings that skip a level and headings that repeat an earlier one, in the
+ * order each tab shows them. A tab is read as a page of its own, below the
+ * page's title. A Title line takes its place in the order at the second level
+ * but is not itself checked: the title checks cover it. A skip right after an
+ * opening line that may be removed is marked `whenTitleRemoved`, because it is
+ * one only when that line becomes the page's title.
  */
 function findHeadingStructure(
   tabs: readonly SourceTab[],
 ): Pick<SourceTitleFacts, 'skippedHeadings' | 'repeatedHeadings'> {
   const skippedHeadings: SourceTitleFacts['skippedHeadings'] = [];
   const repeatedHeadings: SourceTitleFacts['repeatedHeadings'] = [];
+  const opening = openingLine(tabs[0]?.content ?? []);
   for (const tab of tabs) {
-    let previous: number | undefined;
+    // The page's title stands above the first heading.
+    let previous: { level: number; name: string } | undefined;
+    let afterOpening = false;
     const seen = new Set<string>();
-    for (const element of tab.content) {
-      const paragraph = element.paragraph;
-      const level =
-        HEADING_LEVELS[paragraph?.paragraphStyle?.namedStyleType ?? ''];
-      const text = paragraph ? paragraphText(paragraph) : '';
-      if (!paragraph || level === undefined || !text) {
+    for (const paragraph of flowParagraphs(tab.content)) {
+      const style = paragraph.paragraphStyle?.namedStyleType ?? '';
+      const level = HEADING_LEVELS[style];
+      const text = paragraphText(paragraph);
+      if (!text || (level === undefined && style !== 'TITLE')) {
+        continue;
+      }
+      if (level === undefined) {
+        afterOpening = paragraph === opening;
+        previous = { level: TITLE_PAGE_LEVEL, name: 'Title' };
         continue;
       }
       const headingId = paragraph.paragraphStyle?.headingId || undefined;
@@ -257,23 +314,28 @@ function findHeadingStructure(
         ...(headingId ? { headingId } : {}),
         ...(tab.tabId ? { tabId: tab.tabId } : {}),
       };
+      const skipsAfterPrevious = pageLevel(level) > (previous?.level ?? 1) + 1;
+      const skipsUnderTitle = pageLevel(level) > 1 + 1;
       if (
-        // The page's title is its first level, above any heading.
-        pageLevel(level) >
-          (previous === undefined ? 1 : pageLevel(previous)) + 1 &&
+        (skipsAfterPrevious || (afterOpening && skipsUnderTitle)) &&
         skippedHeadings.length < MAX_RECORDED_HEADINGS
       ) {
         skippedHeadings.push({
           text: text.slice(0, MAX_TEXT_LENGTH),
           detail:
-            previous === undefined
+            previous === undefined || !skipsAfterPrevious
               ? `Heading ${level} under the title`
-              : `Heading ${level} after Heading ${previous}`,
+              : `Heading ${level} after ${previous.name}`,
+          ...(skipsAfterPrevious ? {} : { whenTitleRemoved: true as const }),
           ...where,
         });
       }
-      previous = level;
-      const words = comparableHeading(text);
+      afterOpening = paragraph === opening;
+      previous = { level: pageLevel(level), name: `Heading ${level}` };
+      const words = comparable(text);
+      if (!words) {
+        continue;
+      }
       if (seen.has(words)) {
         if (repeatedHeadings.length < MAX_RECORDED_HEADINGS) {
           repeatedHeadings.push({
