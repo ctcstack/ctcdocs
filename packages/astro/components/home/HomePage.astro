@@ -16,6 +16,13 @@
  * page still ends on the whole corpus rather than on a subset. See
  * docs/ADR/012-project-configuration-layer.md and
  * docs/ADR/017-full-index-page.md.
+ *
+ * The page is found by its title and nothing below it. Everything here either
+ * repeats what a document's own page holds — folder names and descriptions,
+ * titles, dates — or is interface text. Indexed, the page came back beside
+ * nearly every document a search found, and the 404 page offered it in place
+ * of the document a stale address named (ADR-032). The exclusion covers the
+ * whole block rather than each part, so a block added later is left out too.
  */
 import { loadCorpus } from '../../lib/corpus';
 import { siteConfiguration } from '../../lib/project';
@@ -30,7 +37,7 @@ const corpus = await loadCorpus();
 const { home } = siteConfiguration;
 ---
 
-<div class="home-page">
+<div class="home-page" data-pagefind-ignore>
   <HomeHero corpus={corpus} />
   <CategoryCards groups={corpus.groups} />
   <RecentUpdates documents={corpus.recent} limit={home.recentLimit} />

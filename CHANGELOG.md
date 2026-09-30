@@ -92,6 +92,13 @@ All three packages share a version and are released together.
   from one constant, and fails when no built page renders that label inside
   an element marked `data-pagefind-ignore`. A document whose own text uses the
   label may still be found.
+- The home page is found in search by its title alone. Its folder cards,
+  recent documents and interface text were indexed, so the home page came back
+  beside nearly every document a search found, and the 404 page could offer it
+  in place of the page a stale address named. The whole block below the title
+  is marked `data-pagefind-ignore`, the way the full index already was, and
+  `ctcdocs-verify-search` also checks that the home page's "For AI agents"
+  heading is not in the index.
 
 ## 0.13.1
 
