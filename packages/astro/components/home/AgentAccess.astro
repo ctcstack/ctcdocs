@@ -13,7 +13,6 @@
  * serve would send agents to a 404.
  */
 import type { CorpusDocument } from '../../lib/corpus';
-import { AGENT_ACCESS_HEADING } from '../../lib/interface-text';
 
 type Props = { documents: CorpusDocument[] };
 
@@ -22,7 +21,7 @@ const example = documents[0];
 ---
 
 <section aria-labelledby="home-agents" class="agents">
-  <h2 class="section-title" id="home-agents">{AGENT_ACCESS_HEADING}</h2>
+  <h2 class="section-title" id="home-agents">For AI agents</h2>
 
   <div class="agents-body">
     <p>

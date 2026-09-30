@@ -173,12 +173,12 @@ test('the full index is a page of its own, whatever the home page shows', async 
   await expect(firstEntry.locator('time')).toBeVisible();
 
   /*
-   * The page lists every title in the corpus, so indexing it would return it
-   * alongside every real result.
+   * The page lists every title in the corpus, so indexing the lists would
+   * return it alongside every real result.
    */
-  await expect(page.locator('[data-pagefind-ignore] .corpus-list')).toHaveCount(
-    await page.locator('.corpus-list').count(),
-  );
+  await expect(
+    page.locator('.corpus-list:not([data-pagefind-ignore])'),
+  ).toHaveCount(0);
 
   await expectNoAccessibilityViolations(page);
 });
@@ -575,8 +575,9 @@ test('a link between documents goes straight to the current address', async ({
 
 test('a missing address searches for the page it named', async ({ page }) => {
   /*
-   * Deep in folders, because the home page names every folder: a search that
-   * took the folders' words would offer it instead of the page.
+   * Deep in folders, because a folder's name is indexed where the folder has
+   * its address: a search that took the folders' words would offer that page
+   * instead of the document.
    */
   const document = deepestDocument();
 

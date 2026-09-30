@@ -61,5 +61,7 @@ Rejected
 - ADR-034: check headings, summaries and links that leave the site.
 - ADR-035: open a folder with its page when it has no landing document.
   Supersedes ADR-014 in part.
+- ADR-036: index the home page by its title, and a folder where it has its
+  address. Supersedes ADR-017 in part.
 
 Create a new ADR by copying `000-template.md`.

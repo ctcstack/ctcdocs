@@ -18,7 +18,6 @@
   "include": [
     "playwright.ts",
     "lib/folder-anchor.ts",
-    "lib/interface-text.ts",
     "lib/project.ts",
     "tests/**/*.ts"
   ],

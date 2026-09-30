@@ -51,6 +51,12 @@ export type CorpusGroup = {
    * otherwise this group's heading in the index on this page.
    */
   href: string;
+  /**
+   * Whether this group's heading in the full index is the folder's address:
+   * a Drive folder with no page of its own. Its name is then searchable there,
+   * because nowhere else indexes it (ADR-036).
+   */
+  addressedInIndex: boolean;
 };
 
 export type Corpus = {
@@ -130,7 +136,10 @@ export async function loadCorpus(): Promise<Corpus> {
     all.push(entry);
 
     const anchor = folderAnchorId(label);
+    const sectionPage =
+      trail.length > 0 ? sectionHref(sections, [label]) : undefined;
     const group = groups.get(label) ?? {
+      addressedInIndex: trail.length > 0 && sectionPage === undefined,
       description: undefined,
       documents: [],
       id: anchor,
@@ -141,9 +150,7 @@ export async function loadCorpus(): Promise<Corpus> {
        * heading in the full index, which is served whether or not the home
        * page carries a copy of that index.
        */
-      href:
-        (trail.length > 0 ? sectionHref(sections, [label]) : undefined) ??
-        folderAnchorHref(label),
+      href: sectionPage ?? folderAnchorHref(label),
     };
     group.documents.push(entry);
     groups.set(label, group);

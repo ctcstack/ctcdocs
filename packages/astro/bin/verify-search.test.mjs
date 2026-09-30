@@ -4,9 +4,10 @@ import test from 'node:test';
 
 import {
   buildSearchCases,
-  phrasePlacement,
   resultPath,
   sitePathOf,
+  unindexedElements,
+  withoutUnindexed,
 } from './verify-search.mjs';
 
 const documentOf = (title, slug) => ({ title, slug });
@@ -108,59 +109,70 @@ test('a document with a non-ASCII slug is always searched for', () => {
 });
 
 const page = (body) =>
-  `<html><body><header>Site header</header><main data-pagefind-body>${body}</main></body></html>`;
+  `<html><body><header data-ctcdocs-unindexed="header">Site</header><main data-pagefind-body>${body}</main></body></html>`;
 
-test('a phrase only inside an ignored element is chrome', () => {
-  assert.equal(
-    phrasePlacement(
+test('a marked element is excluded by its own attribute or an ancestor', () => {
+  assert.deepEqual(
+    unindexedElements(
       page(
-        '<h1>Runbook</h1><div data-pagefind-ignore><a href="index.md">\n  View   as\n Markdown\n</a></div>',
+        '<div data-ctcdocs-unindexed="row" data-pagefind-ignore>Copy</div>' +
+          '<div data-pagefind-ignore="all"><p data-ctcdocs-unindexed="nested">List</p></div>',
       ),
-      'View as Markdown',
     ),
-    'ignored',
+    [
+      { excluded: true, name: 'row' },
+      { excluded: true, name: 'nested' },
+    ],
   );
 });
 
-test('a phrase the document itself contains is content', () => {
-  assert.equal(
-    phrasePlacement(
-      page(
-        '<div data-pagefind-ignore>View as Markdown</div><p>Choose view as Markdown to copy it.</p>',
-      ),
-      'View as Markdown',
-    ),
-    'content',
-  );
-});
-
-test('a phrase the index never reads is not a placement', () => {
+test('a marked element without the attribute is reported on its own page', () => {
   /*
-   * Outside the indexed body, in a script, or on a page with no indexed body
-   * at all, the phrase is absent from the index whether or not exclusion
-   * works. Counting any of these would let the check pass without testing it.
+   * One page losing the attribute is a leak whatever the other pages do. A
+   * check that asked only whether some page still excluded the text let a
+   * partial loss through.
    */
-  assert.equal(
-    phrasePlacement(
-      '<html><body><header>View as Markdown</header><main data-pagefind-body><p>Body</p></main></body></html>',
-      'View as Markdown',
+  assert.deepEqual(
+    unindexedElements(
+      page(
+        '<div data-ctcdocs-unindexed="row" data-pagefind-ignore>Copy</div>' +
+          '<div data-ctcdocs-unindexed="row">Copy</div>',
+      ),
     ),
-    undefined,
+    [
+      { excluded: true, name: 'row' },
+      { excluded: false, name: 'row' },
+    ],
   );
-  assert.equal(
-    phrasePlacement(
-      page('<p>Body</p><script>const label = "View as Markdown";</script>'),
-      'View as Markdown',
+});
+
+test('only the attribute counts as exclusion', () => {
+  // Pagefind skips `nav` by default, but a marked element that relies on that
+  // would pass here while the attribute it is checking is gone.
+  assert.deepEqual(
+    unindexedElements(page('<nav data-ctcdocs-unindexed="trail">Home</nav>')),
+    [{ excluded: false, name: 'trail' }],
+  );
+});
+
+test('a marked element outside the indexed part is not reported', () => {
+  assert.deepEqual(unindexedElements(page('<p>Body</p>')), []);
+  assert.deepEqual(
+    unindexedElements(
+      '<html><body><div data-ctcdocs-unindexed="row">Copy</div></body></html>',
     ),
-    undefined,
+    [],
   );
-  assert.equal(
-    phrasePlacement(
-      '<html><body><div data-pagefind-ignore>View as Markdown</div></body></html>',
-      'View as Markdown',
+});
+
+test('the page compared against has every marked element removed', () => {
+  const stripped = withoutUnindexed(
+    page(
+      '<h1>Title</h1><div data-ctcdocs-unindexed="row" data-pagefind-ignore>Copy</div><p>Body</p>',
     ),
-    undefined,
   );
+  assert.doesNotMatch(stripped, /data-ctcdocs-unindexed|Copy|Site/u);
+  assert.match(stripped, /<h1>Title<\/h1><p>Body<\/p>/u);
 });
 
 test('a built file maps to the path a Pagefind result reports', () => {

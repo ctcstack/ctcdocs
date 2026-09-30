@@ -11,17 +11,12 @@ import {
 } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { dirname, extname, resolve, sep } from 'node:path';
+import { dirname, extname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { findProjectRoot, PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
 import * as cheerio from 'cheerio';
 import { close, createIndex } from 'pagefind';
-
-import {
-  AGENT_ACCESS_HEADING,
-  VIEW_AS_MARKDOWN_LABEL,
-} from '../dist-node/lib/interface-text.js';
 
 const contentTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
@@ -241,41 +236,47 @@ async function searchCases() {
   return cases;
 }
 
+async function verifyBuiltIndex(distRoot) {
+  const cases = await searchCases();
+  await withSearchIndex(resolve(distRoot, 'pagefind'), async (pagefind) => {
+    for (const [query, expectedPath] of cases) {
+      await expectResult(pagefind, query, expectedPath);
+    }
+  });
+  return cases.length;
+}
+
 /**
- * Interface text is not content. Each label is rendered on every build inside
- * an element marked `data-pagefind-ignore`, so a result for it means the index
- * has swallowed chrome: the first on every synchronized document, the second
- * on the home page, which is indexed by its title alone.
+ * Marks an element whose text must never reach the search index: interface
+ * text, and lists that repeat what a document's own page holds. The element
+ * also carries `data-pagefind-ignore`, or sits inside an element that does.
+ * The mark tells this check which elements must be excluded without relying
+ * on the attribute it is checking, and its value names the element in a
+ * failure.
  */
-const IGNORED_INTERFACE_PHRASES = [
-  VIEW_AS_MARKDOWN_LABEL,
-  AGENT_ACCESS_HEADING,
-];
-
-const collapseWhitespace = (text) => text.replace(/\s+/gu, ' ').trim();
+const UNINDEXED = 'data-ctcdocs-unindexed';
 
 /**
- * Where a built page puts `phrase` in the text Pagefind reads.
+ * The elements a built page marks as unindexed inside the part Pagefind reads,
+ * and whether each is excluded.
  *
- * Starlight marks the part of a page to index with `data-pagefind-body`, and
- * Pagefind then skips any page without one. Within that body, `'content'` means
- * the phrase survives with every `data-pagefind-ignore` element removed, so a
- * search may rightly find the page; `'ignored'` means it appears only inside
- * such elements, so a search must not. `undefined` means the indexed body never
- * contains it. Scripts and styles are not text a reader or the index sees.
+ * Starlight marks that part with `data-pagefind-body`, and Pagefind then reads
+ * nothing else. An element outside it never reaches the index, so it is not
+ * reported. An element inside it is excluded when it, or an ancestor, carries
+ * `data-pagefind-ignore`. Nothing else is taken as exclusion — not an element
+ * Pagefind happens to skip by default, such as `nav` — so moving marked text
+ * into one cannot stand in for the attribute.
  */
-export function phrasePlacement(html, phrase) {
+export function unindexedElements(html) {
   const $ = cheerio.load(html);
-  const body = $('[data-pagefind-body]');
-  body.find('script, style, noscript, template').remove();
-  const needle = phrase.toLowerCase();
-  const holds = () =>
-    collapseWhitespace(body.text()).toLowerCase().includes(needle);
-  if (!holds()) {
-    return undefined;
-  }
-  body.find('[data-pagefind-ignore]').remove();
-  return holds() ? 'content' : 'ignored';
+  return $(
+    `[data-pagefind-body] [${UNINDEXED}], [data-pagefind-body][${UNINDEXED}]`,
+  )
+    .toArray()
+    .map((element) => ({
+      excluded: $(element).closest('[data-pagefind-ignore]').length > 0,
+      name: $(element).attr(UNINDEXED) || 'unnamed',
+    }));
 }
 
 /** The site path Pagefind reports for a built HTML file. */
@@ -286,77 +287,132 @@ export function sitePathOf(htmlPath) {
     : path;
 }
 
-async function placementsOf(distRoot, phrase) {
-  const files = (await readdir(distRoot, { recursive: true }))
-    .filter((file) => file.endsWith('.html'))
+/**
+ * Every built page's unindexed elements, read in one pass.
+ *
+ * A page that does not name the mark is not parsed, so the cost is a read of
+ * each page and a parse of the pages that carry one.
+ */
+async function scanUnindexed(distRoot) {
+  const entries = await readdir(distRoot, {
+    recursive: true,
+    withFileTypes: true,
+  });
+  const files = entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.html'))
+    .map((entry) => resolve(entry.parentPath, entry.name))
     .sort();
-  const placements = new Map();
+  let checked = 0;
+  let sample;
+  const included = [];
   for (const file of files) {
-    const placement = phrasePlacement(
-      await readFile(resolve(distRoot, file), 'utf8'),
-      phrase,
-    );
-    if (placement) {
-      placements.set(sitePathOf(file), placement);
+    const html = await readFile(file, 'utf8');
+    if (!html.includes(UNINDEXED)) {
+      continue;
+    }
+    const path = sitePathOf(relative(distRoot, file));
+    for (const element of unindexedElements(html)) {
+      checked += 1;
+      sample ??= { html, path };
+      if (!element.excluded) {
+        included.push(`${path} (${element.name})`);
+      }
     }
   }
-  return placements;
+  return { checked, included, sample };
+}
+
+/** Removes every element a page marks as unindexed. */
+export function withoutUnindexed(html) {
+  const $ = cheerio.load(html);
+  $(`[${UNINDEXED}]`).remove();
+  return $.html();
 }
 
 /**
- * The check fails when it has nothing to test. It once searched for a sentence
- * the interface had stopped rendering, and passed on every build while
- * guarding nothing; a page that renders the phrase only as ignored chrome is
- * what makes a zero-result search mean something. With the exclusion marker
- * gone, the same label reads as content on every page, and that is reported
- * as the leak it is.
+ * What Pagefind itself indexes for each of `pages`, keyed by site path.
  *
- * A document that itself mentions the label is content, and finding it is
- * correct. Only a result for a page where the phrase is chrome alone is a leak.
+ * The question of what reaches the index is put to Pagefind rather than to a
+ * model of it: a model gets stemming, word boundaries, attribute text and the
+ * elements Pagefind skips wrong in both directions. One language is forced so
+ * every page lands in the index the Node client loads.
  */
-async function expectInterfaceTextIgnored(pagefind, phrase, placements) {
-  const chromePages = [...placements]
-    .filter(([, placement]) => placement === 'ignored')
-    .map(([path]) => path);
-  assert(
-    chromePages.length > 0,
-    placements.size === 0
-      ? `No built page under dist/ renders "${phrase}" in its indexed body, so the check that interface text stays out of the search index would test nothing. Point it at text the interface still renders inside an element marked data-pagefind-ignore.`
-      : `"${phrase}" is rendered on ${placements.size} built page(s) but never inside an element marked data-pagefind-ignore, so the interface text is indexed as content.`,
-  );
-  const search = await pagefind.search(`"${phrase}"`);
-  const results = await Promise.all(
-    search.results.map((result) => result.data()),
-  );
-  const leaked = results
-    .map((result) => resultPath(result.url))
-    .filter((path) => placements.get(path) !== 'content');
-  assert.deepEqual(
-    leaked,
-    [],
-    `Interface text "${phrase}" must not be included in the Pagefind index.`,
-  );
+async function indexedContent(pages) {
+  const content = new Map();
+  await withTemporaryIndex(pages, async (pagefind) => {
+    const search = await pagefind.search(null);
+    for (const result of search.results) {
+      const data = await result.data();
+      content.set(resultPath(data.url), data);
+    }
+  });
+  return content;
 }
 
-async function verifyBuiltIndex() {
-  const distRoot = resolve(findProjectRoot(), 'dist');
-  const bundleRoot = resolve(distRoot, 'pagefind');
-  const cases = await searchCases();
-  await withSearchIndex(bundleRoot, async (pagefind) => {
-    for (const [query, expectedPath] of cases) {
-      await expectResult(pagefind, query, expectedPath);
+async function withTemporaryIndex(pages, run) {
+  const temporaryRoot = await mkdtemp(resolve(tmpdir(), 'pagefind-verify-'));
+  try {
+    const created = await createIndex({ forceLanguage: 'en' });
+    assert.deepEqual(created.errors, []);
+    assert(created.index, 'Pagefind did not create the test index.');
+    for (const [sourcePath, content] of Object.entries(pages)) {
+      const added = await created.index.addHTMLFile({ content, sourcePath });
+      assert.deepEqual(added.errors, []);
     }
+    const bundleRoot = resolve(temporaryRoot, 'pagefind');
+    await writeBundle(created.index, bundleRoot);
+    await withSearchIndex(bundleRoot, run);
+  } finally {
+    await rm(temporaryRoot, { force: true, recursive: true });
+  }
+}
 
-    for (const phrase of IGNORED_INTERFACE_PHRASES) {
-      await expectInterfaceTextIgnored(
-        pagefind,
-        phrase,
-        await placementsOf(distRoot, phrase),
-      );
-    }
-    return cases.length;
+/**
+ * Interface text stays out of the search index.
+ *
+ * This check once searched for a sentence the interface had stopped rendering,
+ * and passed on every build without testing anything. It now reads what the
+ * build marks as unindexed, and fails when there is nothing marked to test.
+ * Every marked element on every page has to be excluded; one page that has
+ * lost the attribute is enough to fail. Pagefind then indexes one of those
+ * pages as built and without its marked elements, and the two have to be the
+ * same, which is what exclusion means.
+ *
+ * The home page is indexed by its title alone (ADR-036), so what Pagefind
+ * indexes for it has to be exactly its title. That holds for a block added to
+ * the page later, marked or not.
+ */
+async function verifyExclusions(distRoot) {
+  const { checked, included, sample } = await scanUnindexed(distRoot);
+  assert(
+    sample,
+    `No built page under dist/ marks an element ${UNINDEXED} inside the part Pagefind indexes, so there is nothing to check interface text against. The platform's components mark theirs; a project that replaces them has to keep the marks.`,
+  );
+  assert.deepEqual(
+    included,
+    [],
+    `These elements are marked ${UNINDEXED} but carry no data-pagefind-ignore, so their text is in the search index.`,
+  );
+
+  const homePath = resolve(distRoot, 'index.html');
+  const content = await indexedContent({
+    'home/index.html': await readFile(homePath, 'utf8'),
+    'marked/index.html': sample.html,
+    'stripped/index.html': withoutUnindexed(sample.html),
   });
-  return cases.length;
+  assert.equal(
+    content.get('/marked/')?.content,
+    content.get('/stripped/')?.content,
+    `Pagefind indexes text from the elements ${sample.path} marks ${UNINDEXED}.`,
+  );
+  const home = content.get('/home/');
+  assert(home, 'Pagefind indexes nothing for the home page.');
+  assert.equal(
+    home.content,
+    home.meta.title,
+    'The home page must be indexed by its title alone.',
+  );
+  return { checked, pages: 2 };
 }
 
 /**
@@ -386,15 +442,15 @@ async function writeBundle(index, bundleRoot) {
   );
 }
 
+const MULTILINGUAL_CASES = [
+  ['Синхронизация', '/multilingual/'],
+  ['discoverable', '/multilingual/'],
+];
+
 async function verifyMultilingualSearch() {
-  const temporaryRoot = await mkdtemp(resolve(tmpdir(), 'pagefind-verify-'));
-  try {
-    const created = await createIndex({ forceLanguage: 'en' });
-    assert.deepEqual(created.errors, []);
-    assert(created.index, 'Pagefind did not create the test index.');
-    const added = await created.index.addHTMLFile({
-      sourcePath: 'multilingual/index.html',
-      content: [
+  await withTemporaryIndex(
+    {
+      'multilingual/index.html': [
         '<html lang="en">',
         '<head><title>Multilingual search fixture</title></head>',
         '<body data-pagefind-body>',
@@ -404,19 +460,14 @@ async function verifyMultilingualSearch() {
         '</body>',
         '</html>',
       ].join(''),
-    });
-    assert.deepEqual(added.errors, []);
-    const bundleRoot = resolve(temporaryRoot, 'pagefind');
-    await writeBundle(created.index, bundleRoot);
-
-    await withSearchIndex(bundleRoot, async (pagefind) => {
-      await expectResult(pagefind, 'Синхронизация', '/multilingual/');
-      await expectResult(pagefind, 'discoverable', '/multilingual/');
-    });
-  } finally {
-    await close();
-    await rm(temporaryRoot, { force: true, recursive: true });
-  }
+    },
+    async (pagefind) => {
+      for (const [query, expectedPath] of MULTILINGUAL_CASES) {
+        await expectResult(pagefind, query, expectedPath);
+      }
+    },
+  );
+  return MULTILINGUAL_CASES.length;
 }
 
 /**
@@ -439,9 +490,15 @@ function invokedDirectly() {
 }
 
 if (invokedDirectly()) {
-  const corpusCases = await verifyBuiltIndex();
-  await verifyMultilingualSearch();
-  console.log(
-    `Pagefind regression passed (${corpusCases + IGNORED_INTERFACE_PHRASES.length + 2} acceptance cases).`,
-  );
+  const distRoot = resolve(findProjectRoot(), 'dist');
+  try {
+    const corpusCases = await verifyBuiltIndex(distRoot);
+    const exclusions = await verifyExclusions(distRoot);
+    const multilingualCases = await verifyMultilingualSearch();
+    console.log(
+      `Pagefind regression passed (${corpusCases + multilingualCases} search cases; ${exclusions.checked} unindexed elements and ${exclusions.pages} pages checked for exclusion).`,
+    );
+  } finally {
+    await close();
+  }
 }

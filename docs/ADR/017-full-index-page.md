@@ -1,6 +1,8 @@
 # ADR-017: The full index becomes a page
 
-- Status: Accepted
+- Status: Accepted; superseded in part by
+  [ADR-036](036-index-the-home-page-by-its-title-and-a-folder-where-it-has-its-address.md),
+  under which a folder's heading is indexed where it is the folder's address
 - Date: 2026-08-02
 - Owners: CTCDocs maintainers
 - Supersedes: none

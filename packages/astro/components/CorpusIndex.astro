@@ -32,18 +32,24 @@ const GroupHeading = heading ? 'h3' : 'h2';
 
 {
   /*
-  Excluded from the search index: this section lists every document title, so
-  indexing it would return the page it sits on alongside every real result.
+  The lists are excluded from the search index: they repeat every document
+  title, so indexing them would return this page alongside every real result.
+  A folder's heading is indexed when the heading is the folder's address,
+  because nowhere else indexes its name (ADR-036).
 */
 }
 <section
   class="corpus"
-  data-pagefind-ignore
   {...heading ? { 'aria-labelledby': 'home-index' } : { 'aria-label': TITLE }}
 >
   {
     heading && (
-      <h2 class="section-title" id="home-index">
+      <h2
+        class="section-title"
+        data-ctcdocs-unindexed="full-index-title"
+        data-pagefind-ignore
+        id="home-index"
+      >
         {TITLE}
       </h2>
     )
@@ -51,17 +57,34 @@ const GroupHeading = heading ? 'h3' : 'h2';
 
   {
     groups.length === 0 ? (
-      <p class="corpus-empty">
+      <p
+        class="corpus-empty"
+        data-ctcdocs-unindexed="full-index-empty"
+        data-pagefind-ignore
+      >
         No documents have been synchronized yet. Once the pipeline publishes its
         first document from the Shared Drive, it appears here.
       </p>
     ) : (
       groups.map((group) => (
         <section aria-labelledby={group.id} class="corpus-group">
-          <GroupHeading class="corpus-group-title" id={group.id}>
+          <GroupHeading
+            class="corpus-group-title"
+            id={group.id}
+            {...(group.addressedInIndex
+              ? {}
+              : {
+                  'data-ctcdocs-unindexed': 'folder-heading',
+                  'data-pagefind-ignore': '',
+                })}
+          >
             {group.label}
           </GroupHeading>
-          <ul class="corpus-list">
+          <ul
+            class="corpus-list"
+            data-ctcdocs-unindexed="full-index-list"
+            data-pagefind-ignore
+          >
             {group.documents.map((entry) => (
               <li>
                 <a href={entry.href}>
