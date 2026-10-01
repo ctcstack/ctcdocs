@@ -176,6 +176,21 @@
   /* The light ramp sets its own gray-7 below; the dark one keeps Starlight's. */
   --kb-gray-7: var(--sl-color-gray-7);
   --kb-danger: var(--sl-color-red-high);
+  /*
+   * Status hues, for the page that ranks work by priority (ADR-037), from the
+   * palette Starlight's asides use, which sets each per theme: a mark in the
+   * hue itself, a surface in its low step, and text on that surface in ink.
+   */
+  --kb-red: var(--sl-color-red);
+  --kb-red-low: var(--sl-color-red-low);
+  --kb-orange: var(--sl-color-orange);
+  --kb-orange-low: var(--sl-color-orange-low);
+  --kb-blue: var(--sl-color-blue);
+  --kb-blue-low: var(--sl-color-blue-low);
+  --kb-green: var(--sl-color-green);
+  --kb-green-low: var(--sl-color-green-low);
+  --kb-purple: var(--sl-color-purple);
+  --kb-purple-low: var(--sl-color-purple-low);
   --kb-text-xs: var(--sl-text-xs);
   --kb-text-sm: var(--sl-text-sm);
   --kb-text-base: var(--sl-text-base);

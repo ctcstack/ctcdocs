@@ -1,6 +1,8 @@
 # ADR-024: A content health page that turns checks into work
 
-- Status: Proposed
+- Status: Proposed; superseded in part by
+  [ADR-037](037-rank-the-content-health-page-by-priority.md), under which the
+  page is ordered by priority rather than by severity
 - Date: 2026-09-27
 - Owners: CTCDocs maintainers
 - Supersedes: none

@@ -17,10 +17,12 @@ interface HealthCheck {
   code: string;
   severity: HealthSeverity;
   title: string;
+  /** Absent from a report written before checks carried one. */
+  action?: string;
   instruction: string;
 }
 
-interface HealthIssue {
+export interface HealthIssue {
   check: string;
   text?: string;
   detail?: string;
@@ -29,7 +31,7 @@ interface HealthIssue {
   related?: { slug: string; title: string };
 }
 
-interface HealthDocument {
+export interface HealthDocument {
   id: string;
   slug: string;
   name: string;
@@ -117,7 +119,7 @@ export interface UnpublishedItem {
   publishedVersion?: string;
 }
 
-interface ReportNote {
+export interface ReportNote {
   id: string;
   name: string;
   folderPath: string[];
@@ -129,7 +131,7 @@ interface ReportNote {
   detail?: string;
 }
 
-interface IgnoredFolder {
+export interface IgnoredFolder {
   id: string;
   name: string;
   folderPath: string[];
@@ -158,8 +160,8 @@ export interface SyncState {
 }
 
 /**
- * Where a group's items are, by top-level section, most first:
- * `Teams (4), General (1)`.
+ * Where a group's items are, by top-level section, most first, two named:
+ * `Handbook 4 · General 1 · +2 more`.
  */
 export function whereOf(
   items: ReadonlyArray<{ folderPath: readonly string[] }>,
@@ -174,10 +176,10 @@ export function whereOf(
       ([leftName, left], [rightName, right]) =>
         right - left || leftName.localeCompare(rightName, 'en'),
     )
-    .map(([name, count]) => `${name} (${count})`);
-  return sections.length > 3
-    ? `${sections.slice(0, 3).join(', ')} and ${sections.length - 3} more`
-    : sections.join(', ');
+    .map(([name, count]) => `${name} ${count}`);
+  return sections.length > 2
+    ? `${sections.slice(0, 2).join(' · ')} · +${sections.length - 2} more`
+    : sections.join(' · ');
 }
 
 /** The state, or `undefined` before a sync has written a report that has it. */

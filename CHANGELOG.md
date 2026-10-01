@@ -2,6 +2,49 @@
 
 All three packages share a version and are released together.
 
+## 0.15.0
+
+### Changed
+
+- The content health page is ordered by priority: **Fix now**, **Fix next**,
+  **Improve**, **Tidy up**, and the proposed title convention last, which is
+  not required yet. Every group of findings, whether a check, a reason a file
+  is not on the site or a note, sits under one of them, each in its own color
+  with an icon and a label, quieter as the priority falls. See
+  [ADR-037](docs/ADR/037-rank-the-content-health-page-by-priority.md), which
+  supersedes ADR-024 and ADR-028 in part, and ADR-011 in part for status
+  colors on this page.
+- The page opens on the whole knowledge base: the number of files in the most
+  urgent state, with a link to them, how many files are on the site, and a bar
+  of every file by its most urgent task, its states named apart from the
+  priorities. "Where the work is" follows: tasks by section and by last
+  editor, and choosing a row filters the page to it.
+- A group is folded to one line, what it is, what to do, how many files and
+  where, except under Fix now; within a priority, files not on the site come
+  first under their own heading, and the largest group first. A file leads with
+  "Open in Google Docs" or "Open in Google Drive"; its page is a quieter link.
+  A letter typed in the other alphabet is named in words and marked in its
+  heading. The checks that were all clear are listed under their priority.
+- The section and editor filters sit in a toolbar that stays at the top of a
+  wide screen, with a chip per priority, and narrow every task list and count.
+  The address keeps the filter, a filtered view offers to copy its link, and
+  such a link opens on the tasks, unfolded when there are 15 or fewer.
+- The old section anchors `#not-on-the-site`, `#notes`, `#fix`, `#convention`
+  and `#note` are replaced by `#fix-now`, `#fix-next`, `#improve`, `#tidy-up`
+  and `#proposal`. A group keeps its own anchor.
+- Each title check carries a short action, as reasons and notes do, written to
+  `data/title-report.json`. The page leaves it out for a report written before.
+
+### Added
+
+- `--kb-red`, `--kb-orange`, `--kb-blue`, `--kb-green` and `--kb-purple`, with
+  a `-low` step each, read in the adapter from Starlight's aside palette, which
+  sets them per theme. Only the content health page uses them.
+
+### Removed
+
+- `HealthSummaryTable.astro`: a group's folded line replaces its row.
+
 ## 0.14.0
 
 ### Added

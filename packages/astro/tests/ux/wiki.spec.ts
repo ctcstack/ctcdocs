@@ -615,22 +615,81 @@ test('the content health page links each issue to its document', async ({
   const sourceLinks = page.locator(
     'content-health a[href^="https://docs.google.com/document/d/"]',
   );
-  await expect(sourceLinks.first()).toBeVisible();
+  await expect(sourceLinks.first()).toBeAttached();
   if (linkedIssueCount > 0) {
     await expect(
       page.locator('content-health a[href*="/edit#heading="]').first(),
     ).toBeAttached();
   }
+  const theme = page.getByRole('combobox', { name: 'Select theme' });
+  await theme.selectOption({ label: 'Light' });
+  await expectNoAccessibilityViolations(page);
+  await theme.selectOption({ label: 'Dark' });
   await expectNoAccessibilityViolations(page);
 
-  // Narrowing to one section leaves only that section's documents.
+  // Narrowing to one section leaves only that section's files, and the
+  // address keeps the choice.
   const [section] = sections;
-  await page.getByLabel('Section').selectOption(section ?? '');
-  const visible = page.locator('content-health li:visible');
+  await page.getByLabel('Section', { exact: true }).selectOption(section ?? '');
+  await expect(page).toHaveURL(/[?&]section=/u);
+  const tasks = page.locator('content-health [data-group] li');
+  const visible = tasks.filter({ visible: true });
+  const expand = page.getByRole('button', { name: 'Expand all' });
+  if (await expand.isVisible()) await expand.click();
   await expect(visible.first()).toBeVisible();
   for (const item of await visible.all()) {
     await expect(item).toHaveAttribute('data-section', section ?? '');
   }
+
+  // Every count on the page follows the filter: each priority's count is the
+  // number of its tasks still shown.
+  for (const tier of await page.locator('content-health [data-tier]').all()) {
+    const id = (await tier.getAttribute('id')) ?? '';
+    const count = tier.locator(`[data-tier-count="${id}"]`);
+    if ((await count.count()) === 0) continue;
+    await expect(count).toHaveText(
+      String(await tier.locator('[data-group] li:not([hidden])').count()),
+    );
+  }
+
+  // The address alone brings the same view back.
+  await page.reload();
+  await expect(page.getByLabel('Section', { exact: true })).toHaveValue(
+    section ?? '',
+  );
+});
+
+test('the content health page ranks what it found, most urgent first', async ({
+  page,
+}) => {
+  const report = contentHealthReport();
+  const unpublished = unpublishedReport();
+  test.skip(
+    !report && !unpublished,
+    'The corpus has no content health report yet.',
+  );
+
+  await page.goto('/content-health/');
+  await expect(
+    page.locator('content-health [data-tier] > h2 > span:first-of-type'),
+  ).toHaveText([
+    'Fix now',
+    'Fix next',
+    'Improve',
+    'Tidy up',
+    'Proposed convention: one Title line',
+    ...((unpublished?.ignoredFolders ?? 0) > 0 ? ['Left out on purpose'] : []),
+  ]);
+
+  // A group folded to its summary opens from a link to it.
+  const folded = page.locator('content-health details[data-group]:not([open])');
+  test.skip(
+    (await folded.count()) === 0,
+    'Every group on the page starts open.',
+  );
+  const id = (await folded.first().getAttribute('id')) ?? '';
+  await page.goto(`/content-health/#${id}`);
+  await expect(page.locator(`details[id="${id}"]`)).toHaveAttribute('open', '');
 });
 
 test('the content health page names every check and note it has findings for', async ({
@@ -651,35 +710,7 @@ test('the content health page names every check and note it has findings for', a
   }
 });
 
-test('the content health page names what is not on the site', async ({
-  page,
-}) => {
-  const report = unpublishedReport();
-  test.skip(
-    !report || report.items.length + report.ignoredFolders === 0,
-    'The corpus has no files left off the site.',
-  );
-  const { items } = report as NonNullable<typeof report>;
-
-  await page.goto('/content-health/');
-  const section = page.locator('section:has(> h2#not-on-the-site)');
-  await expect(
-    section.getByRole('heading', { level: 2, name: 'Not on the site' }),
-  ).toBeVisible();
-  for (const item of items) {
-    const entry = section
-      .locator('li')
-      .filter({ has: page.locator(`a[href="${item.sourceUrl}"]`) });
-    await expect(entry).toHaveCount(1);
-    await expect(entry).toContainText(item.name);
-    if (item.slug) {
-      await expect(entry.locator(`a[href="/${item.slug}/"]`)).toBeAttached();
-    }
-  }
-  await expectNoAccessibilityViolations(page);
-});
-
-test('the content health page sums up each group and opens it from its row', async ({
+test('the content health page names what is not on the site, and every note', async ({
   page,
 }) => {
   const report = unpublishedReport();
@@ -687,25 +718,30 @@ test('the content health page sums up each group and opens it from its row', asy
     !report || report.items.length + report.notes.length === 0,
     'The corpus has nothing off the site and nothing to note.',
   );
+  const { items, notes } = report as NonNullable<typeof report>;
 
   await page.goto('/content-health/');
-  const rows = page.locator('content-health .health-table tbody tr');
-  await expect(rows.first()).toBeVisible();
-  const link = rows.first().locator('a[data-open-group]');
-  const target = (await link.getAttribute('href')) ?? '';
-  const group = page.locator(`details${target}`);
-  await group.evaluate((element) => {
-    (element as HTMLDetailsElement).open = false;
-  });
-  await link.click();
-  await expect(group).toHaveAttribute('open', '');
-  await expectNoAccessibilityViolations(page);
-
-  const notes = page.locator('section:has(> h2#notes)');
-  await expect(notes.getByRole('heading', { level: 2 })).toHaveText('Notes');
-  for (const note of report?.notes ?? []) {
+  for (const item of items) {
+    const entry = page.locator(
+      `content-health li[data-kind="unpublished"]:has(a[href="${item.sourceUrl}"])`,
+    );
+    await expect(entry).toHaveCount(1);
+    await expect(entry).toContainText(item.name);
+    await expect(entry.locator('xpath=ancestor::details[1]')).toHaveAttribute(
+      'id',
+      /^not-on-the-site-/u,
+    );
+    if (item.slug) {
+      await expect(entry.locator(`a[href="/${item.slug}/"]`)).toBeAttached();
+    }
+  }
+  for (const note of notes) {
     await expect(
-      notes.locator(`li:has(a[href="${note.sourceUrl}"])`).first(),
+      page
+        .locator(
+          `content-health li[data-kind="note"]:has(a[href="${note.sourceUrl}"])`,
+        )
+        .first(),
     ).toContainText(note.name);
   }
 });

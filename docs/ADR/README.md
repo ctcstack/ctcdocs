@@ -63,5 +63,7 @@ Rejected
   Supersedes ADR-014 in part.
 - ADR-036: index the home page by its title, and a folder where it has its
   address. Supersedes ADR-017 in part.
+- ADR-037: rank the content health page by priority. Supersedes ADR-024 and
+  ADR-028 in part, and ADR-011 in part for status colors on that page.
 
 Create a new ADR by copying `000-template.md`.

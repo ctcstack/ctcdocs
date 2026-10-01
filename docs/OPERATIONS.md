@@ -311,56 +311,59 @@ Every sync writes `data/title-report.json`
 `/content-health/` ([ADR-024](ADR/024-content-health-page.md)). Send editors
 there. It is not in the sidebar or in search.
 
-The page opens with an overview — pages on the site, files not on it, notes,
-documents to fix — and when the site last changed
-([ADR-028](ADR/028-legible-sync.md)). Then:
+The page is ordered by priority
+([ADR-037](ADR/037-rank-the-content-health-page-by-priority.md)). It opens on
+the whole knowledge base: the number of files in the most urgent state, how
+many files are on the site, and a bar of every file in the published folders
+by its most urgent task. "Where the work is" gives the tasks by section and by
+last editor; choosing a row filters the page to it. Then every group of
+findings, under its priority:
 
-- **Not on the site**
-  ([ADR-025](ADR/025-name-every-file-left-off-the-site.md)): every file in the
-  published folders that the site does not show, shows in an earlier version,
-  or shows only in part. One table gives each group, how many files it holds,
-  where they are and what to do; the lists follow, each with its instruction:
-  - documents held back: a name in another alphabet, over 10 MB, downloading
-    turned off, content refused;
-  - PDFs with no readable text, or too large for the site;
-  - files by kind: Word and text files, presentations, archives, images,
-    diagrams, spreadsheets, video and audio, other files, shortcuts;
-  - folders the site is configured to leave out.
-- **Notes**: pages that are on the site with something to know: what
-  conversion left out (an image, a link, a merged cell, a link to a heading),
-  images with no alt text
-  ([ADR-029](ADR/029-say-when-an-image-has-no-alt-text.md)), a cropped image
-  the site could not crop and shows whole
-  ([ADR-031](ADR/031-apply-the-crop-google-docs-makes.md)), images larger
-  than `sync.largeImageMegabytes` (2 MB unless the project sets it), files in
-  one folder the site cannot tell apart, order numbers used twice, a page with
-  no summary because it has no paragraph of plain text, and a link to a Google
-  Doc or Drive file outside the published folders
-  ([ADR-034](ADR/034-check-headings-summaries-and-outside-links.md)).
-
-A document held back
-([ADR-026](ADR/026-hold-back-a-document-that-cannot-be-exported.md)) keeps
-its published version if it had one, and the page says when that version was
-edited. It is tried again on every sync.
-
-Then the checks, grouped by what fixes them:
-
-- **Fix.** A heading that mixes alphabets, a document that opens with
-  another document's title, an empty document.
+- **Fix now**: a reader runs into a mistake, or a document cannot reach the
+  site. A heading that mixes alphabets, a document that opens with another
+  document's title, an empty document; a document held back
+  ([ADR-026](ADR/026-hold-back-a-document-that-cannot-be-exported.md)) by a
+  name in another alphabet, over 10 MB, downloading turned off or content
+  refused; a cropped image the site could not crop and shows whole
+  ([ADR-031](ADR/031-apply-the-crop-google-docs-makes.md)); an image or a link
+  conversion left out; a code block never closed.
+- **Fix next**: files the site does not show
+  ([ADR-025](ADR/025-name-every-file-left-off-the-site.md)), by kind — Word
+  and text files, presentations, archives, images, diagrams, spreadsheets,
+  video and audio, other files, shortcuts — and PDFs with no readable text or
+  too large for the site; files in one folder the site cannot tell apart; a
+  merged cell split, formatting removed.
+- **Improve**: images with no alt text
+  ([ADR-029](ADR/029-say-when-an-image-has-no-alt-text.md)), a page with no
+  summary, images larger than `sync.largeImageMegabytes` (2 MB unless the
+  project sets it), a link to a Google file outside the published folders, a
+  link to a heading that opens the top of a page, a PDF only partly
+  searchable, a heading that skips a level and a heading with the words of an
+  earlier one ([ADR-034](ADR/034-check-headings-summaries-and-outside-links.md)),
+  a second landing document.
+- **Tidy up**: Drive names with "Copy of", a file extension, underscores or
+  extra spaces; order numbers used twice or not read; an ignored folder that
+  is no longer there.
 - **Proposed convention: one Title line.** A document opens with its name as
-  one line in the Title style, and uses Heading 1 to 3 for sections.
-- **Worth a look.** A heading that skips a level, as the page shows it, and a
-  heading with the words of an earlier one
-  ([ADR-034](ADR/034-check-headings-summaries-and-outside-links.md)); Drive
-  names with "Copy of", a file extension, underscores or extra spaces.
+  one line in the Title style, and uses Heading 1 to 3 for sections. It is not
+  required yet and does not count against a file.
 
-Each check says what to do. Each document links to its page and to Google
-Docs, straight to the line concerned when there is one, and shows its
-section and who last edited it. Filter by section, or by last editor, to hand
-out the work. The page is rebuilt on every sync, so a fixed item disappears
-after the next one. When a release adds a check read from the documents'
-structure, the next normal sync exports every Google Doc once more to read it;
-nothing else changes, and the sync after that is quick again.
+A group is folded to one line — what it is, what to do, how many files, where
+— except under Fix now. Opened, it gives the instruction, and each file opens
+in Google Docs or Drive, straight to the line concerned when there is one,
+with its section, who last edited it and a link to its page. Each priority
+also lists the checks that were all clear. A document held back keeps
+its published version if it had one, the page says when that version was
+edited, and it is tried again on every sync. Folders the site is configured
+to leave out are listed last.
+
+Filter by section, or by last editor, to hand out the work: every task list
+and count below the overview follows, and the address keeps the filter. "Copy
+link" copies it, so send each editor the link to their own view; it opens on
+their tasks. The page is rebuilt on every sync, so a fixed item
+disappears after the next one. When a release adds a check read from the
+documents' structure, the next normal sync exports every Google Doc once more
+to read it; nothing else changes, and the sync after that is quick again.
 
 The job summary of every sync has three parts
 ([ADR-028](ADR/028-legible-sync.md)):

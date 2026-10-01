@@ -1,203 +1,239 @@
 ---
 /**
- * What editors have to fix, grouped by the action that fixes it (ADR-024),
- * and what in the published folders is not on the site, with why (ADR-025).
+ * What editors have to fix, most urgent first, and what is already in order
+ * (ADR-024, ADR-025, ADR-037).
  *
- * Every item links to the document in Google Drive or Docs, at the paragraph
- * concerned when the check is about one, and to its page on this site when it
- * has one. Filters narrow the list to one section of the corpus or to whoever
- * last edited a file, which is how the work is shared out. The page is rebuilt
- * on every sync, so a fixed item disappears after the next one.
+ * The page leads with the state of the whole knowledge base: one figure, one
+ * bar of every file by its most urgent task, and where the work is, by section
+ * and by editor. Below, every group of findings sits under its priority: fix
+ * now, fix next, improve, tidy up, and the proposed title convention, which is
+ * not required yet. A group is folded to one line saying what it is, what to
+ * do, how many files and where; open, it gives the instruction and every file,
+ * each with one action: open it in Google Docs or Drive. The checks that found
+ * nothing are listed under their priority, so what is in order shows as
+ * plainly as what is not.
+ *
+ * Filters by section and by last editor narrow every task list and count in
+ * the browser, and the address keeps them, so a filtered view can be sent to
+ * the person it is for. Without script the whole page stays readable. It is
+ * rebuilt on every sync, so a fixed task disappears after the next one.
  *
  * It is not in the sidebar and not in search: it is an address people are
  * sent to, not part of the documentation.
  */
 import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { Icon } from '@astrojs/starlight/components';
 import { PLATFORM_ROUTE_HREFS } from '@ctcstack/ctcdocs-core';
 
-import HealthSummaryTable from '../components/HealthSummaryTable.astro';
+import HealthBreakdown from '../components/HealthBreakdown.astro';
+import HealthGroup from '../components/HealthGroup.astro';
 import {
-  googleDocsUrl,
   loadHealthReport,
   loadSyncState,
   sectionOf,
-  whereOf,
-  type HealthSeverity,
-  type UnpublishedItem,
 } from '../lib/content-health';
+import {
+  buildHealthView,
+  PRIORITY_LEVELS,
+  TASK_PRIORITIES,
+  type HealthGroup as Group,
+  type Priority,
+  type TaskPriority,
+} from '../lib/content-health-view';
 
 const report = loadHealthReport();
 const state = loadSyncState();
+const view = buildHealthView(report, state);
 
-const SEVERITIES: Array<{
-  severity: HealthSeverity;
-  heading: string;
-  lede: string;
-  open: boolean;
-}> = [
-  {
-    severity: 'fix',
-    heading: 'Fix',
-    lede: 'Mistakes a reader can run into. Each takes a minute.',
-    open: true,
-  },
-  {
-    severity: 'convention',
-    heading: 'Proposed convention: one Title line',
-    lede: "Every document opens with its name as one line in the Title style, and uses Heading 1 to 3 for its sections. The site will take a document's title from that line once the convention is agreed.",
-    open: true,
-  },
-  {
-    severity: 'note',
-    heading: 'Worth a look',
-    lede: 'Tidiness in Drive names. The site shows these names today.',
-    open: false,
-  },
-];
-
-/** A group this long starts folded; its row in the table says what it holds. */
+/** A group this long starts folded, even under "Fix now". */
 const OPEN_UP_TO = 20;
 
-const byName = (left: string, right: string) => left.localeCompare(right, 'en');
-const documents = report?.documents ?? [];
-const unpublished = state?.unpublished ?? [];
-const ignoredFolders = state?.ignoredFolders ?? [];
-const notes = state?.notes ?? [];
-const sections = [
-  ...new Set([
-    ...documents.map(sectionOf),
-    ...unpublished.map(sectionOf),
-    ...ignoredFolders.map(sectionOf),
-    ...notes.map(sectionOf),
-  ]),
-].sort(byName);
-const editors = [
-  ...new Set(
-    [...documents, ...unpublished, ...notes].flatMap((item) =>
-      item.lastEditedBy ? [item.lastEditedBy] : [],
-    ),
-  ),
-].sort(byName);
+const ICONS: Record<Priority | 'good', string> = {
+  'fix-now': 'error',
+  'fix-next': 'warning',
+  improve: 'information',
+  'tidy-up': 'pencil',
+  proposal: 'comment-alt',
+  good: 'approve-check-circle',
+};
+const LABELS = Object.fromEntries(
+  PRIORITY_LEVELS.map((level) => [level.id, level.label]),
+) as Record<Priority, string>;
+/**
+ * A file's state by its most urgent task. These name files, not priorities,
+ * so the overview's counts never sit under a priority's own label.
+ */
+const FILE_STATES: Record<TaskPriority | 'good', string> = {
+  'fix-now': 'Need a fix now',
+  'fix-next': 'Need a fix next',
+  improve: 'Only improvements',
+  'tidy-up': 'Only tidying',
+  good: 'All good',
+};
+const HEADLINES: Record<TaskPriority, string> = {
+  'fix-now': 'to fix now',
+  'fix-next': 'to fix next',
+  improve: 'to improve',
+  'tidy-up': 'to tidy up',
+};
 
-const groups = (report?.checks ?? []).map((check) => ({
-  check,
-  documents: documents
-    .map((document) => ({
-      document,
-      issues: document.issues.filter((issue) => issue.check === check.code),
-    }))
-    .filter((entry) => entry.issues.length > 0),
-}));
-const unpublishedGroups = (state?.reasons ?? [])
-  .map((reason) => ({
-    reason,
-    items: unpublished.filter((item) => item.reason === reason.code),
-  }))
-  .filter((group) => group.items.length > 0);
-const noteGroups = (state?.noteKinds ?? [])
-  .map((kind) => ({
-    kind,
-    items: notes.filter((note) => note.note === kind.code),
-  }))
-  .filter((group) => group.items.length > 0);
-
-const published = state
-  ? state.summary.published.googleDocs + state.summary.published.pdfs
-  : undefined;
 const plural = (count: number, one: string, many = `${one}s`) =>
   `${count} ${count === 1 ? one : many}`;
-const trail = (item: { folderPath: readonly string[] }) =>
-  item.folderPath.length > 0 ? item.folderPath.join(' › ') : 'General';
-const isFileNameCheck = (code: string) => code.startsWith('file-name-');
-const status = (item: UnpublishedItem) =>
-  item.status === 'incomplete'
-    ? 'On the site, incomplete.'
-    : item.status === 'out-of-date' && item.publishedVersion
-      ? `The site shows the version edited on ${item.publishedVersion.slice(0, 10)}.`
-      : 'Not on the site.';
+const percent = (part: number, whole: number) =>
+  whole > 0 ? Math.round((part / whole) * 100) : 0;
+
+const files = view.files;
+/** The most urgent state any file is in, which the figure leads with. */
+const lead = files
+  ? TASK_PRIORITIES.find((priority) => files.byPriority[priority] > 0)
+  : undefined;
+const segments = files
+  ? [
+      ...TASK_PRIORITIES.map((priority) => ({
+        id: priority as TaskPriority | 'good',
+        count: files.byPriority[priority],
+      })),
+      { id: 'good' as const, count: files.good },
+    ]
+  : [];
+const tasks = view.tiers
+  .filter((tier) => tier.level.id !== 'proposal')
+  .reduce((sum, tier) => sum + tier.tasks, 0);
+const notOnSite = view.onSite ? view.onSite.total - view.onSite.published : 0;
+const hasBreakdown = view.bySection.length + view.byEditor.length > 0;
+
+/**
+ * A priority's groups, with the files the site does not show apart from the
+ * rest, under a heading each when both are there.
+ */
+const blocks = (groups: Group[]) => {
+  const off = groups.filter((group) => group.source === 'unpublished');
+  const on = groups.filter((group) => group.source !== 'unpublished');
+  if (off.length === 0 || on.length === 0) {
+    return [{ heading: undefined, groups }];
+  }
+  return [
+    { heading: 'Not on the site', groups: off },
+    { heading: 'On the site', groups: on },
+  ];
+};
 ---
 
 <StarlightPage
   frontmatter={{
     title: 'Content health',
     description:
-      'What is on the site and what is not, and what to fix in Google Docs and Drive.',
+      'What to fix in Google Docs and Drive, most urgent first, and what is already in order.',
     tableOfContents: false,
     pagefind: false,
     prev: false,
     next: false,
   }}
 >
-  <content-health data-pagefind-ignore>
+  <content-health class="not-content" data-pagefind-ignore>
     {
       !report && !state ? (
-        <p>
+        <p class="health-intro">
           The next sync writes the report this page is built from. Check back
           after it has run.
         </p>
       ) : (
         <>
-          <p>
-            What is on the site and what is not, and what to fix in Google Docs
-            and Drive, grouped by what fixes it. Each item links to its file in
-            Drive, and to its page when it has one. The page is rebuilt on every
-            sync, so a fixed item disappears after the next one.
+          <p class="health-intro">
+            What to fix in Google Docs and Drive, most urgent first. A fixed
+            task disappears after the next sync.
           </p>
 
-          <dl class="health-stats">
-            {state && published !== undefined && (
-              <>
-                <div>
-                  <dt>On the site</dt>
-                  <dd>
-                    {published}
-                    <span class="health-stat-detail">
-                      {`${plural(state.summary.published.googleDocs, 'Google Doc')}, ${plural(state.summary.published.pdfs, 'PDF')}`}
-                    </span>
-                  </dd>
-                </div>
-                <div>
-                  <dt>
-                    <a href="#not-on-the-site">Not on the site</a>
-                  </dt>
-                  <dd>{unpublished.length}</dd>
-                </div>
-                <div>
-                  <dt>
-                    <a href="#notes">Notes</a>
-                  </dt>
-                  <dd>{notes.length}</dd>
-                </div>
-              </>
-            )}
-            {report && (
-              <>
-                <div>
-                  <dt>
-                    <a href="#fix">Documents to fix</a>
-                  </dt>
-                  <dd>{report.summary.severity.fix}</dd>
-                </div>
-                <div>
-                  <dt>Following the proposed convention</dt>
-                  <dd>
-                    {report.summary.conforming}
-                    <span> of {report.summary.inspected}</span>
-                  </dd>
-                </div>
-              </>
-            )}
-          </dl>
-
-          {state && (
-            <p class="health-notice">
-              The site last changed on{' '}
-              <time datetime={state.generatedAt}>
-                {state.generatedAt.slice(0, 16).replace('T', ' ')} UTC
-              </time>
-              .
-            </p>
+          {files && (
+            <section
+              class="health-overview"
+              aria-labelledby="health-overview-title"
+              data-priority={lead ?? 'good'}
+            >
+              <p class="health-eyebrow">Whole knowledge base</p>
+              <div class="health-hero">
+                <Icon name={ICONS[lead ?? 'good']} size="2.25rem" />
+                <p class="health-hero-title" id="health-overview-title">
+                  {lead ? (
+                    <>
+                      <span class="health-hero-figure">
+                        {files.byPriority[lead]}
+                      </span>{' '}
+                      {files.byPriority[lead] === 1 ? 'file' : 'files'}{' '}
+                      {HEADLINES[lead]}
+                    </>
+                  ) : (
+                    'Everything is in order'
+                  )}
+                </p>
+                {lead && (
+                  <a class="health-hero-go" href={`#${lead}`}>
+                    Start with these
+                    <Icon name="down-arrow" size="1rem" />
+                  </a>
+                )}
+              </div>
+              <p class="health-hero-context">
+                {view.onSite && (
+                  <>
+                    {view.onSite.published} of{' '}
+                    {plural(view.onSite.total, 'file')} are on the site
+                    {notOnSite > 0 ? (
+                      <>
+                        ; {notOnSite} are not, under{' '}
+                        <a href="#fix-next">Fix next</a>.{' '}
+                      </>
+                    ) : (
+                      '. '
+                    )}
+                  </>
+                )}
+                {state && (
+                  <>
+                    As of the sync on{' '}
+                    <time datetime={state.generatedAt} data-synced>
+                      {state.generatedAt.slice(0, 16).replace('T', ' ')} UTC
+                    </time>
+                    .
+                  </>
+                )}
+              </p>
+              <p class="health-stack-caption">
+                {plural(files.total, 'file')} in the published folders, each
+                counted once by its most urgent task:
+              </p>
+              <div
+                class="health-stack"
+                role="img"
+                aria-label={segments
+                  .filter((segment) => segment.count > 0)
+                  .map(
+                    (segment) => `${FILE_STATES[segment.id]}: ${segment.count}`,
+                  )
+                  .join(', ')}
+              >
+                {segments
+                  .filter((segment) => segment.count > 0)
+                  .map((segment) => (
+                    <span
+                      data-priority={segment.id}
+                      style={`--share: ${(segment.count / files.total) * 100}%`}
+                      title={`${FILE_STATES[segment.id]}: ${segment.count}`}
+                    />
+                  ))}
+              </div>
+              <ul class="health-legend" aria-label="Files by state">
+                {segments.map((segment) => (
+                  <li data-priority={segment.id}>
+                    <span class="health-dot" />
+                    <span>{FILE_STATES[segment.id]}</span>
+                    <strong>{segment.count}</strong>
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
+
           {report && report.summary.inspected < report.summary.documents && (
             <p class="health-notice">
               {report.summary.documents - report.summary.inspected} documents
@@ -205,323 +241,211 @@ const status = (item: UnpublishedItem) =>
             </p>
           )}
 
-          <form class="health-filters" aria-label="Filter the list">
-            <label>
-              Section
-              <select name="section">
-                <option value="">All sections</option>
-                {sections.map((section) => (
-                  <option value={section}>{section}</option>
-                ))}
-              </select>
-            </label>
-            {editors.length > 0 && (
-              <label>
-                Last edited by
-                <select name="editor">
-                  <option value="">Anyone</option>
-                  {editors.map((editor) => (
-                    <option value={editor}>{editor}</option>
+          {hasBreakdown && (
+            <details class="health-where" open data-where-block>
+              <summary>Where the work is</summary>
+              <p class="health-where-lede">
+                Tasks in the whole knowledge base, by section and by who last
+                edited the file, the most urgent first. Choose a row to see only
+                its tasks.
+              </p>
+              <div class="health-where-lists">
+                {view.bySection.length > 0 && (
+                  <HealthBreakdown
+                    heading="By section"
+                    filter="section"
+                    rows={view.bySection}
+                    labels={LABELS}
+                  />
+                )}
+                {view.byEditor.length > 0 && (
+                  <HealthBreakdown
+                    heading="By last editor"
+                    filter="editor"
+                    rows={view.byEditor}
+                    labels={LABELS}
+                  />
+                )}
+              </div>
+            </details>
+          )}
+
+          <form class="health-toolbar" aria-label="Filter the tasks">
+            <div class="health-filters">
+              <div class="health-filter">
+                <label for="health-filter-section">Section</label>
+                <select id="health-filter-section" name="section">
+                  <option value="">All sections</option>
+                  {view.sections.map((section) => (
+                    <option value={section}>{section}</option>
                   ))}
                 </select>
-              </label>
-            )}
-            <p class="health-filter-status" role="status" data-status />
+              </div>
+              {view.editors.length > 0 && (
+                <div class="health-filter">
+                  <label for="health-filter-editor">Last edited by</label>
+                  <select id="health-filter-editor" name="editor">
+                    <option value="">Anyone</option>
+                    {view.editors.map((editor) => (
+                      <option value={editor}>{editor}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div class="health-filter-actions">
+                <button type="reset" data-clear hidden>
+                  Clear filters
+                </button>
+                <button type="button" data-copy hidden>
+                  Copy link
+                </button>
+                <button type="button" data-expand>
+                  Expand all
+                </button>
+              </div>
+            </div>
+            <nav class="health-jump" aria-label="Priorities">
+              <span class="health-jump-label">Jump to:</span>
+              <ul>
+                {view.tiers.map((tier) => (
+                  <li data-priority={tier.level.id}>
+                    <a href={`#${tier.level.id}`}>
+                      <Icon name={ICONS[tier.level.id]} size="1rem" />
+                      {tier.level.id === 'proposal'
+                        ? 'Proposal'
+                        : tier.level.label}
+                      <span
+                        class="health-chip-count"
+                        data-tier-count={tier.level.id}
+                      >
+                        {tier.tasks}
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+            <p class="health-filter-status" role="status" data-status>
+              {tasks > 0 &&
+                files &&
+                `${plural(tasks, 'task')} in ${plural(files.total - files.good, 'file')}. A file can have more than one.`}
+            </p>
           </form>
 
-          {state && (
-            <section class="health-severity" data-severity-section>
-              <h2 id="not-on-the-site">Not on the site</h2>
-              <p class="health-lede">
-                Files in the published folders that the site does not show,
-                shows in an earlier version, or shows only in part, grouped by
-                what to do about them.
-              </p>
-              {unpublishedGroups.length === 0 && ignoredFolders.length === 0 ? (
-                <p class="health-empty">
-                  Every file in the published folders is on the site.
+          <p
+            class="health-all-clear health-filter-clear"
+            data-priority="good"
+            data-all-clear
+            hidden
+          >
+            <Icon name={ICONS.good} size="1.25rem" />
+            Nothing to do for this filter.
+          </p>
+
+          {view.tiers.map((tier) => (
+            <section
+              class="health-tier"
+              id={tier.level.id}
+              data-priority={tier.level.id}
+              data-tier
+            >
+              <h2>
+                <Icon name={ICONS[tier.level.id]} size="1.25rem" />
+                <span>{tier.level.label}</span>
+                <span class="health-tier-count">
+                  <span data-tier-count={tier.level.id}>{tier.tasks}</span>{' '}
+                  {tier.tasks === 1 ? 'task' : 'tasks'}
+                </span>
+              </h2>
+              <p class="health-lede">{tier.level.lede}</p>
+              {tier.level.id === 'proposal' && view.convention && (
+                <div class="health-progress">
+                  <div class="health-meter" aria-hidden="true">
+                    <span
+                      style={`--share: ${percent(view.convention.conforming, view.convention.inspected)}%`}
+                    />
+                  </div>
+                  <p>
+                    {view.convention.conforming} of{' '}
+                    {plural(view.convention.inspected, 'document')} follow it
+                    already.
+                  </p>
+                </div>
+              )}
+              {tier.tasks === 0 ? (
+                <p class="health-all-clear" data-priority="good">
+                  <Icon name={ICONS.good} size="1.25rem" />
+                  {tier.level.clear}
                 </p>
               ) : (
-                <p class="health-empty" data-filter-empty hidden>
-                  Nothing here for this filter.
+                <p
+                  class="health-all-clear"
+                  data-priority="good"
+                  data-filter-empty
+                  hidden
+                >
+                  <Icon name={ICONS.good} size="1.25rem" />
+                  Nothing at this priority for this filter.
                 </p>
               )}
-              {unpublishedGroups.length > 0 && (
-                <HealthSummaryTable
-                  label="Files not on the site, by what to do"
-                  unit="Files"
-                  rows={unpublishedGroups.map(({ reason, items }) => ({
-                    id: `not-on-the-site-${reason.code}`,
-                    title: reason.title,
-                    count: items.length,
-                    where: whereOf(items),
-                    action: reason.action,
-                  }))}
-                />
-              )}
-              {unpublishedGroups.map(({ reason, items }) => (
-                <details
-                  class="health-check"
-                  id={`not-on-the-site-${reason.code}`}
-                  open={items.length <= OPEN_UP_TO}
-                  data-check
-                >
-                  <summary>
-                    <span class="health-check-title">{reason.title}</span>
-                    <span class="health-count" data-count>
-                      {items.length}
-                    </span>
-                  </summary>
-                  <p class="health-instruction">{reason.instruction}</p>
-                  <ul>
-                    {items.map((item) => (
-                      <li
-                        data-section={sectionOf(item)}
-                        data-editor={item.lastEditedBy ?? ''}
-                      >
-                        <div class="health-item-head">
-                          {item.slug ? (
-                            <a href={`/${item.slug}/`}>{item.name}</a>
-                          ) : (
-                            <span class="health-item-name">{item.name}</span>
-                          )}
-                          <a
-                            class="health-source"
-                            href={item.sourceUrl}
-                            rel="noopener noreferrer"
-                            target="_blank"
-                          >
-                            Open in Google Drive
-                          </a>
-                        </div>
-                        <p class="health-meta">
-                          {trail(item)} · {item.type}
-                          {item.lastEditedBy &&
-                            ` · last edited by ${item.lastEditedBy}`}
-                        </p>
-                        <p class="health-detail">
-                          {status(item)}
-                          {item.detail && ` ${item.detail}`}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              ))}
-              {ignoredFolders.length > 0 && (
-                <details class="health-check" data-check>
-                  <summary>
-                    <span class="health-check-title">
-                      Folders the site is configured to leave out
-                    </span>
-                    <span class="health-count" data-count>
-                      {ignoredFolders.length}
-                    </span>
-                  </summary>
-                  <p class="health-instruction">
-                    Nothing in these folders is published, on purpose. Ask
-                    whoever maintains the site if one of them should be.
-                  </p>
-                  <ul>
-                    {ignoredFolders.map((folder) => (
-                      <li data-section={sectionOf(folder)} data-editor="">
-                        <div class="health-item-head">
-                          <span class="health-item-name">{folder.name}</span>
-                        </div>
-                        <p class="health-meta">
-                          {trail(folder)} · {folder.items}{' '}
-                          {folder.items === 1 ? 'item' : 'items'}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-            </section>
-          )}
-
-          {state && (
-            <section class="health-severity" data-severity-section>
-              <h2 id="notes">Notes</h2>
-              <p class="health-lede">
-                Pages that are on the site, with something a reader would miss
-                or an editor should know: what conversion left out, and what in
-                Drive makes two pages hard to tell apart.
-              </p>
-              {noteGroups.length === 0 ? (
-                <p class="health-empty">
-                  Nothing to note: every published page came through conversion
-                  whole.
-                </p>
-              ) : (
-                <>
-                  <p class="health-empty" data-filter-empty hidden>
-                    Nothing here for this filter.
-                  </p>
-                  <HealthSummaryTable
-                    label="Notes, by what to do"
-                    unit="Items"
-                    rows={noteGroups.map(({ kind, items }) => ({
-                      id: `notes-${kind.code}`,
-                      title: kind.title,
-                      count: items.length,
-                      where: whereOf(items),
-                      action: kind.action,
-                    }))}
-                  />
-                </>
-              )}
-              {noteGroups.map(({ kind, items }) => (
-                <details
-                  class="health-check"
-                  id={`notes-${kind.code}`}
-                  open={items.length <= OPEN_UP_TO}
-                  data-check
-                >
-                  <summary>
-                    <span class="health-check-title">{kind.title}</span>
-                    <span class="health-count" data-count>
-                      {items.length}
-                    </span>
-                  </summary>
-                  <p class="health-instruction">{kind.instruction}</p>
-                  <ul>
-                    {items.map((note) => (
-                      <li
-                        data-section={sectionOf(note)}
-                        data-editor={note.lastEditedBy ?? ''}
-                      >
-                        <div class="health-item-head">
-                          {note.slug ? (
-                            <a href={`/${note.slug}/`}>{note.name}</a>
-                          ) : (
-                            <span class="health-item-name">{note.name}</span>
-                          )}
-                          <a
-                            class="health-source"
-                            href={note.sourceUrl}
-                            rel="noopener noreferrer"
-                            target="_blank"
-                          >
-                            Open in Google Drive
-                          </a>
-                        </div>
-                        <p class="health-meta">
-                          {trail(note)} · {note.type}
-                          {note.lastEditedBy &&
-                            ` · last edited by ${note.lastEditedBy}`}
-                        </p>
-                        {note.detail && (
-                          <p class="health-detail">{note.detail}</p>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              ))}
-            </section>
-          )}
-
-          {report ? (
-            SEVERITIES.map(({ severity, heading, lede, open }) => {
-              const inSeverity = groups.filter(
-                (group) =>
-                  group.check.severity === severity &&
-                  group.documents.length > 0,
-              );
-              return (
-                <section class="health-severity" data-severity-section>
-                  <h2 id={severity}>{heading}</h2>
-                  <p class="health-lede">{lede}</p>
-                  {inSeverity.length === 0 ? (
-                    <p class="health-empty">Nothing to do here.</p>
-                  ) : (
-                    <p class="health-empty" data-filter-empty hidden>
-                      Nothing here for this filter.
-                    </p>
+              {blocks(tier.groups).map((block) => (
+                <div class="health-block" data-block>
+                  {block.heading && (
+                    <h3 class="health-block-heading">{block.heading}</h3>
                   )}
-                  {inSeverity.length > 0 &&
-                    inSeverity.map(({ check, documents: entries }) => (
-                      <details class="health-check" open={open} data-check>
-                        <summary>
-                          <span class="health-check-title">{check.title}</span>
-                          <span class="health-count" data-count>
-                            {entries.length}
-                          </span>
-                        </summary>
-                        <p class="health-instruction">{check.instruction}</p>
-                        <ul>
-                          {entries.map(({ document, issues }) => (
-                            <li
-                              data-section={sectionOf(document)}
-                              data-editor={document.lastEditedBy ?? ''}
-                            >
-                              <div class="health-item-head">
-                                <a href={`/${document.slug}/`}>
-                                  {document.title}
-                                </a>
-                                <a
-                                  class="health-source"
-                                  href={googleDocsUrl(
-                                    document.id,
-                                    issues.find((issue) => issue.headingId),
-                                  )}
-                                  rel="noopener noreferrer"
-                                  target="_blank"
-                                >
-                                  Open in Google Docs
-                                </a>
-                              </div>
-                              <p class="health-meta">
-                                {trail(document)}
-                                {document.lastEditedBy &&
-                                  ` · last edited by ${document.lastEditedBy}`}
-                              </p>
-                              {isFileNameCheck(check.code) && (
-                                <p class="health-detail">
-                                  Drive name: “{document.name}”
-                                </p>
-                              )}
-                              {issues
-                                .filter((issue) => issue.text)
-                                .map((issue) => (
-                                  <p class="health-detail">
-                                    {'Line: '}
-                                    {issue.headingId ? (
-                                      <a
-                                        href={googleDocsUrl(document.id, issue)}
-                                        rel="noopener noreferrer"
-                                        target="_blank"
-                                      >
-                                        “{issue.text}”
-                                      </a>
-                                    ) : (
-                                      <span>“{issue.text}”</span>
-                                    )}
-                                    {issue.detail && ` — ${issue.detail}`}
-                                    {issue.related && (
-                                      <>
-                                        {' — the title of '}
-                                        <a href={`/${issue.related.slug}/`}>
-                                          {issue.related.title}
-                                        </a>
-                                      </>
-                                    )}
-                                  </p>
-                                ))}
-                            </li>
-                          ))}
-                        </ul>
-                      </details>
+                  {block.groups.map((group) => (
+                    <HealthGroup
+                      group={group}
+                      open={
+                        tier.level.id === 'fix-now' &&
+                        group.entries.length <= OPEN_UP_TO
+                      }
+                    />
+                  ))}
+                </div>
+              ))}
+              {tier.clear.length > 0 && (
+                <details class="health-passed" data-priority="good">
+                  <summary>
+                    <Icon name={ICONS.good} size="1rem" />
+                    {tier.tasks === 0
+                      ? `All clear on ${plural(tier.clear.length, 'check')}`
+                      : `All clear on ${plural(tier.clear.length, 'other check')}`}
+                  </summary>
+                  <ul>
+                    {tier.clear.map((check) => (
+                      <li>{check.title}</li>
                     ))}
-                </section>
-              );
-            })
-          ) : (
-            <p class="health-notice">
-              The next sync writes the title report the checks below this list
-              are built from.
-            </p>
+                  </ul>
+                </details>
+              )}
+            </section>
+          ))}
+
+          {view.ignoredFolders.length > 0 && (
+            <section class="health-tier" id="left-out" data-tier>
+              <h2>
+                <span>Left out on purpose</span>
+              </h2>
+              <p class="health-lede">
+                Folders the site is configured to leave out. Nothing in them is
+                published. Ask whoever maintains the site if one of them should
+                be.
+              </p>
+              <ul class="health-folders">
+                {view.ignoredFolders.map((folder) => (
+                  <li data-section={sectionOf(folder)} data-editor="">
+                    <span class="health-folder-name">{folder.name}</span>
+                    <span class="health-folder-meta">
+                      {folder.folderPath.length > 0
+                        ? folder.folderPath.join(' › ')
+                        : 'General'}{' '}
+                      · {plural(folder.items, 'item')}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
 
           {state && (
@@ -545,219 +469,864 @@ const status = (item: UnpublishedItem) =>
 
 <script>
   /**
-   * Narrows the list to one section or one editor. Filtering runs in the
-   * browser over the rendered list: nothing is fetched, and without script the
-   * whole list stays visible.
+   * Narrows every task list and count to one section, one editor or both, in
+   * the browser over the rendered page: nothing is fetched, and without script
+   * the whole page stays visible. The address keeps the filter, so a view can
+   * be sent to the person it is for, and a view that short opens its groups.
    */
+  const UNFOLD_UP_TO = 15;
+  const NARROW = '(max-width: 50rem)';
+
+  /** As the page writes it: `Handbook 4 · General 1 · +2 more`. */
+  function whereOf(sections: string[]): string {
+    const counts = new Map<string, number>();
+    for (const section of sections) {
+      counts.set(section, (counts.get(section) ?? 0) + 1);
+    }
+    const named = [...counts]
+      .sort(
+        ([leftName, left], [rightName, right]) =>
+          right - left || leftName.localeCompare(rightName, 'en'),
+      )
+      .map(([name, count]) => `${name} ${count}`);
+    return named.length > 2
+      ? `${named.slice(0, 2).join(' · ')} · +${named.length - 2} more`
+      : named.join(' · ');
+  }
+
+  /** `3 hours ago`, or nothing for a time in the future or unreadable. */
+  function ago(time: string): string {
+    const minutes = Math.round((Date.now() - Date.parse(time)) / 60_000);
+    if (!(minutes >= 0)) return '';
+    const format = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+    if (minutes < 60) return format.format(-minutes, 'minute');
+    if (minutes < 48 * 60)
+      return format.format(-Math.round(minutes / 60), 'hour');
+    return format.format(-Math.round(minutes / 1440), 'day');
+  }
+
   class ContentHealth extends HTMLElement {
+    private summary = '';
+
     connectedCallback() {
       /*
-       * A long group starts folded. Following its row in a summary table, or
-       * a link to it, opens it.
+       * A long group starts folded. A link to it, or to anything inside it,
+       * opens it.
        */
       const openTarget = (id: string) => {
         const target = id ? document.getElementById(id) : null;
-        if (target instanceof HTMLDetailsElement) {
-          target.open = true;
-        }
+        const group = target?.closest('details');
+        if (group) group.open = true;
       };
       openTarget(decodeURIComponent(location.hash.slice(1)));
       window.addEventListener('hashchange', () =>
         openTarget(decodeURIComponent(location.hash.slice(1))),
       );
-      for (const link of this.querySelectorAll<HTMLAnchorElement>(
-        '[data-open-group]',
-      )) {
-        link.addEventListener('click', () =>
-          openTarget(decodeURIComponent(link.hash.slice(1))),
-        );
-      }
+
+      const synced = this.querySelector<HTMLTimeElement>('[data-synced]');
+      const relative = synced ? ago(synced.dateTime) : '';
+      if (synced && relative) synced.textContent += ` (${relative})`;
+
+      this.watchPriorities();
 
       const form = this.querySelector('form');
       const status = this.querySelector<HTMLElement>('[data-status]');
       if (!form || !status) return;
+      this.summary = status.textContent ?? '';
+
+      const params = new URLSearchParams(location.search);
+      for (const name of ['section', 'editor']) {
+        const select = form.elements.namedItem(name);
+        const value = params.get(name);
+        if (
+          select instanceof HTMLSelectElement &&
+          value &&
+          [...select.options].some((option) => option.value === value)
+        ) {
+          select.value = value;
+        }
+      }
+
       form.addEventListener('submit', (event) => event.preventDefault());
       form.addEventListener('change', () => this.apply(form, status));
+      form.addEventListener('reset', () =>
+        setTimeout(() => this.apply(form, status)),
+      );
+
+      // A row of "Where the work is" sets its filter and goes to the tasks.
+      for (const button of this.querySelectorAll<HTMLButtonElement>(
+        '[data-filter-name]',
+      )) {
+        button.addEventListener('click', () => {
+          const select = form.elements.namedItem(
+            button.dataset.filterName ?? '',
+          );
+          if (!(select instanceof HTMLSelectElement)) return;
+          select.value =
+            select.value === button.dataset.filterValue
+              ? ''
+              : (button.dataset.filterValue ?? '');
+          this.apply(form, status);
+          this.firstTier()?.scrollIntoView({ behavior: 'smooth' });
+        });
+      }
+
+      const expand = this.querySelector<HTMLButtonElement>('[data-expand]');
+      expand?.addEventListener('click', () => {
+        const groups = this.groups().filter((group) => !group.hidden);
+        const open = groups.some((group) => !group.open);
+        for (const group of groups) group.open = open;
+        this.labelExpand();
+      });
+      for (const group of this.groups()) {
+        group.addEventListener('toggle', () => this.labelExpand());
+      }
+
+      const copy = this.querySelector<HTMLButtonElement>('[data-copy]');
+      copy?.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(location.href);
+          copy.textContent = 'Link copied';
+        } catch {
+          copy.textContent = 'Copy the address bar';
+        }
+        setTimeout(() => (copy.textContent = 'Copy link'), 2000);
+      });
+
+      const filtered = this.apply(form, status);
+      /*
+       * A link to someone's tasks opens on them: past the overview, with the
+       * breakdown folded. A phone folds the breakdown anyway.
+       */
+      const where =
+        this.querySelector<HTMLDetailsElement>('[data-where-block]');
+      if (where && (filtered || matchMedia(NARROW).matches)) where.open = false;
+      if (filtered && !location.hash) {
+        form.scrollIntoView({ block: 'start' });
+      }
     }
 
-    apply(form: HTMLFormElement, status: HTMLElement) {
+    /** "Expand all" while anything shown is folded, "Collapse all" after. */
+    labelExpand() {
+      const expand = this.querySelector<HTMLButtonElement>('[data-expand]');
+      if (!expand) return;
+      const folded = this.groups().some(
+        (group) => !group.hidden && !group.open,
+      );
+      expand.textContent = folded ? 'Expand all' : 'Collapse all';
+    }
+
+    groups(): HTMLDetailsElement[] {
+      return [...this.querySelectorAll<HTMLDetailsElement>('[data-group]')];
+    }
+
+    firstTier(): HTMLElement | null {
+      return (
+        [...this.querySelectorAll<HTMLElement>('[data-tier]')].find((tier) =>
+          tier.querySelector('[data-group]:not([hidden])'),
+        ) ?? this.querySelector<HTMLElement>('[data-tier]')
+      );
+    }
+
+    /** Marks the chip of the priority in view. */
+    watchPriorities() {
+      const chips = new Map(
+        [...this.querySelectorAll<HTMLAnchorElement>('.health-jump a')].map(
+          (link) => [link.hash.slice(1), link],
+        ),
+      );
+      if (!('IntersectionObserver' in window) || chips.size === 0) return;
+      const observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            for (const [id, link] of chips) {
+              if (id === entry.target.id) {
+                link.setAttribute('aria-current', 'true');
+              } else {
+                link.removeAttribute('aria-current');
+              }
+            }
+          }
+        },
+        { rootMargin: '-40% 0px -55% 0px' },
+      );
+      for (const tier of this.querySelectorAll('[data-tier]')) {
+        observer.observe(tier);
+      }
+    }
+
+    /** Applies the filter; says whether one is set. */
+    apply(form: HTMLFormElement, status: HTMLElement): boolean {
       const data = new FormData(form);
       const section = String(data.get('section') ?? '');
       const editor = String(data.get('editor') ?? '');
-      const shown = new Set<string>();
+      const filtered = !!(section || editor);
+      const tiers = new Map<string, number>();
+      let shown = 0;
 
-      for (const check of this.querySelectorAll<HTMLElement>('[data-check]')) {
-        let visible = 0;
-        for (const item of check.querySelectorAll<HTMLElement>('li')) {
+      for (const group of this.groups()) {
+        const sections: string[] = [];
+        for (const item of group.querySelectorAll<HTMLElement>('li')) {
           const match =
             (!section || item.dataset.section === section) &&
             (!editor || item.dataset.editor === editor);
           item.hidden = !match;
-          if (match) {
-            visible += 1;
-            const link = item.querySelector('a');
-            shown.add(link?.getAttribute('href') ?? item.textContent ?? '');
-          }
+          if (match) sections.push(item.dataset.section ?? '');
         }
-        check.hidden = visible === 0;
-        const count = check.querySelector('[data-count]');
+        const visible = sections.length;
+        group.hidden = visible === 0;
+        const count = group.querySelector('[data-count]');
         if (count) count.textContent = String(visible);
+        const unit = group.querySelector('[data-count-unit]');
+        const name = unit?.closest<HTMLElement>('[data-unit]')?.dataset.unit;
+        if (unit && name) unit.textContent = visible === 1 ? name : `${name}s`;
+        const where = group.querySelector<HTMLElement>('[data-where]');
+        if (where) {
+          where.textContent = whereOf(sections);
+          where.hidden = !!section;
+        }
+        const tier = group.dataset.priority ?? '';
+        tiers.set(tier, (tiers.get(tier) ?? 0) + visible);
+        if (tier !== 'proposal') shown += visible;
+      }
+      for (const count of this.querySelectorAll<HTMLElement>(
+        '[data-tier-count]',
+      )) {
+        count.textContent = String(
+          tiers.get(count.dataset.tierCount ?? '') ?? 0,
+        );
+      }
+      for (const block of this.querySelectorAll<HTMLElement>('[data-block]')) {
+        block.hidden = !block.querySelector('[data-group]:not([hidden])');
+      }
+      for (const folder of this.querySelectorAll<HTMLElement>(
+        '.health-folders li',
+      )) {
+        folder.hidden =
+          !!editor || (!!section && folder.dataset.section !== section);
       }
       for (const note of this.querySelectorAll<HTMLElement>(
         '[data-filter-empty]',
       )) {
-        const block = note.closest('[data-severity-section]');
-        note.hidden = !!block?.querySelector('[data-check]:not([hidden])');
+        const tier = note.closest<HTMLElement>('[data-tier]');
+        note.hidden =
+          !filtered || !!tier?.querySelector('[data-group]:not([hidden])');
+        tier?.toggleAttribute('data-emptied', !note.hidden);
       }
-      status.textContent =
-        section || editor
-          ? `Showing ${shown.size} items${section ? ` in ${section}` : ''}${editor ? ` last edited by ${editor}` : ''}.`
-          : '';
+      const empty = filtered && shown === 0;
+      const allClear = this.querySelector<HTMLElement>('[data-all-clear]');
+      if (allClear) allClear.hidden = !empty;
+      if (empty) {
+        for (const note of this.querySelectorAll<HTMLElement>(
+          '[data-filter-empty]',
+        )) {
+          note.hidden = true;
+        }
+      }
+
+      /*
+       * A short list opens; the whole list goes back to how the page was
+       * built.
+       */
+      for (const group of this.groups()) {
+        if (!filtered) group.open = group.hasAttribute('data-default-open');
+        else if (shown <= UNFOLD_UP_TO && !group.hidden) group.open = true;
+      }
+
+      for (const button of this.querySelectorAll<HTMLButtonElement>(
+        '[data-filter-name]',
+      )) {
+        const value =
+          button.dataset.filterName === 'section' ? section : editor;
+        button.setAttribute(
+          'aria-pressed',
+          String(value === button.dataset.filterValue),
+        );
+      }
+      for (const [selector, hidden] of [
+        ['[data-clear]', !filtered],
+        ['[data-copy]', !filtered || !navigator.clipboard],
+      ] as const) {
+        const button = form.querySelector<HTMLElement>(selector);
+        if (button) button.hidden = hidden;
+      }
+      status.textContent = filtered
+        ? `Showing ${shown} ${shown === 1 ? 'task' : 'tasks'}${section ? ` in ${section}` : ''}${editor ? ` last edited by ${editor}` : ''}, the proposal aside. The overview above stays the whole knowledge base.`
+        : this.summary;
+
+      this.labelExpand();
+
+      const url = new URL(location.href);
+      for (const [name, value] of [
+        ['section', section],
+        ['editor', editor],
+      ] as const) {
+        if (value) url.searchParams.set(name, value);
+        else url.searchParams.delete(name);
+      }
+      if (url.href !== location.href) {
+        history.replaceState(history.state, '', url);
+      }
+      return filtered;
     }
   }
 
   customElements.define('content-health', ContentHealth);
 </script>
 
-<style>
+<style is:global>
   @layer starlight.components {
     content-health {
       display: block;
+      font-size: var(--kb-text-body);
+
+      /*
+       * One hue per priority, quieter as the priority falls, so the eye goes
+       * to red first however many tasks the others hold. Every mark keeps at
+       * least 3:1 against the page in both themes. A hue marks things, a dot,
+       * a bar, an icon, a rule; text stays in ink.
+       */
+      --health-fix-now: var(--kb-red);
+      --health-fix-next: color-mix(
+        in oklab,
+        var(--kb-orange) 70%,
+        var(--kb-gray-4)
+      );
+      --health-improve: color-mix(
+        in oklab,
+        var(--kb-blue) 45%,
+        var(--kb-gray-4)
+      );
+      --health-tidy-up: var(--kb-gray-4);
+      --health-good: color-mix(in oklab, var(--kb-green) 50%, var(--kb-gray-4));
+      --health-proposal: var(--kb-purple);
     }
 
-    .health-stats {
-      display: grid;
-      gap: 1rem;
-      grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-      margin-block: 1.5rem;
+    :root[data-theme='light'] content-health {
+      --health-fix-next: color-mix(
+        in oklab,
+        var(--kb-orange) 70%,
+        var(--kb-gray-1)
+      );
+      --health-tidy-up: color-mix(
+        in oklab,
+        var(--kb-gray-3) 60%,
+        var(--kb-gray-4)
+      );
+      --health-good: color-mix(in oklab, var(--kb-green) 70%, var(--kb-gray-1));
     }
 
-    .health-stats div {
-      border: 1px solid var(--kb-hairline);
-      border-radius: 0.5rem;
-      padding: 0.75rem 1rem;
+    content-health [data-priority='fix-now'] {
+      --tone: var(--health-fix-now);
+      --tone-low: var(--kb-red-low);
     }
 
-    .health-stats dt {
-      color: var(--kb-gray-3);
-      font-size: var(--kb-text-sm);
+    content-health [data-priority='fix-next'] {
+      --tone: var(--health-fix-next);
+      --tone-low: var(--kb-orange-low);
     }
 
-    .health-stats dd {
-      color: var(--kb-ink);
-      font-size: var(--kb-text-2xl);
-      font-weight: 600;
+    content-health [data-priority='improve'] {
+      --tone: var(--health-improve);
+      --tone-low: var(--kb-blue-low);
+    }
+
+    content-health [data-priority='tidy-up'] {
+      --tone: var(--health-tidy-up);
+      --tone-low: var(--kb-gray-6);
+    }
+
+    content-health [data-priority='proposal'] {
+      --tone: var(--health-proposal);
+      --tone-low: var(--kb-purple-low);
+    }
+
+    content-health [data-priority='good'] {
+      --tone: var(--health-good);
+      --tone-low: var(--kb-green-low);
+    }
+
+    /* Filtering hides by attribute; no layout rule may show it again. */
+    content-health [hidden] {
+      display: none !important;
+    }
+
+    content-health p,
+    content-health ul {
       margin: 0;
     }
 
-    .health-stats dt a {
-      color: inherit;
+    content-health a {
+      color: var(--kb-text-accent);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.2em;
     }
 
-    .health-stats .health-stat-detail {
-      display: block;
-      font-size: var(--kb-text-xs);
-    }
-
-    .health-stats dd span {
+    content-health .health-intro {
       color: var(--kb-gray-3);
-      font-size: var(--kb-text-base);
-      font-weight: 400;
     }
 
-    .health-notice,
-    .health-lede,
-    .health-empty,
-    .health-meta,
-    .health-filter-status {
+    /* ---------------------------------------------------------- overview */
+
+    content-health .health-overview {
+      border: 1px solid var(--kb-hairline);
+      border-radius: 0.75rem;
+      margin-top: 1.5rem;
+      padding: 1rem 1.5rem 1.25rem;
+    }
+
+    content-health .health-eyebrow,
+    content-health .health-block-heading {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-xs);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    content-health .health-hero {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+      margin-top: 0.5rem;
+    }
+
+    content-health .health-hero > svg {
+      color: var(--tone);
+      flex: none;
+    }
+
+    content-health .health-hero-go {
+      align-items: center;
+      display: inline-flex;
+      font-size: var(--kb-text-sm);
+      font-weight: 500;
+      gap: 0.25rem;
+      margin-inline-start: auto;
+      white-space: nowrap;
+    }
+
+    content-health .health-hero-title {
+      color: var(--kb-ink);
+      font-size: var(--kb-text-h3);
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    content-health .health-hero-figure {
+      font-size: 3rem;
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+
+    content-health .health-hero-context,
+    content-health .health-stack-caption {
       color: var(--kb-gray-3);
       font-size: var(--kb-text-sm);
+      margin-top: 0.75rem;
     }
 
-    .health-filters {
+    content-health .health-stack-caption {
+      margin-top: 1rem;
+    }
+
+    content-health .health-stack {
+      display: flex;
+      gap: 2px;
+      height: 0.75rem;
+      margin-block: 0.5rem 0.875rem;
+    }
+
+    content-health .health-stack span {
+      background: var(--tone);
+      flex: 0 1 var(--share);
+      min-width: 4px;
+    }
+
+    content-health .health-stack span:first-child {
+      border-end-start-radius: 4px;
+      border-start-start-radius: 4px;
+    }
+
+    content-health .health-stack span:last-child {
+      border-end-end-radius: 4px;
+      border-start-end-radius: 4px;
+    }
+
+    content-health .health-legend {
+      display: flex;
+      flex-wrap: wrap;
+      font-size: var(--kb-text-sm);
+      gap: 0.5rem 1.5rem;
+      list-style: none;
+      padding: 0;
+    }
+
+    content-health .health-legend li {
+      align-items: center;
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    content-health .health-legend strong {
+      color: var(--kb-ink);
+      font-variant-numeric: tabular-nums;
+    }
+
+    content-health .health-dot {
+      background: var(--tone);
+      border-radius: 50%;
+      flex: none;
+      height: 0.625rem;
+      width: 0.625rem;
+    }
+
+    content-health .health-meter {
+      background: var(--tone-low);
+      border-radius: 4px;
+      height: 0.5rem;
+      overflow: hidden;
+    }
+
+    content-health .health-meter span {
+      background: var(--tone);
+      border-radius: 4px;
+      display: block;
+      height: 100%;
+      width: var(--share);
+    }
+
+    content-health .health-notice {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-sm);
+      margin-top: 1rem;
+    }
+
+    /* ---------------------------------------------------- where the work is */
+
+    content-health .health-where {
+      border: 1px solid var(--kb-hairline);
+      border-radius: 0.75rem;
+      margin-top: 1rem;
+      padding: 0.875rem 1.25rem;
+    }
+
+    content-health .health-where > summary {
+      color: var(--kb-ink);
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    content-health .health-where-lede {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-sm);
+      margin-top: 0.5rem;
+    }
+
+    content-health .health-where-lists {
+      display: grid;
+      gap: 1.25rem;
+      margin-top: 1rem;
+    }
+
+    /* ------------------------------------------------------------ toolbar */
+
+    content-health .health-toolbar {
+      scroll-margin-top: var(--kb-nav-height);
+      background: var(--kb-ground);
+      border-bottom: 1px solid var(--kb-hairline);
+      display: grid;
+      gap: 0.625rem;
+      margin-top: 1.5rem;
+      padding-block: 0.75rem;
+    }
+
+    @media (min-width: 50rem) {
+      content-health .health-toolbar {
+        position: sticky;
+        top: var(--kb-nav-height);
+        z-index: 2;
+      }
+    }
+
+    content-health .health-filters {
       align-items: end;
       display: flex;
       flex-wrap: wrap;
-      gap: 1rem;
-      margin-block: 1.5rem;
+      gap: 0.75rem 1rem;
     }
 
-    .health-filters label {
+    content-health .health-filter {
       display: grid;
       font-size: var(--kb-text-sm);
       gap: 0.25rem;
     }
 
-    .health-filters select {
+    content-health .health-filter-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-inline-start: auto;
+    }
+
+    content-health .health-filters select,
+    content-health .health-filters button {
       background: var(--kb-ground);
-      border: 1px solid var(--kb-hairline);
+      border: 1px solid var(--kb-border-strong);
       border-radius: 0.375rem;
       color: var(--kb-ink);
       font: inherit;
+      font-size: var(--kb-text-sm);
       max-width: 100%;
-      padding: 0.375rem 0.5rem;
+      padding: 0.375rem 0.625rem;
     }
 
-    .health-check {
-      border-top: 1px solid var(--kb-hairline);
-      padding-block: 0.75rem;
-    }
-
-    .health-check summary {
+    content-health .health-filters button {
       cursor: pointer;
+    }
+
+    content-health .health-jump {
+      align-items: center;
       display: flex;
-      font-weight: 600;
-      gap: 0.75rem;
-      justify-content: space-between;
+      font-size: var(--kb-text-sm);
+      gap: 0.5rem;
     }
 
-    .health-check-title {
-      flex: 1;
-      text-align: start;
-    }
-
-    .health-count {
+    content-health .health-jump-label {
       color: var(--kb-gray-3);
-      font-weight: 400;
+      flex: none;
     }
 
-    .health-instruction {
-      margin-block: 0.5rem 0.75rem;
-    }
-
-    .health-check ul {
+    content-health .health-jump ul {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
       list-style: none;
       padding: 0;
     }
 
-    .health-check li {
-      border-top: 1px solid var(--kb-hairline);
-      padding-block: 0.625rem;
+    /* The proposal is not work yet: set apart, its count in grey. */
+    content-health .health-jump li[data-priority='proposal'] {
+      border-inline-start: 1px solid var(--kb-hairline);
+      padding-inline-start: 0.5rem;
     }
 
-    .health-item-name {
-      font-weight: 600;
+    content-health
+      .health-jump
+      li[data-priority='proposal']
+      .health-chip-count {
+      background: var(--kb-gray-6);
     }
 
-    .health-item-head {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.25rem 1rem;
-      justify-content: space-between;
+    @media (max-width: 50rem) {
+      content-health .health-jump ul {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-block-end: 0.25rem;
+      }
     }
 
-    .health-source {
-      font-size: var(--kb-text-sm);
+    content-health .health-jump a {
+      align-items: center;
+      border: 1px solid var(--kb-hairline);
+      border-radius: 999px;
+      color: var(--kb-ink);
+      display: inline-flex;
+      gap: 0.375rem;
+      padding: 0.25rem 0.375rem 0.25rem 0.625rem;
+      text-decoration: none;
       white-space: nowrap;
     }
 
-    .health-meta,
-    .health-detail {
-      margin-top: 0.25rem;
+    content-health .health-jump a:hover,
+    content-health .health-jump a[aria-current='true'] {
+      border-color: var(--tone);
     }
 
-    .health-detail {
+    content-health .health-jump a[aria-current='true'] {
+      background: var(--kb-surface-sunken);
+    }
+
+    content-health .health-jump svg {
+      color: var(--tone);
+    }
+
+    content-health .health-chip-count {
+      background: var(--tone-low);
+      border-radius: 999px;
+      font-variant-numeric: tabular-nums;
+      min-width: 1.5rem;
+      padding-inline: 0.4rem;
+      text-align: center;
+    }
+
+    content-health .health-filter-status {
+      color: var(--kb-gray-3);
       font-size: var(--kb-text-sm);
     }
+
+    content-health .health-filter-status:empty {
+      display: none;
+    }
+
+    /* -------------------------------------------------------------- tiers */
+
+    content-health .health-tier {
+      scroll-margin-top: calc(var(--kb-nav-height) + 8rem);
+    }
+
+    content-health .health-tier > h2 {
+      align-items: center;
+      color: var(--kb-ink);
+      display: flex;
+      flex-wrap: wrap;
+      font-size: var(--kb-text-h2);
+      gap: 0.5rem;
+      line-height: 1.25;
+    }
+
+    /* A priority the filter empties keeps its heading and its green line. */
+    content-health [data-emptied] :is(.health-lede, .health-passed) {
+      display: none;
+    }
+
+    content-health .health-tier > h2 > svg {
+      color: var(--tone);
+    }
+
+    content-health .health-tier-count {
+      background: var(--tone-low);
+      border-radius: 999px;
+      font-size: var(--kb-text-sm);
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
+      letter-spacing: 0;
+      padding: 0.125rem 0.625rem;
+    }
+
+    content-health .health-lede {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-sm);
+      max-width: 44rem;
+    }
+
+    content-health .health-progress {
+      align-items: center;
+      display: grid;
+      font-size: var(--kb-text-sm);
+      gap: 0.75rem;
+      grid-template-columns: minmax(6rem, 16rem) auto;
+      margin-top: 0.75rem;
+    }
+
+    content-health .health-all-clear {
+      align-items: center;
+      background: var(--tone-low);
+      border-radius: 0.5rem;
+      color: var(--kb-ink);
+      display: flex;
+      font-weight: 500;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      padding: 0.625rem 0.875rem;
+    }
+
+    content-health .health-all-clear svg {
+      color: var(--tone);
+      flex: none;
+    }
+
+    content-health .health-filter-clear {
+      margin-top: 1.5rem;
+    }
+
+    content-health .health-block-heading {
+      margin-top: 1.25rem;
+    }
+
+    content-health .health-passed {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-sm);
+      margin-top: 0.75rem;
+    }
+
+    content-health .health-passed > summary {
+      align-items: center;
+      cursor: pointer;
+      display: inline-flex;
+      gap: 0.375rem;
+    }
+
+    content-health .health-passed > summary::after {
+      border-block: 0.3em solid transparent;
+      border-inline-start: 0.45em solid var(--kb-gray-3);
+      content: '';
+      transition: transform 0.15s;
+    }
+
+    content-health .health-passed[open] > summary::after {
+      transform: rotate(90deg);
+    }
+
+    content-health .health-passed svg {
+      color: var(--tone);
+    }
+
+    content-health .health-passed ul {
+      columns: 2 18rem;
+      list-style: none;
+      margin-top: 0.5rem;
+      padding-inline-start: 1.375rem;
+    }
+
+    content-health .health-passed li {
+      break-inside: avoid;
+      padding-block: 0.125rem;
+    }
+
+    /* ------------------------------------------------------------ the rest */
+
+    content-health .health-folders {
+      list-style: none;
+      margin-top: 0.75rem;
+      padding: 0;
+    }
+
+    content-health .health-folders li {
+      border-top: 1px solid var(--kb-hairline);
+      display: grid;
+      padding-block: 0.5rem;
+    }
+
+    content-health .health-folder-name {
+      color: var(--kb-ink);
+      font-weight: 600;
+    }
+
+    content-health .health-folder-meta {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-sm);
+    }
+
+    content-health .health-footer {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-sm);
+      margin-top: 2.5rem;
+    }
+
+    content-health .health-footer + .health-footer {
+      margin-top: 0.5rem;
+    }
+  }
+
+  /*
+   * The documentation's headings own 2.5rem above them, in an unlayered rule
+   * a layered one cannot outrank. A priority's sub-heading sits closer to the
+   * groups it names.
+   */
+  content-health h3.health-block-heading {
+    margin-top: 1.25rem;
   }
 </style>

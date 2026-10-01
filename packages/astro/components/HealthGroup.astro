@@ -1,0 +1,384 @@
+---
+/**
+ * One group of the content health page: what it is, what to do, how many
+ * files and where, and, unfolded, the instruction and each file (ADR-037).
+ *
+ * The folded summary is the group's row in the page's overview of work, so a
+ * reader can scan a priority without opening anything. Each file leads with
+ * one action, opening its source in Google Docs or Drive, at the paragraph
+ * concerned when a check names one; its page on the site is a quieter link.
+ */
+import { Icon } from '@astrojs/starlight/components';
+
+import { googleDocsUrl, type UnpublishedItem } from '../lib/content-health';
+import {
+  describeStrayLetters,
+  markStrayLetters,
+  strayLetters,
+  type HealthEntry,
+  type HealthGroup,
+} from '../lib/content-health-view';
+
+interface Props {
+  group: HealthGroup;
+  open: boolean;
+}
+
+const { group, open } = Astro.props;
+
+const unit = group.source === 'check' ? 'document' : 'file';
+const trail = (item: { folderPath: readonly string[] }) =>
+  item.folderPath.length > 0 ? item.folderPath.join(' › ') : 'General';
+const status = (item: UnpublishedItem) =>
+  item.status === 'incomplete'
+    ? 'On the site, incomplete.'
+    : item.status === 'out-of-date' && item.publishedVersion
+      ? `The site shows the version edited on ${item.publishedVersion.slice(0, 10)}.`
+      : undefined;
+
+/** What every kind of entry shows, read once so the markup is one shape. */
+const rows = group.entries.map((entry: HealthEntry) => {
+  switch (entry.kind) {
+    case 'issue':
+      return {
+        entry,
+        name: entry.document.title,
+        slug: entry.document.slug,
+        source: googleDocsUrl(
+          entry.document.id,
+          entry.issues.find((issue) => issue.headingId),
+        ),
+        sourceLabel: 'Open in Google Docs',
+        meta: [trail(entry.document)],
+        details: group.code.startsWith('file-name-')
+          ? [`Drive name: “${entry.document.name}”`]
+          : [],
+      };
+    case 'unpublished': {
+      const letters = entry.item.detail
+        ? strayLetters(entry.item.detail)
+        : undefined;
+      const detail = [
+        status(entry.item),
+        letters ? describeStrayLetters(letters) : entry.item.detail,
+      ]
+        .filter(Boolean)
+        .join(' ');
+      return {
+        entry,
+        name: entry.item.name,
+        slug: entry.item.slug,
+        source: entry.item.sourceUrl,
+        sourceLabel: 'Open in Google Drive',
+        meta: [trail(entry.item), entry.item.type],
+        details: detail ? [detail] : [],
+      };
+    }
+    case 'note':
+      return {
+        entry,
+        name: entry.note.name,
+        slug: entry.note.slug,
+        source: entry.note.sourceUrl,
+        sourceLabel: 'Open in Google Drive',
+        meta: [trail(entry.note), entry.note.type],
+        details: entry.note.detail ? [entry.note.detail] : [],
+      };
+  }
+});
+---
+
+<details
+  class="health-group"
+  id={group.id}
+  open={open}
+  data-group
+  data-priority={group.priority}
+  data-default-open={open ? '' : undefined}
+>
+  <summary>
+    <span class="health-group-caret" aria-hidden="true"></span>
+    <span class="health-group-head">
+      <span class="health-group-title">{group.title}</span>
+      {
+        group.action && (
+          <span class="health-group-action">
+            <Icon name="right-arrow" size="0.875rem" />
+            {group.action}
+          </span>
+        )
+      }
+    </span>
+    <span class="health-group-count" data-unit={unit}>
+      <span data-count>{group.entries.length}</span>{' '}
+      <span data-count-unit>
+        {group.entries.length === 1 ? unit : `${unit}s`}
+      </span>
+    </span>
+    <span class="health-group-where" data-where>{group.where}</span>
+  </summary>
+  <div class="health-group-body">
+    <p class="health-instruction">
+      <strong>How to fix:</strong>{' '}
+      {group.instruction}
+    </p>
+    <ul>
+      {
+        rows.map(
+          ({ entry, name, slug, source, sourceLabel, meta, details }) => (
+            <li
+              data-kind={entry.kind}
+              data-section={entry.section}
+              data-editor={entry.editor ?? ''}
+            >
+              <div class="health-item-head">
+                <span class="health-item-name">{name}</span>
+                <span class="health-item-actions">
+                  {slug && (
+                    <a class="health-item-page" href={`/${slug}/`}>
+                      View page
+                    </a>
+                  )}
+                  <a
+                    class="health-source"
+                    href={source}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    {sourceLabel}
+                    <Icon name="external" size="0.875rem" />
+                  </a>
+                </span>
+              </div>
+              <p class="health-meta">
+                {meta.join(' · ')}
+                {entry.editor && ` · last edited by ${entry.editor}`}
+              </p>
+              {details.map((detail) => (
+                <p class="health-detail">{detail}</p>
+              ))}
+              {entry.kind === 'issue' &&
+                entry.issues
+                  .filter((issue) => issue.text)
+                  .map((issue) => {
+                    const letters = issue.detail
+                      ? strayLetters(issue.detail)
+                      : undefined;
+                    const quoted = letters
+                      ? markStrayLetters(issue.text ?? '', letters.letters)
+                      : [{ text: issue.text ?? '', stray: false }];
+                    const line = (
+                      <>
+                        “
+                        {quoted.map((run) =>
+                          run.stray ? <mark>{run.text}</mark> : run.text,
+                        )}
+                        ”
+                      </>
+                    );
+                    return (
+                      <p class="health-detail">
+                        {'Heading: '}
+                        {issue.headingId ? (
+                          <a
+                            href={googleDocsUrl(entry.document.id, issue)}
+                            rel="noopener noreferrer"
+                            target="_blank"
+                          >
+                            {line}
+                          </a>
+                        ) : (
+                          <span>{line}</span>
+                        )}
+                        {letters
+                          ? ` — ${describeStrayLetters(letters)}`
+                          : issue.detail && ` — ${issue.detail}`}
+                        {issue.related && (
+                          <>
+                            {' — the title of '}
+                            <a href={`/${issue.related.slug}/`}>
+                              {issue.related.title}
+                            </a>
+                          </>
+                        )}
+                      </p>
+                    );
+                  })}
+            </li>
+          ),
+        )
+      }
+    </ul>
+  </div>
+</details>
+
+<style is:global>
+  @layer starlight.components {
+    content-health .health-group {
+      border: 1px solid var(--kb-hairline);
+      border-inline-start: 3px solid var(--tone);
+      border-radius: 0.5rem;
+      margin-top: 0.75rem;
+      scroll-margin-top: calc(var(--kb-nav-height) + 8rem);
+    }
+
+    content-health .health-group > summary {
+      column-gap: 0.625rem;
+      cursor: pointer;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      list-style: none;
+      padding: 0.75rem 1rem;
+      row-gap: 0.25rem;
+    }
+
+    content-health .health-group > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    content-health .health-group > summary:hover {
+      background: var(--kb-surface-sunken);
+    }
+
+    content-health .health-group-head {
+      align-items: baseline;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.125rem 0.75rem;
+    }
+
+    /* The fold's own marker, which a grid summary does not draw. */
+    content-health .health-group-caret {
+      align-self: start;
+      border-block: 0.3em solid transparent;
+      border-inline-start: 0.45em solid var(--kb-gray-3);
+      height: 0;
+      margin-top: 0.45em;
+      transition: transform 0.15s;
+      width: 0;
+    }
+
+    content-health .health-group[open] .health-group-caret {
+      transform: rotate(90deg);
+    }
+
+    content-health .health-group-title {
+      color: var(--kb-ink);
+      font-weight: 600;
+    }
+
+    content-health .health-group-action {
+      align-items: center;
+      color: var(--kb-ink);
+      display: inline-flex;
+      font-weight: 500;
+      gap: 0.25rem;
+    }
+
+    content-health .health-group-action svg {
+      color: var(--tone);
+    }
+
+    content-health .health-group-count {
+      align-self: start;
+      background: var(--tone-low);
+      border-radius: 999px;
+      color: var(--kb-ink);
+      font-size: var(--kb-text-sm);
+      font-variant-numeric: tabular-nums;
+      padding: 0.0625rem 0.625rem;
+      white-space: nowrap;
+    }
+
+    content-health .health-group-count [data-count] {
+      font-weight: 600;
+    }
+
+    content-health .health-group-where {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-sm);
+      grid-column: 2 / -1;
+    }
+
+    content-health .health-group-body {
+      border-top: 1px solid var(--kb-hairline);
+      padding: 0.75rem 1rem 0.25rem;
+    }
+
+    content-health .health-instruction {
+      background: var(--kb-surface-sunken);
+      border-radius: 0.375rem;
+      font-size: var(--kb-text-sm);
+      padding: 0.625rem 0.75rem;
+    }
+
+    content-health .health-instruction strong {
+      color: var(--kb-ink);
+    }
+
+    content-health .health-group ul {
+      list-style: none;
+      margin-top: 0.5rem;
+      padding: 0;
+    }
+
+    content-health .health-group li {
+      padding-block: 0.625rem;
+    }
+
+    content-health .health-group li:not([hidden]) ~ li {
+      border-top: 1px solid var(--kb-hairline);
+    }
+
+    content-health .health-item-head {
+      align-items: baseline;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem 1rem;
+      justify-content: space-between;
+    }
+
+    content-health .health-item-name {
+      color: var(--kb-ink);
+      font-weight: 600;
+    }
+
+    content-health .health-item-actions {
+      align-items: baseline;
+      display: inline-flex;
+      flex-wrap: wrap;
+      font-size: var(--kb-text-sm);
+      gap: 0.25rem 1rem;
+    }
+
+    content-health a.health-item-page {
+      color: var(--kb-gray-3);
+    }
+
+    content-health .health-source {
+      align-items: center;
+      display: inline-flex;
+      font-weight: 500;
+      gap: 0.25rem;
+      white-space: nowrap;
+    }
+
+    content-health .health-meta,
+    content-health .health-detail {
+      font-size: var(--kb-text-sm);
+      margin-top: 0.25rem;
+    }
+
+    content-health .health-meta {
+      color: var(--kb-gray-3);
+    }
+
+    content-health .health-detail mark {
+      background: var(--kb-red-low);
+      border-radius: 0.125rem;
+      color: var(--kb-ink);
+      outline: 1px solid var(--kb-red);
+      padding-inline: 0.0625rem;
+    }
+  }
+</style>
