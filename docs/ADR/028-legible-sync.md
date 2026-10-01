@@ -1,6 +1,8 @@
 # ADR-028: Make every sync legible, grouped by what to do
 
-- Status: Proposed
+- Status: Proposed; superseded in part by
+  [ADR-037](037-rank-the-content-health-page-by-priority.md), under which a
+  group's folded line on the content health page replaces its table row
 - Date: 2026-09-28
 - Owners: CTCDocs maintainers
 - Supersedes: none

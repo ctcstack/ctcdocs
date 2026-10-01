@@ -1,0 +1,218 @@
+---
+/**
+ * Where the work of the content health page is: a row per section or per
+ * editor, with a bar of its tasks by priority (ADR-037).
+ *
+ * Bars share one scale, the largest row's total, so rows compare by length.
+ * The numbers stand beside the bar, under column labels, not only in it.
+ * Choosing a row narrows the page to it, through the filter of the same name,
+ * and the row shows it is chosen.
+ */
+import { Icon } from '@astrojs/starlight/components';
+
+import { TASK_PRIORITIES, type BreakdownRow } from '../lib/content-health-view';
+
+interface Props {
+  heading: string;
+  /** The filter a row sets: `section` or `editor`. */
+  filter: 'section' | 'editor';
+  rows: BreakdownRow[];
+  labels: Record<string, string>;
+}
+
+const { heading, filter, rows, labels } = Astro.props;
+const scale = Math.max(1, ...rows.map((row) => row.total));
+const describe = (row: BreakdownRow) =>
+  TASK_PRIORITIES.filter((priority) => row.counts[priority] > 0)
+    .map((priority) => `${row.counts[priority]} ${labels[priority]}`)
+    .join(', ');
+---
+
+<div class="health-breakdown">
+  <div class="health-breakdown-columns" aria-hidden="true">
+    <span>{heading}</span>
+    <span>Fix now</span>
+    <span>Tasks</span>
+  </div>
+  <ul aria-label={`Tasks ${heading.toLowerCase()}`}>
+    {
+      rows.map((row) => (
+        <li>
+          <button
+            type="button"
+            aria-pressed="false"
+            data-filter-name={filter}
+            data-filter-value={row.name}
+            aria-label={`${row.name}: ${row.total} tasks, ${describe(row)}`}
+          >
+            <span class="health-breakdown-name">{row.name}</span>
+            <span class="health-breakdown-bar" aria-hidden="true">
+              {TASK_PRIORITIES.filter(
+                (priority) => row.counts[priority] > 0,
+              ).map((priority) => (
+                <span
+                  data-priority={priority}
+                  style={`--share: ${(row.counts[priority] / scale) * 100}%`}
+                  title={`${row.counts[priority]} ${labels[priority]}`}
+                />
+              ))}
+            </span>
+            <span class="health-breakdown-urgent" aria-hidden="true">
+              {row.counts['fix-now'] > 0 ? (
+                <span data-priority="fix-now">
+                  <Icon name="error" size="0.875rem" />
+                  {row.counts['fix-now']}
+                </span>
+              ) : (
+                '—'
+              )}
+            </span>
+            <span class="health-breakdown-total" aria-hidden="true">
+              {row.total}
+            </span>
+            <Icon name="right-caret" size="1rem" class="health-breakdown-go" />
+          </button>
+        </li>
+      ))
+    }
+  </ul>
+</div>
+
+<style is:global>
+  @layer starlight.components {
+    content-health .health-breakdown-columns,
+    content-health .health-breakdown button {
+      align-items: center;
+      column-gap: 0.75rem;
+      display: grid;
+      grid-template-areas: 'name urgent total go' 'bar bar bar bar';
+      grid-template-columns: 1fr auto 3rem 1rem;
+      row-gap: 0.25rem;
+    }
+
+    @media (min-width: 40rem) {
+      content-health .health-breakdown-columns,
+      content-health .health-breakdown button {
+        grid-template-areas: 'name bar urgent total go';
+        grid-template-columns: minmax(7rem, 13rem) 1fr 4.5rem 3rem 1rem;
+      }
+    }
+
+    content-health .health-breakdown-columns {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-xs);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      padding-inline: 0.5rem;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    content-health .health-breakdown-columns span:first-child {
+      grid-area: name;
+    }
+
+    content-health .health-breakdown-columns span:nth-child(2) {
+      grid-area: urgent;
+      text-align: end;
+    }
+
+    content-health .health-breakdown-columns span:nth-child(3) {
+      grid-area: total;
+      text-align: end;
+    }
+
+    content-health .health-breakdown ul {
+      list-style: none;
+      margin-top: 0.25rem;
+      padding: 0;
+    }
+
+    content-health .health-breakdown button {
+      background: none;
+      border: 1px solid transparent;
+      border-radius: 0.375rem;
+      color: var(--kb-text);
+      cursor: pointer;
+      font: inherit;
+      font-size: var(--kb-text-sm);
+      padding: 0.375rem 0.5rem;
+      text-align: start;
+      width: 100%;
+    }
+
+    content-health .health-breakdown button:hover {
+      background: var(--kb-surface-sunken);
+    }
+
+    content-health .health-breakdown button[aria-pressed='true'] {
+      background: var(--kb-surface-sunken);
+      border-color: var(--kb-border-strong);
+    }
+
+    content-health .health-breakdown-name {
+      color: var(--kb-ink);
+      grid-area: name;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    content-health .health-breakdown-bar {
+      display: flex;
+      gap: 2px;
+      grid-area: bar;
+      height: 0.625rem;
+    }
+
+    content-health .health-breakdown-bar span {
+      background: var(--tone);
+      flex: 0 1 var(--share);
+      min-width: 3px;
+    }
+
+    content-health .health-breakdown-bar span:first-child {
+      border-end-start-radius: 3px;
+      border-start-start-radius: 3px;
+    }
+
+    content-health .health-breakdown-bar span:last-child {
+      border-end-end-radius: 3px;
+      border-start-end-radius: 3px;
+    }
+
+    content-health .health-breakdown-urgent {
+      color: var(--kb-gray-3);
+      grid-area: urgent;
+      text-align: end;
+    }
+
+    content-health .health-breakdown-urgent > span {
+      align-items: center;
+      background: var(--tone-low);
+      border-radius: 999px;
+      color: var(--kb-ink);
+      display: inline-flex;
+      font-size: var(--kb-text-xs);
+      font-variant-numeric: tabular-nums;
+      gap: 0.25rem;
+      padding: 0.0625rem 0.45rem 0.0625rem 0.3rem;
+    }
+
+    content-health .health-breakdown-urgent svg {
+      color: var(--tone);
+    }
+
+    content-health .health-breakdown-total {
+      color: var(--kb-ink);
+      font-variant-numeric: tabular-nums;
+      grid-area: total;
+      text-align: end;
+    }
+
+    content-health .health-breakdown-go {
+      color: var(--kb-gray-3);
+      grid-area: go;
+    }
+  }
+</style>

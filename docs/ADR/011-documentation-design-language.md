@@ -1,6 +1,8 @@
 # ADR-011: Adopt a documentation design language for the reader interface
 
-- Status: Accepted
+- Status: Accepted; superseded in part by
+  [ADR-037](037-rank-the-content-health-page-by-priority.md), under which the
+  content health page uses status colors beside the accent
 - Date: 2026-07-31
 - Owners: CTCDocs maintainers
 - Supersedes: none
