@@ -525,6 +525,8 @@ export const titleReportSchema = z.object({
       code: z.enum(checkCodes),
       severity: z.enum(['fix', 'convention', 'note']),
       title: z.string(),
+      // Absent from a report an earlier version wrote.
+      action: z.string().optional(),
       instruction: z.string(),
     }),
   ),
