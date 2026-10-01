@@ -27,6 +27,8 @@ export interface Check {
   code: CheckCode;
   severity: CheckSeverity;
   title: string;
+  /** The instruction in a few words, for a summary line. */
+  action: string;
   instruction: string;
 }
 
@@ -42,6 +44,7 @@ export const CHECKS: readonly Check[] = [
     code: 'heading-mixes-alphabets',
     severity: 'fix',
     title: 'A heading mixes alphabets',
+    action: 'Retype the letter named',
     instruction:
       'A letter in the heading was typed on the other keyboard layout. It looks right, but search does not find the word. Open the heading and retype the letter named below.',
   },
@@ -49,6 +52,7 @@ export const CHECKS: readonly Check[] = [
     code: 'heading-from-another-document',
     severity: 'fix',
     title: "The document opens with another document's title",
+    action: 'Replace the first heading',
     instruction:
       "The first heading is the title of a different document, most likely copied along with a template. Replace it with this document's own title.",
   },
@@ -56,6 +60,7 @@ export const CHECKS: readonly Check[] = [
     code: 'empty-document',
     severity: 'fix',
     title: 'The document is empty',
+    action: 'Write it, or move it out',
     instruction:
       'Nothing in it can be published. Write the content, or move the document out of the published folders.',
   },
@@ -63,6 +68,7 @@ export const CHECKS: readonly Check[] = [
     code: 'title-styled-as-heading-1',
     severity: 'convention',
     title: 'The title is styled as Heading 1',
+    action: 'Set the first line to Title',
     instruction:
       "The first line reads like the document's title. Select it and choose Format → Paragraph styles → Title.",
   },
@@ -70,6 +76,7 @@ export const CHECKS: readonly Check[] = [
     code: 'title-missing',
     severity: 'convention',
     title: 'The document has no title line',
+    action: 'Add a Title line',
     instruction:
       "Type the document's name as its first line and choose Format → Paragraph styles → Title.",
   },
@@ -77,6 +84,7 @@ export const CHECKS: readonly Check[] = [
     code: 'title-not-first',
     severity: 'convention',
     title: 'The title is not the first line',
+    action: 'Move the title to the top',
     instruction:
       'Move the line in the Title style to the top of the document, above everything else.',
   },
@@ -84,6 +92,7 @@ export const CHECKS: readonly Check[] = [
     code: 'title-style-on-section',
     severity: 'convention',
     title: 'The Title style is used for a section',
+    action: 'Set those lines to Heading 1',
     instruction:
       "Only the document's name takes the Title style. Change the lines below to Format → Paragraph styles → Heading 1.",
   },
@@ -91,6 +100,7 @@ export const CHECKS: readonly Check[] = [
     code: 'heading-skips-level',
     severity: 'note',
     title: 'A heading skips a level',
+    action: 'Fix the heading level',
     instruction:
       'The heading is more than one level below the heading before it, such as a Heading 4 straight after a Heading 2. Screen readers, the contents list beside the page and AI agents take it for part of a section that is not there. Change it to the level in between, or add the heading it belongs under.',
   },
@@ -98,6 +108,7 @@ export const CHECKS: readonly Check[] = [
     code: 'heading-repeated',
     severity: 'note',
     title: 'Two headings say the same',
+    action: 'Rename or merge the headings',
     instruction:
       'An earlier heading in the document has the same words. A link to a section, the contents list beside the page and an AI agent quoting a section cannot tell the two apart. If they are different sections, name each for what it covers; if one repeats the other, merge them.',
   },
@@ -105,6 +116,7 @@ export const CHECKS: readonly Check[] = [
     code: 'file-name-copy-of',
     severity: 'note',
     title: 'The file name starts with “Copy of”',
+    action: 'Rename the file in Drive',
     instruction:
       'Google adds this when a file is copied. Rename the file in Drive without it.',
   },
@@ -112,6 +124,7 @@ export const CHECKS: readonly Check[] = [
     code: 'file-name-extension',
     severity: 'note',
     title: 'The file name ends with a file extension',
+    action: 'Remove the extension',
     instruction:
       'Remove the extension, such as “.doc”, from the name in Drive. It is left over from an upload.',
   },
@@ -119,6 +132,7 @@ export const CHECKS: readonly Check[] = [
     code: 'file-name-underscores',
     severity: 'note',
     title: 'The file name uses underscores',
+    action: 'Use spaces in the name',
     instruction:
       'The site shows the file name as the page title, underscores included. Use spaces instead, or “ — ” where Drive replaced a colon with “_”.',
   },
@@ -126,6 +140,7 @@ export const CHECKS: readonly Check[] = [
     code: 'file-name-spaces',
     severity: 'note',
     title: 'The file name has extra spaces',
+    action: 'Remove the extra spaces',
     instruction:
       'Remove the spaces at the start or end of the name, or doubled between words.',
   },
