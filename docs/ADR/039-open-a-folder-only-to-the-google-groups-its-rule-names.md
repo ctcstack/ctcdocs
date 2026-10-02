@@ -53,11 +53,13 @@ may name the Drive root. Without an `access` section every document is open to
 every member, as today. The section is rejected when any environment is
 public, and an unknown key in it is an error.
 
-**Every rule on a document's folder chain must admit the reader.** A
-document's readers are the intersection of the rules on its folder and every
-ancestor, so a rule below can only narrow and a move can only keep or narrow
-what a rule above allowed. **A folder with no rule on it or above it is closed**
-to everyone but the admin groups. The admin groups read everything.
+**A document's readers are the groups every rule on its folder chain names.**
+They are the set intersection of the rules on its folder and every ancestor,
+where `"*"` names every member and leaves the set as it is. A rule below can
+therefore only narrow, and a move can only keep or narrow what a rule above
+allowed; a group a rule names that a rule above it does not is reported, since
+it admits no one there. **A folder with no rule on it or above it is closed** to
+everyone but the admin groups. The admin groups read everything.
 
 **A sync is not stopped by the rules.** A malformed rule fails validation.
 A label that no longer matches its folder's name, a rule whose folder has gone,
@@ -97,19 +99,20 @@ files deploy and roll back as one version. It lists every built file by its
 canonical path:
 
 - A document's page, its Markdown version and its originals under
-  `/assets/generated/<file ID>/` belong to the document's class. A folder page
-  that shows a landing document counts as that document's page.
-- An optimized image belongs to the documents whose pages reference it; a
-  reader may load it when they may open one of them. No other page may
-  reference an optimized image; the build fails if one does.
+  `/assets/generated/<file ID>/` belong to the document's class.
+- An optimized image belongs to every page that references it, and a reader may
+  load it when they may open one of them. The build fails when a page that is
+  not a document's own references an image that a document of a narrower class
+  also references. An image no page references is readable by admins only.
 - A folder page belongs to its folder's class.
 - `/llms.txt` belongs to the members class. A top-level folder's `llms.txt`
   belongs to that folder's class. Each gives descriptions only of documents of
   its own class, and titles and addresses of the rest.
 - The home page, the full index, the sitemap, permanent links, redirects and
   hand-authored pages belong to the members class. A home folder card shows a
-  description only when its folder is in the members class.
-- The content health page belongs to the admin groups.
+  description only when the document it is taken from is in the members class.
+- The content health page belongs to the admin groups once the project names
+  them; without an `access` section it stays in the members class.
 - Platform scripts, styles, fonts, the favicon and `robots.txt` are served to
   any signed-in reader.
 - A signed-in reader who asks for a path the map does not list gets the 404
@@ -121,7 +124,14 @@ platform indexes each class into its own bundle: the members class at
 runtime. The platform's search component asks the Worker which classes the
 reader may open, at a `no-store` route under `/_kb/`, and merges those bundles
 in the browser with Pagefind's `mergeIndex`; the Worker still refuses every
-bundle the reader may not open. The 404 page's search does the same.
+bundle the reader may not open. The 404 page's search does the same. Where no
+Worker answers that route, the component merges nothing beyond the members
+bundle.
+
+**Rules take effect only where the Worker enforces them** (ADR-038). A build
+with rules but without the Worker closes nothing, and its search covers the
+members class only, so a deployment names closed folders only once its Worker
+is live.
 
 **A build check keeps body text inside its class.** The build fails when a
 file readable by a wider class contains a run of words found only in documents
