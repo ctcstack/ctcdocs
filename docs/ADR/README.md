@@ -26,7 +26,7 @@ Rejected
 - ADR-001: Astro + Starlight.
 - ADR-002: generated Markdown is stored in Git.
 - ADR-003: inventory reconciliation in GitHub Actions.
-- ADR-004: Cloudflare Access.
+- ADR-004: Cloudflare Access. Superseded by ADR-038.
 - ADR-005: stable slug strategy.
 - ADR-006: manifest v2 and redirects.
 - ADR-007: separate Cloudflare development and production environments.
@@ -65,5 +65,10 @@ Rejected
   address. Supersedes ADR-017 in part.
 - ADR-037: rank the content health page by priority. Supersedes ADR-024 and
   ADR-028 in part, and ADR-011 in part for status colors on that page.
+- ADR-038: a private deployment signs readers in itself, with Google.
+  Supersedes ADR-004, and ADR-016 in part.
+- ADR-039: open a folder only to the Google groups its rule names.
+  Supersedes ADR-033 in part.
+- ADR-040: a Worker cron keeps a snapshot of group membership.
 
 Create a new ADR by copying `000-template.md`.

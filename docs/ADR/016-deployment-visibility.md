@@ -1,6 +1,9 @@
 # ADR-016: Who may read a deployment is configuration, not an assumption
 
-- Status: Accepted
+- Status: Accepted; superseded in part by
+  [ADR-038](038-sign-readers-in-with-google-in-the-worker.md), under which a
+  private deployment refuses anonymous readers in its own Worker and admits
+  automated ones by a key it issues
 - Date: 2026-08-02
 - Owners: CTCDocs maintainers
 - Supersedes: none
