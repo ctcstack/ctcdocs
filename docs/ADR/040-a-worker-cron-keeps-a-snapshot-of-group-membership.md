@@ -18,11 +18,9 @@ identity federation from GitHub Actions, and holds no key. A Worker has no such
 federation to Google; to call a Google API on a schedule it must sign a token
 with a service account's private key.
 
-Not every Workspace edition offers the same group APIs. The Cloud Identity
-method that resolves nested membership, `searchTransitiveMemberships`, is
-available only on Enterprise editions and Cloud Identity Premium. The Admin
-SDK Directory API lists a group's members on every edition, including members
-reached through nested groups when asked to with `includeDerivedMembership`.
+Not every Workspace edition offers the same group APIs. Cloud Identity's
+membership search is available only on Enterprise editions and Cloud Identity
+Premium; the Admin SDK Directory API lists a group's members on every edition.
 
 A change of membership should reach the site within minutes, and a departure
 should end access without waiting for a session to expire. Google itself can
@@ -47,10 +45,11 @@ default. The Admin console's audit log names it as the actor of every read.
 has no route, so the key never sits in the Worker that parses readers'
 requests. It signs a JWT with the key through WebCrypto and exchanges it for an
 access token. For every group the access rules and admin groups name — and no
-other — it reads the group's immutable ID and its members with
-`includeDerivedMembership`, through the Directory API. Where the Groups Settings
-API answers it, it also reads whether members may join themselves or come from
-outside the organization. It reads the users of each configured Workspace
+other — it reads the group's immutable ID and its members through the
+Directory API. Groups hold people directly: a member that is itself a group, or
+the whole organization, admits no one through that group and is reported.
+Where the Groups Settings API answers it, it also reads whether members may
+join themselves or come from outside the organization. It reads the users of each configured Workspace
 domain with their ID, whether they are suspended or archived, and nothing else
 it does not need; the Directory API refuses the `my_customer` alias to a
 service account acting through an admin role, so users are listed by domain.
@@ -87,7 +86,7 @@ on an admin-only status route under `/_kb/`.
   reporting it, and a departure ends every session as fast.
 - No reader's request depends on Google, CI or another company system being
   up; it reads only the Worker's own KV.
-- One API serves every Workspace edition, and nested groups count.
+- One API serves every Workspace edition.
 - Only the groups the rules name are read, and the reading identity cannot
   change anything in the directory.
 
@@ -114,9 +113,8 @@ on an admin-only status route under `/_kb/`.
 - A spike on a Business edition confirmed that a custom admin role assigned to
   the service account, without delegation, reads a group's members and each
   domain's users, and that the directory user ID equals the `sub` of a
-  sign-in. Still to confirm: nested members through
-  `includeDerivedMembership`, and whether the Groups Settings API answers the
-  service account.
+  sign-in. Whether the Groups Settings API answers the service account is
+  open; until it does, invitation-only groups are a runbook rule.
 - Add the key rotation, the role, the group policy and an alert on a stale
   snapshot to the operations runbook.
 - Update `AGENTS.md` (Workers KV as runtime storage, and a second, read-only
