@@ -72,8 +72,10 @@ The Worker verifies the ID token's signature against Google's published keys,
 which it caches as their `Cache-Control` allows and refetches, at most once a
 minute, for an unknown key ID. It checks the issuer, the audience, the expiry
 and issue time with a minute of allowed skew, the nonce, `email_verified`, and
-that `hd` is one of the configured Workspace domains. The `hd` request
-parameter is a hint to Google's account chooser and is never trusted.
+that `hd` is one of the configured Workspace domains. `hd` names the domain of
+the reader's own primary address, so an organization with secondary domains
+lists each of them. The `hd` request parameter is a hint to Google's account
+chooser and is never trusted.
 
 **A reader is identified by the token's `sub`,** the Google account ID, which is
 also the user's ID in the Workspace directory. The address is kept for display
@@ -220,7 +222,8 @@ dependency on it.
 - Ignore `.dev.vars`, where Wrangler reads local secrets, in the platform and
   in the fixture project.
 - When this record is accepted, mark ADR-004 superseded.
-- A local spike carried the sign-in routes through a Worker with no
-  dependencies, with placeholder credentials. Still to run: the round trip
-  against a real client of an Internal consent screen, and whether `sub`
-  equals the directory user ID.
+- A spike ran the sign-in through a Worker with no dependencies, against a web
+  client of an Internal consent screen: every check above passed for an account
+  of the organization; an account outside it was refused by Google itself, with
+  `org_internal`, before the Worker was reached; a tampered session cookie was
+  refused; and the `sub` matched the user's ID in the directory.

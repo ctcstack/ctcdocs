@@ -50,8 +50,10 @@ access token. For every group the access rules and admin groups name — and no
 other — it reads the group's immutable ID and its members with
 `includeDerivedMembership`, through the Directory API. Where the Groups Settings
 API answers it, it also reads whether members may join themselves or come from
-outside the organization. It reads the users of the organization with their ID,
-whether they are suspended or archived, and nothing else it does not need.
+outside the organization. It reads the users of each configured Workspace
+domain with their ID, whether they are suspended or archived, and nothing else
+it does not need; the Directory API refuses the `my_customer` alias to a
+service account acting through an admin role, so users are listed by domain.
 
 **A refresh writes everything or nothing.** If any named group cannot be read,
 the refresh writes nothing. A result with no active users, or one that loses
@@ -109,10 +111,12 @@ on an admin-only status route under `/_kb/`.
 
 ### Follow-up
 
-- Confirm by spike, on the deployment's edition: that the custom admin role can
-  be created and assigned to a service account; that the Directory API returns
-  nested members to it without delegation; that the directory user ID equals
-  the `sub` of a sign-in; and whether the Groups Settings API answers it.
+- A spike on a Business edition confirmed that a custom admin role assigned to
+  the service account, without delegation, reads a group's members and each
+  domain's users, and that the directory user ID equals the `sub` of a
+  sign-in. Still to confirm: nested members through
+  `includeDerivedMembership`, and whether the Groups Settings API answers the
+  service account.
 - Add the key rotation, the role, the group policy and an alert on a stale
   snapshot to the operations runbook.
 - Update `AGENTS.md` (Workers KV as runtime storage, and a second, read-only
