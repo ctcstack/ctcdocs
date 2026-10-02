@@ -1,8 +1,8 @@
 # ADR-033: Publish llms.txt indexes and describe pages for agents
 
 - Status: Proposed; superseded in part by
-  [ADR-039](039-open-a-folder-to-the-google-groups-it-names.md), under which an
-  index gives descriptions only for documents of its own access class
+  [ADR-039](039-open-a-folder-only-to-the-google-groups-its-rule-names.md), under which
+  an index describes only documents of its own access class
 - Date: 2026-09-29
 - Owners: CTCDocs maintainers
 - Supersedes: ADR-010 in part: the protected `llms.txt` index it deferred until

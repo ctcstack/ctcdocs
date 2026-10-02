@@ -1,6 +1,8 @@
 # ADR-032: Search a missing address by its name
 
-- Status: Proposed
+- Status: Proposed; superseded in part by
+  [ADR-039](039-open-a-folder-only-to-the-google-groups-its-rule-names.md), under which
+  the 404 page searches only the bundles the reader may open
 - Date: 2026-09-29
 - Owners: CTCDocs maintainers
 - Supersedes: ADR-021 in part: the 404 page searches for the name in an

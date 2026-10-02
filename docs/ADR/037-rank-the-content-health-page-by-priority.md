@@ -1,6 +1,8 @@
 # ADR-037: Rank the content health page by priority
 
-- Status: Proposed
+- Status: Proposed; superseded in part by
+  [ADR-039](039-open-a-folder-only-to-the-google-groups-its-rule-names.md), under which
+  the page is read by admins only and lists folders without a rule
 - Date: 2026-10-01
 - Owners: CTCDocs maintainers
 - Supersedes: ADR-024 and ADR-028 in part: how the content health page is laid
