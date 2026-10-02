@@ -1,5 +1,6 @@
 import type { APIRoute, GetStaticPaths } from 'astro';
 
+import { classOfFolderSlug } from '../../lib/access-source.js';
 import { renderSectionIndex } from '../../lib/agent-index.js';
 import {
   agentIndexSite,
@@ -20,11 +21,16 @@ export const getStaticPaths = (async () => {
     if (!path?.startsWith('/') || !path.endsWith(SUFFIX)) {
       return [];
     }
+    const slug = path.slice(1, -SUFFIX.length);
     return [
       {
-        params: { section: path.slice(1, -SUFFIX.length) },
+        params: { section: slug },
         props: {
-          content: renderSectionIndex(agentIndexSite, section),
+          content: renderSectionIndex(
+            agentIndexSite,
+            section,
+            classOfFolderSlug(slug),
+          ),
         } satisfies SectionIndexProps,
       },
     ];

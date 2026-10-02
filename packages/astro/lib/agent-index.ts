@@ -15,6 +15,8 @@
  *
  * See docs/ADR/033-publish-llms-txt-indexes.md.
  */
+import { MEMBERS_CLASS } from '@ctcstack/ctcdocs-core';
+
 import { normalizeFolderName } from './folder-anchor.js';
 import { markdownProjectionPath } from './projection.js';
 import { inlineMarkdown } from './published-markdown.js';
@@ -45,6 +47,12 @@ export interface IndexedDocument {
    * also tells apart a document and a PDF that share a name.
    */
   pdf: boolean;
+  /**
+   * The document's access class (ADR-039). An index describes only documents
+   * of its own class and lists the rest by title and address; without one, a
+   * document is in the members class.
+   */
+  classId?: string;
 }
 
 export interface AgentIndexSite {
@@ -57,6 +65,7 @@ interface AgentIndexEntry {
   title: string;
   description: string | undefined;
   pdf: boolean;
+  classId: string;
 }
 
 export interface AgentIndexSection {
@@ -129,6 +138,7 @@ export function buildAgentIndex(
       title: document.title,
       description: oneLine(document.description),
       pdf: document.pdf,
+      classId: document.classId ?? MEMBERS_CLASS,
     };
   }
 
@@ -196,6 +206,7 @@ export function buildAgentIndex(
       title: document.title,
       description: oneLine(document.description),
       pdf: document.pdf,
+      classId: document.classId ?? MEMBERS_CLASS,
     }))
     .sort(
       (a, b) =>
@@ -214,10 +225,14 @@ export function buildAgentIndex(
   return sections;
 }
 
-function documentLine(document: AgentIndexEntry): string {
+/**
+ * A description is a document's own text, so it is shown only in an index of
+ * the document's class; elsewhere the document keeps its title and address.
+ */
+function documentLine(document: AgentIndexEntry, indexClass: string): string {
   const title = inlineMarkdown(document.title);
   const link = `- [${document.pdf ? `${title} (PDF)` : title}](${markdownProjectionPath(document.slug)})`;
-  return document.description
+  return document.description && document.classId === indexClass
     ? `${link}: ${inlineMarkdown(document.description)}`
     : link;
 }
@@ -229,7 +244,7 @@ function documentLine(document: AgentIndexEntry): string {
  */
 function sectionLines(
   section: AgentIndexSection,
-  { linkOwnIndex }: { linkOwnIndex: boolean },
+  { linkOwnIndex, indexClass }: { linkOwnIndex: boolean; indexClass: string },
 ): string[] {
   const lines: string[] = [];
   const ownIndex = linkOwnIndex ? section.indexPath : undefined;
@@ -243,11 +258,15 @@ function sectionLines(
         `- [${inlineMarkdown(section.trail.join(' / '))}: section index](${ownIndex}): Every document in this section, on its own.`,
       );
     }
-    lines.push(...section.documents.map((document) => documentLine(document)));
+    lines.push(
+      ...section.documents.map((document) =>
+        documentLine(document, indexClass),
+      ),
+    );
     lines.push('');
   }
   for (const child of section.children) {
-    lines.push(...sectionLines(child, { linkOwnIndex: false }));
+    lines.push(...sectionLines(child, { linkOwnIndex: false, indexClass }));
   }
   return lines;
 }
@@ -266,11 +285,12 @@ function finish(lines: string[]): string {
   return `${lines.join('\n').trimEnd()}\n`;
 }
 
-/** The whole corpus, served at `/llms.txt`. */
+/** The whole corpus, served at `/llms.txt` to every member. */
 export function renderSiteIndex(
   site: AgentIndexSite,
   sections: readonly AgentIndexSection[],
 ): string {
+  const indexClass = MEMBERS_CLASS;
   return finish([
     ...header(
       site.title,
@@ -281,15 +301,19 @@ export function renderSiteIndex(
         'first.',
     ),
     ...sections.flatMap((section) =>
-      sectionLines(section, { linkOwnIndex: true }),
+      sectionLines(section, { linkOwnIndex: true, indexClass }),
     ),
   ]);
 }
 
-/** One top-level folder, served at `<its page>llms.txt`. */
+/**
+ * One top-level folder, served at `<its page>llms.txt` to the readers of that
+ * folder, whose class `indexClass` is.
+ */
 export function renderSectionIndex(
   site: AgentIndexSite,
   section: AgentIndexSection,
+  indexClass: string = MEMBERS_CLASS,
 ): string {
   return finish([
     ...header(
@@ -299,6 +323,6 @@ export function renderSectionIndex(
         "the document's Markdown version: its page address plus `index.md`. " +
         'The index of the whole site is [/llms.txt](/llms.txt).',
     ),
-    ...sectionLines(section, { linkOwnIndex: false }),
+    ...sectionLines(section, { linkOwnIndex: false, indexClass }),
   ]);
 }

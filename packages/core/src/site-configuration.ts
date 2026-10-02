@@ -14,6 +14,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import {
+  parseAccessConfiguration,
+  type AccessConfiguration,
+} from './access-configuration.js';
 import { PROJECT_LAYOUT } from './project-layout.js';
 
 export interface BrandConfiguration {
@@ -153,6 +157,11 @@ export interface NavigationConfiguration {
 export type AddressPolicy = 'stable' | 'follow-names';
 
 export interface SiteConfiguration {
+  /**
+   * Who may read which folder (ADR-039). Absent, every document is open to
+   * every reader the deployment admits, as before access rules existed.
+   */
+  readonly access?: AccessConfiguration;
   readonly brand: BrandConfiguration;
   readonly deployment: DeploymentConfiguration;
   readonly home: HomeConfiguration;
@@ -460,13 +469,34 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
 
   const navigationSource = record(root.navigation, 'navigation');
   const homeSource = record(root.home, 'home');
+  const deployment: DeploymentConfiguration = {
+    environments: environments(deploymentSource),
+    workerName,
+  };
+
+  /*
+   * Rules close folders to some readers, which a public environment cannot
+   * do: everyone may read it. Accepting rules there would promise a boundary
+   * that does not exist.
+   */
+  let access: AccessConfiguration | undefined;
+  if (root.access !== undefined) {
+    const publicEnvironment = Object.entries(deployment.environments).find(
+      ([, environment]) => environment.visibility === 'public',
+    );
+    if (publicEnvironment) {
+      fail(
+        'access',
+        `must not be set while the ${publicEnvironment[0]} environment is public`,
+      );
+    }
+    access = parseAccessConfiguration(root.access, fail);
+  }
 
   return {
+    ...(access ? { access } : {}),
     brand,
-    deployment: {
-      environments: environments(deploymentSource),
-      workerName,
-    },
+    deployment,
     home: {
       corpusIndex: optionalFlag(
         homeSource,

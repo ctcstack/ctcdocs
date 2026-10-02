@@ -15,6 +15,7 @@ import {
   type IndexedDocument,
   type NavigationItem,
 } from './agent-index.js';
+import { classOfDocument } from './access-source.js';
 import { siteConfiguration } from './project.js';
 import { hasMarkdownProjection } from './projection.js';
 import { loadSectionHrefs, sectionHref } from './sections.js';
@@ -35,6 +36,7 @@ async function readAgentIndex(): Promise<AgentIndexSection[]> {
         title: data.title,
         description: data.description,
         pdf: data.sourceType === 'drive-pdf',
+        classId: classOfDocument(data.googleFileId),
       },
     ]),
   );

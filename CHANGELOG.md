@@ -2,6 +2,26 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Added
+
+- An optional `access` section in `site.config.json` names who may read each
+  Drive folder: admin groups, and per folder the Google groups that may read
+  it, or `"*"` for every member. A document's readers are the groups every
+  rule on its folder chain names; a folder with no rule is closed to all but
+  the admins. See
+  [ADR-039](docs/ADR/039-open-a-folder-only-to-the-google-groups-its-rule-names.md).
+  Rules take effect once the Worker that enforces them exists; this release
+  computes the classes and reports on them.
+- The content health page and the sync job summary list folders closed for
+  want of a rule, rules whose label no longer matches the folder, rules for a
+  folder the corpus does not have, and groups a rule names that the rule above
+  does not.
+- The `llms.txt` indexes describe a document only in an index of its own
+  access class and list the rest by title and address, and a home page folder
+  card takes its description only from a document every member may read.
+
 ## 0.15.0
 
 ### Changed

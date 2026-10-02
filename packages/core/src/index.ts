@@ -19,6 +19,42 @@ export {
 } from './ownership-markers.js';
 export { findProjectRoot, ProjectRootError } from './project-root.js';
 export {
+  EVERY_MEMBER,
+  parseAccessConfiguration,
+} from './access-configuration.js';
+export type {
+  AccessConfiguration,
+  AccessRule,
+} from './access-configuration.js';
+export {
+  CorpusStructureError,
+  EMPTY_CORPUS,
+  parseCorpusStructure,
+  readCorpusStructure,
+} from './corpus-structure.js';
+export type {
+  CorpusDocument,
+  CorpusFolder,
+  CorpusStructure,
+} from './corpus-structure.js';
+export {
+  ADMINS_CLASS,
+  chainReaders,
+  classIdentifiers,
+  computeAccessModel,
+  documentClass,
+  folderClass,
+  MEMBERS_CLASS,
+} from './access-classes.js';
+export type {
+  AccessClass,
+  AccessModel,
+  ChainReaders,
+  Readers,
+} from './access-classes.js';
+export { accessFindings } from './access-findings.js';
+export type { AccessFinding } from './access-findings.js';
+export {
   loadSiteConfiguration,
   parseSiteConfiguration,
   SiteConfigurationError,

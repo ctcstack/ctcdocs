@@ -6,6 +6,7 @@ import { UNPUBLISHED_REASONS } from '../generation/unpublished.js';
 import { readSourceTitle } from '../titles/source-title.js';
 import { createTitleReport } from '../titles/title-report.js';
 import {
+  renderAccessSummary,
   renderContentHealthSummary,
   renderFailureSummary,
   renderRunSummary,
@@ -297,5 +298,54 @@ describe('renderContentHealthSummary', () => {
     ]) {
       expect(summary).not.toContain(secret);
     }
+  });
+});
+
+describe('renderAccessSummary', () => {
+  it('says nothing when every folder has a working rule', () => {
+    expect(renderAccessSummary([], pageUrl)).toBe('');
+  });
+
+  it('lists closed folders and drifted rules with escaped names', () => {
+    const summary = renderAccessSummary(
+      [
+        {
+          code: 'folder-without-rule',
+          documents: 3,
+          folder: 'f-team',
+          name: 'Team | Leads',
+          trail: ['Company'],
+        },
+        {
+          code: 'rule-group-not-admitted-above',
+          folder: 'f-leads',
+          groups: ['leads@example.com'],
+          label: 'Leads',
+          name: 'Leads',
+          trail: ['Team'],
+        },
+        { code: 'rule-folder-missing', folder: 'f-gone', label: 'Archive' },
+        {
+          code: 'rule-label-outdated',
+          folder: 'f-leads',
+          label: 'Team leads',
+          name: 'Leads',
+          trail: ['Team'],
+        },
+      ],
+      pageUrl,
+    );
+    expect(summary).toContain('## Folder access — 4');
+    expect(summary).toContain(
+      '| Closed, no rule | Company › Team \\| Leads | 3 documents readable by admins only until a rule names this folder |',
+    );
+    expect(summary).toContain(
+      'leads\\@example\\.com not named by a rule above',
+    );
+    expect(summary).toContain(
+      '| Rule for a missing folder | Archive `f-gone` |',
+    );
+    expect(summary).toContain('The rule calls it Team leads');
+    expect(summary).toContain(`[content health page](${pageUrl})`);
   });
 });

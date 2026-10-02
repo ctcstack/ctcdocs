@@ -53,8 +53,9 @@ way Starlight does, because the consuming project's Astro build compiles them.
   follow the declaration rather than assuming one. See ADR-016.
 - Do not add a database, server-side rendering, semantic search, vector storage,
   an LLM content transformation, or an authentication system of our own.
-- Do not broaden scope to Sheets, Slides, comments, suggestions, per-section
-  access control, webhooks, or bidirectional editing.
+- Do not broaden scope to Sheets, Slides, comments, suggestions, webhooks, or
+  bidirectional editing. Access per folder follows ADR-039: rules name Google
+  groups by folder, and a folder without a rule is closed.
 
 ## Priorities
 

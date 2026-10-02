@@ -1,4 +1,29 @@
 {
+  "access": {
+    "admins": ["docs-admins@example.com"],
+    "rules": [
+      {
+        "folder": "folder-handbook",
+        "label": "01 - Handbook",
+        "readers": ["*"]
+      },
+      {
+        "folder": "folder-reference",
+        "label": "Reference",
+        "readers": ["engineering@example.com", "writers@example.com"]
+      },
+      {
+        "folder": "folder-reference-guides",
+        "label": "Style guides",
+        "readers": ["designers@example.com", "writers@example.com"]
+      },
+      {
+        "folder": "folder-drafts",
+        "label": "Drafts",
+        "readers": ["*"]
+      }
+    ]
+  },
   "brand": {
     "name": "Example Corp",
     "siteTitle": "Example [DOCS]",
