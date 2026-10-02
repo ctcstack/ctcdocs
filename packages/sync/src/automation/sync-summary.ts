@@ -12,6 +12,8 @@
  * and never becomes markup, a link or a new column. The catalog's own wording
  * is the platform's, and goes in as written.
  */
+import type { AccessFinding } from '@ctcstack/ctcdocs-core';
+
 import type { SyncReport } from '../generation/sync-report.js';
 import { UNPUBLISHED_STATUS_LABELS } from '../generation/unpublished.js';
 import { plural } from '../plural.js';
@@ -314,6 +316,64 @@ export function renderContentHealthSummary(
     '| Group | Check | Documents |',
     '| --- | --- | ---: |',
     ...rows,
+    '',
+  ].join('\n');
+}
+
+/** Where a finding's folder is, as the site names it. */
+function place(finding: { name: string; trail: readonly string[] }): string {
+  return [...finding.trail, finding.name].map(cell).join(' › ');
+}
+
+function accessRow(finding: AccessFinding): string {
+  switch (finding.code) {
+    case 'folder-without-rule':
+      return row([
+        'Closed, no rule',
+        place(finding),
+        `${plural(finding.documents, 'document')} readable by admins only until a rule names this folder`,
+      ]);
+    case 'rule-group-not-admitted-above':
+      return row([
+        'Group admits no one',
+        place(finding),
+        `${finding.groups.map(cell).join(', ')} not named by a rule above`,
+      ]);
+    case 'rule-folder-missing':
+      return row([
+        'Rule for a missing folder',
+        `${cell(finding.label)} \`${finding.folder}\``,
+        'Not in the corpus: update or remove the rule',
+      ]);
+    case 'rule-label-outdated':
+      return row([
+        'Label out of date',
+        place(finding),
+        `The rule calls it ${cell(finding.label)}`,
+      ]);
+  }
+}
+
+/**
+ * Folder access (ADR-039): folders closed for want of a rule, and rules that
+ * drifted from the corpus. None of it fails the sync; a closed folder is the
+ * safe outcome, and the fix is a pull request to the configuration.
+ */
+export function renderAccessSummary(
+  findings: readonly AccessFinding[],
+  pageUrl: string,
+): string {
+  if (findings.length === 0) {
+    return '';
+  }
+  return [
+    `## Folder access — ${findings.length}`,
+    '',
+    `Who may read each folder is set in the site configuration. Details: [content health page](${pageUrl}).`,
+    '',
+    '| What | Folder | Detail |',
+    '| --- | --- | --- |',
+    ...findings.map(accessRow),
     '',
   ].join('\n');
 }

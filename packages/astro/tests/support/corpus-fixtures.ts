@@ -13,7 +13,13 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { parseFrontmatter } from '@astrojs/markdown-remark';
-import { findProjectRoot, PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
+import {
+  accessFindings,
+  findProjectRoot,
+  loadSiteConfiguration,
+  PROJECT_LAYOUT,
+  readCorpusStructure,
+} from '@ctcstack/ctcdocs-core';
 
 export interface CorpusFixture {
   /** Google file identifier, which is also the generated asset directory. */
@@ -376,6 +382,17 @@ export function contentHealthReport():
       )
       .map((check) => check.title),
   };
+}
+
+/**
+ * How many folder access findings (ADR-039) the content health page lists:
+ * none for a project without an `access` section.
+ */
+export function folderAccessFindingCount(): number {
+  const { access } = loadSiteConfiguration(repositoryRoot);
+  return access
+    ? accessFindings(access, readCorpusStructure(repositoryRoot)).length
+    : 0;
 }
 
 /**

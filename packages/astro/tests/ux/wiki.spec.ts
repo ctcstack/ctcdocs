@@ -14,6 +14,7 @@ import {
   anyDocument,
   contentHealthReport,
   deepestDocument,
+  folderAccessFindingCount,
   unpublishedReport,
   documentInFolder,
   documentLinkingAnother,
@@ -678,6 +679,7 @@ test('the content health page ranks what it found, most urgent first', async ({
     'Improve',
     'Tidy up',
     'Proposed convention: one Title line',
+    ...(folderAccessFindingCount() > 0 ? ['Folder access'] : []),
     ...((unpublished?.ignoredFolders ?? 0) > 0 ? ['Left out on purpose'] : []),
   ]);
 

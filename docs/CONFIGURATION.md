@@ -63,6 +63,7 @@ name of its own; they read this file. The rationale is recorded in
 | `sync.commitBotName`                   | Git author the sync workflow commits generated output as.                                                                                |
 | `sync.defaultLocale`                   | Fallback locale for documents whose language cannot be determined.                                                                       |
 | `sync.largeImageMegabytes`             | Optional. Megabytes (a million bytes each) above which the content health page notes an image. Above 0; defaults to 2.                   |
+| `access`                               | Optional. Who may read which folder, by Google group. Only on a deployment whose every environment is private. See below.                |
 
 ## Who may read the deployment
 
@@ -97,6 +98,48 @@ an agent decodes every non-ASCII title wrongly. The access smoke test checks
 both after a deployment. See [ADR-033](ADR/033-publish-llms-txt-indexes.md).
 
 See [ADR-016](ADR/016-deployment-visibility.md).
+
+## Who may read which folder
+
+A private deployment may close folders to everyone but named Google groups:
+
+```json
+"access": {
+  "admins": ["docs-admins@example.com"],
+  "rules": [
+    { "folder": "<Drive folder ID>", "label": "Handbook", "readers": ["*"] },
+    {
+      "folder": "<Drive folder ID>",
+      "label": "Finance",
+      "readers": ["finance@example.com", "finance-leads@example.com"]
+    }
+  ]
+}
+```
+
+- **A rule covers its folder and everything below it.** `folder` is the Drive
+  folder's ID, so renaming or moving the folder does not move the rule.
+  `label` is its name, for whoever reviews the configuration; when it no
+  longer matches the folder's name in Drive or on the site, the content health
+  page and the sync job summary say so.
+- **`readers` is a list of group addresses, or `["*"]`** for every signed-in
+  member. Addresses are compared without regard to case.
+- **A document's readers are the groups every rule on its folder chain
+  names.** A rule below another can only narrow it; a group it names that the
+  rule above does not admits no one there, and is reported.
+- **A folder with no rule on it or above it is closed** to everyone but the
+  `admins` groups, who read everything. The reports list every such folder, so
+  a new folder does not stay closed unnoticed. A rule may name the Drive root
+  to open everything not otherwise ruled.
+- **Without an `access` section** every document is open to every member, as
+  before. The section is refused while any environment is public, and an
+  unknown key in it is an error.
+
+Rules take effect only where the deployment's Worker enforces them. Until a
+deployment has one, rules already decide what the site's indexes say: the
+`llms.txt` indexes describe a document only in an index of its own class, and
+a home page folder card takes its description only from a document every
+member may read. See [ADR-039](ADR/039-open-a-folder-only-to-the-google-groups-its-rule-names.md).
 
 ## Environments
 

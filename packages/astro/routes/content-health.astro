@@ -27,6 +27,7 @@ import { PLATFORM_ROUTE_HREFS } from '@ctcstack/ctcdocs-core';
 
 import HealthBreakdown from '../components/HealthBreakdown.astro';
 import HealthGroup from '../components/HealthGroup.astro';
+import { folderAccessFindings, rootFolderId } from '../lib/access-source';
 import {
   loadHealthReport,
   loadSyncState,
@@ -40,6 +41,49 @@ import {
   type Priority,
   type TaskPriority,
 } from '../lib/content-health-view';
+
+/**
+ * A folder access finding as one line: what it is, and what to do (ADR-039).
+ * The fix is always a change to the site configuration, which editors ask the
+ * site's maintainers for.
+ */
+function describeAccess(finding: (typeof folderAccessFindings)[number]): {
+  name: string;
+  where: string;
+  what: string;
+} {
+  const where = (trail: readonly string[]) =>
+    trail.length > 0 ? trail.join(' › ') : 'Top of the Drive';
+  switch (finding.code) {
+    case 'folder-without-rule':
+      return {
+        name:
+          finding.folder === rootFolderId
+            ? 'Documents outside any folder'
+            : finding.name,
+        where: where(finding.trail),
+        what: `No rule: ${plural(finding.documents, 'document')} closed to everyone but the admins until a rule names this folder`,
+      };
+    case 'rule-group-not-admitted-above':
+      return {
+        name: finding.name,
+        where: where(finding.trail),
+        what: `${finding.groups.join(', ')} ${finding.groups.length === 1 ? 'is' : 'are'} not named by a rule above, so ${finding.groups.length === 1 ? 'it admits' : 'they admit'} no one here`,
+      };
+    case 'rule-folder-missing':
+      return {
+        name: finding.label,
+        where: 'Not in the Drive',
+        what: 'A rule names a folder the site does not have: update or remove it',
+      };
+    case 'rule-label-outdated':
+      return {
+        name: finding.name,
+        where: where(finding.trail),
+        what: `The rule still calls it "${finding.label}"`,
+      };
+  }
+}
 
 const report = loadHealthReport();
 const state = loadSyncState();
@@ -421,6 +465,39 @@ const blocks = (groups: Group[]) => {
               )}
             </section>
           ))}
+
+          {folderAccessFindings.length > 0 && (
+            <section class="health-tier" id="folder-access" data-tier>
+              <h2>
+                <span>Folder access</span>
+              </h2>
+              <p class="health-lede">
+                Who may read each folder is set in the site's configuration. A
+                folder without a rule is closed to everyone but the admins until
+                one is added. Ask whoever maintains the site to change a rule.
+              </p>
+              <ul class="health-folders">
+                {folderAccessFindings.map((finding) => {
+                  const line = describeAccess(finding);
+                  return (
+                    <li
+                      data-section={
+                        'trail' in finding && finding.folder !== rootFolderId
+                          ? (finding.trail[0] ?? finding.name)
+                          : 'General'
+                      }
+                      data-editor=""
+                    >
+                      <span class="health-folder-name">{line.name}</span>
+                      <span class="health-folder-meta">
+                        {line.where} · {line.what}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
 
           {view.ignoredFolders.length > 0 && (
             <section class="health-tier" id="left-out" data-tier>

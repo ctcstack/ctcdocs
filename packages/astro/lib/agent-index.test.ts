@@ -190,3 +190,45 @@ The documents are in the order the navigation shows them. Each link is the docum
     expect(renderSiteIndex(site, again)).toBe(renderSiteIndex(site, sections));
   });
 });
+
+describe('descriptions and access classes', () => {
+  const classed = new Map<string, IndexedDocument>([
+    [
+      'handbook/overview',
+      { title: 'Overview', description: 'Open to all.', pdf: false },
+    ],
+    [
+      'handbook/payroll',
+      {
+        title: 'Payroll',
+        description: 'Only finance reads this.',
+        pdf: false,
+        classId: '0a1b2c3d',
+      },
+    ],
+  ]);
+  const [handbook] = buildAgentIndex(
+    [{ label: 'Handbook', items: ['handbook/overview', 'handbook/payroll'] }],
+    classed,
+    () => '/handbook/',
+  );
+  if (!handbook) throw new Error('missing section');
+
+  it('lists a closed document in the site index by title alone', () => {
+    const index = renderSiteIndex(site, [handbook]);
+    expect(index).toContain(
+      '- [Overview](/handbook/overview/index.md): Open to all.',
+    );
+    expect(index).toContain('- [Payroll](/handbook/payroll/index.md)\n');
+    expect(index).not.toContain('Only finance reads this.');
+  });
+
+  it("describes only documents of a section index's own class", () => {
+    const index = renderSectionIndex(site, handbook, '0a1b2c3d');
+    expect(index).toContain(
+      '- [Payroll](/handbook/payroll/index.md): Only finance reads this.',
+    );
+    expect(index).toContain('- [Overview](/handbook/overview/index.md)\n');
+    expect(index).not.toContain('Open to all.');
+  });
+});

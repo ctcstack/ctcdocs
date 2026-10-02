@@ -2,14 +2,17 @@ import { appendFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import {
+  accessFindings,
   loadSiteConfiguration,
   PLATFORM_ROUTE_HREFS,
   PROJECT_LAYOUT,
+  readCorpusStructure,
 } from '@ctcstack/ctcdocs-core';
 
 import { syncReportSchema } from '../generation/sync-report.js';
 import { titleReportSchema, type TitleReport } from '../titles/title-report.js';
 import {
+  renderAccessSummary,
   renderContentHealthSummary,
   renderSiteSummary,
 } from './sync-summary.js';
@@ -67,6 +70,26 @@ export async function writeSyncSummary(
       ),
       'utf8',
     );
+  }
+  if (site.access) {
+    /*
+     * A summary that cannot be written is not worth failing a sync over; the
+     * same findings are on the content health page.
+     */
+    try {
+      await appendFile(
+        summaryPath,
+        renderAccessSummary(
+          accessFindings(site.access, readCorpusStructure(repositoryRoot)),
+          contentHealthUrl,
+        ),
+        'utf8',
+      );
+    } catch (error: unknown) {
+      console.warn(
+        `Folder access summary skipped: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
   console.log('Sync job summary written.');
 }

@@ -9,6 +9,7 @@
  * the Google Doc — never from `syncedAt`, which changes on every pipeline run
  * and would report the whole corpus as fresh after any sync.
  */
+import { isOpenToMembers } from './access-source.js';
 import { siteConfiguration } from './project.js';
 import { getCollection } from 'astro:content';
 
@@ -35,6 +36,8 @@ export type CorpusDocument = {
   folder: string;
   href: string;
   modified: Date | undefined;
+  /** Whether every signed-in member may read it (ADR-039). */
+  openToMembers: boolean;
   /** Sub-folder path, when the document sits deeper than the top level. */
   qualifier: string | undefined;
   title: string;
@@ -91,14 +94,19 @@ function newestEdit(group: CorpusGroup): number {
   return times.length > 0 ? Math.max(...times) : Number.NEGATIVE_INFINITY;
 }
 
-/** Picks the description a folder publishes about itself, when it has one. */
+/**
+ * Picks the description a folder publishes about itself, when it has one. The
+ * home page is read by every member, so a description is taken only from a
+ * document every member may read (ADR-039).
+ */
 function folderDescription(
   label: string,
   documents: CorpusDocument[],
 ): string | undefined {
   const wanted = new Set([...DESCRIPTION_DOC_TITLES, label.toLowerCase()]);
-  const marker = documents.find((entry) =>
-    wanted.has(entry.title.trim().toLowerCase()),
+  const marker = documents.find(
+    (entry) =>
+      entry.openToMembers && wanted.has(entry.title.trim().toLowerCase()),
   );
   const description = marker?.description?.trim();
   return description ? description : undefined;
@@ -124,6 +132,7 @@ export async function loadCorpus(): Promise<Corpus> {
 
     const entry: CorpusDocument = {
       description: description ? description : undefined,
+      openToMembers: isOpenToMembers(doc.data.googleFileId),
       folder: label,
       href: `/${doc.id}/`,
       modified: modifiedRaw ? new Date(modifiedRaw) : undefined,
