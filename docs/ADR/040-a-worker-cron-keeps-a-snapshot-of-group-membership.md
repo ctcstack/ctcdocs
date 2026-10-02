@@ -114,8 +114,9 @@ on an admin-only status route under `/_kb/`.
 - A spike on a Business edition confirmed that a custom admin role assigned to
   the service account, without delegation, reads a group's members and each
   domain's users, and that the directory user ID equals the `sub` of a
-  sign-in. Whether the Groups Settings API answers the service account is
-  open; until it does, invitation-only groups are a runbook rule.
+  sign-in. The Groups Settings API answers it as well, so the refresh can
+  read whether each named group is invitation-only and closed to outside
+  members.
 - Add the key rotation, the role, the group policy and an alert on a stale
   snapshot to the operations runbook.
 - Update `AGENTS.md` (Workers KV as runtime storage, and a second, read-only
