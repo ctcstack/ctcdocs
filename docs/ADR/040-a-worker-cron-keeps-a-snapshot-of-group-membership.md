@@ -49,10 +49,11 @@ other — it reads the group's immutable ID and its members through the
 Directory API. Groups hold people directly: a member that is itself a group, or
 the whole organization, admits no one through that group and is reported.
 Where the Groups Settings API answers it, it also reads whether members may
-join themselves or come from outside the organization. It reads the users of each configured Workspace
-domain with their ID, whether they are suspended or archived, and nothing else
-it does not need; the Directory API refuses the `my_customer` alias to a
-service account acting through an admin role, so users are listed by domain.
+join themselves or come from outside the organization. It reads the users of
+each configured Workspace domain with their ID, whether they are suspended or
+archived, and nothing else it does not need; the Directory API refuses the
+`my_customer` alias to a service account acting through an admin role, so
+users are listed by domain.
 
 **A refresh writes everything or nothing.** If any named group cannot be read,
 the refresh writes nothing. A result with no active users, or one that loses
