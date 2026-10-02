@@ -2,7 +2,9 @@
 
 - Status: Proposed; superseded in part by
   [ADR-037](037-rank-the-content-health-page-by-priority.md), under which the
-  page is ordered by priority rather than by severity
+  page is ordered by priority rather than by severity; and by
+  [ADR-039](039-open-a-folder-only-to-the-google-groups-its-rule-names.md), under which
+  the page is read by admins only and lists folders without a rule
 - Date: 2026-09-27
 - Owners: CTCDocs maintainers
 - Supersedes: none

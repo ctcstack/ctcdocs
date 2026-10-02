@@ -1,6 +1,9 @@
 # ADR-007: Separate Cloudflare development and production environments
 
-- Status: Accepted
+- Status: Accepted; superseded in part by
+  [ADR-038](038-a-private-deployment-signs-readers-in-itself-with-google.md), under which each
+  environment holds its own OAuth client, signing secret, KV namespace and keys
+  instead of an Access application and service token
 - Date: 2026-07-31
 - Owners: CTCDocs maintainers
 - Supersedes: none

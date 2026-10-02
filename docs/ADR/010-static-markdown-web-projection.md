@@ -2,7 +2,9 @@
 
 - Status: Accepted; superseded in part by
   [ADR-033](033-publish-llms-txt-indexes.md), under which the protected
-  `llms.txt` index is published without waiting for usage evidence
+  `llms.txt` index is published without waiting for usage evidence; and by
+  [ADR-038](038-a-private-deployment-signs-readers-in-itself-with-google.md), under which the
+  projection is served through the platform's Worker, which authorizes it
 - Date: 2026-07-31
 - Owners: CTCDocs maintainers
 - Supersedes: none
