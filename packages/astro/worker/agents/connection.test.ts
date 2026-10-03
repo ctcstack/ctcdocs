@@ -1,0 +1,581 @@
+/**
+ * Connecting an assistant end to end, through the gate and the real OAuth
+ * library (ADR-041): discovery, registration, consent, Google, the token, the
+ * MCP tools, and access that follows the directory on every request.
+ */
+import { createHash } from 'node:crypto';
+
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
+import { handle, SESSION_COOKIE, type WorkerContext } from '../handler.js';
+import { GoogleKeys } from '../oidc.js';
+import { base64url, seal, sealKeys } from '../seal.js';
+import type { DirectorySnapshot } from '../snapshot.js';
+import { agentOAuth } from './oauth.js';
+import {
+  agentMap,
+  FixedIndex,
+  ORIGIN,
+  publishedStore,
+} from './test-support.js';
+
+const NOW = Date.now();
+const SECRET = 'a-session-secret-long-enough-to-be-accepted-0123456789';
+const CLIENT_ID = 'client-id.apps.googleusercontent.com';
+const CALLBACK = 'https://assistant.example/callback';
+
+/** Workers KV, in memory, as far as the OAuth library uses it. */
+class MemoryKv {
+  readonly values = new Map<string, { value: string; metadata?: unknown }>();
+
+  async get(key: string, options?: 'json' | { type?: string }) {
+    const entry = this.values.get(key);
+    if (!entry) {
+      return null;
+    }
+    const type = typeof options === 'string' ? options : options?.type;
+    return type === 'json' ? JSON.parse(entry.value) : entry.value;
+  }
+
+  async put(key: string, value: string, options?: { metadata?: unknown }) {
+    this.values.set(key, { value, metadata: options?.metadata });
+  }
+
+  async delete(key: string) {
+    this.values.delete(key);
+  }
+
+  async list(options: { prefix?: string; limit?: number; cursor?: string }) {
+    const names = [...this.values.keys()]
+      .filter((name) => name.startsWith(options.prefix ?? ''))
+      .sort();
+    const start = Number(options.cursor ?? 0);
+    const limit = options.limit ?? 1000;
+    const page = names.slice(start, start + limit);
+    const complete = start + limit >= names.length;
+    return {
+      keys: page.map((name) => ({
+        name,
+        metadata: this.values.get(name)?.metadata,
+      })),
+      list_complete: complete,
+      ...(complete ? {} : { cursor: String(start + limit) }),
+    };
+  }
+}
+
+let signingKey: CryptoKey;
+let publicJwk: JsonWebKey;
+
+beforeAll(async () => {
+  const pair = await crypto.subtle.generateKey(
+    {
+      name: 'RSASSA-PKCS1-v1_5',
+      modulusLength: 2048,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: 'SHA-256',
+    },
+    true,
+    ['sign', 'verify'],
+  );
+  signingKey = pair.privateKey;
+  publicJwk = {
+    ...(await crypto.subtle.exportKey('jwk', pair.publicKey)),
+    kid: 'k1',
+  } as JsonWebKey;
+});
+
+async function idToken(claims: Record<string, unknown>): Promise<string> {
+  const encode = (value: unknown) =>
+    base64url(new TextEncoder().encode(JSON.stringify(value)));
+  const unsigned = `${encode({ alg: 'RS256', kid: 'k1', typ: 'JWT' })}.${encode(claims)}`;
+  const signature = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5',
+    signingKey,
+    new TextEncoder().encode(unsigned),
+  );
+  return `${unsigned}.${base64url(signature)}`;
+}
+
+/** Google, signing in whoever `person` names with the nonce it was sent. */
+function google(person: () => { sub: string; nonce: string }): typeof fetch {
+  return (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes('/oauth2/v3/certs')) {
+      return Response.json(
+        { keys: [publicJwk] },
+        { headers: { 'cache-control': 'max-age=3600' } },
+      );
+    }
+    if (url.includes('oauth2.googleapis.com/token')) {
+      const { sub, nonce } = person();
+      return Response.json({
+        id_token: await idToken({
+          iss: 'https://accounts.google.com',
+          aud: CLIENT_ID,
+          exp: Math.floor(NOW / 1000) + 600,
+          iat: Math.floor(NOW / 1000),
+          nonce,
+          email: `${sub}@example.com`,
+          email_verified: true,
+          hd: 'example.com',
+          sub,
+        }),
+      });
+    }
+    return new Response('unexpected', { status: 500 });
+  }) as typeof fetch;
+}
+
+function snapshotWith(users: string[], team: string[] = []): DirectorySnapshot {
+  return {
+    schemaVersion: 1,
+    takenAt: new Date(NOW - 60_000).toISOString(),
+    users: Object.fromEntries(users.map((user) => [user, true])),
+    groups: {
+      'team@example.com': { id: 'g1', members: team },
+      'admins@example.com': { id: 'g2', members: [] },
+    },
+  };
+}
+
+/** Cookies a browser would keep between the steps of a connection. */
+class Jar {
+  private readonly values = new Map<string, string>();
+
+  take(response: Response) {
+    for (const header of response.headers.getSetCookie()) {
+      const [pair] = header.split(';');
+      const index = pair?.indexOf('=') ?? -1;
+      if (pair && index > 0) {
+        this.values.set(pair.slice(0, index), pair.slice(index + 1));
+      }
+    }
+  }
+
+  header(): string {
+    return [...this.values]
+      .map(([name, value]) => `${name}=${value}`)
+      .join('; ');
+  }
+}
+
+let kv: MemoryKv;
+let snapshot: DirectorySnapshot | undefined;
+let googlePerson: { sub: string; nonce: string };
+let events: Record<string, unknown>[];
+
+function context(map = agentMap): WorkerContext {
+  const fetcher = google(() => googlePerson);
+  return {
+    map,
+    assets: { fetch: async () => new Response('asset') },
+    snapshot: async () => snapshot,
+    machineKeys: async () => [],
+    secrets: {
+      googleClientId: CLIENT_ID,
+      googleClientSecret: 'client-secret',
+      sessionSecret: SECRET,
+      previousSessionSecret: undefined,
+    },
+    fetch: fetcher,
+    now: () => NOW,
+    googleKeys: new GoogleKeys(fetcher, () => NOW),
+    log: (event) => events.push(event),
+    agents: {
+      oauth: (origin) =>
+        agentOAuth({
+          env: { OAUTH_KV: kv },
+          ctx: {
+            waitUntil: () => undefined,
+            passThroughOnException: () => undefined,
+          },
+          origin,
+          site: map.site.title,
+          log: (event) => events.push(event),
+        }),
+      store: publishedStore(),
+      index: new FixedIndex([
+        'docs/aaaaaa.md',
+        'docs/bbbbbb.md',
+        'docs/cccccc.md',
+      ]),
+    },
+  };
+}
+
+const call = (request: Request, map = agentMap) =>
+  handle(request, context(map));
+
+beforeEach(() => {
+  kv = new MemoryKv();
+  snapshot = snapshotWith(['user-member']);
+  googlePerson = { sub: 'user-member', nonce: '' };
+  events = [];
+});
+
+async function register(): Promise<string> {
+  const response = await call(
+    new Request(`${ORIGIN}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_name: 'Example Assistant',
+        redirect_uris: [CALLBACK],
+        token_endpoint_auth_method: 'none',
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+      }),
+    }),
+  );
+  expect(response.status).toBe(201);
+  return ((await response.json()) as { client_id: string }).client_id;
+}
+
+const VERIFIER = 'a-pkce-verifier-that-is-long-enough-for-the-rules-0123456789';
+const CHALLENGE = createHash('sha256').update(VERIFIER).digest('base64url');
+
+function authorizeUrl(clientId: string): string {
+  return `${ORIGIN}/auth/authorize?${new URLSearchParams({
+    response_type: 'code',
+    client_id: clientId,
+    redirect_uri: CALLBACK,
+    scope: 'kb:read offline_access',
+    state: 'client-state',
+    code_challenge: CHALLENGE,
+    code_challenge_method: 'S256',
+    resource: `${ORIGIN}/mcp`,
+  })}`;
+}
+
+async function consent(jar: Jar, clientId: string) {
+  const page = await call(
+    new Request(authorizeUrl(clientId), { headers: { Cookie: jar.header() } }),
+  );
+  jar.take(page);
+  const html = await page.text();
+  const handle = /name="handle" value="([^"]+)"/u.exec(html)?.[1] ?? '';
+  return { page, html, handle };
+}
+
+function answer(jar: Jar, handle: string, decision = 'approve') {
+  return call(
+    new Request(`${ORIGIN}/auth/authorize`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Cookie: jar.header(),
+      },
+      body: new URLSearchParams({ handle, decision }),
+    }),
+  );
+}
+
+/** Connects an assistant for `sub`, signing in with Google; returns tokens. */
+async function connect(sub: string) {
+  const clientId = await register();
+  const jar = new Jar();
+  const { handle } = await consent(jar, clientId);
+  const toGoogle = await answer(jar, handle);
+  jar.take(toGoogle);
+  const googleUrl = new URL(toGoogle.headers.get('Location') ?? '');
+  googlePerson = { sub, nonce: googleUrl.searchParams.get('nonce') ?? '' };
+  const back = await call(
+    new Request(
+      `${ORIGIN}/auth/callback?code=google-code&state=${googleUrl.searchParams.get('state')}`,
+      { headers: { Cookie: jar.header() } },
+    ),
+  );
+  const redirect = new URL(back.headers.get('Location') ?? 'https://x/');
+  const token = await call(
+    new Request(`${ORIGIN}/auth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: redirect.searchParams.get('code') ?? '',
+        redirect_uri: CALLBACK,
+        client_id: clientId,
+        code_verifier: VERIFIER,
+        resource: `${ORIGIN}/mcp`,
+      }),
+    }),
+  );
+  return {
+    clientId,
+    googleUrl,
+    back,
+    redirect,
+    tokens: (await token.json()) as {
+      access_token: string;
+      refresh_token: string;
+      scope: string;
+    },
+  };
+}
+
+let rpc = 0;
+
+async function mcp(token: string, method: string, params: object = {}) {
+  const response = await call(
+    new Request(`${ORIGIN}/mcp`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        'MCP-Protocol-Version': '2025-11-25',
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: (rpc += 1), method, params }),
+    }),
+  );
+  const text = await response.text();
+  // A 2025-era client is answered over SSE: one `data:` line per message.
+  const data = text.startsWith('{')
+    ? text
+    : text
+        .split('\n')
+        .find((line) => line.startsWith('data: '))
+        ?.slice('data: '.length);
+  return {
+    status: response.status,
+    body: (data ? JSON.parse(data) : {}) as {
+      result?: {
+        tools?: { name: string; annotations?: { readOnlyHint?: boolean } }[];
+        structuredContent?: Record<string, unknown>;
+        isError?: boolean;
+      };
+    },
+  };
+}
+
+const tool = (token: string, name: string, args: object) =>
+  mcp(token, 'tools/call', { name, arguments: args });
+
+describe('discovery', () => {
+  it('points an anonymous MCP request at the resource metadata', async () => {
+    const response = await call(
+      new Request(`${ORIGIN}/mcp`, { method: 'POST', body: '{}' }),
+    );
+    expect(response.status).toBe(401);
+    expect(response.headers.get('WWW-Authenticate')).toContain(
+      `resource_metadata="${ORIGIN}/.well-known/oauth-protected-resource/mcp"`,
+    );
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+  });
+
+  it('serves the resource metadata, at its path and at the root', async () => {
+    for (const path of [
+      '/.well-known/oauth-protected-resource/mcp',
+      '/.well-known/oauth-protected-resource',
+    ]) {
+      const response = await call(new Request(`${ORIGIN}${path}`));
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        resource: `${ORIGIN}/mcp`,
+        authorization_servers: [ORIGIN],
+        scopes_supported: ['kb:read'],
+      });
+    }
+  });
+
+  it('serves the authorization server metadata', async () => {
+    const response = await call(
+      new Request(`${ORIGIN}/.well-known/oauth-authorization-server`),
+    );
+    expect(await response.json()).toMatchObject({
+      issuer: ORIGIN,
+      authorization_endpoint: `${ORIGIN}/auth/authorize`,
+      token_endpoint: `${ORIGIN}/auth/token`,
+      registration_endpoint: `${ORIGIN}/auth/register`,
+      code_challenge_methods_supported: ['S256'],
+      scopes_supported: ['kb:read', 'offline_access'],
+      authorization_response_iss_parameter_supported: true,
+    });
+  });
+
+  it('leaves every MCP route to the gate when the server is off', async () => {
+    const off = { ...agentMap, site: { ...agentMap.site, mcp: false } };
+    const response = await call(
+      new Request(`${ORIGIN}/mcp`, { method: 'POST', body: '{}' }),
+      off,
+    );
+    expect(response.status).toBe(405);
+  });
+});
+
+describe('connecting an assistant', () => {
+  it('asks once, names the assistant, and allows the form to go on', async () => {
+    const jar = new Jar();
+    const { page, html, handle } = await consent(jar, await register());
+    expect(page.status).toBe(200);
+    expect(html).toContain('Connect Example Assistant?');
+    expect(html).toContain('assistant.example');
+    expect(handle).not.toBe('');
+    const policy = page.headers.get('Content-Security-Policy') ?? '';
+    expect(policy).toContain("frame-ancestors 'none'");
+    expect(policy).toContain(
+      "form-action 'self' https://accounts.google.com https://assistant.example",
+    );
+  });
+
+  it('signs the person in with Google, then hands the assistant a code', async () => {
+    const { googleUrl, back, redirect, tokens } = await connect('user-member');
+    expect(googleUrl.origin).toBe('https://accounts.google.com');
+    expect(googleUrl.searchParams.get('redirect_uri')).toBe(
+      `${ORIGIN}/auth/callback`,
+    );
+    expect(back.status).toBe(302);
+    expect(`${redirect.origin}${redirect.pathname}`).toBe(CALLBACK);
+    expect(redirect.searchParams.get('state')).toBe('client-state');
+    expect(redirect.searchParams.get('iss')).toBe(ORIGIN);
+    // Connecting signs the person in to the site as well.
+    expect(back.headers.getSetCookie().join(';')).toContain(
+      `${SESSION_COOKIE}=`,
+    );
+    expect(tokens.access_token).toBeTruthy();
+    expect(tokens.refresh_token).toBeTruthy();
+    expect(tokens.scope).toContain('kb:read');
+  });
+
+  it('skips Google for a person whose site session holds', async () => {
+    const clientId = await register();
+    const jar = new Jar();
+    const keys = await sealKeys('session', SECRET);
+    const session = await seal(keys, {
+      aud: ORIGIN,
+      exp: Math.floor(NOW / 1000) + 3600,
+      iat: Math.floor(NOW / 1000),
+      sub: 'user-member',
+      email: 'user-member@example.com',
+    });
+    const { handle } = await consent(jar, clientId);
+    const response = await call(
+      new Request(`${ORIGIN}/auth/authorize`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Cookie: `${jar.header()}; ${SESSION_COOKIE}=${session}`,
+        },
+        body: new URLSearchParams({ handle, decision: 'approve' }),
+      }),
+    );
+    const location = new URL(response.headers.get('Location') ?? '');
+    expect(`${location.origin}${location.pathname}`).toBe(CALLBACK);
+    expect(location.searchParams.get('code')).toBeTruthy();
+  });
+
+  it('tells the assistant when the person cancels', async () => {
+    const jar = new Jar();
+    const { handle } = await consent(jar, await register());
+    const response = await answer(jar, handle, 'deny');
+    const location = new URL(response.headers.get('Location') ?? '');
+    expect(location.searchParams.get('error')).toBe('access_denied');
+    expect(location.searchParams.get('state')).toBe('client-state');
+  });
+
+  it('refuses an answer posted without the browser that saw the page', async () => {
+    const { handle } = await consent(new Jar(), await register());
+    const response = await answer(new Jar(), handle);
+    expect(response.status).toBe(400);
+    expect(response.headers.get('Location')).toBe(null);
+  });
+
+  it('refuses a person the directory does not list', async () => {
+    snapshot = snapshotWith(['someone-else']);
+    const { back } = await connect('user-member');
+    expect(back.status).toBe(403);
+    expect(await back.text()).toContain('not in the directory');
+  });
+
+  it('leaves a site sign-in to the site', async () => {
+    const response = await call(
+      new Request(`${ORIGIN}/auth/callback?code=x&state=site-state-123`, {
+        headers: { Cookie: '__Host-kb-sign-in-site-state-1=tampered' },
+      }),
+    );
+    expect(await response.text()).toContain('Sign-in did not work');
+  });
+});
+
+describe('an assistant reading', () => {
+  it('lists two read-only tools', async () => {
+    const { tokens } = await connect('user-member');
+    const listed = await mcp(tokens.access_token, 'tools/list');
+    expect(listed.body.result?.tools?.map((entry) => entry.name)).toEqual([
+      'search',
+      'fetch',
+    ]);
+    expect(
+      listed.body.result?.tools?.every(
+        (entry) => entry.annotations?.readOnlyHint === true,
+      ),
+    ).toBe(true);
+  });
+
+  it('finds and reads only what the person may open, decided per request', async () => {
+    const { tokens } = await connect('user-member');
+    const token = tokens.access_token;
+
+    const found = await tool(token, 'search', { query: 'plan' });
+    expect(found.body.result?.structuredContent).toEqual({
+      results: [
+        { id: 'aaaaaa', title: 'Handbook', url: `${ORIGIN}/d/aaaaaa/` },
+      ],
+    });
+    expect(
+      (await tool(token, 'fetch', { id: 'bbbbbb' })).body.result?.isError,
+    ).toBe(true);
+
+    // Joining the team opens its document to the same connection.
+    snapshot = snapshotWith(['user-member'], ['user-member']);
+    const read = await tool(token, 'fetch', { id: 'bbbbbb' });
+    expect(read.body.result?.structuredContent).toMatchObject({
+      id: 'bbbbbb',
+      title: 'Team plan',
+      url: `${ORIGIN}/d/bbbbbb/`,
+    });
+
+    // Leaving the directory ends it.
+    snapshot = snapshotWith([]);
+    expect((await mcp(token, 'tools/list')).status).toBe(403);
+  });
+
+  it('keeps reading after a refresh, with a rotated refresh token', async () => {
+    const { clientId, tokens } = await connect('user-member');
+    const response = await call(
+      new Request(`${ORIGIN}/auth/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: tokens.refresh_token,
+          client_id: clientId,
+        }),
+      }),
+    );
+    const refreshed = (await response.json()) as {
+      access_token: string;
+      refresh_token: string;
+    };
+    expect(refreshed.refresh_token).not.toBe(tokens.refresh_token);
+    const read = await tool(refreshed.access_token, 'fetch', { id: 'aaaaaa' });
+    expect(read.body.result?.structuredContent).toMatchObject({ id: 'aaaaaa' });
+  });
+
+  it('accepts no other bearer: not a machine key, not a made-up token', async () => {
+    for (const token of ['kbk_not-for-mcp', 'made-up']) {
+      expect((await mcp(token, 'tools/list')).status).toBe(401);
+    }
+  });
+
+  it('logs tool calls without the query, the person or the document', async () => {
+    const { tokens } = await connect('user-member');
+    await tool(tokens.access_token, 'search', { query: 'secret plans' });
+    const logged = JSON.stringify(events);
+    expect(logged).toContain('"tool":"search"');
+    expect(logged).not.toContain('secret plans');
+    expect(logged).not.toContain('user-member');
+    expect(logged).not.toContain('Handbook');
+  });
+});

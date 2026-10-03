@@ -89,7 +89,14 @@ export function withPolicy(
     path,
     policy,
     map,
-  }: { path: string; policy: CachePolicy; map: AccessMapFile },
+    ownPolicy = false,
+  }: {
+    path: string;
+    policy: CachePolicy;
+    map: AccessMapFile;
+    /** The Worker wrote this page's Content Security Policy itself. */
+    ownPolicy?: boolean;
+  },
 ): Response {
   const headers = new Headers(response.headers);
   const html = (headers.get('Content-Type') ?? '').startsWith('text/html');
@@ -113,7 +120,7 @@ export function withPolicy(
       headers.set('Content-Type', type);
     }
   }
-  if (html) {
+  if (html && !(ownPolicy && headers.has('Content-Security-Policy'))) {
     headers.set('Content-Security-Policy', contentSecurityPolicy(map));
   }
   return new Response(response.body, {

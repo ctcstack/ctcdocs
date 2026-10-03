@@ -3,18 +3,26 @@ import { describe, expect, it } from 'vitest';
 
 import { buildAgentCatalog } from './agent-catalog.js';
 
+type Field = 'shortId' | 'title' | 'modified';
+
 const document = (
   slug: string,
   extra: Partial<CorpusDocument> = {},
-): CorpusDocument => ({
-  id: `drive-${slug}`,
-  parentId: null,
-  slug,
-  shortId: `${slug.length}a${slug.length}b`,
-  title: `Title of ${slug}`,
-  modified: '2026-10-01T00:00:00.000Z',
-  ...extra,
-});
+  without: readonly Field[] = [],
+): CorpusDocument => {
+  const value: Record<string, unknown> = {
+    id: `drive-${slug}`,
+    parentId: null,
+    slug,
+    shortId: `${slug.length}a${slug.length}b`,
+    title: `Title of ${slug}`,
+    modified: '2026-10-01T00:00:00.000Z',
+    ...extra,
+  };
+  return Object.fromEntries(
+    Object.entries(value).filter(([key]) => !without.includes(key as Field)),
+  ) as unknown as CorpusDocument;
+};
 
 const projections: Record<string, string> = {
   handbook: '# Handbook\n',
@@ -60,7 +68,7 @@ describe('agent catalog', () => {
   it('leaves out a document without a short ID, a projection or one class', async () => {
     const result = await catalog(
       [
-        document('handbook', { shortId: undefined }),
+        document('handbook', {}, ['shortId']),
         document('missing'),
         document('shared'),
       ],
@@ -91,7 +99,7 @@ describe('agent catalog', () => {
 
   it('falls back to the slug for a title and to null for a time', async () => {
     const result = await catalog(
-      [document('handbook', { title: undefined, modified: undefined })],
+      [document('handbook', {}, ['title', 'modified'])],
       { '/handbook/index.md': 'members' },
     );
     expect(result.documents[0]).toMatchObject({
