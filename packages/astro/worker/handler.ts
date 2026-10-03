@@ -491,13 +491,18 @@ async function route(
     }
   }
   if (fileClass === undefined) {
+    /*
+     * The 404 page is asked for by its canonical address: with
+     * `auto-trailing-slash`, `/404.html` answers a redirect to `/404`, which
+     * the gate does not follow. A store without that handling answers `/404`
+     * with the same page through its 404 handling.
+     */
     const missing = await context.assets.fetch(
-      new Request(new URL('/404.html', environment.origin), {
-        redirect: 'manual',
-      }),
+      new Request(new URL('/404', environment.origin), { redirect: 'manual' }),
     );
+    const page = missing.ok || missing.status === 404;
     return withPolicy(
-      missing.ok
+      page
         ? new Response(missing.body, { status: 404, headers: missing.headers })
         : new Response('Not found', { status: 404 }),
       { path: '/404.html', policy: 'content', map },
@@ -524,8 +529,13 @@ async function route(
    * a `_redirects` rule, say — would hand over another file's bytes under
    * this path's class, so it is never followed.
    */
+  // With `auto-trailing-slash` the store serves `x.html` at `/x` and answers
+  // `/x.html` with a redirect, so a file is fetched by its canonical address.
+  const stored = /[^/]\.html$/u.test(path)
+    ? path.slice(0, -'.html'.length)
+    : path;
   const response = await context.assets.fetch(
-    new Request(new URL(sitePath(path), environment.origin), {
+    new Request(new URL(sitePath(stored), environment.origin), {
       method: request.method === 'HEAD' ? 'HEAD' : 'GET',
       headers,
       redirect: 'manual',

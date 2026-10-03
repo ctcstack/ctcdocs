@@ -39,14 +39,30 @@ async function sha256Hex(text) {
     .join('');
 }
 
-/** A file in `dist` by the path the gate asks for, as the asset store would. */
+/**
+ * A file in `dist` by the path the gate asks for, as the asset store would with
+ * `auto-trailing-slash`: `/x/` is `x/index.html`, and `/x` may be `x.html`.
+ */
 function assetsFrom(distRoot) {
+  const read = (file) => readFile(resolve(distRoot, `.${file}`));
   return {
     async fetch(request) {
       const path = decodeURIComponent(new URL(request.url).pathname);
-      const file = path.endsWith('/') ? `${path}index.html` : path;
+      if (path.endsWith('.html')) {
+        return new Response(null, {
+          status: 307,
+          headers: { Location: path.replace(/(index)?\.html$/u, '') },
+        });
+      }
+      let file = path.endsWith('/') ? `${path}index.html` : path;
+      if (!extname(file)) {
+        file = await read(file).then(
+          () => file,
+          () => `${file}.html`,
+        );
+      }
       try {
-        const body = await readFile(resolve(distRoot, `.${file}`));
+        const body = await read(file);
         return new Response(request.method === 'HEAD' ? null : body, {
           headers: {
             'Content-Type':
@@ -237,9 +253,12 @@ export async function verifyGate({ projectRoot, distRoot }) {
       403,
       `A key for ${name} read the directory status.`,
     );
-    assert.equal(
-      (await ask('/no-such-page-for-the-denial-suite/', auth)).status,
-      404,
+    const missing = await ask('/no-such-page-for-the-denial-suite/', auth);
+    assert.equal(missing.status, 404);
+    assert.match(
+      missing.headers.get('Content-Type') ?? '',
+      /^text\/html/u,
+      'A missing page was answered without the 404 page.',
     );
     requests += 3;
   }

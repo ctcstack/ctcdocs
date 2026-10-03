@@ -377,6 +377,35 @@ describe('the gate', () => {
     );
   });
 
+  it('serves the 404 page from its canonical address, without a redirect', async () => {
+    const cookie = await sessionCookie('user-member');
+    const store = context({
+      assets: {
+        fetch: async (request: Request) => {
+          const path = new URL(request.url).pathname;
+          // As `auto-trailing-slash` does: the `.html` address redirects.
+          return path === '/404'
+            ? new Response('<h1>Missing</h1>', {
+                headers: { 'Content-Type': 'text/html; charset=utf-8' },
+              })
+            : new Response(null, {
+                status: 307,
+                headers: { Location: '/404' },
+              });
+        },
+      },
+    });
+    const response = await handle(
+      get('/no-such-page', { ...page, Cookie: cookie }),
+      store,
+    );
+    expect(response.status).toBe(404);
+    expect(response.headers.get('Content-Type')).toBe(
+      'text/html; charset=utf-8',
+    );
+    expect(await response.text()).toBe('<h1>Missing</h1>');
+  });
+
   it('never follows a redirect from the asset store', async () => {
     const cookie = await sessionCookie('user-member');
     const redirecting = context({
@@ -674,7 +703,7 @@ describe('the gate', () => {
       context(),
     );
     expect(missing.status).toBe(404);
-    expect(await missing.text()).toBe('asset /404.html');
+    expect(await missing.text()).toBe('asset /404');
     const directory = await handle(
       get('/handbook', { Cookie: cookie }),
       context(),
