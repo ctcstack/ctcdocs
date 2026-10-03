@@ -59,7 +59,12 @@ export function parseWikiBaseUrl(value) {
   return url;
 }
 
-export function markdownPathFromDocsIndex(value) {
+/**
+ * The Markdown route the checks read: the first document every member may
+ * read, when the build's access map says so (ADR-039), so a smoke key that
+ * reads the members class alone can fetch it. Without a map, the first.
+ */
+export function markdownPathFromDocsIndex(value, accessMap = undefined) {
   if (
     typeof value !== 'object' ||
     value === null ||
@@ -68,7 +73,12 @@ export function markdownPathFromDocsIndex(value) {
   ) {
     throw new AccessSmokeError('The AI document index is invalid.');
   }
-  const first = value.documents[0];
+  const open = (document) =>
+    typeof document?.slug === 'string' &&
+    accessMap?.files?.[`/${document.slug}/`] === 'members';
+  const first = accessMap?.enabled
+    ? (value.documents.find(open) ?? value.documents[0])
+    : value.documents[0];
   if (
     typeof first !== 'object' ||
     first === null ||
@@ -97,7 +107,9 @@ function isAccessLoginRedirect(response) {
     const url = new URL(location, response.url || 'https://invalid.example');
     return (
       url.pathname.startsWith('/cdn-cgi/access/') ||
-      url.hostname.endsWith('.cloudflareaccess.com')
+      url.hostname.endsWith('.cloudflareaccess.com') ||
+      // The platform's own Worker sends a reader to sign in (ADR-038).
+      url.pathname === '/auth/sign-in'
     );
   } catch {
     return false;
@@ -173,15 +185,23 @@ async function request(fetchImplementation, url, headers = undefined) {
   });
 }
 
-function serviceHeaders(clientId, clientSecret) {
-  if (!clientId || !clientSecret) {
+/**
+ * How the smoke test proves admission: a machine key the deployment's Worker
+ * issued (ADR-038), an Access service token, or both while Access still
+ * stands in front of the Worker.
+ */
+function serviceHeaders(clientId, clientSecret, machineKey) {
+  const access = clientId && clientSecret;
+  if (!access && !machineKey) {
     throw new AccessSmokeError(
-      'Cloudflare Access service-token credentials are required.',
+      'A machine key (CTCDOCS_MACHINE_KEY) or Cloudflare Access service-token credentials are required.',
     );
   }
   return {
-    [ACCESS_HEADERS[0]]: clientId,
-    [ACCESS_HEADERS[1]]: clientSecret,
+    ...(access
+      ? { [ACCESS_HEADERS[0]]: clientId, [ACCESS_HEADERS[1]]: clientSecret }
+      : {}),
+    ...(machineKey ? { Authorization: `Bearer ${machineKey}` } : {}),
   };
 }
 
@@ -206,6 +226,7 @@ export async function verifyAccessPreflight({
   baseUrl,
   clientId,
   clientSecret,
+  machineKey,
   markdownPath,
   site,
   fetchImplementation = fetch,
@@ -217,7 +238,7 @@ export async function verifyAccessPreflight({
   // behind a network failure.
   const authenticatedHeaders =
     visibility === 'private'
-      ? serviceHeaders(clientId, clientSecret)
+      ? serviceHeaders(clientId, clientSecret, machineKey)
       : undefined;
   const anonymousPaths = [
     '/',
@@ -282,6 +303,43 @@ export async function verifyAccessPreflight({
   );
 }
 
+/**
+ * The independent probe (ADR-038): anonymous requests, no credentials, run on
+ * a schedule of its own rather than as part of a deployment, so a boundary
+ * that disappears between deployments is noticed. A public environment has
+ * no boundary to probe.
+ */
+export async function verifyAnonymousDenial({
+  baseUrl,
+  markdownPath,
+  site,
+  fetchImplementation = fetch,
+}) {
+  const origin = parseWikiBaseUrl(baseUrl);
+  if (visibilityOf(site, origin) === 'public') {
+    console.log('Public deployment: no boundary to probe.');
+    return;
+  }
+  for (const path of [
+    '/',
+    markdownPath,
+    '/llms.txt',
+    '/pagefind/pagefind.js',
+    '/missing-access-boundary-probe',
+  ].filter(Boolean)) {
+    const response = await request(
+      fetchImplementation,
+      uncachedProbe(new URL(path, origin)),
+    );
+    if (!isAccessDenied(response)) {
+      throw new AccessSmokeError(
+        `Anonymous request was admitted: ${path} (${response.status}).`,
+      );
+    }
+    console.log(`Anonymous boundary holds: ${path} (${response.status}).`);
+  }
+}
+
 function isPropagationFailure(error) {
   if (error instanceof AccessSmokeError) {
     return error.retryable;
@@ -309,6 +367,7 @@ export async function verifyPostDeploy({
   baseUrl,
   clientId,
   clientSecret,
+  machineKey,
   markdownPath,
   site,
   fetchImplementation = fetch,
@@ -316,7 +375,7 @@ export async function verifyPostDeploy({
   propagationPollIntervalMs = PROPAGATION_POLL_INTERVAL_MS,
 }) {
   const origin = parseWikiBaseUrl(baseUrl);
-  const headers = serviceHeaders(clientId, clientSecret);
+  const headers = serviceHeaders(clientId, clientSecret, machineKey);
   const checks = [
     {
       path: '/',
@@ -338,6 +397,9 @@ export async function verifyPostDeploy({
       status: 200,
       contentType: 'text/markdown; charset=utf-8',
       content: ['content_hash: "sha256:', '\n# '],
+      // Document content is cached privately and kept out of indexes, by
+      // `_headers` behind Access or by the platform's Worker (ADR-038).
+      headers: { 'cache-control': 'private', 'x-robots-tag': 'noindex' },
     },
     {
       // The index lists the document the Markdown check reads, by the same
@@ -394,6 +456,16 @@ export async function verifyPostDeploy({
             { retryable: true },
           );
         }
+        for (const [name, expected] of Object.entries(check.headers ?? {})) {
+          if (
+            !(response.headers.get(name) ?? '').toLowerCase().includes(expected)
+          ) {
+            throw new AccessSmokeError(
+              `Unexpected ${name} for ${check.path}: ${response.headers.get(name) || 'missing'}.`,
+              { retryable: true },
+            );
+          }
+        }
         const body = await readBoundedText(response, check.maxBytes);
         for (const expected of check.content) {
           if (!body.includes(expected)) {
@@ -422,6 +494,7 @@ export async function verifyPostDeploy({
     baseUrl,
     clientId,
     clientSecret,
+    machineKey,
     markdownPath,
     site,
     fetchImplementation,
@@ -438,6 +511,10 @@ async function main() {
       'utf8',
     ),
   );
+  const accessMap = await readFile(
+    resolve(projectRoot, PROJECT_LAYOUT.accessMapFile),
+    'utf8',
+  ).then(JSON.parse, () => undefined);
   const options = {
     // `||` rather than `??`: an `.env` copied from `.env.example` leaves the
     // override defined but empty, which is not an origin to probe.
@@ -446,7 +523,8 @@ async function main() {
       siteConfig.deployment.environments.production.url,
     clientId: process.env.CF_ACCESS_CLIENT_ID,
     clientSecret: process.env.CF_ACCESS_CLIENT_SECRET,
-    markdownPath: markdownPathFromDocsIndex(docsIndex),
+    machineKey: process.env.CTCDOCS_MACHINE_KEY || undefined,
+    markdownPath: markdownPathFromDocsIndex(docsIndex, accessMap),
     site: siteConfig,
   };
 
@@ -458,8 +536,12 @@ async function main() {
     await verifyPostDeploy(options);
     return;
   }
+  if (mode === '--anonymous') {
+    await verifyAnonymousDenial(options);
+    return;
+  }
   throw new AccessSmokeError(
-    'Usage: ctcdocs-access-smoke <--preflight|--post-deploy>',
+    'Usage: ctcdocs-access-smoke <--preflight|--post-deploy|--anonymous>',
   );
 }
 
