@@ -373,10 +373,12 @@ async function agentRoute(
         serveAgent(gate, agents, request, sub),
       );
     case '/.well-known/oauth-protected-resource':
-      // Some clients look at the root; the one resource is `/mcp`.
+      // Some clients look at the root; the one resource is `/mcp`. The
+      // request's headers go along, so a browser client gets its CORS.
       return oauth.protect(
         new Request(`${gate.origin}/.well-known/oauth-protected-resource/mcp`, {
           method: request.method,
+          headers: request.headers,
         }),
         () => Promise.resolve(new Response(null, { status: 404 })),
       );
