@@ -332,7 +332,9 @@ findings, under its priority:
   and text files, presentations, archives, images, diagrams, spreadsheets,
   video and audio, other files, shortcuts — and PDFs with no readable text or
   too large for the site; files in one folder the site cannot tell apart; a
-  merged cell split, formatting removed.
+  merged cell split, formatting removed; a document longer than AI agents read,
+  `mcp.fetchCharacters`
+  ([ADR-043](ADR/043-content-health-names-documents-too-long-to-read-whole.md)).
 - **Improve**: images with no alt text
   ([ADR-029](ADR/029-say-when-an-image-has-no-alt-text.md)), a page with no
   summary, images larger than `sync.largeImageMegabytes` (2 MB unless the
@@ -340,7 +342,9 @@ findings, under its priority:
   link to a heading that opens the top of a page, a PDF only partly
   searchable, a heading that skips a level and a heading with the words of an
   earlier one ([ADR-034](ADR/034-check-headings-summaries-and-outside-links.md)),
-  a second landing document.
+  a second landing document, a document longer than
+  `sync.largeDocumentCharacters` (40,000 characters unless the project sets
+  it), worth splitting, and a long PDF.
 - **Tidy up**: Drive names with "Copy of", a file extension, underscores or
   extra spaces; order numbers used twice or not read; an ignored folder that
   is no longer there.

@@ -167,13 +167,15 @@ describe('createNotes', () => {
         record('one', 'team/brief'),
       ]),
       {
-        largeImageMegabytes: 2,
-        imageBytes: new Map([
-          ['heavy', [4_330_000, 150_000, 2_100_000]],
-          // An image of exactly the limit is not over it.
-          ['light', [1_990_000, 2_000_000]],
-          ['one', [2_500_000]],
-        ]),
+        images: {
+          largeImageMegabytes: 2,
+          imageBytes: new Map([
+            ['heavy', [4_330_000, 150_000, 2_100_000]],
+            // An image of exactly the limit is not over it.
+            ['light', [1_990_000, 2_000_000]],
+            ['one', [2_500_000]],
+          ]),
+        },
       },
     );
 
@@ -189,6 +191,98 @@ describe('createNotes', () => {
         note: 'image-large',
         name: 'Plan',
         detail: '2 images over 2 MB, the largest 4.3 MB',
+      },
+    ]);
+  });
+
+  it('notes a document too long to read whole, by the line it is over', () => {
+    const notes = createNotes(
+      corpus([
+        item('line', 'Brief', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('long', 'Plan', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('edge', 'Guide', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('cut', 'Handbook', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('unmeasured', 'Notes', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+      ]),
+      manifestOf([
+        record('line', 'team/brief'),
+        record('long', 'team/plan'),
+        record('edge', 'team/guide'),
+        record('cut', 'team/handbook'),
+        record('unmeasured', 'team/notes'),
+      ]),
+      {
+        documents: {
+          largeDocumentCharacters: 40_000,
+          fetchCharacters: 100_000,
+          characters: new Map([
+            // A document of exactly a line is not over it.
+            ['line', 40_000],
+            ['long', 52_341],
+            ['edge', 100_000],
+            ['cut', 130_512],
+          ]),
+        },
+      },
+    );
+
+    // Over both lines, a document gets the one note that matters more.
+    expect(
+      notes.map(({ note, name, detail }) => ({ note, name, detail })),
+    ).toEqual([
+      {
+        note: 'document-long',
+        name: 'Guide',
+        detail: '100,000 characters, over 40,000',
+      },
+      {
+        note: 'document-long',
+        name: 'Plan',
+        detail: '52,341 characters, over 40,000',
+      },
+      {
+        note: 'document-over-agent-limit',
+        name: 'Handbook',
+        detail: '130,512 characters; AI agents read the first 100,000',
+      },
+    ]);
+  });
+
+  it('notes a long PDF without telling its editor to split it', () => {
+    const pdf = (id: string, slug: string): SyncedDocumentRecord => ({
+      ...record(id, slug),
+      exportMode: 'pdf',
+    });
+    const notes = createNotes(
+      corpus([
+        item('long', 'Plan.pdf', GOOGLE_DRIVE_PDF_MIME_TYPE, 'team'),
+        item('cut', 'Handbook.pdf', GOOGLE_DRIVE_PDF_MIME_TYPE, 'team'),
+      ]),
+      manifestOf([pdf('long', 'team/plan'), pdf('cut', 'team/handbook')]),
+      {
+        documents: {
+          largeDocumentCharacters: 40_000,
+          fetchCharacters: 100_000,
+          characters: new Map([
+            ['long', 52_341],
+            ['cut', 130_512],
+          ]),
+        },
+      },
+    );
+
+    expect(
+      notes.map(({ note, name, detail }) => ({ note, name, detail })),
+    ).toEqual([
+      {
+        note: 'pdf-long',
+        name: 'Handbook.pdf',
+        detail: '130,512 characters; AI agents read the first 100,000',
+      },
+      {
+        note: 'pdf-long',
+        name: 'Plan.pdf',
+        detail: '52,341 characters, over 40,000',
       },
     ]);
   });

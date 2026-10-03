@@ -36,7 +36,9 @@ was not settled, which ADR-037 ranks under Improve.
 **The sync measures every published document.** Its length is the number of
 characters of the Markdown body the sync writes for it, without the front
 matter: the text the site's projection serves and `fetch` returns. It is
-counted the same way on every run, so the notes are deterministic.
+counted as `fetch` counts it, and the same way on every run, so the notes are
+deterministic. It is read from the output the run writes, as image sizes are,
+so a changed line applies on the next run without exporting anything again.
 
 **Two steps, two priorities.**
 
@@ -48,6 +50,9 @@ counted the same way on every run, so the notes are deterministic.
   100,000 characters by default, it is noted under **Fix next**: assistants
   read only its beginning, and do not see the rest.
 
+A document over both lines gets the one note, under Fix next, which says to
+split it too.
+
 **A PDF is noted, not told to split.** A PDF over either line is noted under
 Improve with its length, and, over the second, that assistants read only its
 beginning.
@@ -57,15 +62,18 @@ hard to read on the site.
 
 **Both lines are the project's.** `sync.largeDocumentCharacters` is
 optional, a whole number above 0 and no greater than the limit; anything else
-is a configuration error. The limit is `mcp.fetchCharacters`, the cut `fetch`
+is a configuration error. Unset, it is 40,000, or the limit where the limit is
+lower, so that a project that lowers only the limit is still valid. The limit is `mcp.fetchCharacters`, the cut `fetch`
 makes (ADR-042), 100,000 unless the project sets another; with MCP off, its
 default. The note and the cut read the same setting, so they cannot drift
 apart.
 
 **Each new note code is ranked** on the content health page, as ADR-037
 requires of every code, and the unit test that reads the fixture reports
-fails on one without a rank. The fixture corpus gains a document over each
-line.
+fails on one without a rank: `document-over-agent-limit` under Fix next,
+`document-long` and `pdf-long` under Improve. The fixture corpus gains a
+document over each line; the fixture project sets both lines low, so that
+those documents stay short.
 
 ## Consequences
 

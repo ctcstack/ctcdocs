@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
+import { parseSiteConfiguration } from '@ctcstack/ctcdocs-core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { parseSyncConfiguration } from './config.js';
@@ -29,6 +30,7 @@ import {
   gridRectangle,
 } from './test-support/png-fixture.js';
 import {
+  TEST_SITE_CONFIGURATION_INPUT,
   testSiteConfiguration,
   testSyncContext,
 } from './test-support/project-fixture.js';
@@ -982,6 +984,82 @@ describe('basic Markdown sync', () => {
     const raised = await run(3);
     expect(raised.report.summary.exported).toBe(0);
     expect(large(raised)).toEqual([]);
+  });
+
+  it('notes a document by the length of the body it publishes', async () => {
+    const repository = await mkdtemp(resolve(tmpdir(), 'kb-sync-long-'));
+    temporaryDirectories.push(repository);
+    /*
+     * Under the title, which the page shows as its heading, fifty paragraphs
+     * of 901 characters: 45,148 with the blank lines between them.
+     */
+    const paragraph = `${'Plain words. '.repeat(69)}End.`;
+    const markdown = `# Architecture\n\n${Array.from({ length: 50 }, () => paragraph).join('\n\n')}\n`;
+    const run = (
+      sync: Record<string, unknown>,
+      mcp?: Record<string, unknown>,
+    ) =>
+      runBasicMarkdownSync(
+        createSyncContext(
+          repository,
+          parseSiteConfiguration({
+            ...TEST_SITE_CONFIGURATION_INPUT,
+            sync: { ...TEST_SITE_CONFIGURATION_INPUT.sync, ...sync },
+            ...(mcp ? { mcp } : {}),
+          }),
+        ),
+        configuration,
+        tokenProvider,
+        { dryRun: false, full: false },
+        {
+          inventoryResult: inventory(),
+          markdownExporter: {
+            exportMarkdown: () =>
+              Promise.resolve(new TextEncoder().encode(markdown)),
+            exportHtmlZip: () => Promise.reject(new Error('No archive.')),
+          },
+          documentInspector: {
+            inspectDocument: () =>
+              Promise.resolve({
+                hasEmbeddedDrawings: false,
+                hasImages: false,
+                inlineObjectCount: 0,
+                positionedObjectCount: 0,
+                tabCount: 1,
+              }),
+          },
+          now: () => new Date(firstTimestamp),
+        },
+      );
+    const long = (result: Awaited<ReturnType<typeof run>>) =>
+      result.report.notes
+        .filter((note) => note.note.startsWith('document-'))
+        .map(({ id, note, detail }) => ({ id, note, detail }));
+
+    // Over the 40,000 characters a project gets unless it sets its own line.
+    expect(long(await run({}))).toEqual([
+      {
+        id: 'doc-one',
+        note: 'document-long',
+        detail: '45,148 characters, over 40,000',
+      },
+    ]);
+
+    // A higher line reads on the next run, without exporting anything again.
+    const raised = await run({ largeDocumentCharacters: 50_000 });
+    expect(raised.report.summary.exported).toBe(0);
+    expect(long(raised)).toEqual([]);
+
+    // Past what `fetch` returns, the line is the cut, and the note says so.
+    expect(
+      long(await run({}, { enabled: true, fetchCharacters: 30_000 })),
+    ).toEqual([
+      {
+        id: 'doc-one',
+        note: 'document-over-agent-limit',
+        detail: '45,148 characters; AI agents read the first 30,000',
+      },
+    ]);
   });
 
   it('crops, once, an image an earlier version published whole', async () => {
