@@ -35,13 +35,21 @@ export function canonicalPath(url: URL): string | undefined {
   return path;
 }
 
+/** Longer return paths would push the sign-in cookie past what browsers keep. */
+const LONGEST_RETURN_PATH = 1024;
+
 /**
  * Where a reader is sent back after signing in: a path on this site only.
  * Anything else — another origin, a protocol-relative address, a path the
  * canonical form refuses — returns them to the home page.
  */
 export function returnPath(value: string | null | undefined): string {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) {
+  if (
+    !value ||
+    value.length > LONGEST_RETURN_PATH ||
+    !value.startsWith('/') ||
+    value.startsWith('//')
+  ) {
     return '/';
   }
   let url: URL;

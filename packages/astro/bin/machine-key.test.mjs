@@ -22,7 +22,7 @@ test('a key the command issues is one the Worker admits until it expires', async
     ]),
     NOW,
   );
-  const records = parseMachineKeys(JSON.stringify([record]));
+  const records = parseMachineKeys([record]);
   assert.equal(records.length, 1);
   const request = new Request('https://docs.example.com/', {
     headers: { Authorization: `Bearer ${key}` },
@@ -79,7 +79,7 @@ test('a missing name or owner, a bad group or a bad lifetime is refused', () => 
       ]),
     /--group takes a group address/u,
   );
-  for (const days of ['0', '366', '1.5', '-1', '']) {
+  for (const days of ['0', '91', '1.5', '-1', '']) {
     assert.throws(
       () =>
         parseMachineKeyArguments([

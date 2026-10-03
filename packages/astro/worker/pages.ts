@@ -1,6 +1,6 @@
 /**
- * The few pages the Worker writes itself (ADR-038): signed out, refused, and
- * why a sign-in failed. They are self-contained, with their styles inline,
+ * The few pages the Worker writes itself (ADR-038): signed out, refused, not
+ * in the directory, and why a sign-in failed. They are self-contained, with their styles inline,
  * because nothing else on the site is served before sign-in.
  */
 
@@ -71,5 +71,14 @@ export function unavailablePage(site: string, reason: string): Response {
     title: 'The site is not ready',
     site,
     body: `<p>${escape(reason)}</p>`,
+  });
+}
+
+export function notInDirectoryPage(site: string): Response {
+  return page(403, {
+    title: 'Your account is not in the directory yet',
+    site,
+    body: `<p>The site reads its list of people from Google every ten minutes. A new account is admitted after the next reading; a suspended or archived one is not.</p>
+<form method="post" action="/auth/sign-out"><button type="submit">Sign out</button></form>`,
   });
 }

@@ -41,6 +41,44 @@ const CONTENT_TYPES: ReadonlyArray<[RegExp, string]> = [
   [/\.txt$/u, 'text/plain; charset=utf-8'],
 ];
 
+/** Browsers reach every environment over HTTPS only, for a year. */
+const TRANSPORT_SECURITY = 'max-age=31536000';
+
+/** A copy of `response` that tells the browser to keep to HTTPS. */
+export function withTransportSecurity(response: Response): Response {
+  const headers = new Headers(response.headers);
+  headers.set('Strict-Transport-Security', TRANSPORT_SECURITY);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+/**
+ * A public environment's response: nothing is private, but the headers
+ * `_headers` would have set behind no Worker still apply — the charset of
+ * Markdown and text, `nosniff`, and a year for fingerprinted assets.
+ */
+export function withPublicPolicy(response: Response, path: string): Response {
+  const headers = new Headers(response.headers);
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('Referrer-Policy', 'same-origin');
+  if (cachePolicyFor(path) === 'immutable') {
+    headers.set('Cache-Control', 'public, max-age=31556952, immutable');
+  }
+  for (const [pattern, type] of CONTENT_TYPES) {
+    if (pattern.test(path) && response.ok) {
+      headers.set('Content-Type', type);
+    }
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 /** A copy of `response` with the policy's headers. */
 export function withPolicy(
   response: Response,

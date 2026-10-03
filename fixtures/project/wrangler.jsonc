@@ -6,7 +6,8 @@
 // A private deployment is served through the platform's Worker, which runs
 // before every asset and is bundled with the build's access map (ADR-038).
 // Secrets, set with `wrangler secret put`: GOOGLE_CLIENT_SECRET,
-// SESSION_SECRET, and optionally SESSION_SECRET_PREVIOUS and MACHINE_KEYS.
+// SESSION_SECRET, and optionally SESSION_SECRET_PREVIOUS. Machine keys are
+// records in the KB_STATE namespace, which the deploy token cannot write.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "example-docs",

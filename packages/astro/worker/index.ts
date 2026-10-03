@@ -3,11 +3,13 @@
  * entry point around the web-standard gate in `handler.ts`.
  *
  * Only this file knows it runs on Cloudflare: the asset binding, the KV
- * namespace holding the directory snapshot, and the secrets.
+ * namespace holding the directory snapshot and the machine keys, and the
+ * secrets.
  */
 import accessMap from 'ctcdocs-access-map';
 
 import { handle } from './handler.js';
+import { MACHINE_KEYS_KEY } from './machine-keys.js';
 import { GoogleKeys } from './oidc.js';
 import {
   isSnapshot,
@@ -22,12 +24,12 @@ interface Env {
   readonly GOOGLE_CLIENT_SECRET?: string;
   readonly SESSION_SECRET?: string;
   readonly SESSION_SECRET_PREVIOUS?: string;
-  readonly MACHINE_KEYS?: string;
 }
 
-/** The snapshot is read at most once a minute per isolate. */
-const SNAPSHOT_CACHE_MS = 60_000;
+/** The snapshot and the machine keys are read at most once a minute per isolate. */
+const STATE_CACHE_MS = 60_000;
 let cached: { at: number; value: DirectorySnapshot | undefined } | undefined;
+let cachedKeys: { at: number; value: unknown } | undefined;
 
 const googleKeys = new GoogleKeys(
   (input, init) => fetch(input, init),
@@ -41,18 +43,27 @@ export default {
       assets: env.ASSETS,
       snapshot: async () => {
         const now = Date.now();
-        if (!cached || now - cached.at > SNAPSHOT_CACHE_MS) {
+        if (!cached || now - cached.at > STATE_CACHE_MS) {
           const value = await env.KB_STATE.get(SNAPSHOT_KEY, 'json');
           cached = { at: now, value: isSnapshot(value) ? value : undefined };
         }
         return cached.value;
+      },
+      machineKeys: async () => {
+        const now = Date.now();
+        if (!cachedKeys || now - cachedKeys.at > STATE_CACHE_MS) {
+          cachedKeys = {
+            at: now,
+            value: await env.KB_STATE.get(MACHINE_KEYS_KEY, 'json'),
+          };
+        }
+        return cachedKeys.value;
       },
       secrets: {
         googleClientId: env.GOOGLE_CLIENT_ID,
         googleClientSecret: env.GOOGLE_CLIENT_SECRET,
         sessionSecret: env.SESSION_SECRET,
         previousSessionSecret: env.SESSION_SECRET_PREVIOUS,
-        machineKeys: env.MACHINE_KEYS,
       },
       fetch: (input, init) => fetch(input, init),
       now: () => Date.now(),
