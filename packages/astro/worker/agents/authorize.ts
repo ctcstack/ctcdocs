@@ -256,7 +256,8 @@ export async function finishConnection(
     const resumed = await context.oauth.api.finishUpstream(request);
     const person = await context.signedIn();
     if (!person) {
-      // The sign-in did not hold: the assistant is told, and may ask again.
+      // Google refused the sign-in, or it did not hold: the assistant is
+      // told, and may ask again.
       return redirect(
         context.oauth.errorRedirect(resumed.request, 'access_denied'),
         resumed.headers,
