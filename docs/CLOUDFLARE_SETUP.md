@@ -21,6 +21,9 @@ A deployment is two Workers per environment and one KV namespace:
 | The directory Worker     | `wrangler.directory.jsonc` | The directory reader's key; a schedule; no route                 |
 | The `KB_STATE` namespace | both files                 | The directory snapshot, the groups' pinned IDs, the machine keys |
 
+With the MCP server on, the site Worker also has its OAuth namespace, a bucket
+of documents and an AI Search instance; see [The MCP server](#the-mcp-server).
+
 A deployment is gated — served through the Worker — when any of its
 environments is private. A wholly public deployment is a plain Workers Static
 Assets site with neither Worker nor namespace; most of this page does not apply
@@ -102,6 +105,85 @@ Machine keys are not secrets of the Worker but records in the KV namespace; see
 
 Without the client or the session secret the Worker admits no one and says the
 site is not configured; it never falls open.
+
+## The MCP server
+
+With `mcp.enabled` in `site.config.json`
+([ADR-041](ADR/041-agents-read-the-site-through-an-mcp-server-as-their-reader.md)),
+the site Worker also serves `/mcp` and its OAuth routes, publishes each
+document's Markdown to an R2 bucket, and searches it through AI Search. Each
+environment needs three more resources:
+
+| Piece                 | Binding        | What it holds                                                          |
+| --------------------- | -------------- | ---------------------------------------------------------------------- |
+| A KV namespace        | `OAUTH_KV`     | Registered clients, grants and tokens, hashed; the OAuth library's own |
+| An R2 bucket          | `KB_DOCUMENTS` | `docs/<short ID>.md` per document, with its class as metadata; private |
+| An AI Search instance | `KB_SEARCH`    | The index of that bucket                                               |
+
+Create them once per environment:
+
+```bash
+pnpm exec wrangler kv namespace create example-docs-production-oauth
+pnpm exec wrangler r2 bucket create example-docs-production-documents
+```
+
+The AI Search instance reads R2 with the account's AI Search service token.
+Create it once per account under **AI Search → API tokens** in the dashboard,
+then the instance:
+
+```bash
+pnpm exec wrangler ai-search create example-docs-production-search \
+  --type r2 --source example-docs-production-documents --hybrid-search true \
+  --custom-metadata class:text --custom-metadata title:text \
+  --custom-metadata short_id:text
+```
+
+Then set its **Sync interval** to 15 minutes in the dashboard: a backstop for
+a sync the Worker could not start. Do not enable the instance's public
+endpoint, its MCP endpoint or a custom domain for it: the Worker is the only
+way in, because only the Worker knows who is asking.
+
+Add to `wrangler.jsonc`:
+
+```jsonc
+{
+  "compatibility_flags": ["global_fetch_strictly_public"],
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "env": {
+    "production": {
+      "kv_namespaces": [
+        { "binding": "KB_STATE", "id": "<state namespace ID>" },
+        { "binding": "OAUTH_KV", "id": "<OAuth namespace ID>" },
+      ],
+      "r2_buckets": [
+        {
+          "binding": "KB_DOCUMENTS",
+          "bucket_name": "example-docs-production-documents",
+        },
+      ],
+      "ai_search": [
+        {
+          "binding": "KB_SEARCH",
+          "instance_name": "example-docs-production-search",
+        },
+      ],
+    },
+  },
+}
+```
+
+- `global_fetch_strictly_public` lets the OAuth library read an assistant's
+  client metadata document safely.
+- The cron runs the Worker's publishing: every five minutes it compares the
+  build's list of documents with what it last published and, when they
+  differ, rewrites what changed and starts a sync. A deploy or a rollback
+  reaches the bucket within five minutes, and search follows once the sync
+  ends.
+- The directory Worker takes none of these.
+
+The Google client needs nothing new: a connection signs in through the
+existing `/auth/callback`. The deploy token needs nothing new either: deploying
+a Worker with these bindings needs only the Worker permission it has.
 
 ## The directory Worker
 

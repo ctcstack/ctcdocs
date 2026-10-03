@@ -41,8 +41,9 @@ docs/              architecture decisions, configuration reference, runbooks
 them. `packages/astro` ships its `.astro`, `.ts` and `.css` sources unbuilt, the
 way Starlight does, because the consuming project's Astro build compiles them;
 its `worker/` is bundled by the project's Wrangler. The Worker code uses
-web-standard APIs only, with Cloudflare confined to its two entry files, so a
-deployment can move to another host without rewriting its gate.
+web-standard APIs only, with Cloudflare confined to its two entry files and
+the MCP server's OAuth adapter (`worker/agents/oauth.ts`), so a deployment can
+move to another host without rewriting its gate.
 
 ## Product invariants
 
@@ -63,10 +64,13 @@ deployment can move to another host without rewriting its gate.
   a folder without a rule is closed to all but administrators, and a move in
   Drive never gives a document readers it did not have until a rule on its new
   place is confirmed.
-- Do not add server-side rendering, a database, semantic search, vector
-  storage, or an LLM content transformation. The Worker decides who may read a
-  file; it never renders or changes one. Its only state is in KV: the
-  directory snapshot, the groups' pins and the machine keys.
+- Do not add server-side rendering, a database, or an LLM content
+  transformation. The Worker decides who may read a file; it serves pages and
+  files as built and never changes one. Its state is the directory snapshot,
+  the groups' pins and the machine keys in KV and, when the MCP server is on
+  (ADR-041), the OAuth library's own KV namespace and a copy of each
+  document's Markdown in R2, which AI Search indexes. Neither the bucket nor
+  the index decides access: the access map does, on every request.
 - Do not broaden scope to Sheets, Slides, comments, suggestions, webhooks, or
   bidirectional editing.
 

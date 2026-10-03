@@ -66,10 +66,12 @@ Rejected
 - ADR-037: rank the content health page by priority. Supersedes ADR-024 and
   ADR-028 in part, and ADR-011 in part for status colors on that page.
 - ADR-038: a private deployment signs readers in itself, with Google.
-  Supersedes ADR-004, and ADR-016, ADR-010 and ADR-007 in part.
+  Supersedes ADR-004, and ADR-016, ADR-010 and ADR-007 in part. Superseded in
+  part by ADR-041.
 - ADR-039: open a folder only to the Google groups its rule names. Supersedes
   ADR-033, ADR-032, ADR-024 and ADR-037 in part.
 - ADR-040: a Worker cron keeps a snapshot of group membership.
 - ADR-041: agents read the site through an MCP server, as their reader.
+  Supersedes ADR-038 in part.
 
 Create a new ADR by copying `000-template.md`.

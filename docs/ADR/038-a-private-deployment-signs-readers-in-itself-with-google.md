@@ -1,6 +1,9 @@
 # ADR-038: A private deployment signs readers in itself, with Google
 
-- Status: Accepted
+- Status: Accepted; superseded in part by
+  [ADR-041](041-agents-read-the-site-through-an-mcp-server-as-their-reader.md),
+  under which the OAuth library, the documents bucket and the AI Search
+  instance join the four adapters, and any MCP client may connect
 - Date: 2026-10-02
 - Owners: CTCDocs maintainers
 - Supersedes: ADR-004; ADR-016 in part: how a private deployment
