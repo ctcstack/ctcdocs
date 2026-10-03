@@ -3,182 +3,197 @@
 - Status: Proposed
 - Date: 2026-10-03
 - Owners: CTCDocs maintainers
-- Supersedes: none
+- Supersedes: ADR-038 in part: what may be specific to Cloudflare (an OAuth
+  library, an R2 bucket and an AI Search instance join its four adapters), and
+  how MCP clients sign in (any client may connect; there is no list of allowed
+  ones)
 
 ## Context
 
 People want the knowledge base inside the AI assistants they already use —
-claude.ai and ChatGPT first — and they must see there exactly what they may
-read on the site: the same folders, the same groups, the same end when they
-leave (ADR-038, ADR-039, ADR-040).
+claude.ai, ChatGPT, Claude Code, Cursor — from whatever account they use them
+with. They must see there exactly what they may read on the site (ADR-039),
+for as long as they are in the Workspace (ADR-040). Connecting has to be as
+simple as pasting one address and signing in.
 
-Both assistants connect to remote servers that speak the Model Context
-Protocol over Streamable HTTP, from their own infrastructure, and sign the
-person in with OAuth. As of this decision:
+What the clients expect, as of this decision:
 
-- The MCP authorization specification makes the MCP server an OAuth 2.1
-  resource server that publishes Protected Resource Metadata (RFC 9728) and
-  answers an unauthenticated request with `401` and a `WWW-Authenticate`
-  challenge pointing at it. The authorization server publishes RFC 8414
-  metadata, requires PKCE with S256, binds every token to one resource
-  (RFC 8707), and should return `iss` in its authorization response
-  (RFC 9207). A server must not accept a token issued for anything else, nor
-  pass one on.
-- Clients register by a Client ID Metadata Document (CIMD), preferred by both
-  assistants, or by Dynamic Client Registration (DCR), which the latest
-  revision deprecates but keeps, and which claude.ai falls back to.
-- claude.ai redirects to `https://claude.ai/api/mcp/auth_callback`, calls
-  from a published address range, and on Team and Enterprise plans an owner
-  adds a connector once for the organization; each member then connects with
-  their own account.
-- ChatGPT uses `https://chatgpt.com/connector_platform_oauth_redirect` when
-  the authorization server meets RFC 9207. Its deep research and company
-  knowledge modes require two read-only tools named `search` and `fetch`
-  with fixed shapes.
-- The protocol's latest revision is stateless; older clients still open with
-  `initialize`. Neither needs a session on the server.
-- Pagefind has no supported search outside a browser, and a Worker cannot
-  instantiate WebAssembly from bytes, which Pagefind's runtime does.
-- Cloudflare's `workers-oauth-provider` (1.2) implements the authorization
-  and resource server roles in a Worker — CIMD, DCR, PKCE, RFC 9207, resource
-  binding, rotating refresh tokens, hashed storage in Workers KV, encrypted
-  per-grant properties — and leaves the sign-in and consent step to the
-  application. Cloudflare's `createMcpHandler` serves stateless MCP without
-  Durable Objects.
+- A remote MCP server over Streamable HTTP. The current revision (2026-07-28)
+  is stateless; older clients still open with `initialize`, and neither needs
+  a session on the server. An unauthenticated request gets `401` with a
+  pointer to the server's Protected Resource Metadata (RFC 9728). The
+  authorization server publishes RFC 8414 metadata, requires PKCE with S256
+  and binds each token to the server (RFC 8707).
+- A client identifies itself by a Client ID Metadata Document (CIMD) —
+  claude.ai, Claude Code and ChatGPT each publish one — or registers itself
+  dynamically (DCR), which other clients still rely on.
+- ChatGPT uses its stable callback only when the authorization server returns
+  `iss` (RFC 9207), and keeps refreshing only when `offline_access` is
+  advertised. Its company knowledge uses only servers whose read-only `search`
+  and `fetch` tools have a fixed shape.
+- Cloudflare's `workers-oauth-provider` (1.2) is an OAuth authorization and
+  resource server for Workers: CIMD, DCR, PKCE, `iss`, resource binding,
+  rotating refresh tokens, hashed storage in a KV namespace bound as
+  `OAUTH_KV`, and consent helpers. Sign-in is left to the application.
+  `createMcpHandler` serves stateless MCP without Durable Objects.
+- Cloudflare AI Search indexes an R2 bucket with hybrid keyword and vector
+  search, filters by up to five custom metadata fields set on the objects,
+  and is reached from a Worker through a binding. It is in open beta and free
+  within its limits. Its own MCP endpoint does not know who is asking, so it
+  cannot be the server itself.
+- Pagefind cannot search inside a Worker: its runtime compiles WebAssembly
+  from bytes, which Workers forbid.
 
-Machines that act for no person — a chat bot, an internal agent — already
-read with machine keys (ADR-038). Agents can already read the Markdown
-projections and `llms.txt`, but only with a key, and an assistant's chat
-surface cannot add a header.
+Bots already read the Markdown projections and `llms.txt` with machine keys
+(ADR-038, ADR-033). That stays as it is.
+
+References: the MCP authorization specification
+(<https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization>),
+OpenAI's MCP tool shapes (<https://developers.openai.com/api/docs/mcp>),
+Claude's connector authentication
+(<https://claude.com/docs/connectors/building/authentication>),
+`workers-oauth-provider` (<https://github.com/cloudflare/workers-oauth-provider>)
+and AI Search (<https://developers.cloudflare.com/ai-search/>).
 
 ## Decision
 
-### The server
+### Connecting
 
-**The deployment's Worker serves MCP at `/mcp`**, on the site's own hostname,
-over stateless Streamable HTTP. It answers both the current revision and
-clients that still open with `initialize`, and keeps no session. The tools
-are read-only and carry `readOnlyHint` and a title:
+**The deployment's Worker serves MCP at `/mcp`**, on the site's own hostname.
+A person adds `https://<host>/mcp` to their assistant — any assistant, any
+account — and signs in with their Workspace Google account. Nothing else is
+set up per person or per assistant.
 
-- `search` — a query in, results out as `{ id, title, url }`, in the shape
-  ChatGPT requires; the `url` is the document's page, so answers cite it;
-- `fetch` — a document's `id` in, its Markdown projection out as
-  `{ id, title, text, url, metadata }`, cut to the size the clients accept;
-- `browse` — a folder's address in, its subfolders and documents out, so an
-  assistant can follow the site's own order.
+**The Worker is the authorization server, with `workers-oauth-provider`.** It
+accepts both CIMD and DCR, so any MCP client can connect, and keeps no list of
+allowed clients: who may read is decided by the sign-in, not by the client.
+Its endpoints sit under `/auth/` beside the sign-in routes, its metadata under
+`/.well-known/`. The gate hands these and `/mcp` to the library after its host
+and HTTPS checks, and their answers carry the gate's headers. `mcp` becomes a
+reserved slug, as `auth` is.
 
-Every answer is decided by the same classes and the same snapshot as a page:
-a document the reader may not open is neither found, fetched nor listed, and
-a closed document's title appears only where a member would see it on the
-site (ADR-039).
+**Authorizing is one confirmation and the usual sign-in:**
 
-### Who is asking
+1. One page, from the library's consent helpers, names the client and where
+   it returns, with one button. It cannot be framed, and its CSP lets the form
+   return to that client's redirect URI.
+2. The person signs in with Google (ADR-038), or their live session is used,
+   and the snapshot must list them as active (ADR-040).
+3. The grant is completed with the person's `sub` as its user and nothing
+   else.
 
-**The Worker is the authorization server too**, with `workers-oauth-provider`
-for the protocol. It publishes the metadata both documents name, advertises
-CIMD and S256 and returns `iss`, and keeps its clients, grants and tokens in a
-KV namespace of their own, which the deploy token cannot write.
+**Access tokens live an hour.** Refresh tokens rotate and last 30 days from
+the sign-in, after which the person connects again. `offline_access` is
+advertised so that clients keep refreshing.
 
-**Signing in to an assistant is signing in to the site.** The authorization
-step is ours:
+### Every request is checked like a page
 
-1. it looks up the client, and refuses one whose redirect URI is not on the
-   deployment's allow-list — by default the two assistants' callbacks and
-   Claude Code's loopback;
-2. it shows a consent page that names the client and its exact redirect URI,
-   carries a CSRF token and cannot be framed;
-3. it signs the reader in with Google through the existing client
-   (ADR-038), or takes their live session, and requires the snapshot to list
-   them as active (ADR-040);
-4. it completes the grant with the reader's `sub` as its only property.
+A token must be ours, unexpired and bound to `/mcp`. Its `sub` must be active
+in the snapshot, and the reader's groups — so their classes — are read from
+the snapshot on each request, not from the grant. A change of groups or a
+departure applies within the snapshot's refresh, about ten minutes, and
+nothing stored in a grant can widen what it reads. An admin reads what an
+admin reads on the site.
 
-DCR stays on for claude.ai's fallback; the allow-list, the consent page and a
-Workspace sign-in are what stand between a registered client and the corpus.
+Machine keys are not accepted at `/mcp`. Bots keep reading over HTTP with
+their keys.
 
-**Every MCP request is checked like a session.** The token must be ours,
-unexpired and bound to this server's `/mcp`. Its `sub` must be an active user
-in the snapshot, and its groups come from the snapshot at that moment, not
-from the grant: a change of groups takes effect within the snapshot's ten
-minutes, a departure ends every grant at once, and a stale snapshot serves
-the members class only. An admin reads everything, as on the site. Access
-tokens live an hour and refresh tokens rotate; a grant lasts as long as the
-library's default allows and is revoked by the client's revocation request or
-by an admin.
+### Documents in R2, search in AI Search
 
-**Machine keys work at `/mcp` too**, as the groups they were issued, never as
-an admin, so a bot uses the same tools as an assistant.
+**Each deploy publishes the documents to R2.** After the Worker is deployed,
+the deploy job writes every document's Markdown projection to the
+deployment's private bucket as `docs/<short ID>.md`, with its class, title,
+Markdown address and dates as object metadata. It deletes the objects of
+documents that are gone, then starts an AI Search sync.
 
-### Search
+**AI Search indexes that bucket**: one instance per deployment, hybrid search,
+`class` among its custom metadata fields.
 
-**The build writes a search index per class** for the server, the way it
-writes a Pagefind bundle per class for the browser: titles, headings and body
-text of that class's documents, as a prebuilt MiniSearch index under
-`/_kb/mcp/`. The access map classifies each index as its class, so the gate
-refuses one to anyone outside it. The Worker loads the indexes of the
-reader's classes from the asset store, keeps them in memory for the life of
-the isolate, and merges the results. The leak check covers these files as it
-covers every other.
+**The Worker's own access map still decides.** AI Search is asked with a
+filter on the reader's classes, or none for an admin. Every result, and every
+document `fetch` reads from the bucket, is checked again against the build's
+map by its Markdown address. A bucket or an index that lags a deploy can
+therefore hide a document for a while, never open one.
 
-### Limits and records
+This copy in R2 is the first step of moving generated content out of Git.
+Building the site itself from R2 is a later decision.
 
-**Requests are rate-limited per reader and per machine key** with Workers Rate
-Limiting, which also delivers the limit ADR-038 deferred for machine keys.
-**The Worker logs each tool call** by tool and outcome — never the query, the
-reader, a document or a token.
+### Tools
 
-### Environments and checks
+Two read-only tools, in the shapes ChatGPT requires, with `readOnlyHint`, a
+title, and descriptions built from the site's name and description so that an
+assistant knows when to use them:
 
-**A deployment turns MCP on** with an `mcp` section in its configuration: the
-switch and, optionally, the redirect allow-list. Validation then requires the
-OAuth KV binding, the rate-limit binding and the compatibility flag the
-library needs to fetch client metadata documents. The access smoke test
-requires `/mcp` to answer an anonymous request with `401` and a challenge,
-the metadata documents to be served, and a key's search to find a members
-document and no narrower one. The denial suite asks the tools, as each of its
-readers, for every document.
+- `search` — a `query` in; `{ results: [{ id, title, url }] }` out, one entry
+  per document, best first;
+- `fetch` — an `id` in; `{ id, title, text, url, metadata }` out: the
+  document's Markdown projection as `text`, its folder and dates in
+  `metadata`.
 
-**An organization adds the connector once**: an owner on claude.ai Team or
-Enterprise, an admin on ChatGPT Business or Enterprise, with the URL
-`https://<host>/mcp` and the client's published identity (CIMD).
+`id` is the document's short ID (ADR-022), and `url` its permanent link
+`https://<host>/d/<short ID>/`, so a citation survives a rename. Results are
+returned as `structuredContent` and as the same JSON in a text item. Neither
+tool ever shows a document its reader cannot open. A document longer than
+about 100,000 characters is cut there, and `metadata` says so.
+
+### Configuration and checks
+
+**An `mcp` section switches the server on.** Turned off, `/mcp` and the OAuth
+routes answer `404`. It requires `signIn` and a gated deployment. Validation
+then requires the `OAUTH_KV` namespace, the R2 bucket and AI Search bindings,
+and the `global_fetch_strictly_public` compatibility flag the library needs
+to read client metadata documents. The deploy token gains write access to the
+bucket and permission to start an AI Search sync.
+
+The access smoke test checks that `/mcp` answers an anonymous request with
+`401` and a pointer to the metadata. The denial suite asks both tools, as each
+of its readers, for every document. The Worker logs each tool call by tool and
+outcome only.
 
 ## Consequences
 
 ### Positive
 
-- People reach the knowledge base from claude.ai and ChatGPT with their own
-  Google account, and an assistant sees exactly what they may read, changing
-  with their groups and ending when they leave.
-- One identity layer serves the browser, the assistants and the bots.
-- ChatGPT's deep research and company knowledge can use the corpus, with
-  citations to the site.
-- Machine keys gain a rate limit, which ADR-038 left open.
+- Anyone in the Workspace reaches the knowledge base from claude.ai, ChatGPT,
+  Claude Code or Cursor with one address and one Google sign-in, from any
+  account.
+- An assistant sees what its reader may read, and stops seeing it when their
+  groups change or they leave.
+- Search matches meaning as well as words, with no index to build or ship
+  with the site.
+- ChatGPT's company knowledge and deep research can use the corpus, citing
+  permanent links.
+- Content starts living in R2, the first step away from content in Git.
 
 ### Negative
 
-- The perimeter grows by an OAuth authorization server: registration,
-  consent, codes, refresh and revocation are ours to keep correct. The
-  library carries the protocol; our consent and sign-in step does not have
-  that cover.
-- The authorization server is a Cloudflare library on Workers KV. ADR-038's
-  core stays portable — the tools and the access decisions use web standards
-  — but moving host means replacing this piece with another OAuth server.
-- DCR lets anyone register a client. The redirect allow-list and the consent
-  page answer that; a new assistant needs the allow-list changed.
-- A server-side index per class is another copy of each class's text in the
-  build, and more to keep inside its class.
-- Grants outlive sessions: a connected assistant keeps reading for as long as
-  its grant lasts, until the reader leaves, is removed from a group, or the
-  grant is revoked. Sign-out on the site does not end it.
-- Two more bindings — a KV namespace and a rate limiter — and two assistants'
-  behaviour to follow as their connector platforms change names and rules.
+- An OAuth authorization server is ours to keep working; the library carries
+  the protocol.
+- The OAuth library, R2 and AI Search are Cloudflare's. Moving host means
+  replacing them, beyond ADR-038's four adapters.
+- AI Search is in beta and its price is not announced. `search` keeps its own
+  interface, so a plain keyword index over the same bucket can replace it.
+- Search lags a deploy until AI Search finishes syncing. `fetch` reads the
+  bucket and is current.
+- People connect again every 30 days. Signing out of the site does not
+  disconnect an assistant; a departure or a group change does.
+- What an assistant has read stays in that assistant's history.
+- Three more bindings per environment: a KV namespace, an R2 bucket and an AI
+  Search instance.
 
 ### Follow-up
 
-- A spike, before implementation: a minimal Worker with the library, our
-  Google sign-in and consent, and `createMcpHandler`, on a test hostname,
-  connected from claude.ai and from ChatGPT with each client's published
-  identity; record what each sends and whether refresh works.
-- An admin view of a reader's grants, with revocation.
-- Per-document rules (ADR-039) apply to the tools unchanged when they come.
-- Document adding the connector in each assistant, and the bots' use of
-  machine keys, in the setup guide and the operations runbook.
+- A spike on a test hostname before implementation. claude.ai, ChatGPT and
+  Claude Code connect, sign in, return through the consent page and refresh.
+  AI Search returns only a reader's classes, and latency is recorded.
+- On acceptance:
+  - strike from `AGENTS.md` the invariants this ADR lifts: no semantic search
+    or vector storage; a Worker that never renders a file and keeps no state
+    beyond the snapshot, the pins and the machine keys;
+  - mark ADR-038 superseded in part;
+  - describe connecting an assistant in the setup guide;
+  - add to the runbook how to disconnect everyone (turn `mcp` off and clear
+    `OAUTH_KV`) and how to revoke one reader's grants.
+- A `browse` tool, by folder, if people ask for it.
+- A rate limit for readers and machine keys, if abuse appears.
+- Moving generated content from Git to R2, in its own ADR.
