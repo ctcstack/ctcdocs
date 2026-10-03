@@ -17,7 +17,7 @@ export const MACHINE_KEYS_KEY = 'machine-keys';
  * A record whose expiry is further away than this admits nothing: 90 days,
  * and a day more so a key issued on a clock slightly ahead still works.
  */
-export const LONGEST_KEY_LIFETIME_MS = 91 * 24 * 60 * 60 * 1000;
+const LONGEST_KEY_LIFETIME_MS = 91 * 24 * 60 * 60 * 1000;
 const KEY_SHAPE = /^kbk_[A-Za-z0-9_-]{43}$/u;
 
 export interface MachineKeyRecord {
