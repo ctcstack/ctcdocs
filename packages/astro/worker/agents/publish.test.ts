@@ -91,6 +91,7 @@ describe('publishing documents for the MCP server', () => {
     expect(run.index.syncs).toBe(1);
     expect(run.state.values.get(PUBLISHED_KEY)).toEqual({
       digest: 'digest-1',
+      complete: true,
       synced: true,
     });
   });
@@ -102,7 +103,10 @@ describe('publishing documents for the MCP server', () => {
       hash: 'h-old',
     });
     store.seed('docs/ffffff.md', 'gone', { hash: 'h-gone' });
-    const run = setup({ store, marker: { digest: 'digest-0', synced: true } });
+    const run = setup({
+      store,
+      marker: { digest: 'digest-0', complete: true, synced: true },
+    });
     expect(await run.run()).toBe('published');
     expect(run.fetched).toEqual(['/handbook/index.md']);
     expect(store.objects.has('docs/ffffff.md')).toBe(false);
@@ -125,7 +129,9 @@ describe('publishing documents for the MCP server', () => {
   });
 
   it('skips a build it already published and synced', async () => {
-    const run = setup({ marker: { digest: 'digest-1', synced: true } });
+    const run = setup({
+      marker: { digest: 'digest-1', complete: true, synced: true },
+    });
     expect(await run.run()).toBe('unchanged');
     expect(run.fetched).toEqual([]);
     expect(run.index.syncs).toBe(0);
@@ -137,6 +143,7 @@ describe('publishing documents for the MCP server', () => {
     expect(await run.run()).toBe('published');
     expect(run.state.values.get(PUBLISHED_KEY)).toEqual({
       digest: 'digest-1',
+      complete: true,
       synced: false,
     });
     run.index.failSync = false;
@@ -147,11 +154,50 @@ describe('publishing documents for the MCP server', () => {
     expect(await run.run()).toBe('unchanged');
   });
 
-  it('leaves the marker alone when a projection could not be read', async () => {
-    const run = setup({ missing: ['/team/plan/index.md'] });
+  it('publishes the others when one projection cannot be read, then retries it', async () => {
+    const missing = ['/team/plan/index.md'];
+    const run = setup({ missing });
     expect(await run.run()).toBe('incomplete');
-    expect(run.store.objects.has('docs/bbbbbb.md')).toBe(false);
-    expect(run.state.values.has(PUBLISHED_KEY)).toBe(false);
-    expect(run.index.syncs).toBe(0);
+    expect([...run.store.objects.keys()].sort()).toEqual([
+      'docs/aaaaaa.md',
+      'docs/cccccc.md',
+    ]);
+    // What was written is indexed now, not when the last document is.
+    expect(run.index.syncs).toBe(1);
+    expect(run.state.values.get(PUBLISHED_KEY)).toEqual({
+      digest: 'digest-1',
+      complete: false,
+      synced: true,
+    });
+
+    // Still missing: retried, nothing new to index.
+    run.fetched.length = 0;
+    expect(await run.run()).toBe('incomplete');
+    expect(run.fetched).toEqual(['/team/plan/index.md']);
+    expect(run.index.syncs).toBe(1);
+
+    missing.length = 0;
+    expect(await run.run()).toBe('published');
+    expect(run.store.objects.has('docs/bbbbbb.md')).toBe(true);
+    expect(run.index.syncs).toBe(2);
+    expect(await run.run()).toBe('unchanged');
+  });
+
+  it('keeps going past a document the bucket refuses', async () => {
+    const store = new MemoryStore();
+    const put = store.put.bind(store);
+    store.put = async (key, value, options) => {
+      if (key === 'docs/aaaaaa.md') {
+        throw new Error('put failed');
+      }
+      return put(key, value, options);
+    };
+    const run = setup({ store });
+    expect(await run.run()).toBe('incomplete');
+    expect([...store.objects.keys()].sort()).toEqual([
+      'docs/bbbbbb.md',
+      'docs/cccccc.md',
+    ]);
+    expect(run.index.syncs).toBe(1);
   });
 });

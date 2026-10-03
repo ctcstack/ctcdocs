@@ -622,9 +622,10 @@ assistant.
 Every five minutes the site Worker checks whether the documents in its
 `KB_DOCUMENTS` bucket match its build, and when they do not, rewrites what
 changed and starts an AI Search sync. Its log shows `agents-published` with
-the counts written and deleted, or `agents-publish-incomplete` when a
-projection could not be read; the last published digest is the
-`agents-published` key in `KB_STATE`. To publish everything again, delete that
+the counts written and deleted, and `agents-publish-incomplete` when a
+document could not be written: the others are published and indexed all the
+same, and the next run tries the missing ones again. The last published
+digest is the `agents-published` key in `KB_STATE`. To publish everything again, delete that
 key; the next run compares every document and syncs:
 
 ```bash

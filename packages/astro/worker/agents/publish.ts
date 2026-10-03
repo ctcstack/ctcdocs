@@ -5,8 +5,11 @@
  * its stored object would hold. On a schedule the Worker compares that list
  * with the bucket: it writes each document whose hash differs, from the
  * Markdown projection in its own assets, deletes the ones the build no longer
- * has, and asks AI Search to sync. A digest of the list, kept in the state
- * namespace, lets an unchanged build skip all of that, and a rollback is
+ * has, and asks AI Search to sync what changed. A document that cannot be
+ * written now is tried again on the next run, without holding back the
+ * others. A marker in the state namespace — the build's digest, whether every
+ * document is written, whether the index has been asked to sync since the
+ * last change — lets a finished build skip all of that, and a rollback is
  * published like any other build, because its digest differs.
  *
  * Web-standard code only: the bucket, the index, the assets and the state are
@@ -24,6 +27,9 @@ export const PUBLISHED_KEY = 'agents-published';
 
 interface PublishedMarker {
   readonly digest: string;
+  /** Every document of the build is in the bucket. */
+  readonly complete: boolean;
+  /** AI Search has been asked to sync since the bucket last changed. */
   readonly synced: boolean;
 }
 
@@ -48,6 +54,7 @@ function isMarker(value: unknown): value is PublishedMarker {
     typeof value === 'object' &&
     value !== null &&
     typeof (value as PublishedMarker).digest === 'string' &&
+    typeof (value as PublishedMarker).complete === 'boolean' &&
     typeof (value as PublishedMarker).synced === 'boolean'
   );
 }
@@ -84,13 +91,16 @@ export async function publishDocuments(
     return 'off';
   }
   const marker = await state.get(PUBLISHED_KEY);
-  const published = isMarker(marker) && marker.digest === catalog.digest;
-  if (published && marker.synced) {
+  const current =
+    isMarker(marker) && marker.digest === catalog.digest ? marker : undefined;
+  if (current?.complete && current.synced) {
     return 'unchanged';
   }
 
-  let complete = true;
-  if (!published) {
+  let complete = current?.complete ?? false;
+  let synced = current?.synced ?? false;
+  if (!complete) {
+    complete = true;
     const stored = await storedHashes(store);
     let written = 0;
     for (const document of catalog.documents) {
@@ -99,27 +109,32 @@ export async function publishDocuments(
         continue;
       }
       const fileClass = map.files[document.markdown];
-      const response = await assets.fetch(
-        new Request(new URL(sitePath(document.markdown), origin), {
-          redirect: 'manual',
-        }),
-      );
-      if (!response.ok || typeof fileClass !== 'string') {
+      try {
+        const response = await assets.fetch(
+          new Request(new URL(sitePath(document.markdown), origin), {
+            redirect: 'manual',
+          }),
+        );
+        if (!response.ok || typeof fileClass !== 'string') {
+          complete = false;
+          continue;
+        }
+        await store.put(key, await response.text(), {
+          httpMetadata: { contentType: 'text/markdown; charset=utf-8' },
+          customMetadata: {
+            class: fileClass,
+            title: document.title,
+            short_id: document.id,
+            markdown: document.markdown,
+            ...(document.modified ? { modified: document.modified } : {}),
+            hash: document.hash,
+          },
+        });
+        written += 1;
+      } catch {
+        // Tried again on the next run; the others are not held back.
         complete = false;
-        continue;
       }
-      await store.put(key, await response.text(), {
-        httpMetadata: { contentType: 'text/markdown; charset=utf-8' },
-        customMetadata: {
-          class: fileClass,
-          title: document.title,
-          short_id: document.id,
-          markdown: document.markdown,
-          ...(document.modified ? { modified: document.modified } : {}),
-          hash: document.hash,
-        },
-      });
-      written += 1;
     }
     const kept = new Set(
       catalog.documents.map((document) => documentKey(document.id)),
@@ -128,23 +143,26 @@ export async function publishDocuments(
     for (let start = 0; start < gone.length; start += 1000) {
       await store.delete(gone.slice(start, start + 1000));
     }
+    if (written > 0 || gone.length > 0) {
+      synced = false;
+    }
     log({ event: 'agents-published', written, deleted: gone.length });
-  }
-  if (!complete) {
-    log({ event: 'agents-publish-incomplete' });
-    return 'incomplete';
+    if (!complete) {
+      log({ event: 'agents-publish-incomplete' });
+    }
   }
 
-  let synced = true;
-  try {
-    await index.sync();
-  } catch {
-    // A sync already running refuses another; the next run starts it.
-    synced = false;
+  if (!synced) {
+    try {
+      await index.sync();
+      synced = true;
+    } catch {
+      // A sync already running refuses another; the next run starts it.
+    }
   }
   await state.put(
     PUBLISHED_KEY,
-    JSON.stringify({ digest: catalog.digest, synced }),
+    JSON.stringify({ digest: catalog.digest, complete, synced }),
   );
-  return 'published';
+  return complete ? 'published' : 'incomplete';
 }
