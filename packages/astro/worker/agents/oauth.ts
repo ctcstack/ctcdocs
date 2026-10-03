@@ -16,6 +16,7 @@ import {
 } from '@cloudflare/workers-oauth-provider';
 
 import {
+  AGENT_PATHS,
   REQUIRED_SCOPES,
   SCOPES,
   type AgentOAuth,
@@ -26,7 +27,7 @@ export interface OAuthEnv {
   readonly OAUTH_KV: unknown;
 }
 
-interface ExecutionContextLike {
+export interface ExecutionContextLike {
   waitUntil(promise: Promise<unknown>): void;
   passThroughOnException(): void;
 }
@@ -42,10 +43,10 @@ function serverFor(
   if (!server) {
     server = new OAuthAuthorizationServer<OAuthEnv>({
       issuer: origin,
-      resources: [`${origin}/mcp`],
-      authorizeEndpoint: '/auth/authorize',
-      tokenEndpoint: '/auth/token',
-      clientRegistrationEndpoint: '/auth/register',
+      resources: [`${origin}${AGENT_PATHS.mcp}`],
+      authorizeEndpoint: AGENT_PATHS.authorize,
+      tokenEndpoint: AGENT_PATHS.token,
+      clientRegistrationEndpoint: AGENT_PATHS.register,
       scopesSupported: [...SCOPES],
       clientIdMetadataDocumentEnabled: true,
       onError: ({ code, status, internal }) => {
@@ -84,7 +85,7 @@ export function agentOAuth({
     protect: (request, handler) =>
       new OAuthResourceServer<OAuthEnv, GrantProps>({
         resourceMetadata: {
-          resource: `${origin}/mcp`,
+          resource: `${origin}${AGENT_PATHS.mcp}`,
           authorization_servers: [origin],
           bearer_methods_supported: ['header'],
           resource_name: site,

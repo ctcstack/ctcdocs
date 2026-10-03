@@ -20,8 +20,8 @@ import {
   type AccessMapFile,
 } from './access-map.js';
 import {
+  AGENT_PATHS,
   answerConsent,
-  CONNECT_ROUTE,
   finishConnection,
   showConsent,
   type AgentOAuth,
@@ -95,20 +95,23 @@ export interface AgentContext {
   readonly index: DocumentIndex;
 }
 
+/** The metadata of the one protected resource, `/mcp` (RFC 9728). */
+const MCP_METADATA = `${AGENT_PATHS.resourceMetadata}${AGENT_PATHS.mcp}`;
+
 /**
  * The MCP server's routes and the methods each answers. They are answered
  * before a reader is identified: the OAuth flow and the bearer token decide
  * who is asking.
  */
 const AGENT_ROUTES: Readonly<Record<string, readonly string[]>> = {
-  '/mcp': ['POST', 'GET', 'DELETE', 'OPTIONS'],
-  '/auth/authorize': ['GET', 'POST'],
-  [CONNECT_ROUTE]: ['GET'],
-  '/auth/token': ['POST', 'OPTIONS'],
-  '/auth/register': ['POST', 'OPTIONS'],
-  '/.well-known/oauth-authorization-server': ['GET', 'HEAD', 'OPTIONS'],
-  '/.well-known/oauth-protected-resource': ['GET', 'HEAD', 'OPTIONS'],
-  '/.well-known/oauth-protected-resource/mcp': ['GET', 'HEAD', 'OPTIONS'],
+  [AGENT_PATHS.mcp]: ['POST', 'GET', 'DELETE', 'OPTIONS'],
+  [AGENT_PATHS.authorize]: ['GET', 'POST'],
+  [AGENT_PATHS.connect]: ['GET'],
+  [AGENT_PATHS.token]: ['POST', 'OPTIONS'],
+  [AGENT_PATHS.register]: ['POST', 'OPTIONS'],
+  [AGENT_PATHS.serverMetadata]: ['GET', 'HEAD', 'OPTIONS'],
+  [AGENT_PATHS.resourceMetadata]: ['GET', 'HEAD', 'OPTIONS'],
+  [MCP_METADATA]: ['GET', 'HEAD', 'OPTIONS'],
 };
 
 export interface WorkerContext {
@@ -353,22 +356,22 @@ async function agentRoute(
 ): Promise<Response> {
   const oauth = agents.oauth(gate.origin);
   switch (url.pathname) {
-    case '/auth/authorize':
+    case AGENT_PATHS.authorize:
       return request.method === 'POST'
         ? answerConsent(request, authorizeContext(gate, oauth, request))
         : showConsent(request, authorizeContext(gate, oauth, request));
-    case CONNECT_ROUTE:
+    case AGENT_PATHS.connect:
       return finishConnection(request, authorizeContext(gate, oauth, request));
-    case '/mcp':
-    case '/.well-known/oauth-protected-resource/mcp':
+    case AGENT_PATHS.mcp:
+    case MCP_METADATA:
       return oauth.protect(request, (sub) =>
         serveAgent(gate, agents, request, sub),
       );
-    case '/.well-known/oauth-protected-resource':
+    case AGENT_PATHS.resourceMetadata:
       // Some clients look at the root; the one resource is `/mcp`. The
       // request's headers go along, so a browser client gets its CORS.
       return oauth.protect(
-        new Request(`${gate.origin}/.well-known/oauth-protected-resource/mcp`, {
+        new Request(`${gate.origin}${MCP_METADATA}`, {
           method: request.method,
           headers: request.headers,
         }),
@@ -546,7 +549,8 @@ async function route(
       path: url.pathname,
       policy: 'no-store',
       map,
-      ownPolicy: true,
+      // Only the consent page writes its own policy, for where its form leads.
+      ownPolicy: url.pathname === AGENT_PATHS.authorize,
     });
   }
 

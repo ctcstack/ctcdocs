@@ -25,8 +25,21 @@ import { connectionFailedPage, consentPage } from '../pages.js';
 export const SCOPES = ['kb:read', 'offline_access'] as const;
 export const REQUIRED_SCOPES = ['kb:read'] as const;
 
-/** Where the site's sign-in returns a person who is connecting an assistant. */
-export const CONNECT_ROUTE = '/auth/connect';
+/**
+ * The MCP server's routes, named once for the OAuth library and the gate:
+ * the resource itself, and the authorization server's endpoints beside the
+ * sign-in. `connect` is where the site's sign-in returns a person who is
+ * connecting an assistant.
+ */
+export const AGENT_PATHS = {
+  mcp: '/mcp',
+  authorize: '/auth/authorize',
+  connect: '/auth/connect',
+  token: '/auth/token',
+  register: '/auth/register',
+  resourceMetadata: '/.well-known/oauth-protected-resource',
+  serverMetadata: '/.well-known/oauth-authorization-server',
+} as const;
 
 /** The library's helpers this step uses. */
 type AuthorizationApi = Pick<
@@ -224,7 +237,7 @@ export async function answerConsent(
     const { state, headers } = await api.beginUpstream(approved.request, {
       headers: approved.headers,
     });
-    const back = `${CONNECT_ROUTE}?${new URLSearchParams({ state })}`;
+    const back = `${AGENT_PATHS.connect}?${new URLSearchParams({ state })}`;
     return redirect(
       `/auth/sign-in?${new URLSearchParams({ return: back })}`,
       headers,
