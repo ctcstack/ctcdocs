@@ -497,6 +497,10 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
     workerName,
   };
 
+  const publicEnvironment = Object.entries(deployment.environments).find(
+    ([, environment]) => environment.visibility === 'public',
+  );
+
   /*
    * Rules close folders to some readers, which a public environment cannot
    * do: everyone may read it. Accepting rules there would promise a boundary
@@ -504,9 +508,6 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
    */
   let access: AccessConfiguration | undefined;
   if (root.access !== undefined) {
-    const publicEnvironment = Object.entries(deployment.environments).find(
-      ([, environment]) => environment.visibility === 'public',
-    );
     if (publicEnvironment) {
       fail(
         'access',
@@ -557,16 +558,11 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
         fail(`mcp.${key}`, 'is not a known setting');
       }
     }
-    if (typeof source.enabled !== 'boolean') {
-      fail('mcp.enabled', 'must be true or false');
-    }
-    if (source.enabled) {
+    const enabled = flag(source, 'enabled', 'mcp.enabled');
+    if (enabled) {
       if (!signIn) {
         fail('mcp', 'needs signIn: assistants sign in as the site does');
       }
-      const publicEnvironment = Object.entries(deployment.environments).find(
-        ([, environment]) => environment.visibility === 'public',
-      );
       if (publicEnvironment) {
         fail(
           'mcp',
@@ -574,7 +570,7 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
         );
       }
     }
-    mcp = { enabled: source.enabled };
+    mcp = { enabled };
   }
 
   return {
