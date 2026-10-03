@@ -725,6 +725,31 @@ describe('an assistant reading', () => {
     );
   });
 
+  it('reads no more than 4 MiB of a request', async () => {
+    const { tokens } = await connect('user-member');
+    const response = await call(
+      new Request(`${ORIGIN}/mcp`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokens.access_token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          'MCP-Protocol-Version': '2025-11-25',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: {
+            name: 'search',
+            arguments: { query: 'x'.repeat(4 * 1024 * 1024) },
+          },
+        }),
+      }),
+    );
+    expect(response.status).toBe(413);
+  });
+
   it('accepts no other bearer: not a machine key, not a made-up token', async () => {
     for (const token of ['kbk_not-for-mcp', 'made-up']) {
       expect((await mcp(token, 'tools/list')).status).toBe(401);
