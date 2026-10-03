@@ -554,6 +554,19 @@ test('the MCP server must challenge an anonymous assistant', async () => {
     site: withMcp,
     fetchImplementation: server({ mcpStatus: 405, challenge: false }),
   });
+  // Right after deploying a version that has it, the server must answer.
+  await assert.rejects(
+    verifyMcpChallenge({
+      baseUrl: origin,
+      site: withMcp,
+      fetchImplementation: server({ mcpStatus: 405, challenge: false }),
+      serverRequired: true,
+    }),
+    (error) =>
+      error instanceof AccessSmokeError &&
+      error.retryable &&
+      /does not serve the MCP server \(405\)/u.test(error.message),
+  );
   for (const [broken, message] of [
     [{ mcpStatus: 200 }, /was not challenged \(200\)/u],
     [{ mcpStatus: 200, challenge: false }, /was not challenged \(200\)/u],
@@ -572,4 +585,22 @@ test('the MCP server must challenge an anonymous assistant', async () => {
       message,
     );
   }
+});
+
+test('post-deploy requires the MCP server it deployed, not one a rollback removed', async () => {
+  const { fetchImplementation: deployed } = deployedProduction();
+  // The version serving refuses POST /mcp as any write: it has no server.
+  const withoutServer = async (url, init) =>
+    new URL(url).pathname === '/mcp'
+      ? new Response('Method not allowed', { status: 405 })
+      : deployed(url, init);
+  const options = postDeployOptions(withoutServer, {
+    site: { ...siteConfig, mcp: { enabled: true } },
+    propagationTimeoutMs: 0,
+  });
+  await assert.rejects(
+    verifyPostDeploy(options),
+    /does not serve the MCP server \(405\)/u,
+  );
+  await verifyPostDeploy({ ...options, rollback: true });
 });
