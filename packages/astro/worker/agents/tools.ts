@@ -33,6 +33,30 @@ const FETCH_OUTPUT = z.object({
   metadata: z.record(z.string(), z.union([z.string(), z.boolean()])),
 });
 
+/**
+ * Runs a tool's lookup. A failure of the bucket or the index is logged by its
+ * name and answered plainly, never with the store's own message.
+ */
+async function guarded<T>(
+  tool: string,
+  log: ToolContext['log'],
+  run: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await run();
+  } catch (error: unknown) {
+    log({
+      event: 'tool-failed',
+      tool,
+      error: error instanceof Error ? error.name : 'unknown',
+    });
+    // The client sees the message only; the cause stays in the Worker.
+    throw new Error('The knowledge base could not answer; try again later.', {
+      cause: error,
+    });
+  }
+}
+
 /** The same value as structured content and as JSON text, as ChatGPT asks. */
 function result(value: Record<string, unknown>) {
   return {
@@ -64,7 +88,9 @@ function server(context: ToolContext): McpServer {
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async ({ query }) => {
-      const results = await searchDocuments(context, query);
+      const results = await guarded('search', log, () =>
+        searchDocuments(context, query),
+      );
       log({ event: 'tool', tool: 'search', results: results.length });
       return result({ results });
     },
@@ -82,7 +108,9 @@ function server(context: ToolContext): McpServer {
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async ({ id }) => {
-      const document = await fetchDocument(context, id);
+      const document = await guarded('fetch', log, () =>
+        fetchDocument(context, id),
+      );
       log({ event: 'tool', tool: 'fetch', found: document !== undefined });
       if (!document) {
         throw new Error('No document with that id.');
@@ -93,13 +121,16 @@ function server(context: ToolContext): McpServer {
   return mcp;
 }
 
-/** Answers one MCP request for the reader in `context`. */
+/**
+ * Answers one MCP request for the reader in `context`, with a handler of its
+ * own, so that nothing one reader's request opens outlives it or is shared.
+ * The tools emit nothing before their result, so the answer is one JSON body.
+ */
 export function serveMcp(
   request: Request,
   context: ToolContext,
 ): Promise<Response> {
   return createMcpHandler(() => server(context), {
-    responseMode: 'json',
     onerror: (error) => context.log({ event: 'mcp-error', error: error.name }),
   }).fetch(request);
 }
