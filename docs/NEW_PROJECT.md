@@ -88,7 +88,9 @@ documented in [CONFIGURATION.md](CONFIGURATION.md); the minimum is:
 `visibility` decides who may read the deployment and defaults to `private`.
 Choose it deliberately now: the crawler rules, the response headers and the
 boundary checks all follow it, and a mismatch fails validation rather than
-reaching a deployment.
+reaching a deployment. A private deployment also needs `signIn`, naming the
+organization's Workspace domains, and is served through the platform's Worker;
+see [CONFIGURATION.md](CONFIGURATION.md#signing-in).
 
 ### 3. Wire up Astro
 
@@ -140,17 +142,18 @@ fails the gate for a reason that has nothing to do with what you are testing.
 
 ### 4. The rest of the files
 
-| File                   | What goes in it                                                                                                                                      |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `public/favicon.svg`   | Your mark. Also probed by the access smoke test                                                                                                      |
-| `public/robots.txt`    | `Disallow: /` for a private deployment; anything else for a public one                                                                               |
-| `public/_headers`      | Cache, robots and charset headers for `/*.md`, `/llms.txt`, `/*/llms.txt` and `/assets/generated/*`, matching visibility; copy the fixture project's |
-| `src/styles/brand.css` | The accent triad per theme. See [DESIGN.md](DESIGN.md)                                                                                               |
-| `.gitleaks.toml`       | Secret-scanning rules; path exemptions cover only paths Git never tracks                                                                             |
-| `tsconfig.json`        | Extends `astro/tsconfigs/strict`, includes `.astro/types.d.ts`                                                                                       |
-| `eslint.config.js`     | `import { ctcdocsEslintConfig } from '@ctcstack/ctcdocs/eslint'` plus your ignores                                                                   |
-| `prettier.config.mjs`  | `export { default } from '@ctcstack/ctcdocs/prettier'`                                                                                               |
-| `.prettierignore`      | Every generated path, so the formatter never touches what the sync owns                                                                              |
+| File                                         | What goes in it                                                                                                                                                                                                                         |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `public/favicon.svg`                         | Your mark. Also probed by the access smoke test                                                                                                                                                                                         |
+| `public/robots.txt`                          | `Disallow: /` for a private deployment; anything else for a public one                                                                                                                                                                  |
+| `public/_headers`                            | Cache, robots and charset headers for `/*.md`, `/llms.txt`, `/*/llms.txt` and `/assets/generated/*`, matching visibility; copy the fixture project's. Behind the Worker it is checked but not applied: the Worker sets the same headers |
+| `wrangler.jsonc`, `wrangler.directory.jsonc` | The Workers. Copy the fixture project's and change the names, the domain, the namespace ID and the client ID; a public deployment needs only a plain `wrangler.jsonc`                                                                   |
+| `src/styles/brand.css`                       | The accent triad per theme. See [DESIGN.md](DESIGN.md)                                                                                                                                                                                  |
+| `.gitleaks.toml`                             | Secret-scanning rules; path exemptions cover only paths Git never tracks                                                                                                                                                                |
+| `tsconfig.json`                              | Extends `astro/tsconfigs/strict`, includes `.astro/types.d.ts`                                                                                                                                                                          |
+| `eslint.config.js`                           | `import { ctcdocsEslintConfig } from '@ctcstack/ctcdocs/eslint'` plus your ignores                                                                                                                                                      |
+| `prettier.config.mjs`                        | `export { default } from '@ctcstack/ctcdocs/prettier'`                                                                                                                                                                                  |
+| `.prettierignore`                            | Every generated path, so the formatter never touches what the sync owns                                                                                                                                                                 |
 
 `ctcdocs-sync validate` checks that `robots.txt`, `_headers` and `.gitleaks.toml`
 exist and agree with your configuration, so run it early and let it tell you what
@@ -197,10 +200,15 @@ was going to check:
     "validate": "ctcdocs-sync validate",
     "test:search": "ctcdocs-verify-search",
     "test:ux": "playwright test --config playwright.ux.config.ts",
-    "deploy:dry-run": "wrangler deploy --env production --dry-run"
+    "deploy:dry-run": "wrangler deploy --env production --dry-run && wrangler deploy --config wrangler.directory.jsonc --env production --dry-run"
   }
 }
 ```
+
+A public deployment has no directory Worker, so its `deploy:dry-run` is the
+first command alone. Add `.ctcdocs/` and `.dev.vars` to `.gitignore`: the build
+writes the access map to the first, and the second is where Wrangler would read
+local secrets from.
 
 `playwright.ux.config.ts` is a factory call, so the suites stay owned by the
 platform and run against whatever corpus you have:
@@ -232,22 +240,24 @@ Start these early; neither is fast.
 Follow [GOOGLE_WORKSPACE_SETUP.md](GOOGLE_WORKSPACE_SETUP.md). You need a
 Shared Drive, a Google Cloud project, a workload identity pool and provider
 bound to your repository, and a service account that is a Viewer on the Drive
-and has no roles anywhere else.
+and has no roles anywhere else. A private deployment also needs an OAuth client
+for sign-in and a directory reader with a read-only admin role — the part that
+needs a Workspace administrator.
 
 Then run a synchronization. The first one replaces the stubs from step 3.
 
 ### 8. Cloudflare
 
 Follow [CLOUDFLARE_SETUP.md](CLOUDFLARE_SETUP.md) for the Worker, the custom
-domain, and — for a private deployment — the Access application and its service
-token. `wrangler.jsonc` is hand-written because Wrangler reads it itself;
-`ctcdocs-sync validate` fails when its Worker name or custom domain disagrees
-with `site.config.json`.
+domain, and — for a private deployment — the directory Worker, the KV namespace,
+the secrets and a smoke machine key. The Wrangler files are hand-written
+because Wrangler reads them itself; `ctcdocs-sync validate` fails when a Worker
+name or custom domain disagrees with `site.config.json`.
 
 ### 9. Workflows
 
-Four thin callers, each pinned to a full commit SHA of this repository rather
-than a tag — it is public, and these run inside CI that holds your deployment
+Thin callers, each pinned to a full commit SHA of this repository rather than
+a tag — it is public, and these run inside CI that holds your deployment
 credentials:
 
 ```yaml
@@ -266,7 +276,8 @@ jobs:
 
 The other three are `project-sync.yml` (give it the schedule you want, plus
 `workflow_dispatch`), `project-deploy.yml` (one call per environment) and
-`project-rollback.yml`. Their inputs are documented in the header comment of
+`project-rollback.yml`. A private deployment adds a fifth, `project-probe.yml`,
+on a schedule of its own. Their inputs are documented in the header comment of
 each file, and [DEPLOYMENT.md](DEPLOYMENT.md) lists the GitHub environments,
 variables and secrets they read.
 

@@ -31,7 +31,7 @@ be public while the deployments stay private.
 ```text
 packages/core/     @ctcstack/ctcdocs-core   configuration, layout, allowlist
 packages/sync/     @ctcstack/ctcdocs-sync   Google Drive → Markdown, CLI
-packages/astro/    @ctcstack/ctcdocs        preset, components, routes, styles, browser suite
+packages/astro/    @ctcstack/ctcdocs        preset, components, routes, styles, browser suite, Workers
 fixtures/project/  a complete synthetic project, built and tested by CI
 docs/              architecture decisions, configuration reference, runbooks
 .github/workflows/ this repository's CI, plus reusable workflows projects call
@@ -39,7 +39,10 @@ docs/              architecture decisions, configuration reference, runbooks
 
 `packages/core` and `packages/sync` compile to `dist` because Node executes
 them. `packages/astro` ships its `.astro`, `.ts` and `.css` sources unbuilt, the
-way Starlight does, because the consuming project's Astro build compiles them.
+way Starlight does, because the consuming project's Astro build compiles them;
+its `worker/` is bundled by the project's Wrangler. The Worker code uses
+web-standard APIs only, with Cloudflare confined to its two entry files, so a
+deployment can move to another host without rewriting its gate.
 
 ## Product invariants
 
@@ -48,14 +51,23 @@ way Starlight does, because the consuming project's Astro build compiles them.
   and index committed to the project repository.
 - Synchronization is one way: Drive → Markdown → static site.
 - The target is Astro + Starlight + Pagefind on Cloudflare Workers Static
-  Assets. A deployment is private behind Cloudflare Access or public, declared
-  per environment by `visibility` in the project configuration; the checks
-  follow the declaration rather than assuming one. See ADR-016.
-- Do not add a database, server-side rendering, semantic search, vector storage,
-  an LLM content transformation, or an authentication system of our own.
+  Assets. A deployment is private or public, declared per environment by
+  `visibility` in the project configuration; the checks follow the declaration
+  rather than assuming one. See ADR-016.
+- A private deployment is served through the platform's Worker, which signs
+  readers in with Google and decides every request against the build's access
+  map (ADR-038). Google is the only identity provider: the Worker keeps no
+  passwords, profiles or roles of its own, and group membership is read from
+  Google into a snapshot (ADR-040).
+- Access per folder follows ADR-039: rules name Google groups by Drive folder,
+  a folder without a rule is closed to all but administrators, and a document
+  never gains readers without a rule that names its folder.
+- Do not add server-side rendering, a database, semantic search, vector
+  storage, or an LLM content transformation. The Worker decides who may read a
+  file; it never renders or changes one. Its only state is the directory
+  snapshot in KV.
 - Do not broaden scope to Sheets, Slides, comments, suggestions, webhooks, or
-  bidirectional editing. Access per folder follows ADR-039: rules name Google
-  groups by folder, and a folder without a rule is closed.
+  bidirectional editing.
 
 ## Priorities
 
@@ -87,10 +99,14 @@ in the browser suite is a hard constraint on every visual change.
 
 - The generated-path allowlist in `packages/core` is a compile-time constant.
   Never make it configurable.
-- The Google identity is read-only: no create, edit, move, delete, or permission
-  change.
-- Do not log document bodies, tokens, private keys, service account JSON, or
-  sensitive URLs.
+- Every Google identity is read-only: no create, edit, move, delete, or
+  permission change. The synchronization identity reads one Drive and has no
+  key; the directory reader reads groups and users through a read-only admin
+  role, and its key lives only in the directory Worker's secret.
+- Do not log document bodies, tokens, private keys, service account JSON,
+  sensitive URLs, or a reader's address, ID or group membership.
+- The Worker fails closed. A missing secret, snapshot or map entry admits no
+  one; a stale snapshot admits members only to what every member reads.
 - Sanitize HTML and SVG, validate URL schemes, and defend archive extraction
   against traversal, excessive file counts and excessive extracted size.
 - Workflows declare explicit minimal `permissions`, pin third-party actions to
@@ -108,7 +124,8 @@ pnpm verify
 ```
 
 It covers formatting, lint, types, unit and fixture tests, the fixture project's
-build, its browser and Pagefind checks, and `wrangler deploy --dry-run`.
+build, its validation, the denial suite against its build, its browser and
+Pagefind checks, and `wrangler deploy --dry-run` for both Workers.
 
 Also useful, and run in CI:
 
@@ -131,6 +148,10 @@ Flag, and do not merge:
 
 - a change that could publish a private deployment's content without its
   identity boundary, or make a public one unreachable;
+- a change to the Worker, the access map, the class computation or the search
+  split without a test that would fail if it admitted the wrong reader;
+- a built file the access map does not place, or text that reaches a wider
+  class than the document it came from;
 - a workflow exposing credentials to a pull request or taking permissions
   broader than its job needs;
 - a deployment value written into source, tests, workflows or documentation

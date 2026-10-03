@@ -5,10 +5,11 @@ readers should not.
 
 CTCDocs synchronizes a Google Shared Drive one way into standard Markdown,
 commits the result to a private repository, and builds it into a static
-Astro/Starlight site deployed as Cloudflare Workers Static Assets behind
-Cloudflare Access. There is no database, no server-side rendering, and no
-editing surface: the Google Doc is the source of truth, and everything the site
-serves is a file somebody can read in a diff.
+Astro/Starlight site deployed as Cloudflare Workers Static Assets. A private
+deployment signs its readers in with Google in a small Worker of its own, and
+serves each folder only to the Google groups allowed to read it. There is no
+server-side rendering and no editing surface: the Google Doc is the source of
+truth, and everything the site serves is a file somebody can read in a diff.
 
 > **Status: 0.x.** The packages are used in production by their first
 > deployment, and the API is still allowed to move between minor versions.
@@ -22,8 +23,9 @@ choice:
 - **Writers keep Google Docs.** Comments, suggestions, sharing, and the editing
   habits a team already has.
 - **Readers get a static site.** Fast, searchable with Pagefind, keyboard- and
-  screen-reader-accessible, and either private behind Cloudflare Access or open
-  to the world — one setting, and the checks follow it.
+  screen-reader-accessible, and either private — Google sign-in, folders
+  opened per Google group — or open to the world. One setting, and the checks
+  follow it.
 - **Machines get plain Markdown.** Every page is also served as `.md`, and
   `/llms.txt` lists every document in the reader's order, so an agent can find
   and read the documentation without scraping HTML.
@@ -51,6 +53,9 @@ wrong tool, and it is cheaper to find that out now:
 - Synchronization authenticates with a **short-lived OAuth token**, normally
   from GitHub OIDC through Google Workload Identity Federation. The pipeline
   never reads a service-account key file, by design.
+- A private deployment's readers sign in with **Google Workspace** accounts,
+  and its folder rules name **Google groups**. Reading group membership needs
+  a Workspace administrator to create a read-only admin role, once.
 - **Node 22.12 or newer** (below 23) and **pnpm 11**.
 
 Standing a project up involves a Google Workspace administrator and a
@@ -124,8 +129,8 @@ In the order a new deployment needs them:
 | -------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | [Starting a new project](docs/NEW_PROJECT.md)            | The ordered path from an empty repository to a deployed site                   |
 | [Configuration](docs/CONFIGURATION.md)                   | Every key of `site.config.json`, and what is deliberately not in it            |
-| [Google Workspace setup](docs/GOOGLE_WORKSPACE_SETUP.md) | The read-only identity the pipeline synchronizes with                          |
-| [Cloudflare setup](docs/CLOUDFLARE_SETUP.md)             | Worker, custom domains, and the Access application in front of them            |
+| [Google Workspace setup](docs/GOOGLE_WORKSPACE_SETUP.md) | The read-only identities: synchronization, sign-in, and the directory reader   |
+| [Cloudflare setup](docs/CLOUDFLARE_SETUP.md)             | The Workers, their secrets, custom domains, and the response headers           |
 | [Deployment](docs/DEPLOYMENT.md)                         | Environments, secrets, and the workflows that publish a commit                 |
 | [Operations](docs/OPERATIONS.md)                         | Running it: scheduled sync, rollback, and what to do when something fails      |
 | [Design](docs/DESIGN.md)                                 | The reader interface, and the accessibility budget any visual change must meet |

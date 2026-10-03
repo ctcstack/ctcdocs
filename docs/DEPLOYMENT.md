@@ -16,9 +16,12 @@ The Worker name and both hostnames are declared once in
 `ctcdocs-sync validate` fails if the two disagree. Setting this platform up for
 another project starts there — see [Configuration](CONFIGURATION.md).
 
-Both targets use Cloudflare Workers Static Assets. Both disable `workers.dev`
-and version preview URLs. Both must be protected by Cloudflare Access before
-they can contain internal content.
+Both targets use Cloudflare Workers Static Assets, and both disable
+`workers.dev` and version preview URLs. A private target is served through the
+platform's Worker, which signs readers in with Google and serves each file only
+to the readers its access class names, and each private environment has a
+directory Worker beside it that keeps the snapshot of group membership. See
+[Cloudflare setup](CLOUDFLARE_SETUP.md).
 
 Local `pnpm dev` is not the remote development deployment. It is an
 unauthenticated loopback-only Astro server intended for synthetic content.
@@ -29,145 +32,104 @@ The release sequence is:
 
 ```text
 exact main commit
-→ canonical verification
+→ canonical verification and the denial suite
 → optional protected development deployment and smoke test
 → protected production deployment
 → production smoke test
 ```
 
-Development and production use separate Workers, hostnames, deploy tokens,
-Access service tokens, GitHub environments, and deployment histories. A
-production deployment never reads Google Drive. It deploys only the generated
-content already committed in the exact `main` revision.
+Development and production use separate Workers, hostnames, KV namespaces,
+deploy tokens, session secrets, machine keys, GitHub environments, and
+deployment histories. A production deployment never reads Google Drive. It
+deploys only the generated content already committed in the exact `main`
+revision.
 
 Never deploy internal content if:
 
-- the target does not have an Access application;
+- `ctcdocs-sync validate` or `ctcdocs-verify-gate` fails;
 - an anonymous request can reach HTML or a static asset;
 - `workers.dev` or a version preview URL is enabled;
 - the build contains unreviewed local generated changes;
 - the source revision is not an exact commit on `main`.
 
-## One-time Cloudflare setup
+## One-time setup
 
-Complete the Access configuration before creating each custom-domain Worker
-binding.
+Each private environment needs, once:
 
-### 1. Create the development Access application
-
-1. Open **Cloudflare Dashboard → Zero Trust → Access controls →
-   Applications**.
-2. Select **Add an application → Self-hosted and private → Add public
-   hostname**.
-3. Configure:
-
-   ```text
-   Application name: Example Docs Development
-   Domain: example.com
-   Subdomain: docs-dev
-   Path: leave empty so the whole hostname is protected
-   Session duration: 24 hours
-   ```
-
-4. Add the employee policy:
-
-   ```text
-   Action: Allow
-   Include: Login Methods = <your identity provider>
-   ```
-
-5. Accept only the identity provider you configured.
-6. Do not add `Everyone`, One-time PIN, email-domain matching, or a `Bypass
-Everyone` policy.
-7. Save the application.
-
-The production application must apply the same rules to
-`docs.example.com`.
-
-### 2. Create separate smoke-test service tokens
-
-For each environment:
-
-1. Open **Zero Trust → Access controls → Service credentials → Service
-   Tokens**.
-2. Create one token per environment, named for the environment it probes.
-3. Copy its Client ID and Client Secret once into the appropriate password
-   manager entry.
-4. Return to the matching Access application and add:
-
-   ```text
-   Action: Service Auth
-   Include: Service Token = <matching smoke token>
-   ```
-
-5. Never put either value in repository variables, workflow YAML, Wrangler
-   configuration, command-line arguments, or documentation.
-
-Do not reuse one smoke token across development and production. The two tokens
-must be independently revocable and auditable.
-
-### 3. Create separate deploy API tokens
-
-Create one token for development and one for production:
-
-1. Open **Cloudflare Dashboard → My Profile → API Tokens → Create Token**.
-2. Start with **Edit Cloudflare Workers**.
-3. Restrict account resources to the project's Cloudflare account.
-4. Restrict zone resources to the project's zone.
-5. Keep only the permissions required to upload Workers and manage the
-   committed custom-domain binding.
-6. Do not grant Access Apps and Policies, Access Service Tokens, broad DNS
-   administration, user administration, billing, or unrelated account access.
-7. Store each token in the matching GitHub deployment environment.
+1. **The sign-in client and the directory reader** in Google, following
+   [Google Workspace setup](GOOGLE_WORKSPACE_SETUP.md#sign-in). One client can
+   serve every environment, with one redirect URI each.
+2. **A KV namespace**, its ID in both `wrangler.jsonc` and
+   `wrangler.directory.jsonc`, following
+   [Cloudflare setup](CLOUDFLARE_SETUP.md#the-kv-namespace).
+3. **A deploy API token** without KV permissions, following
+   [Cloudflare setup](CLOUDFLARE_SETUP.md#deploy-api-token). Do not reuse one
+   token across environments.
+4. **A smoke machine key**, issued with `ctcdocs-machine-key` and recorded in
+   that environment's `MACHINE_KEYS` secret, following
+   [Cloudflare setup](CLOUDFLARE_SETUP.md#machine-keys). Do not reuse one key
+   across environments: each must be revocable on its own.
 
 Cloudflare API token resource scopes do not replace repository controls.
 GitHub environment branch rules and the explicit Wrangler environment are also
 required.
 
-### 4. Bootstrap the development custom domain
+### Bootstrap a new hostname
 
-The normal workflow runs an Access preflight before deployment. A brand-new
-hostname cannot pass that preflight until its first Worker custom-domain
-binding exists. Bootstrap it exactly once with synthetic, non-sensitive
-content:
+The deployment workflow probes the hostname before it deploys, and a hostname
+that has never been deployed to cannot answer. Bootstrap each new environment
+once, from a reviewed revision whose generated content is synthetic or
+otherwise approved:
 
-1. Confirm the development Access application and both policies already exist.
-2. Check out the reviewed repository revision and confirm the generated
-   content is synthetic or otherwise approved for the bootstrap.
-3. Add the development Cloudflare account ID and deploy token to the ignored
-   `.env` beside `wrangler.jsonc`, which is where Wrangler loads it from. Do
-   not use the production token.
-4. Run:
+1. Put that environment's Cloudflare account ID and deploy token in the ignored
+   `.env` beside `wrangler.jsonc`, which is where Wrangler loads it from.
+2. Build and deploy both Workers:
 
    ```bash
    corepack enable
    pnpm install --frozen-lockfile
    pnpm verify
-   pnpm deploy:development
+   pnpm exec wrangler deploy --config wrangler.directory.jsonc --env development
+   pnpm exec wrangler deploy --env development
    ```
 
-5. Immediately verify anonymous denial:
+   With no secrets yet, the site Worker admits no one and says sign-in is not
+   configured. That is the safe state to start from.
+
+3. Put the secrets — `DIRECTORY_KEY` on the directory Worker;
+   `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET` and `MACHINE_KEYS` on the site
+   Worker — and wait for the first refresh:
+
+   ```bash
+   pnpm exec wrangler tail example-docs-directory-development
+   ```
+
+   shows `directory-refreshed` within ten minutes. Until then the site says the
+   directory has not been read yet.
+
+4. Verify anonymous denial:
 
    ```bash
    curl --head https://docs-dev.example.com/
    ```
 
-   A redirect to the Access login flow or an Access denial is expected. A
-   direct `200` wiki response is a security failure.
+   `401` is expected. A `200` with wiki content is a security failure.
 
-6. Put the development hostname and development smoke token in the ignored
-   repository-root `.env`, which the smoke scripts load, then run:
+5. Put the hostname and the smoke key in the ignored repository-root `.env`,
+   which the smoke scripts load, then run:
 
    ```bash
-   pnpm test:access:preflight
-   pnpm test:access:post-deploy
+   pnpm exec ctcdocs-access-smoke --preflight
+   pnpm exec ctcdocs-access-smoke --post-deploy
    ```
 
-7. In the Worker settings, confirm `workers.dev` and Preview URLs are disabled.
+6. Sign in in a browser, and check `/_kb/status` as a member of an admin group.
+7. In the Worker settings, confirm `workers.dev` and Preview URLs are disabled
+   for both Workers.
 
-Do not use this bootstrap exception for production or for real internal
-content. Production already requires a working Access preflight before every
-deployment.
+A deployment that stood behind Cloudflare Access moves off it in the order
+[Cloudflare setup](CLOUDFLARE_SETUP.md#moving-a-deployment-off-cloudflare-access)
+gives, never by detaching Access first.
 
 ## One-time GitHub setup
 
@@ -179,7 +141,7 @@ For every environment, restrict deployment branches to `main`. Add required
 reviewers when the repository plan supports them; production should require a
 reviewer distinct from the person initiating the deployment where possible.
 
-### `development-deploy`
+### `development-deploy` and `production-deploy`
 
 Environment variable:
 
@@ -193,42 +155,9 @@ Environment secret:
 CLOUDFLARE_API_TOKEN
 ```
 
-Use the development deploy token.
+Use the matching environment's deploy token.
 
-### `development-smoke`
-
-Environment variable:
-
-```text
-CTCDOCS_BASE_URL=https://docs-dev.example.com
-```
-
-Environment secrets:
-
-```text
-CF_ACCESS_CLIENT_ID
-CF_ACCESS_CLIENT_SECRET
-```
-
-Use the development smoke token.
-
-### `production-deploy`
-
-Environment variable:
-
-```text
-CLOUDFLARE_ACCOUNT_ID
-```
-
-Environment secret:
-
-```text
-CLOUDFLARE_API_TOKEN
-```
-
-Use the production deploy token.
-
-### `production-smoke`
+### `development-smoke` and `production-smoke`
 
 Environment variable:
 
@@ -236,14 +165,15 @@ Environment variable:
 CTCDOCS_BASE_URL=https://docs.example.com
 ```
 
-Environment secrets:
+Environment secret:
 
 ```text
-CF_ACCESS_CLIENT_ID
-CF_ACCESS_CLIENT_SECRET
+CTCDOCS_MACHINE_KEY
 ```
 
-Use the production smoke token.
+Use the matching environment's smoke key. While a deployment still stands
+behind Cloudflare Access, `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET`
+sit beside it; the smoke test sends both.
 
 ### `production-sync`
 
@@ -299,6 +229,29 @@ requiring `production` to exist. Whatever `site.config.json` declares,
 `wrangler.jsonc` must match, and `ctcdocs-sync validate` fails when they
 disagree.
 
+The workflow deploys the site Worker and, when `wrangler.directory.jsonc`
+exists, the directory Worker, from the same build and therefore with the same
+access map. A private environment's versions are tagged `ctcdocs-gate-v1`.
+
+## The anonymous probe
+
+`project-probe.yml` asks production, with no credentials, for a page, a
+Markdown file, the agent index and the search runtime, and fails when any is
+admitted. It reads no secret. Call it on a schedule of the project's own, so a
+boundary that disappears between deployments is noticed:
+
+```yaml
+on:
+  schedule:
+    - cron: '23 */2 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    uses: ctcstack/ctcdocs/.github/workflows/project-probe.yml@<commit sha>
+```
+
 ## Deploy to a development environment
 
 The workflow deploys an exact commit, defaulting to the one that triggered it.
@@ -307,7 +260,7 @@ The workflow deploys an exact commit, defaulting to the one that triggered it.
 2. Open **GitHub → Actions**, choose the workflow that calls
    `project-deploy.yml` for development, and run it.
 3. Confirm every job passes: the corpus guard, the candidate verification, the
-   anonymous-boundary check, the deployment, and the post-deploy check.
+   boundary check, the deployment, and the post-deploy check.
 4. Open the development hostname in a private window and confirm the access
    boundary behaves as the environment's `visibility` declares.
 5. Check navigation, search, images, tables, one missing route, and any changed
@@ -332,24 +285,25 @@ For an automatic deployment:
 6. Confirm these production jobs pass:
 
    ```text
-   Verify production candidate
-   Verify Access before deployment
+   Verify the deployment candidate
+   Verify the boundary before deployment
    Deploy immutable static assets
-   Verify protected production
-   Require completed production deployment
+   Verify the protected deployment
+   Require a completed deployment
    ```
 
-   The candidate verification and the Access preflight run side by side, and
-   the deployment waits for both. The final gate fails when either deployment
-   or the protected smoke test is skipped. A green workflow therefore
-   guarantees that the verified commit was actually deployed and exercised
-   through Cloudflare Access.
+   The candidate verification — the project's gate, then the denial suite —
+   and the boundary check run side by side, and the deployment waits for both.
+   The final gate fails when either deployment or the protected smoke test is
+   skipped. A green workflow therefore guarantees that the verified commit was
+   actually deployed and exercised through its boundary.
 
 A deployment started by a sync shows the candidate verification as skipped,
-not passed. The sync job ran `pnpm verify` on the exact tree it committed, and
-its caller passes `candidate_verified: true` with `candidate_sha`, so the gate
-does not run a second time. The input is refused without a SHA, and any other
-reason for verification to be skipped still stops the deployment.
+not passed. The sync job ran `pnpm verify` and the denial suite on the exact
+tree it committed, and its caller passes `candidate_verified: true` with
+`candidate_sha`, so the gate does not run a second time. The input is refused
+without a SHA, and any other reason for verification to be skipped still stops
+the deployment.
 
 For a manual re-deployment of the current `main` revision:
 
@@ -360,8 +314,8 @@ For a manual re-deployment of the current `main` revision:
 
 After either path:
 
-1. Open `https://docs.example.com` in an incognito window.
-2. Confirm the only login option is the identity provider you configured.
+1. Open `https://docs.example.com` in a private window.
+2. Confirm it sends you to Google, and that a personal account is refused.
 3. Verify the home page, navigation, Pagefind search, images, tables, and a
    missing route.
 4. Confirm an anonymous request to the home page and a Pagefind asset does not
@@ -378,23 +332,24 @@ corepack enable
 pnpm install --frozen-lockfile
 PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers pnpm exec playwright install chromium
 pnpm verify
-pnpm deploy:dry-run:development
-pnpm deploy:dry-run:production
+pnpm exec ctcdocs-verify-gate
+pnpm deploy:dry-run
 ```
 
 Normal releases should use GitHub Actions. Direct local production deployment
 is reserved for an approved incident procedure:
 
 ```bash
-pnpm test:access:preflight
-pnpm deploy:production
-pnpm test:access:post-deploy
+pnpm exec ctcdocs-access-smoke --preflight
+pnpm exec wrangler deploy --env production --tag ctcdocs-gate-v1
+pnpm exec wrangler deploy --config wrangler.directory.jsonc --env production
+pnpm exec ctcdocs-access-smoke --post-deploy
 ```
 
 For a direct local operation, Wrangler reads deploy credentials from the
 ignored `.env` beside `wrangler.jsonc`, while the smoke test reads the target
-and Access credentials from the project root `.env`. Both must describe the
-same environment. Never paste tokens directly into shell commands.
+and the machine key from the project root `.env`. Both must describe the same
+environment. Never paste tokens directly into shell commands.
 
 ## Rollback production
 
@@ -409,8 +364,15 @@ same environment. Never paste tokens directly into shell commands.
 8. Wait for the post-rollback protected smoke test.
 9. Record the incident, restored version, root cause, and follow-up fix.
 
-If Access itself is failing, stop deployments and follow the security incident
-procedure in [Operations](OPERATIONS.md) instead of rolling application code.
+A private deployment's rollback refuses a version without the
+`ctcdocs-gate-v1` tag: such a version predates the Worker and would serve
+everything to everyone. A rollback restores the site Worker with its own
+access map; the directory Worker keeps reading the groups of the latest build,
+so a group only the older map names admits no one until the next deployment.
+
+If the boundary itself is failing, stop deployments and follow the security
+incident procedure in [Operations](OPERATIONS.md) instead of rolling
+application code.
 
 ## Troubleshooting
 
@@ -419,17 +381,28 @@ procedure in [Operations](OPERATIONS.md) instead of rolling application code.
 Typical log:
 
 ```text
-CTCDOCS_BASE_URL:
-CF_ACCESS_CLIENT_ID:
-CF_ACCESS_CLIENT_SECRET:
+A machine key (CTCDOCS_MACHINE_KEY) or Cloudflare Access service-token credentials are required.
 ```
 
 Cause: the values exist only in local `.env`, or were added to a different
 GitHub environment.
 
-Fix: add the URL as an environment variable and the two credentials as
-environment secrets in the exact `development-smoke` or `production-smoke`
-environment, then re-run the workflow.
+Fix: add the URL as an environment variable and the key as an environment
+secret in the exact `development-smoke` or `production-smoke` environment, then
+re-run the workflow.
+
+### The smoke key is refused
+
+The key is not in that environment's `MACHINE_KEYS`, the record was pasted
+into the other environment, or it has expired. Issue a new one and replace
+both the record and `CTCDOCS_MACHINE_KEY`; see
+[Operations](OPERATIONS.md#machine-keys).
+
+### The site says the directory has not been read yet
+
+There is no snapshot in the environment's namespace: the directory Worker has
+not run, or every run has failed. Its logs say why; see
+[Operations](OPERATIONS.md#the-directory-snapshot).
 
 ### `production-deploy` does not exist
 
@@ -450,27 +423,21 @@ and any test-corpus environment do not flow into it.
 
 ### Custom domain already belongs to another Worker
 
-Keep the Access application enabled. Remove only the obsolete Worker
-custom-domain binding, deploy the intended named environment immediately, run
-the protected smoke test, and delete the old Worker only after successful
-verification.
+Remove only the obsolete Worker's custom-domain binding, deploy the intended
+named environment immediately, run the protected smoke test, and delete the
+old Worker only after successful verification.
 
 ### Anonymous request returns wiki content
 
-Treat this as a security incident:
-
-1. stop sync and deployment workflows;
-2. disable the public route or Worker;
-3. restore the Access application and policies;
-4. revoke affected tokens;
-5. inspect Cloudflare and GitHub audit logs;
-6. re-enable deployment only after the anonymous negative check passes.
+Treat this as a security incident and follow
+[Operations](OPERATIONS.md#rollback): take the custom domain off the Worker
+first, then find the cause.
 
 ## Official references
 
 - [Cloudflare Workers environments](https://developers.cloudflare.com/workers/wrangler/environments/)
 - [Cloudflare Workers custom domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)
 - [Cloudflare Workers GitHub Actions](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/)
-- [Cloudflare Access self-hosted applications](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/)
-- [Cloudflare Access service tokens](https://developers.cloudflare.com/cloudflare-one/access-controls/service-credentials/service-tokens/)
+- [Cloudflare Workers secrets](https://developers.cloudflare.com/workers/configuration/secrets/)
+- [Cloudflare Workers versions and rollbacks](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/)
 - [GitHub deployment environments](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)
