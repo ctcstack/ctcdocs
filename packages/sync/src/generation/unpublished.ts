@@ -34,6 +34,7 @@ export type UnpublishedReasonCode =
   | 'export-too-large'
   | 'download-restricted'
   | 'content-rejected'
+  | 'readers-widened'
   | 'pdf-no-text'
   | 'pdf-over-site-limit'
   | 'pdf-too-large'
@@ -98,6 +99,13 @@ export const UNPUBLISHED_REASONS: readonly UnpublishedReason[] = [
     action: 'Remove the part named',
     instruction:
       'Conversion stopped on content it cannot publish safely, named under the document. Remove or replace that part of the document.',
+  },
+  {
+    code: 'readers-widened',
+    title: 'More people would read the document than before',
+    action: 'Add an access rule for its folder',
+    instruction:
+      "The document moved, or a rule changed, so that more people would read it than it was published to. It stays with its earlier readers until the site's configuration names its folder in an access rule. Ask whoever maintains the site to add one, or move the document back.",
   },
   {
     code: 'pdf-no-text',

@@ -8,7 +8,9 @@ import {
   computeAccessModel,
   documentClass,
   folderClass,
+  intersectReaders,
   MEMBERS_CLASS,
+  widensReaders,
 } from './access-classes.js';
 import { parseCorpusStructure } from './corpus-structure.js';
 
@@ -200,5 +202,53 @@ describe('classIdentifiers', () => {
         }
       }),
     );
+  });
+});
+
+describe('published readers', () => {
+  it('never lets a document reach beyond the readers it was published with', () => {
+    const narrowed = parseCorpusStructure({
+      rootFolderId: 'root',
+      folders: {
+        root: { googleParentId: null, googleName: 'R', displayLabel: 'R' },
+        open: {
+          googleParentId: 'root',
+          googleName: 'Open',
+          displayLabel: 'Open',
+        },
+      },
+      documents: {
+        moved: {
+          googleParentId: 'open',
+          stableSlug: 'open/moved',
+          publishedReaders: ['team@example.com'],
+        },
+        never: {
+          googleParentId: 'open',
+          stableSlug: 'open/never',
+          publishedReaders: [],
+        },
+      },
+    });
+    const model = computeAccessModel(
+      {
+        admins: ['admins@example.com'],
+        rules: [{ folder: 'open', label: 'Open', readers: ['*'] }],
+      },
+      narrowed,
+    );
+    const moved = model.documents.moved as string;
+    expect(model.classes[moved]?.readers).toEqual(['team@example.com']);
+    expect(model.documents.never).toBe(ADMINS_CLASS);
+  });
+
+  it('compares and intersects reader sets', () => {
+    expect(widensReaders('*', ['a@example.com'])).toBe(true);
+    expect(widensReaders(['a@example.com'], '*')).toBe(false);
+    expect(
+      widensReaders(['a@example.com', 'b@example.com'], ['a@example.com']),
+    ).toBe(true);
+    expect(widensReaders([], ['a@example.com'])).toBe(false);
+    expect(intersectReaders('*', ['a@example.com'])).toEqual(['a@example.com']);
   });
 });

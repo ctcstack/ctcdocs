@@ -86,6 +86,7 @@ const PRIORITY_BY_CODE: Readonly<Record<string, Priority>> = {
   'heading-from-another-document': 'fix-now',
   'empty-document': 'fix-now',
   'name-script': 'fix-now',
+  'readers-widened': 'fix-now',
   'export-too-large': 'fix-now',
   'download-restricted': 'fix-now',
   'content-rejected': 'fix-now',

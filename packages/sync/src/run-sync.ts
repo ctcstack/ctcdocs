@@ -1,7 +1,14 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { posix, resolve } from 'node:path';
 
-import { PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
+import {
+  chainReaders,
+  parseCorpusStructure,
+  PROJECT_LAYOUT,
+  widensReaders,
+  type AccessConfiguration,
+  type Readers,
+} from '@ctcstack/ctcdocs-core';
 
 import { extractSafeZipEntries, UnsafeZipError } from './archive/safe-zip.js';
 import { IMAGE_VERSION } from './assets/crop-png.js';
@@ -297,6 +304,54 @@ const PDF_TEXT_WARNINGS: Readonly<Record<string, string | undefined>> = {
   'pdf:damaged': 'It is damaged.',
   'pdf:unreadable': 'It could not be read.',
 };
+
+/**
+ * The readers each document is published with (ADR-039), written into the
+ * candidate manifest. A move or a rule change that would widen them keeps the
+ * earlier readers until a rule names the document's folder; those documents
+ * are returned so the report can say so. Without access rules the field is
+ * dropped.
+ */
+export function recordPublishedReaders(
+  candidate: SyncManifest,
+  existing: SyncManifest,
+  access: AccessConfiguration | undefined,
+): Set<string> {
+  const widened = new Set<string>();
+  const ids = Object.keys(candidate.documents).sort(compareText);
+  if (!access) {
+    for (const id of ids) {
+      const record = { ...(candidate.documents[id] as SyncedDocumentRecord) };
+      delete record.publishedReaders;
+      candidate.documents[id] = record;
+    }
+    return widened;
+  }
+  const rules = new Map(access.rules.map((rule) => [rule.folder, rule]));
+  const corpus = parseCorpusStructure(candidate);
+  for (const id of ids) {
+    const record = candidate.documents[id] as SyncedDocumentRecord;
+    const chain = chainReaders(record.googleParentId, rules, corpus);
+    const current: Readers = chain.kind === 'readers' ? chain.readers : [];
+    const previous = existing.documents[id]?.publishedReaders;
+    const acknowledged =
+      record.googleParentId !== null && rules.has(record.googleParentId);
+    let published: Readers = current;
+    if (
+      previous !== undefined &&
+      !acknowledged &&
+      widensReaders(current, previous)
+    ) {
+      published = previous;
+      widened.add(id);
+    }
+    candidate.documents[id] = {
+      ...record,
+      publishedReaders: published === '*' ? '*' : [...published].sort(),
+    };
+  }
+  return widened;
+}
 
 /** The parts of a PDF's page that are missing, from its record (ADR-027). */
 function incompletePdf(record: SyncedDocumentRecord): IncompleteDocument[] {
@@ -1545,6 +1600,11 @@ async function synchronize(
       : folders,
     redirects,
   };
+  const widened = recordPublishedReaders(
+    candidateManifest,
+    existingManifest,
+    site.access,
+  );
   const manifestChanged = !manifestsMatchExceptGeneratedAt(
     candidateManifest,
     existingManifest,
@@ -1636,7 +1696,12 @@ async function synchronize(
   );
   const incomplete = new Map(
     Object.values(candidateManifest.documents).flatMap((record) => {
-      const missing = incompletePdf(record);
+      const missing: IncompleteDocument[] = [
+        ...incompletePdf(record),
+        ...(widened.has(record.googleFileId)
+          ? [{ reason: 'readers-widened' as const, record }]
+          : []),
+      ];
       return missing.length > 0
         ? [[record.googleFileId, missing] as const]
         : [];

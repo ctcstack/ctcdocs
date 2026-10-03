@@ -66,12 +66,13 @@ A label that no longer matches its folder's name, a rule whose folder has gone,
 and every folder without a rule are listed on the content health page and in
 the sync job summary instead.
 
-**A document whose readers widen is held back.** When a sync would give a
-document a wider reader set than the deployed build — its folder moved out
-from under a narrower rule, or a rule removed — the document keeps its last
-published version and readers, and is listed under Fix now, until a rule names
-its folder. A document held back for another reason (ADR-026) takes the
-narrower of the readers it was published with and those of its current folder.
+**A document whose readers would widen keeps its earlier ones.** The manifest
+records the readers each document was last published with, and a document's
+class never reaches beyond them. When a sync finds that a document would gain
+readers — its folder moved out from under a narrower rule, or a rule changed —
+it keeps the earlier readers and lists the document under Fix now, until a
+rule names the document's folder. The document's content keeps being
+published, to its earlier readers only. Narrowing takes effect at once.
 
 ### Groups
 

@@ -27,6 +27,11 @@ export interface CorpusDocument {
   readonly id: string;
   readonly parentId: string | null;
   readonly slug: string;
+  /**
+   * The readers the document was last published with (ADR-039). Its class
+   * never reaches beyond them until a rule names its folder.
+   */
+  readonly publishedReaders?: '*' | readonly string[];
 }
 
 export interface CorpusStructure {
@@ -95,10 +100,16 @@ export function parseCorpusStructure(manifest: unknown): CorpusStructure {
   const documents = new Map<string, CorpusDocument>();
   for (const [id, raw] of entries(source.documents, 'documents')) {
     const path = `documents.${id}`;
+    const published = (raw as Record<string, unknown>).publishedReaders;
     documents.set(id, {
       id,
       parentId: field(raw, 'googleParentId', path, true),
       slug: field(raw, 'stableSlug', path) ?? '',
+      ...(published === '*' ||
+      (Array.isArray(published) &&
+        published.every((group) => typeof group === 'string'))
+        ? { publishedReaders: published as '*' | readonly string[] }
+        : {}),
     });
   }
   const root = source.rootFolderId;
