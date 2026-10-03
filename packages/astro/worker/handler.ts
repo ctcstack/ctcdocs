@@ -266,12 +266,7 @@ function signOut(gate: Gate, request: Request): Response {
   if (!sameOrigin) {
     return new Response('Forbidden', { status: 403 });
   }
-  const response = redirect('/auth/signed-out', 303, [
-    cookie(SESSION_COOKIE, '', 0),
-  ]);
-  // Pages read while signed in must not stay in this browser's cache.
-  response.headers.set('Clear-Site-Data', '"cache"');
-  return response;
+  return redirect('/auth/signed-out', 303, [cookie(SESSION_COOKIE, '', 0)]);
 }
 
 type Identified = Reader | 'no-directory' | 'not-in-directory' | undefined;

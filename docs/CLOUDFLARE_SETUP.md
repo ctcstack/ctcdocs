@@ -158,25 +158,28 @@ their own that has **Workers KV Storage** permission.
 Cloudflare does not apply `_headers` to a response a Worker returns, so behind
 the Worker the policy lives in the Worker:
 
-| Response                                                              | `Cache-Control`                        |
-| --------------------------------------------------------------------- | -------------------------------------- |
-| Fingerprinted scripts, styles and fonts under `/_astro/`              | `public, max-age=31556952, immutable`  |
-| Everything else the build holds: pages, Markdown, images, search data | `private, max-age=60, must-revalidate` |
-| Anything that depends on who asks: sign-in, `/_kb/*`, refusals        | `no-store`                             |
+| Response                                                       | `Cache-Control`                        |
+| -------------------------------------------------------------- | -------------------------------------- |
+| Fingerprinted scripts, styles and fonts under `/_astro/`       | `public, max-age=31556952, immutable`  |
+| Pages                                                          | `private, no-cache`                    |
+| Everything else the build holds: Markdown, images, search data | `private, max-age=60, must-revalidate` |
+| Anything that depends on who asks: sign-in, `/_kb/*`, refusals | `no-store`                             |
 
 Every response also carries `X-Robots-Tag: noindex, nofollow, noarchive`,
 `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin` and
-`Strict-Transport-Security: max-age=31536000`. Signing out clears the
-browser's cache of the site. Markdown
+`Strict-Transport-Security: max-age=31536000`. Markdown
 is served as `text/markdown; charset=utf-8` and `llms.txt` as
 `text/plain; charset=utf-8`, because a static build discards the type an
 endpoint set and a browser without a charset corrupts every non-ASCII
 character. Every HTML page carries a Content Security Policy admitting the
-site's own scripts, the inline scripts the build hashed, and nothing else.
+site's own scripts, the inline scripts the build hashed, fonts inlined as
+`data:`, the PDF `<object>` of the site's own files, and nothing else.
 
-The short private lifetime lets back-and-forth navigation reuse the browser
-cache while a revoked reader or an updated document is stale for a minute at
-most. Generated images and search data are never immutable, because they can
+A page is checked with the Worker every time it is shown — usually a short
+`304` — so a page read before signing out is not shown from the browser's cache
+after it. Other content keeps a short private lifetime, so back-and-forth
+navigation reuses it while a revoked reader or an updated document is stale for
+a minute at most. Generated images and search data are never immutable, because they can
 contain internal content.
 
 `public/_headers` is still validated against the declared visibility, and still
