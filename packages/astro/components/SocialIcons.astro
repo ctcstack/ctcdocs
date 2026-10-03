@@ -1,0 +1,53 @@
+---
+/**
+ * Overrides Starlight's `SocialIcons`, which the header and the mobile menu
+ * both draw, to add **Sign out** on a private deployment.
+ *
+ * The deployment's Worker signs readers in (ADR-038) and ends a session on a
+ * POST from the site itself, so the control is a form, not a link: a link
+ * could be followed by a prefetch or a crawler. Signing out of the site does
+ * not sign the reader out of Google. A public deployment has no session, so
+ * it draws Starlight's icons alone.
+ */
+import Default from '@astrojs/starlight/components/SocialIcons.astro';
+
+import { siteConfiguration } from '../lib/project';
+
+const isPrivate =
+  siteConfiguration.deployment.environments.production.visibility === 'private';
+---
+
+<Default />
+{
+  isPrivate && (
+    <form method="post" action="/auth/sign-out" class="sign-out">
+      <button type="submit">Sign out</button>
+    </form>
+  )
+}
+
+<style>
+  @layer starlight.components {
+    .sign-out {
+      display: flex;
+      margin: 0;
+    }
+
+    button {
+      background: none;
+      border: 0;
+      color: var(--kb-gray-2);
+      cursor: pointer;
+      font: inherit;
+      font-size: var(--kb-text-sm);
+      padding: 0.5em;
+      margin: -0.5em;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      color: var(--kb-ink);
+      text-decoration: underline;
+    }
+  }
+</style>
