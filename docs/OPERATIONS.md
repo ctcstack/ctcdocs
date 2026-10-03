@@ -625,11 +625,12 @@ changed and starts an AI Search sync. Its log shows `agents-published` with
 the counts written and deleted, and `agents-publish-incomplete` when a
 document could not be written: the others are published and indexed all the
 same, and the next run tries the missing ones again. The last published
-digest is the `agents-published` key in `KB_STATE`. To publish everything again, delete that
-key; the next run compares every document and syncs:
+build is recorded in the bucket itself, as `agents-published.json`, so a new
+or emptied bucket is filled on the next run. To publish everything again,
+delete that object; the next run compares every document and syncs:
 
 ```bash
-pnpm exec wrangler kv key delete agents-published --binding KB_STATE --env production --remote
+pnpm exec wrangler r2 object delete <bucket>/agents-published.json --remote
 ```
 
 AI Search's own jobs show whether the index has caught up:

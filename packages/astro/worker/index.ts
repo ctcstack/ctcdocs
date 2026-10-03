@@ -40,10 +40,7 @@ interface AiSearch {
 
 interface Env {
   readonly ASSETS: { fetch(request: Request): Promise<Response> };
-  readonly KB_STATE: {
-    get(key: string, type: 'json'): Promise<unknown>;
-    put(key: string, value: string): Promise<void>;
-  };
+  readonly KB_STATE: { get(key: string, type: 'json'): Promise<unknown> };
   readonly OAUTH_KV?: unknown;
   readonly KB_DOCUMENTS?: DocumentStore;
   readonly KB_SEARCH?: AiSearch;
@@ -180,10 +177,6 @@ export default {
         assets: env.ASSETS,
         store: env.KB_DOCUMENTS,
         index: documentIndex(env.KB_SEARCH),
-        state: {
-          get: (key) => env.KB_STATE.get(key, 'json'),
-          put: (key, value) => env.KB_STATE.put(key, value),
-        },
         origin,
         log,
       }).catch((error: unknown) => {

@@ -7,13 +7,15 @@
  * Markdown projection in its own assets, deletes the ones the build no longer
  * has, and asks AI Search to sync what changed. A document that cannot be
  * written now is tried again on the next run, without holding back the
- * others. A marker in the state namespace — the build's digest, whether every
- * document is written, whether the index has been asked to sync since the
- * last change — lets a finished build skip all of that, and a rollback is
- * published like any other build, because its digest differs.
+ * others. A marker kept in the bucket itself — the build's digest, whether
+ * every document is written, whether the index has been asked to sync since
+ * the last change — lets a finished build skip all of that. Kept beside the
+ * documents, it describes that bucket and no other: an environment sharing
+ * other state, or a bucket replaced by an empty one, is published in full. A
+ * rollback is published like any other build, because its digest differs.
  *
- * Web-standard code only: the bucket, the index, the assets and the state are
- * handed in.
+ * Web-standard code only: the bucket, the index and the assets are handed
+ * in.
  */
 import type { AccessMapFile } from '../access-map.js';
 import { sitePath } from '../paths.js';
@@ -24,7 +26,11 @@ import {
   type DocumentStore,
 } from './documents.js';
 
-export const PUBLISHED_KEY = 'agents-published';
+/**
+ * The marker's object: outside the documents' prefix, and without the
+ * `class` metadata every search filters on, so no search ever returns it.
+ */
+export const MARKER_KEY = 'agents-published.json';
 
 interface PublishedMarker {
   readonly digest: string;
@@ -39,16 +45,28 @@ export interface PublishContext {
   readonly assets: { fetch(request: Request): Promise<Response> };
   readonly store: DocumentStore;
   readonly index: DocumentIndex;
-  readonly state: {
-    get(key: string): Promise<unknown>;
-    put(key: string, value: string): Promise<void>;
-  };
   /** Any origin the assets answer for; the files are read by path. */
   readonly origin: string;
   readonly log: (event: Readonly<Record<string, unknown>>) => void;
 }
 
 export type PublishOutcome = 'off' | 'unchanged' | 'published' | 'incomplete';
+
+/** The bucket's marker, or `undefined` when it has none it can read. */
+async function markerOf(
+  store: DocumentStore,
+): Promise<PublishedMarker | undefined> {
+  const object = await store.get(MARKER_KEY);
+  if (!object) {
+    return undefined;
+  }
+  try {
+    const value: unknown = JSON.parse(await object.text());
+    return isMarker(value) ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 function isMarker(value: unknown): value is PublishedMarker {
   return (
@@ -82,14 +100,13 @@ async function storedHashes(
 export async function publishDocuments(
   context: PublishContext,
 ): Promise<PublishOutcome> {
-  const { map, assets, store, index, state, origin, log } = context;
+  const { map, assets, store, index, origin, log } = context;
   const catalog = map.agents;
   if (map.site.mcp !== true || !catalog) {
     return 'off';
   }
-  const marker = await state.get(PUBLISHED_KEY);
-  const current =
-    isMarker(marker) && marker.digest === catalog.digest ? marker : undefined;
+  const marker = await markerOf(store);
+  const current = marker?.digest === catalog.digest ? marker : undefined;
   if (current?.complete && current.synced) {
     return 'unchanged';
   }
@@ -157,9 +174,10 @@ export async function publishDocuments(
       // A sync already running refuses another; the next run starts it.
     }
   }
-  await state.put(
-    PUBLISHED_KEY,
+  await store.put(
+    MARKER_KEY,
     JSON.stringify({ digest: catalog.digest, complete, synced }),
+    { httpMetadata: { contentType: 'application/json' }, customMetadata: {} },
   );
   return complete ? 'published' : 'incomplete';
 }
