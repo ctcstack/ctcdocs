@@ -4,13 +4,16 @@
  * Documents live in R2 as `docs/<short ID>.md`, with their class, title and
  * Markdown address as object metadata, and AI Search indexes them. Neither
  * store decides access: the search is asked to look only in the reader's
- * classes, and every result, and every document read, is judged again
- * against the build's access map by its Markdown address. A store or an index
- * that lags a deploy can hide a document for a while, never open one.
+ * classes, and every result, and every document read, is judged again by the
+ * build's own list of documents, which the Worker is bundled with. A short ID
+ * the build does not list does not exist, its class is the one the build gives
+ * its Markdown address, and an object is read only while it holds exactly the
+ * build's text. A store or an index that lags a deploy, or runs ahead of a
+ * rollback, can hide a document for a while, never open one.
  *
  * Web-standard code only: the bucket and the index are handed in.
  */
-import type { AccessMapFile } from '../access-map.js';
+import type { AccessMapFile, AgentDocument } from '../access-map.js';
 import { mayRead, type Reader } from '../decide.js';
 
 /** The part of an R2 bucket the server uses. */
@@ -19,9 +22,6 @@ export interface DocumentStore {
     text(): Promise<string>;
     customMetadata?: Record<string, string>;
   } | null>;
-  head(
-    key: string,
-  ): Promise<{ customMetadata?: Record<string, string> } | null>;
   put(
     key: string,
     value: string,
@@ -44,33 +44,38 @@ export interface DocumentStore {
 
 /** The part of an AI Search instance the server uses. */
 export interface DocumentIndex {
-  /** Chunks matching `query` among documents of these classes, best first. */
-  search(
-    query: string,
-    classes: readonly string[],
-  ): Promise<readonly { key: string; score: number }[]>;
+  /** Keys of the objects whose chunks match `query`, best first. */
+  search(query: string, classes: readonly string[]): Promise<readonly string[]>;
   /** Starts a sync of the bucket; throws when one cannot start now. */
   sync(): Promise<void>;
 }
 
 export const DOCUMENT_PREFIX = 'docs/';
-/** A short ID (ADR-022): lowercase hexadecimal. */
-const SHORT_ID = /^[0-9a-f]{6,64}$/u;
+const DOCUMENT_SUFFIX = '.md';
 /** Results a search returns at most. */
 const MAX_RESULTS = 10;
 /** Text `fetch` returns at most: about 25,000 tokens. */
 export const FETCH_LIMIT = 100_000;
 
 export function documentKey(id: string): string {
-  return `${DOCUMENT_PREFIX}${id}.md`;
+  return `${DOCUMENT_PREFIX}${id}${DOCUMENT_SUFFIX}`;
 }
 
-function idOf(key: string): string | undefined {
-  if (!key.startsWith(DOCUMENT_PREFIX) || !key.endsWith('.md')) {
-    return undefined;
+/** The build's documents by short ID, built once per map. */
+const catalogs = new WeakMap<
+  AccessMapFile,
+  ReadonlyMap<string, AgentDocument>
+>();
+
+function catalogOf(map: AccessMapFile): ReadonlyMap<string, AgentDocument> {
+  let catalog = catalogs.get(map);
+  if (!catalog) {
+    catalog = new Map(
+      (map.agents?.documents ?? []).map((document) => [document.id, document]),
+    );
+    catalogs.set(map, catalog);
   }
-  const id = key.slice(DOCUMENT_PREFIX.length, -'.md'.length);
-  return SHORT_ID.test(id) ? id : undefined;
+  return catalog;
 }
 
 /** The permanent link a citation uses, which survives a rename (ADR-022). */
@@ -89,21 +94,6 @@ export function readableClasses(
     .sort();
 }
 
-/** Whether the reader may open the document an object's metadata names. */
-function readable(
-  map: AccessMapFile,
-  reader: Reader,
-  stale: boolean,
-  metadata: Record<string, string> | undefined,
-): boolean {
-  const markdown = metadata?.markdown;
-  if (!markdown) {
-    return false;
-  }
-  const fileClass = map.files[markdown];
-  return fileClass !== undefined && mayRead(map, reader, fileClass, stale);
-}
-
 export interface DocumentAccess {
   readonly map: AccessMapFile;
   readonly reader: Reader;
@@ -111,6 +101,18 @@ export interface DocumentAccess {
   readonly origin: string;
   readonly store: DocumentStore;
   readonly index: DocumentIndex;
+}
+
+/** The build's entry for a short ID, when it lists one the reader may open. */
+function readableDocument(
+  { map, reader, stale }: DocumentAccess,
+  id: string,
+): AgentDocument | undefined {
+  const document = catalogOf(map).get(id);
+  const fileClass = document && map.files[document.markdown];
+  return fileClass !== undefined && mayRead(map, reader, fileClass, stale)
+    ? document
+    : undefined;
 }
 
 export interface SearchResult {
@@ -123,26 +125,29 @@ export async function searchDocuments(
   access: DocumentAccess,
   query: string,
 ): Promise<SearchResult[]> {
-  const { map, reader, stale, origin, store, index } = access;
+  const { map, reader, stale, origin, index } = access;
   const classes = readableClasses(map, reader, stale);
   if (classes.length === 0 || query.trim().length === 0) {
     return [];
   }
   const results: SearchResult[] = [];
   const seen = new Set<string>();
-  for (const chunk of await index.search(query, classes)) {
-    const id = idOf(chunk.key);
-    if (!id || seen.has(id)) {
+  for (const key of await index.search(query, classes)) {
+    if (!key.startsWith(DOCUMENT_PREFIX) || !key.endsWith(DOCUMENT_SUFFIX)) {
+      continue;
+    }
+    const id = key.slice(DOCUMENT_PREFIX.length, -DOCUMENT_SUFFIX.length);
+    if (seen.has(id)) {
       continue;
     }
     seen.add(id);
-    const object = await store.head(documentKey(id));
-    if (!object || !readable(map, reader, stale, object.customMetadata)) {
+    const document = readableDocument(access, id);
+    if (!document) {
       continue;
     }
     results.push({
       id,
-      title: object.customMetadata?.title ?? id,
+      title: document.title,
       url: permanentLink(origin, id),
     });
     if (results.length === MAX_RESULTS) {
@@ -165,24 +170,24 @@ export async function fetchDocument(
   access: DocumentAccess,
   id: string,
 ): Promise<FetchedDocument | undefined> {
-  const { map, reader, stale, origin, store } = access;
-  if (!SHORT_ID.test(id)) {
+  const document = readableDocument(access, id);
+  if (!document) {
     return undefined;
   }
-  const object = await store.get(documentKey(id));
-  if (!object || !readable(map, reader, stale, object.customMetadata)) {
+  const object = await access.store.get(documentKey(id));
+  // Another build's text, until the schedule publishes this one.
+  if (!object || object.customMetadata?.hash !== document.hash) {
     return undefined;
   }
   const text = await object.text();
   const truncated = text.length > FETCH_LIMIT;
-  const modified = object.customMetadata?.modified;
   return {
     id,
-    title: object.customMetadata?.title ?? id,
+    title: document.title,
     text: truncated ? text.slice(0, FETCH_LIMIT) : text,
-    url: permanentLink(origin, id),
+    url: permanentLink(access.origin, id),
     metadata: {
-      ...(modified ? { modified } : {}),
+      ...(document.modified ? { modified: document.modified } : {}),
       ...(truncated ? { truncated: true } : {}),
     },
   };

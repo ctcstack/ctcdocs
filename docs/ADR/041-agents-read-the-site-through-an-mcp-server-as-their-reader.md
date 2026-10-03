@@ -153,9 +153,12 @@ Cloudflare for this: the deploy job is unchanged.
 15-minute sync interval as a backstop for a sync the Worker could not start.
 
 **The Worker's own access map still decides.** AI Search is asked with a
-filter on the reader's classes, or none for an admin. Every result, and every
-document `fetch` reads from the bucket, is checked again against the build's
-map by its Markdown address. A bucket or an index that lags a deploy can
+filter on the reader's classes. Every result, and every document `fetch`
+reads from the bucket, is judged again by the build's own list, never by what
+the bucket says of it: a short ID the build does not list does not exist, its
+class is the one the build's map gives its Markdown address, and `fetch`
+returns an object only while its hash is the build's. A bucket or an index
+that lags a deploy, or still holds a newer build's text after a rollback, can
 therefore hide a document for a while, never open one.
 
 This copy in R2 is the first step of moving generated content out of Git.
@@ -172,7 +175,7 @@ assistant knows when to use them:
   question the reader's documents do not answer gets no results rather than
   a near miss;
 - `fetch` — an `id` in; `{ id, title, text, url, metadata }` out: the
-  document's Markdown projection as `text`, its folder and dates in
+  document's Markdown projection as `text`, and when it was last changed in
   `metadata`.
 
 `id` is the document's short ID (ADR-022), and `url` its permanent link

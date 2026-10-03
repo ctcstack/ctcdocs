@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import type { AccessMapFile } from '../access-map.js';
 import type { Reader } from '../decide.js';
 import {
   FETCH_LIMIT,
@@ -24,9 +25,10 @@ function access(
     stale = false,
     index = new FixedIndex(ALL_KEYS),
     store = publishedStore(),
-  }: Partial<Pick<DocumentAccess, 'stale' | 'index' | 'store'>> = {},
+    map = agentMap,
+  }: Partial<Pick<DocumentAccess, 'stale' | 'index' | 'store' | 'map'>> = {},
 ): DocumentAccess {
-  return { map: agentMap, reader, stale, origin: ORIGIN, store, index };
+  return { map, reader, stale, origin: ORIGIN, store, index };
 }
 
 const ids = (results: readonly { id: string }[]) =>
@@ -86,17 +88,38 @@ describe('search', () => {
     ).toEqual(['aaaaaa']);
   });
 
-  it('drops a result whose class the map no longer lists', async () => {
+  it('drops a document this build does not list', async () => {
+    // Left in the bucket and the index by an earlier build.
     const store = publishedStore();
-    store.seed('docs/dddddd.md', '# Moved\n', {
+    store.seed('docs/dddddd.md', '# Removed\n', {
       class: 'members',
-      title: 'Moved',
-      markdown: '/old/address/index.md',
+      title: 'Removed',
+      markdown: '/handbook/index.md',
     });
     const index = new FixedIndex(['docs/dddddd.md']);
     expect(
       await searchDocuments(access(readers.admin, { index, store }), 'x'),
     ).toEqual([]);
+  });
+
+  it('judges a document by the build, not by what the bucket says of it', async () => {
+    // An object written by another build names a members address.
+    const store = publishedStore();
+    store.seed('docs/bbbbbb.md', '# Team plan\n', {
+      class: 'members',
+      title: 'Everyone’s plan',
+      markdown: '/handbook/index.md',
+      hash: 'h-plan',
+    });
+    const index = new FixedIndex(['docs/bbbbbb.md']);
+    expect(
+      await searchDocuments(access(readers.member, { index, store }), 'x'),
+    ).toEqual([]);
+    expect(
+      await searchDocuments(access(readers.team, { index, store }), 'x'),
+    ).toEqual([
+      { id: 'bbbbbb', title: 'Team plan', url: `${ORIGIN}/d/bbbbbb/` },
+    ]);
   });
 
   it('answers an empty query, or a reader with no class, with nothing', async () => {
@@ -108,19 +131,22 @@ describe('search', () => {
   });
 
   it('returns at most ten documents', async () => {
-    const store = publishedStore();
-    const keys: string[] = [];
-    for (let n = 0; n < 15; n += 1) {
-      const id = `${n}`.padStart(6, 'e');
-      keys.push(`docs/${id}.md`);
-      store.seed(`docs/${id}.md`, '#\n', {
-        title: id,
-        markdown: '/handbook/index.md',
-      });
-    }
-    const index = new FixedIndex(keys);
+    const documents = Array.from({ length: 15 }, (_, n) => ({
+      id: `${n}`.padStart(6, 'e'),
+      title: `Page ${n}`,
+      markdown: '/handbook/index.md',
+      modified: null,
+      hash: `h-${n}`,
+    }));
+    const map: AccessMapFile = {
+      ...agentMap,
+      agents: { digest: 'digest-many', documents },
+    };
+    const index = new FixedIndex(
+      documents.map((document) => `docs/${document.id}.md`),
+    );
     expect(
-      await searchDocuments(access(readers.member, { index, store }), 'x'),
+      await searchDocuments(access(readers.member, { index, map }), 'x'),
     ).toHaveLength(10);
   });
 });
@@ -157,15 +183,54 @@ describe('fetch', () => {
     ).toBe(undefined);
   });
 
+  it('reads the class from the build, not from the object', async () => {
+    const store = publishedStore();
+    store.seed('docs/bbbbbb.md', '# Team plan\n', {
+      class: 'members',
+      title: 'Team plan',
+      markdown: '/handbook/index.md',
+      hash: 'h-plan',
+    });
+    expect(
+      await fetchDocument(access(readers.member, { store }), 'bbbbbb'),
+    ).toBe(undefined);
+  });
+
+  it('refuses an object holding another build’s text', async () => {
+    /*
+     * A rollback: the bucket still holds what a newer build wrote, which
+     * may have narrowed the document's readers.
+     */
+    const store = publishedStore();
+    store.seed('docs/aaaaaa.md', '# Handbook, restricted\n', {
+      class: 'team0001',
+      title: 'Handbook',
+      markdown: '/handbook/index.md',
+      hash: 'h-handbook-newer',
+    });
+    expect(
+      await fetchDocument(access(readers.member, { store }), 'aaaaaa'),
+    ).toBe(undefined);
+    const unpublished = publishedStore();
+    unpublished.objects.delete('docs/aaaaaa.md');
+    expect(
+      await fetchDocument(
+        access(readers.member, { store: unpublished }),
+        'aaaaaa',
+      ),
+    ).toBe(undefined);
+  });
+
   it('cuts a very long document and says so', async () => {
     const store = publishedStore();
-    store.seed('docs/aaaaaa.md', 'x'.repeat(FETCH_LIMIT + 10), {
-      title: 'Long',
-      markdown: '/handbook/index.md',
+    store.seed('docs/cccccc.md', 'x'.repeat(FETCH_LIMIT + 10), {
+      title: 'Unruled notes',
+      markdown: '/unruled/notes/index.md',
+      hash: 'h-notes',
     });
     const document = await fetchDocument(
-      access(readers.member, { store }),
-      'aaaaaa',
+      access(readers.admin, { store }),
+      'cccccc',
     );
     expect(document?.text).toHaveLength(FETCH_LIMIT);
     expect(document?.metadata).toEqual({ truncated: true });
