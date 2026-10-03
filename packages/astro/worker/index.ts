@@ -34,7 +34,7 @@ interface AiSearch {
         filters: { class: { $in: string[] } };
       };
     };
-  }): Promise<{ chunks?: { score: number; item: { key: string } }[] }>;
+  }): Promise<{ chunks?: { item: { key: string } }[] }>;
   readonly jobs: { create(): Promise<unknown> };
 }
 
@@ -93,10 +93,7 @@ function documentIndex(search: AiSearch): DocumentIndex {
           },
         },
       });
-      return (response.chunks ?? []).map((chunk) => ({
-        key: chunk.item.key,
-        score: chunk.score,
-      }));
+      return (response.chunks ?? []).map((chunk) => chunk.item.key);
     },
     sync: async () => {
       await search.jobs.create();

@@ -100,11 +100,6 @@ export class MemoryStore implements DocumentStore {
       : null;
   }
 
-  async head(key: string) {
-    const object = this.objects.get(key);
-    return object ? { customMetadata: object.customMetadata } : null;
-  }
-
   async put(
     key: string,
     value: string,
@@ -151,7 +146,7 @@ export class FixedIndex implements DocumentIndex {
 
   async search(query: string, classes: readonly string[]) {
     this.queries.push({ query, classes });
-    return this.keys.map((key, index) => ({ key, score: 1 - index / 100 }));
+    return this.keys;
   }
 
   async sync() {

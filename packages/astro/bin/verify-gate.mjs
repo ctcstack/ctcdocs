@@ -282,10 +282,6 @@ function memoryStore() {
         ? { text: async () => object.text, customMetadata: object.metadata }
         : null;
     },
-    async head(key) {
-      const object = objects.get(key);
-      return object ? { customMetadata: object.metadata } : null;
-    },
     async put(key, text, options) {
       objects.set(key, { text, metadata: options.customMetadata });
     },
@@ -317,8 +313,7 @@ async function verifyAgents({ map, distRoot, environment, keys }) {
     return 0;
   }
   const store = memoryStore();
-  const everything = () =>
-    [...store.objects.keys()].map((key) => ({ key, score: 1 }));
+  const everything = () => [...store.objects.keys()];
   const index = {
     search: async () => everything(),
     sync: async () => {},
