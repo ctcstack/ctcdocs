@@ -39,7 +39,7 @@ export const SCOPES = ['kb:read', 'offline_access'] as const;
 export const REQUIRED_SCOPES = ['kb:read'] as const;
 
 /** The library's helpers this step uses. */
-export type AuthorizationApi = Pick<
+type AuthorizationApi = Pick<
   OAuthHelpers,
   | 'parseAuthRequest'
   | 'describeConsent'
@@ -77,7 +77,7 @@ export interface GrantProps {
   readonly sub: string;
 }
 
-export type Admission = 'admitted' | 'no-directory' | 'not-in-directory';
+type Admission = 'admitted' | 'no-directory' | 'not-in-directory';
 
 export interface AuthorizeContext {
   readonly oauth: AgentOAuth;
