@@ -1,6 +1,6 @@
 name: CTCDocs project deployment
 
-# Verifies a commit, proves Cloudflare Access denies anonymous traffic, deploys,
+# Verifies a commit, proves the running site denies anonymous traffic, deploys,
 # and proves the deployed surface is still protected. One environment per call,
 # so a project that promotes through development calls it twice:
 #
@@ -29,7 +29,7 @@ on:
         required: true
         type: string
       smoke_environment:
-        description: GitHub environment holding the Access service token
+        description: GitHub environment holding the smoke test's machine key
         required: true
         type: string
       candidate_sha:
@@ -162,11 +162,14 @@ jobs:
       - name: Run the project gate
         run: pnpm verify
 
+      - name: Ask the gate for every built file as different readers
+        run: pnpm exec ctcdocs-verify-gate
+
   # The preflight probes the live hostname and reads nothing from the
   # candidate, so it runs beside verification rather than after it. It only
   # reads, and the deployment still waits for both.
   access-preflight:
-    name: Verify Access before deployment
+    name: Verify the boundary before deployment
     needs: corpus
     if: needs.corpus.outputs.present == 'true'
     runs-on: ubuntu-24.04
@@ -212,7 +215,7 @@ jobs:
       # Anonymous requests must be denied before anything is published, and the
       # service token must still be admitted. A green preflight is what makes
       # the deployment step safe to run at all.
-      - name: Verify anonymous denial and service-token admission
+      - name: Verify anonymous denial and machine-key admission
         env:
           CTCDOCS_BASE_URL: ${{ vars.CTCDOCS_BASE_URL }}
           CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
@@ -313,7 +316,7 @@ jobs:
           # A private deployment's versions carry the gate's mark, which the
           # rollback workflow requires of any version it restores (ADR-038).
           tag=()
-          if [[ "$(jq -r '.deployment.environments.production.visibility // "private"' site.config.json)" == "private" ]]; then
+          if [[ "$(jq -r --arg env "${WRANGLER_ENVIRONMENT}" '.deployment.environments[$env].visibility // "private"' site.config.json)" == "private" ]]; then
             tag=(--tag ctcdocs-gate-v1)
           fi
 
