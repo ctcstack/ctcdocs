@@ -62,7 +62,8 @@ wrong tool, and it is cheaper to find that out now:
 - **Node 22.12 or newer** (below 23) and **pnpm 11**.
 
 Standing a project up involves a Google Workspace administrator and a
-Cloudflare account. Neither is fast to arrange, so start them early.
+Cloudflare account. Neither is fast to arrange, so start them early. Every step,
+and where each key and ID goes, is in [Setting up a site](docs/NEW_PROJECT.md).
 
 ## Packages
 
@@ -130,7 +131,7 @@ In the order a new deployment needs them:
 
 | Document                                                 | What it answers                                                                |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| [Starting a new project](docs/NEW_PROJECT.md)            | The ordered path from an empty repository to a deployed site                   |
+| [Setting up a site](docs/NEW_PROJECT.md)                 | Every step from nothing to a live site, and where each key and ID goes         |
 | [Configuration](docs/CONFIGURATION.md)                   | Every key of `site.config.json`, and what is deliberately not in it            |
 | [Google Workspace setup](docs/GOOGLE_WORKSPACE_SETUP.md) | The read-only identities: synchronization, sign-in, and the directory reader   |
 | [Cloudflare setup](docs/CLOUDFLARE_SETUP.md)             | The Workers, their secrets, custom domains, and the response headers           |
