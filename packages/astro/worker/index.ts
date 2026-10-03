@@ -11,7 +11,7 @@
 import builtMap from 'ctcdocs-access-map';
 
 import type { AccessMapFile } from './access-map.js';
-import { agentOAuth } from './agents/oauth.js';
+import { agentOAuth, type ExecutionContextLike } from './agents/oauth.js';
 import type { DocumentIndex, DocumentStore } from './agents/documents.js';
 import { publishDocuments } from './agents/publish.js';
 import { handle, type AgentContext } from './handler.js';
@@ -51,11 +51,6 @@ interface Env {
   readonly GOOGLE_CLIENT_SECRET?: string;
   readonly SESSION_SECRET?: string;
   readonly SESSION_SECRET_PREVIOUS?: string;
-}
-
-interface ExecutionContext {
-  waitUntil(promise: Promise<unknown>): void;
-  passThroughOnException(): void;
 }
 
 const accessMap: AccessMapFile = builtMap;
@@ -101,7 +96,10 @@ function documentIndex(search: AiSearch): DocumentIndex {
   };
 }
 
-function agentsFor(env: Env, ctx: ExecutionContext): AgentContext | undefined {
+function agentsFor(
+  env: Env,
+  ctx: ExecutionContextLike,
+): AgentContext | undefined {
   const { OAUTH_KV, KB_DOCUMENTS, KB_SEARCH } = env;
   if (accessMap.site.mcp !== true || !OAUTH_KV || !KB_DOCUMENTS || !KB_SEARCH) {
     return undefined;
@@ -124,7 +122,7 @@ export default {
   async fetch(
     request: Request,
     env: Env,
-    ctx: ExecutionContext,
+    ctx: ExecutionContextLike,
   ): Promise<Response> {
     return handle(request, {
       map: accessMap,
@@ -165,7 +163,7 @@ export default {
   async scheduled(
     _controller: unknown,
     env: Env,
-    ctx: ExecutionContext,
+    ctx: ExecutionContextLike,
   ): Promise<void> {
     const origin = Object.values(accessMap.site.environments)[0]?.origin;
     if (
