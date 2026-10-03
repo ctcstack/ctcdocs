@@ -82,3 +82,46 @@ export function notInDirectoryPage(site: string): Response {
 <form method="post" action="/auth/sign-out"><button type="submit">Sign out</button></form>`,
   });
 }
+
+/** What the consent page shows about the assistant asking (ADR-041). */
+export interface ConsentFacts {
+  readonly clientName: string;
+  /** The domain a published client identity is served from, when it has one. */
+  readonly clientDomain?: string | undefined;
+  readonly redirectHost: string;
+  readonly redirectIsLoopback: boolean;
+}
+
+/**
+ * The one page an assistant's connection shows: which assistant asks, where
+ * access goes, and one button. Everything about the client is escaped: a
+ * self-registered client chooses its own name.
+ */
+export function consentPage(
+  site: string,
+  facts: ConsentFacts,
+  handle: string,
+): Response {
+  const name = escape(facts.clientName);
+  const origin = facts.clientDomain
+    ? `It is published by <strong>${escape(facts.clientDomain)}</strong>.`
+    : 'It registered itself, so its name is not verified.';
+  const loopback = facts.redirectIsLoopback
+    ? '<p><strong>Access goes to an app on this computer.</strong> Continue only if you just started connecting from it.</p>'
+    : '';
+  return page(200, {
+    title: `Connect ${facts.clientName}?`,
+    site,
+    body: `<p>${name} asks to read ${escape(site)} as you: it will find and read exactly what you can open here. ${origin} Access goes to <strong>${escape(facts.redirectHost)}</strong>.</p>${loopback}
+<form method="post"><input type="hidden" name="handle" value="${escape(handle)}">
+<p><button type="submit" name="decision" value="approve">Allow</button> <button type="submit" name="decision" value="deny">Cancel</button></p></form>`,
+  });
+}
+
+export function connectionFailedPage(site: string, reason: string): Response {
+  return page(400, {
+    title: 'The assistant could not connect',
+    site,
+    body: `<p>${escape(reason)}</p><p>Start connecting again from the assistant.</p>`,
+  });
+}

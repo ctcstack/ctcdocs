@@ -20,6 +20,15 @@ import {
   type AccessMapFile,
 } from './access-map.js';
 import {
+  answerConsent,
+  finishConnection,
+  showConsent,
+  type AgentOAuth,
+  type AuthorizeContext,
+} from './agents/authorize.js';
+import type { DocumentIndex, DocumentStore } from './agents/documents.js';
+import { serveMcp } from './agents/tools.js';
+import {
   groupsFor,
   isAdmin,
   mayRead,
@@ -73,6 +82,31 @@ interface WorkerSecrets {
   readonly previousSessionSecret: string | undefined;
 }
 
+/**
+ * The MCP server's parts that are Cloudflare's (ADR-041): its OAuth library,
+ * the bucket holding each document's Markdown, and the AI Search index.
+ */
+export interface AgentContext {
+  readonly oauth: (origin: string) => AgentOAuth;
+  readonly store: DocumentStore;
+  readonly index: DocumentIndex;
+}
+
+/**
+ * The MCP server's routes and the methods each answers. They are answered
+ * before a reader is identified: the OAuth flow and the bearer token decide
+ * who is asking.
+ */
+const AGENT_ROUTES: Readonly<Record<string, readonly string[]>> = {
+  '/mcp': ['POST', 'GET', 'DELETE', 'OPTIONS'],
+  '/auth/authorize': ['GET', 'POST'],
+  '/auth/token': ['POST', 'OPTIONS'],
+  '/auth/register': ['POST', 'OPTIONS'],
+  '/.well-known/oauth-authorization-server': ['GET', 'HEAD', 'OPTIONS'],
+  '/.well-known/oauth-protected-resource': ['GET', 'HEAD', 'OPTIONS'],
+  '/.well-known/oauth-protected-resource/mcp': ['GET', 'HEAD', 'OPTIONS'],
+};
+
 export interface WorkerContext {
   readonly map: AccessMapFile;
   readonly assets: { fetch(request: Request): Promise<Response> };
@@ -85,6 +119,8 @@ export interface WorkerContext {
   readonly googleKeys: GoogleKeys;
   /** Structured events; never an address, a token or a document. */
   readonly log: (event: Readonly<Record<string, unknown>>) => void;
+  /** Present when the deployment runs the MCP server and has its bindings. */
+  readonly agents?: AgentContext | undefined;
 }
 
 function cookies(request: Request): Map<string, string> {
@@ -269,6 +305,129 @@ function signOut(gate: Gate, request: Request): Response {
   return redirect('/auth/signed-out', 303, [cookie(SESSION_COOKIE, '', 0)]);
 }
 
+async function sessionCookieFor(
+  gate: Gate,
+  who: { sub: string; email: string },
+): Promise<string> {
+  const seconds = Math.floor(gate.now / 1000);
+  const session = await seal(gate.session, {
+    aud: gate.origin,
+    exp: seconds + SESSION_SECONDS,
+    iat: seconds,
+    sub: who.sub,
+    email: who.email,
+  });
+  return cookie(SESSION_COOKIE, session, SESSION_SECONDS);
+}
+
+function authorizeContext(
+  gate: Gate,
+  oauth: AgentOAuth,
+  request: Request,
+): AuthorizeContext {
+  const { context } = gate;
+  return {
+    oauth,
+    origin: gate.origin,
+    site: context.map.site.title,
+    google: {
+      clientId: gate.clientId,
+      clientSecret: gate.clientSecret,
+      keys: context.googleKeys,
+      domains: context.map.site.workspaceDomains,
+      fetch: context.fetch,
+      now: gate.now,
+    },
+    signedIn: async () => {
+      const reader = await identify(gate, request, await context.snapshot());
+      return typeof reader === 'object' && reader.kind === 'person'
+        ? { sub: reader.sub }
+        : undefined;
+    },
+    admits: async (sub) => {
+      const snapshot = await context.snapshot();
+      if (!snapshot) {
+        return 'no-directory';
+      }
+      return isActive(snapshot, sub) ? 'admitted' : 'not-in-directory';
+    },
+    sessionCookie: (who) => sessionCookieFor(gate, who),
+    log: context.log,
+  };
+}
+
+/** The MCP server for the person a token belongs to. */
+async function serveAgent(
+  gate: Gate,
+  agents: AgentContext,
+  request: Request,
+  sub: string,
+): Promise<Response> {
+  const { context } = gate;
+  const snapshot = await context.snapshot();
+  if (!snapshot) {
+    return new Response('The directory of groups has not been read yet.', {
+      status: 503,
+    });
+  }
+  if (!isActive(snapshot, sub)) {
+    context.log({ event: 'refused', reader: 'assistant' });
+    return new Response('Your account is not in the directory.', {
+      status: 403,
+    });
+  }
+  return serveMcp(request, {
+    map: context.map,
+    reader: {
+      kind: 'person',
+      sub,
+      email: '',
+      groups: groupsOf(snapshot, sub),
+    },
+    stale: isStale(snapshot, gate.now),
+    origin: gate.origin,
+    store: agents.store,
+    index: agents.index,
+    log: context.log,
+  });
+}
+
+async function agentRoute(
+  gate: Gate,
+  agents: AgentContext,
+  request: Request,
+  url: URL,
+): Promise<Response> {
+  const oauth = agents.oauth(gate.origin);
+  switch (url.pathname) {
+    case '/auth/authorize':
+      return request.method === 'POST'
+        ? answerConsent(request, authorizeContext(gate, oauth, request))
+        : showConsent(request, authorizeContext(gate, oauth, request));
+    case '/mcp':
+    case '/.well-known/oauth-protected-resource/mcp':
+      return oauth.protect(request, (sub) =>
+        serveAgent(gate, agents, request, sub),
+      );
+    case '/.well-known/oauth-protected-resource':
+      // Some clients look at the root; the one resource is `/mcp`.
+      return oauth.protect(
+        new Request(`${gate.origin}/.well-known/oauth-protected-resource/mcp`, {
+          method: request.method,
+        }),
+        () => Promise.resolve(new Response(null, { status: 404 })),
+      );
+    default:
+      return oauth.serve(request);
+  }
+}
+
+/** A callback whose state belongs to a connection, not a site sign-in. */
+function isConnectionCallback(request: Request, url: URL): boolean {
+  const state = url.searchParams.get('state') ?? '';
+  return !cookies(request).has(`${TRANSACTION_COOKIE}${state.slice(0, 12)}`);
+}
+
 type Identified = Reader | 'no-directory' | 'not-in-directory' | undefined;
 
 async function identify(
@@ -371,8 +530,19 @@ async function route(
   const noStore = (response: Response) =>
     withPolicy(response, { path: url.pathname, policy: 'no-store', map });
 
+  const agents = map.site.mcp === true ? context.agents : undefined;
+  const agentMethods = agents ? AGENT_ROUTES[url.pathname] : undefined;
   const isSignOut = url.pathname === '/auth/sign-out';
-  if (
+  if (agentMethods) {
+    if (!agentMethods.includes(request.method)) {
+      return noStore(
+        new Response('Method not allowed', {
+          status: 405,
+          headers: { Allow: agentMethods.join(', ') },
+        }),
+      );
+    }
+  } else if (
     !(request.method === 'GET' || request.method === 'HEAD') &&
     !(request.method === 'POST' && isSignOut)
   ) {
@@ -414,10 +584,27 @@ async function route(
     clientSecret: googleClientSecret,
   };
 
+  if (agents && agentMethods) {
+    return withPolicy(await agentRoute(gate, agents, request, url), {
+      path: url.pathname,
+      policy: 'no-store',
+      map,
+      ownPolicy: true,
+    });
+  }
+
   switch (url.pathname) {
     case '/auth/sign-in':
       return noStore(await startSignIn(gate, url));
     case '/auth/callback':
+      if (agents && isConnectionCallback(request, url)) {
+        return noStore(
+          await finishConnection(
+            request,
+            authorizeContext(gate, agents.oauth(gate.origin), request),
+          ),
+        );
+      }
       return noStore(await finishSignIn(gate, request, url));
     case '/auth/sign-out':
       if (request.method !== 'POST') {
