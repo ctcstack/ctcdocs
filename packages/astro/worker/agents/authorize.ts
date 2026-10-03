@@ -85,7 +85,10 @@ function errorNamed(
   return error instanceof Error && error.name === name;
 }
 
-/** Renders what the library refuses; redirects only where it says it may. */
+/**
+ * Renders what the library refuses, and anything else that fails, as a page;
+ * redirects only where the library says it may.
+ */
 function failure(context: AuthorizeContext, error: unknown): Response {
   if (errorNamed(error, 'AuthorizationError')) {
     if (error.redirectTo) {
@@ -104,7 +107,15 @@ function failure(context: AuthorizeContext, error: unknown): Response {
       'The assistant’s published identity could not be read.',
     );
   }
-  throw error;
+  // A form that is not one, or a store that failed: never a bare exception.
+  context.log({
+    event: 'authorize-failed',
+    error: error instanceof Error ? error.name : 'unknown',
+  });
+  return connectionFailedPage(
+    context.site,
+    'The connection could not be completed.',
+  );
 }
 
 function redirect(location: string, headers: Headers): Response {
