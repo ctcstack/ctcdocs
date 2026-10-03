@@ -222,9 +222,6 @@ async function finishSignIn(
     response.headers.append('Set-Cookie', cookie(name, '', 0));
     return response;
   };
-  if (url.searchParams.get('error')) {
-    return ending(signInFailedPage(site, 'Google did not sign you in.'));
-  }
   const transaction = await unseal(
     gate.transaction,
     cookies(request).get(name),
@@ -233,6 +230,21 @@ async function finishSignIn(
       now: gate.now,
     },
   );
+  if (url.searchParams.get('error')) {
+    /*
+     * A sign-in started to connect an assistant goes back to finish the
+     * connection, which, with no session, tells the assistant it was
+     * refused rather than leaving it waiting.
+     */
+    const back =
+      transaction?.state === state
+        ? returnPath(String(transaction.back ?? '/'))
+        : '/';
+    if (back.startsWith(`${AGENT_PATHS.connect}?`)) {
+      return redirect(back, 302, [cookie(name, '', 0)]);
+    }
+    return ending(signInFailedPage(site, 'Google did not sign you in.'));
+  }
   if (
     !transaction ||
     transaction.state !== state ||

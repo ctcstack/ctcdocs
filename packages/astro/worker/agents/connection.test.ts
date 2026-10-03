@@ -577,6 +577,50 @@ describe('connecting an assistant', () => {
     expect(await expired.text()).toContain('This sign-in expired');
   });
 
+  it('tells the assistant when the person cancels at Google', async () => {
+    const clientId = await register();
+    const jar = new Jar();
+    const { handle } = await consent(jar, clientId);
+    const approved = await answer(jar, handle);
+    jar.take(approved);
+    const toGoogle = await follow(jar, approved);
+    const googleUrl = new URL(toGoogle.headers.get('Location') ?? '');
+    const back = await call(
+      new Request(
+        `${ORIGIN}/auth/callback?error=access_denied&state=${googleUrl.searchParams.get('state')}`,
+        { headers: { Cookie: jar.header() } },
+      ),
+    );
+    jar.take(back);
+    expect(back.headers.get('Location')).toMatch(/^\/auth\/connect\?state=/u);
+    const told = await follow(jar, back);
+    const location = new URL(told.headers.get('Location') ?? '');
+    expect(`${location.origin}${location.pathname}`).toBe(CALLBACK);
+    expect(location.searchParams.get('error')).toBe('access_denied');
+    expect(location.searchParams.get('state')).toBe('client-state');
+  });
+
+  it('leaves a site sign-in Google refused on the site', async () => {
+    const jar = new Jar();
+    const start = await call(
+      new Request(`${ORIGIN}/auth/sign-in?return=%2Fhandbook%2F`),
+    );
+    jar.take(start);
+    const state = new URL(start.headers.get('Location') ?? '').searchParams.get(
+      'state',
+    );
+    const back = await call(
+      new Request(
+        `${ORIGIN}/auth/callback?error=access_denied&state=${state}`,
+        {
+          headers: { Cookie: jar.header() },
+        },
+      ),
+    );
+    expect(back.headers.get('Location')).toBe(null);
+    expect(await back.text()).toContain('Google did not sign you in');
+  });
+
   it('finishes a connection only in the browser that started it', async () => {
     const clientId = await register();
     const jar = new Jar();
