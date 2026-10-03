@@ -11,6 +11,7 @@ import {
   markdownPathFromDocsIndex,
   parseWikiBaseUrl,
   verifyAccessPreflight,
+  verifyAnonymousDenial,
   verifyPostDeploy,
 } from './access-smoke.mjs';
 
@@ -153,7 +154,11 @@ const deployedProduction = ({ missingPaths = () => false } = {}) => {
     }
     if (path === '/section/guide/index.md') {
       return new Response('---\ncontent_hash: "sha256:abc"\n---\n\n# Guide\n', {
-        headers: { 'content-type': 'text/markdown; charset=utf-8' },
+        headers: {
+          'content-type': 'text/markdown; charset=utf-8',
+          'cache-control': 'private, max-age=60, must-revalidate',
+          'x-robots-tag': 'noindex, noarchive',
+        },
       });
     }
     if (path === '/llms.txt') {
@@ -369,5 +374,99 @@ test('an address the configuration does not know is treated as private', async (
       fetchImplementation: async () => new Response('public', { status: 200 }),
     }),
     /service-token credentials are required/u,
+  );
+});
+
+test('the Worker sending a reader to sign in is a refusal', async () => {
+  const calls = [];
+  await verifyAccessPreflight({
+    baseUrl: 'https://docs.example.com',
+    machineKey: 'kbk_synthetic',
+    markdownPath: '/section/guide/index.md',
+    site: siteConfig,
+    fetchImplementation: async (url, init) => {
+      calls.push(init);
+      if (init.headers) {
+        return new Response('page', { status: 200 });
+      }
+      return new URL(url).pathname.endsWith('.md')
+        ? new Response('Sign in to read this site.', { status: 401 })
+        : new Response('', {
+            status: 302,
+            headers: { location: '/auth/sign-in?return=%2F' },
+          });
+    },
+  });
+  assert.deepEqual(calls.at(-1).headers, {
+    Authorization: 'Bearer kbk_synthetic',
+  });
+});
+
+test('a private run needs a machine key or an Access service token', async () => {
+  await assert.rejects(
+    verifyAccessPreflight({
+      baseUrl: 'https://docs.example.com',
+      markdownPath: '/section/guide/index.md',
+      site: siteConfig,
+      fetchImplementation: async () => new Response('', { status: 401 }),
+    }),
+    /machine key \(CTCDOCS_MACHINE_KEY\) or Cloudflare Access/u,
+  );
+});
+
+test('post-deploy refuses Markdown served without its privacy headers', async () => {
+  const { fetchImplementation } = deployedProduction();
+  await assert.rejects(
+    verifyPostDeploy(
+      postDeployOptions(
+        async (url, init) => {
+          const response = await fetchImplementation(url, init);
+          if (new URL(url).pathname.endsWith('.md')) {
+            return new Response(await response.text(), {
+              headers: { 'content-type': 'text/markdown; charset=utf-8' },
+            });
+          }
+          return response;
+        },
+        { propagationTimeoutMs: 0 },
+      ),
+    ),
+    /Unexpected cache-control/u,
+  );
+});
+
+test('the Markdown read is a document every member may open', () => {
+  const index = {
+    documents: [{ slug: 'team/plan' }, { slug: 'handbook/guide' }],
+  };
+  assert.equal(
+    markdownPathFromDocsIndex(index, {
+      enabled: true,
+      files: { '/team/plan/': '0a1b2c3d', '/handbook/guide/': 'members' },
+    }),
+    '/handbook/guide/index.md',
+  );
+  assert.equal(markdownPathFromDocsIndex(index), '/team/plan/index.md');
+});
+
+test('the probe fails when an anonymous request is admitted', async () => {
+  const options = {
+    baseUrl: 'https://docs.example.com',
+    markdownPath: '/section/guide/index.md',
+    site: siteConfig,
+  };
+  await verifyAnonymousDenial({
+    ...options,
+    fetchImplementation: async () => new Response('', { status: 401 }),
+  });
+  await assert.rejects(
+    verifyAnonymousDenial({
+      ...options,
+      fetchImplementation: async (url) =>
+        new URL(url).pathname === '/llms.txt'
+          ? new Response('# leaked', { status: 200 })
+          : new Response('', { status: 401 }),
+    }),
+    /Anonymous request was admitted: \/llms\.txt/u,
   );
 });

@@ -1,0 +1,59 @@
+name: CTCDocs anonymous probe
+
+# Asks a private deployment, with no credentials, for a page, a Markdown file,
+# the agent index and the search runtime, and fails when any is admitted
+# (ADR-038). It runs on a schedule of the caller's own, apart from any
+# deployment, so a boundary that disappears between deployments is noticed:
+#
+#     on:
+#       schedule:
+#         - cron: '23 */2 * * *'
+#       workflow_dispatch:
+#     jobs:
+#       probe:
+#         uses: ctcstack/ctcdocs/.github/workflows/project-probe.yml@<commit sha>
+#
+# It needs no secret, so it reads none.
+
+on:
+  workflow_call:
+    inputs:
+      pnpm_version:
+        required: false
+        type: string
+        default: 11.9.0
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Refuse anonymous readers
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: ${{ inputs.pnpm_version }}
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Probe the production hostname anonymously
+        env:
+          CTCDOCS_BASE_URL: ${{ vars.CTCDOCS_BASE_URL }}
+        run: pnpm exec ctcdocs-access-smoke --anonymous

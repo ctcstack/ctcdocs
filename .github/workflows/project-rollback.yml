@@ -182,6 +182,28 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
 
+      # Every version from before the platform's Worker serves the site with
+      # no gate of its own. Once Access is gone, restoring one would publish
+      # the whole corpus, so a private deployment restores only versions that
+      # carry the gate's mark (ADR-038).
+      - name: Refuse a version without the gate
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          VERSION_ID: ${{ inputs.version_id }}
+          WRANGLER_ENVIRONMENT: ${{ inputs.wrangler_environment }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$(jq -r '.deployment.environments.production.visibility // "private"' site.config.json)" != "private" ]]; then
+            exit 0
+          fi
+          tag="$(pnpm exec wrangler versions view "${VERSION_ID}" --env "${WRANGLER_ENVIRONMENT}" --json | jq -r '.annotations["workers/tag"] // ""')"
+          if [[ "${tag}" != "ctcdocs-gate-v1" ]]; then
+            echo "::error::Version ${VERSION_ID} does not carry the gate's mark (tag '${tag}'); restoring it could publish the site without sign-in."
+            exit 1
+          fi
+
       - name: Roll back to the approved version
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -256,4 +278,5 @@ jobs:
           CTCDOCS_BASE_URL: ${{ vars.CTCDOCS_BASE_URL }}
           CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          CTCDOCS_MACHINE_KEY: ${{ secrets.CTCDOCS_MACHINE_KEY }}
         run: pnpm exec ctcdocs-access-smoke --post-deploy
