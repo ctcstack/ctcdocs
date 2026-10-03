@@ -21,6 +21,7 @@ import {
 } from './access-map.js';
 import {
   answerConsent,
+  CONNECT_ROUTE,
   finishConnection,
   showConsent,
   type AgentOAuth,
@@ -74,6 +75,8 @@ export const SESSION_COOKIE = '__Host-kb-session';
 const TRANSACTION_COOKIE = '__Host-kb-sign-in-';
 const SESSION_SECONDS = 12 * 60 * 60;
 const TRANSACTION_SECONDS = 10 * 60;
+const NO_DIRECTORY =
+  'The directory of groups has not been read yet. Try again in a few minutes.';
 
 interface WorkerSecrets {
   readonly googleClientId: string | undefined;
@@ -100,6 +103,7 @@ export interface AgentContext {
 const AGENT_ROUTES: Readonly<Record<string, readonly string[]>> = {
   '/mcp': ['POST', 'GET', 'DELETE', 'OPTIONS'],
   '/auth/authorize': ['GET', 'POST'],
+  [CONNECT_ROUTE]: ['GET'],
   '/auth/token': ['POST', 'OPTIONS'],
   '/auth/register': ['POST', 'OPTIONS'],
   '/.well-known/oauth-authorization-server': ['GET', 'HEAD', 'OPTIONS'],
@@ -261,16 +265,15 @@ async function finishSignIn(
       now: gate.now,
     });
     // A session is only worth issuing to someone the directory admits.
-    const snapshot = await gate.context.snapshot();
-    if (!snapshot) {
-      return ending(
-        unavailablePage(
-          site,
-          'The directory of groups has not been read yet. Try again in a few minutes.',
-        ),
-      );
+    const person = personFrom(
+      await gate.context.snapshot(),
+      who.sub,
+      who.email,
+    );
+    if (person === 'no-directory') {
+      return ending(unavailablePage(site, NO_DIRECTORY));
     }
-    if (!isActive(snapshot, who.sub)) {
+    if (person === 'not-in-directory') {
       log({ event: 'sign-in-refused', reason: 'not in the directory' });
       return ending(notInDirectoryPage(site));
     }
@@ -305,55 +308,19 @@ function signOut(gate: Gate, request: Request): Response {
   return redirect('/auth/signed-out', 303, [cookie(SESSION_COOKIE, '', 0)]);
 }
 
-async function sessionCookieFor(
-  gate: Gate,
-  who: { sub: string; email: string },
-): Promise<string> {
-  const seconds = Math.floor(gate.now / 1000);
-  const session = await seal(gate.session, {
-    aud: gate.origin,
-    exp: seconds + SESSION_SECONDS,
-    iat: seconds,
-    sub: who.sub,
-    email: who.email,
-  });
-  return cookie(SESSION_COOKIE, session, SESSION_SECONDS);
-}
-
-function authorizeContext(
-  gate: Gate,
-  oauth: AgentOAuth,
-  request: Request,
-): AuthorizeContext {
+function authorizeContext(gate: Gate, oauth: AgentOAuth, request: Request) {
   const { context } = gate;
   return {
     oauth,
-    origin: gate.origin,
     site: context.map.site.title,
-    google: {
-      clientId: gate.clientId,
-      clientSecret: gate.clientSecret,
-      keys: context.googleKeys,
-      domains: context.map.site.workspaceDomains,
-      fetch: context.fetch,
-      now: gate.now,
-    },
     signedIn: async () => {
       const reader = await identify(gate, request, await context.snapshot());
       return typeof reader === 'object' && reader.kind === 'person'
         ? { sub: reader.sub }
         : undefined;
     },
-    admits: async (sub) => {
-      const snapshot = await context.snapshot();
-      if (!snapshot) {
-        return 'no-directory';
-      }
-      return isActive(snapshot, sub) ? 'admitted' : 'not-in-directory';
-    },
-    sessionCookie: (who) => sessionCookieFor(gate, who),
     log: context.log,
-  };
+  } satisfies AuthorizeContext;
 }
 
 /** The MCP server for the person a token belongs to. */
@@ -365,12 +332,11 @@ async function serveAgent(
 ): Promise<Response> {
   const { context } = gate;
   const snapshot = await context.snapshot();
-  if (!snapshot) {
-    return new Response('The directory of groups has not been read yet.', {
-      status: 503,
-    });
+  const reader = personFrom(snapshot, sub, '');
+  if (reader === 'no-directory') {
+    return new Response(NO_DIRECTORY, { status: 503 });
   }
-  if (!isActive(snapshot, sub)) {
+  if (reader === 'not-in-directory') {
     context.log({ event: 'refused', reader: 'assistant' });
     return new Response('Your account is not in the directory.', {
       status: 403,
@@ -378,13 +344,8 @@ async function serveAgent(
   }
   return serveMcp(request, {
     map: context.map,
-    reader: {
-      kind: 'person',
-      sub,
-      email: '',
-      groups: groupsOf(snapshot, sub),
-    },
-    stale: isStale(snapshot, gate.now),
+    reader,
+    stale: !snapshot || isStale(snapshot, gate.now),
     origin: gate.origin,
     store: agents.store,
     index: agents.index,
@@ -404,6 +365,8 @@ async function agentRoute(
       return request.method === 'POST'
         ? answerConsent(request, authorizeContext(gate, oauth, request))
         : showConsent(request, authorizeContext(gate, oauth, request));
+    case CONNECT_ROUTE:
+      return finishConnection(request, authorizeContext(gate, oauth, request));
     case '/mcp':
     case '/.well-known/oauth-protected-resource/mcp':
       return oauth.protect(request, (sub) =>
@@ -422,13 +385,25 @@ async function agentRoute(
   }
 }
 
-/** A callback whose state belongs to a connection, not a site sign-in. */
-function isConnectionCallback(request: Request, url: URL): boolean {
-  const state = url.searchParams.get('state') ?? '';
-  return !cookies(request).has(`${TRANSACTION_COOKIE}${state.slice(0, 12)}`);
-}
-
 type Identified = Reader | 'no-directory' | 'not-in-directory' | undefined;
+
+/**
+ * A person signed in with Google, as the directory has them: the one place
+ * the site, its sign-in and the MCP server decide who a `sub` is.
+ */
+function personFrom(
+  snapshot: DirectorySnapshot | undefined,
+  sub: string,
+  email: string,
+): Reader | 'no-directory' | 'not-in-directory' {
+  if (!snapshot) {
+    return 'no-directory';
+  }
+  if (!isActive(snapshot, sub)) {
+    return 'not-in-directory';
+  }
+  return { kind: 'person', sub, email, groups: groupsOf(snapshot, sub) };
+}
 
 async function identify(
   gate: Gate,
@@ -462,18 +437,11 @@ async function identify(
   if (!claims || typeof claims.sub !== 'string' || claims.sub.length === 0) {
     return undefined;
   }
-  if (!snapshot) {
-    return 'no-directory';
-  }
-  if (!isActive(snapshot, claims.sub)) {
-    return 'not-in-directory';
-  }
-  return {
-    kind: 'person',
-    sub: claims.sub,
-    email: typeof claims.email === 'string' ? claims.email : '',
-    groups: groupsOf(snapshot, claims.sub),
-  };
+  return personFrom(
+    snapshot,
+    claims.sub,
+    typeof claims.email === 'string' ? claims.email : '',
+  );
 }
 
 function statusOf(snapshot: DirectorySnapshot | undefined, now: number) {
@@ -597,14 +565,6 @@ async function route(
     case '/auth/sign-in':
       return noStore(await startSignIn(gate, url));
     case '/auth/callback':
-      if (agents && isConnectionCallback(request, url)) {
-        return noStore(
-          await finishConnection(
-            request,
-            authorizeContext(gate, agents.oauth(gate.origin), request),
-          ),
-        );
-      }
       return noStore(await finishSignIn(gate, request, url));
     case '/auth/sign-out':
       if (request.method !== 'POST') {
@@ -618,12 +578,7 @@ async function route(
   const snapshot = await context.snapshot();
   const reader = await identify(gate, request, snapshot);
   if (reader === 'no-directory') {
-    return noStore(
-      unavailablePage(
-        site,
-        'The directory of groups has not been read yet. Try again in a few minutes.',
-      ),
-    );
+    return noStore(unavailablePage(site, NO_DIRECTORY));
   }
   if (reader === 'not-in-directory') {
     return noStore(
