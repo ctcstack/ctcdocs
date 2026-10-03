@@ -6,7 +6,7 @@ import { siteConfiguration } from '../../lib/project.js';
 /*
  * Which of these suites applies is a property of the deployment, not of the
  * platform. A private deployment must refuse an anonymous reader and admit a
- * service token; a public portal must do neither. Running the wrong pair would
+ * machine key (ADR-038); a public portal must do neither. Running the wrong pair would
  * fail a correct deployment, so the configuration decides.
  */
 const productionVisibility =
@@ -36,22 +36,30 @@ test('anonymous traffic cannot read a private deployment', async ({
   }
 });
 
-test('a service-token session reads a private deployment', async ({ page }) => {
+test('a machine key reads a private deployment', async ({ page }) => {
   test.skip(
     productionVisibility !== 'private',
     'This deployment is published to everyone.',
   );
 
+  const machineKey = process.env.CTCDOCS_MACHINE_KEY;
   const clientId = process.env.CF_ACCESS_CLIENT_ID;
   const clientSecret = process.env.CF_ACCESS_CLIENT_SECRET;
-  if (!clientId || !clientSecret) {
-    test.skip(true, 'Cloudflare Access service-token credentials are required');
+  if (!machineKey) {
+    test.skip(true, 'A machine key (CTCDOCS_MACHINE_KEY) is required');
     return;
   }
 
+  // While Cloudflare Access still stands in front of the Worker, its service
+  // token is sent as well.
   await page.setExtraHTTPHeaders({
-    'CF-Access-Client-Id': clientId,
-    'CF-Access-Client-Secret': clientSecret,
+    Authorization: `Bearer ${machineKey}`,
+    ...(clientId && clientSecret
+      ? {
+          'CF-Access-Client-Id': clientId,
+          'CF-Access-Client-Secret': clientSecret,
+        }
+      : {}),
   });
   await page.goto('/');
 

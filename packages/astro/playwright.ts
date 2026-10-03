@@ -93,8 +93,8 @@ export function defineUxConfig(
 }
 
 /**
- * The deployed gate: proves Cloudflare Access denies anonymous traffic and
- * admits a service token. It runs against a real hostname, so it takes the
+ * The deployed gate: proves a private deployment denies anonymous traffic and
+ * admits a machine key. It runs against a real hostname, so it takes the
  * project's production origin unless told otherwise.
  */
 export function defineAccessConfig(): PlaywrightTestConfig {

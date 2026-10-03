@@ -287,7 +287,7 @@ export async function verifyAccessPreflight({
   );
   if (isAccessDenied(authenticatedResponse)) {
     throw new AccessSmokeError(
-      'The service token did not pass the Access boundary.',
+      'The machine key or service token was not admitted.',
     );
   }
   if (
