@@ -11,12 +11,15 @@
  * build's text. A store or an index that lags a deploy, or runs ahead of a
  * rollback, can hide a document for a while, never open one.
  *
- * Search returns the passages that matched (ADR-042). A passage is shown only
- * when its document is one the reader may open and the class its chunk carries
- * in the index is one the reader may read: neither the index's filter nor its
- * cache is trusted with that. A passage may come from an earlier version of a
- * document the reader may still open, until the index syncs; it never reaches
- * a reader outside the class of the text it was taken from.
+ * Search returns the passages that matched (ADR-042). A chunk counts only
+ * when its document is one the reader may open and the class the chunk
+ * carries in the index is one the reader may read: neither the index's filter
+ * nor its cache is trusted with that. A document is found only through a
+ * chunk that counts, so a match on text the reader may not read neither shows
+ * the document nor takes its place among the results. A passage may come from
+ * an earlier version of a document the reader may still open, until the index
+ * syncs; it never reaches a reader outside the class of the text it was taken
+ * from.
  *
  * Web-standard code only: the bucket and the index are handed in.
  */
@@ -204,28 +207,33 @@ export async function searchDocuments(
   }
   const readable = new Set(classes);
 
-  // The documents the reader may open, in rank order, with their passages.
+  // The documents found through chunks that count, in rank order.
   const found = new Map<
     string,
     { readonly document: AgentDocument; readonly passages: string[] }
   >();
   for (const chunk of await index.search(query, classes)) {
     const id = idOf(chunk.key);
-    let entry = id === undefined ? undefined : found.get(id);
-    if (id !== undefined && !entry && found.size < MAX_RESULTS) {
-      const document = readableDocument(access, id);
-      if (document) {
-        entry = { document, passages: [] };
-        found.set(id, entry);
-      }
-    }
+    // Judged before the chunk's document takes a place among the results.
     if (
-      entry &&
-      entry.passages.length < PASSAGES_PER_RESULT &&
-      chunk.class !== undefined &&
-      readable.has(chunk.class) &&
-      chunk.text.trim().length > 0
+      id === undefined ||
+      chunk.class === undefined ||
+      !readable.has(chunk.class) ||
+      chunk.text.trim().length === 0
     ) {
+      continue;
+    }
+    let entry = found.get(id);
+    if (!entry) {
+      const document =
+        found.size < MAX_RESULTS ? readableDocument(access, id) : undefined;
+      if (!document) {
+        continue;
+      }
+      entry = { document, passages: [] };
+      found.set(id, entry);
+    }
+    if (entry.passages.length < PASSAGES_PER_RESULT) {
       entry.passages.push(excerpt(chunk.text, PASSAGE_LIMIT));
     }
   }

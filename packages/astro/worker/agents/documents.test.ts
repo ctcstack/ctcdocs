@@ -165,7 +165,11 @@ describe('search', () => {
       agents: { digest: 'digest-many', documents },
     };
     const index = new FixedIndex(
-      documents.map((document) => `docs/${document.id}.md`),
+      documents.map((document) => ({
+        key: `docs/${document.id}.md`,
+        text: `A passage of ${document.title}.`,
+        class: 'members',
+      })),
     );
     expect(
       await searchDocuments(access(readers.member, { index, map }), 'x'),
@@ -205,6 +209,36 @@ describe('passages', () => {
       'x',
     );
     expect(text(results)).toEqual({ aaaaaa: 'Members text.' });
+  });
+
+  it('lists a document only for a passage the reader may read', async () => {
+    // A stale or cached index: ten documents match only by text of a class
+    // the reader does not have, and an eleventh by text they may read.
+    const documents = Array.from({ length: 11 }, (_, n) => ({
+      id: `${n}`.padStart(6, 'd'),
+      title: `Page ${n}`,
+      markdown: '/handbook/index.md',
+      modified: null,
+      path: [],
+      hash: `h-${n}`,
+    }));
+    const map: AccessMapFile = {
+      ...agentMap,
+      agents: { digest: 'digest-stale', documents },
+    };
+    const index = new FixedIndex(
+      documents.map((document, n) => ({
+        key: `docs/${document.id}.md`,
+        text: n < 10 ? 'Team text.' : 'Members text.',
+        class: n < 10 ? 'team0001' : 'members',
+      })),
+    );
+    const results = await searchDocuments(
+      access(readers.member, { index, map }),
+      'x',
+    );
+    expect(ids(results)).toEqual(['dddd10']);
+    expect(results[0]?.text).toBe('Members text.');
   });
 
   it('never shows a passage of a document the reader cannot open', async () => {
