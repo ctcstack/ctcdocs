@@ -9,6 +9,9 @@ name of its own; they read this file. The rationale is recorded in
 
 ```json
 {
+  "signIn": {
+    "workspaceDomains": ["example.com"]
+  },
   "brand": {
     "name": "Example Corp",
     "siteTitle": "Example [DOCS]",
@@ -48,7 +51,7 @@ name of its own; they read this file. The rationale is recorded in
 | `brand.name`                           | Reserved for prose that names the organization rather than the site.                                                                     |
 | `brand.siteTitle`                      | Browser tab, header wordmark, home page heading, and both browser test suites.                                                           |
 | `brand.siteDescription`                | Site-wide meta description and the home page's own description.                                                                          |
-| `brand.faviconPath`                    | The `<link rel="icon">` target and the asset the Access smoke test probes.                                                               |
+| `brand.faviconPath`                    | The `<link rel="icon">` target and an asset the access smoke test probes.                                                                |
 | `deployment.workerName`                | The Worker `wrangler.jsonc` must declare; environments deploy as `<name>-<environment>`.                                                 |
 | `deployment.environments.*`            | Canonical site URL, Wrangler custom domains, deployment summaries, smoke-test defaults.                                                  |
 | `deployment.environments.*.visibility` | Who may read that environment: `private` (default) or `public`. See below.                                                               |
@@ -63,6 +66,7 @@ name of its own; they read this file. The rationale is recorded in
 | `sync.commitBotName`                   | Git author the sync workflow commits generated output as.                                                                                |
 | `sync.defaultLocale`                   | Fallback locale for documents whose language cannot be determined.                                                                       |
 | `sync.largeImageMegabytes`             | Optional. Megabytes (a million bytes each) above which the content health page notes an image. Above 0; defaults to 2.                   |
+| `signIn.workspaceDomains`              | The organization's Google Workspace domains, whose accounts may sign in. Required on a private deployment. See below.                    |
 | `access`                               | Optional. Who may read which folder, by Google group. Only on a deployment whose every environment is private. See below.                |
 
 ## Who may read the deployment
@@ -70,18 +74,22 @@ name of its own; they read this file. The rationale is recorded in
 `visibility` decides what the platform asserts about an environment, and it
 defaults to `private` — an omission fails in the recoverable direction.
 
-|                                                                                    | `private`                                                             | `public`                                                 |
-| ---------------------------------------------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------- |
-| `public/robots.txt`                                                                | must disallow every crawler                                           | must not disallow every crawler                          |
-| `public/_headers` on `/*.md`, `/llms.txt`, `/*/llms.txt` and `/assets/generated/*` | `Cache-Control: private` and an `X-Robots-Tag`                        | must not carry `noindex`                                 |
-| every page                                                                         | carries `<meta name="robots" content="noindex, nofollow, noarchive">` | carries no robots meta                                   |
-| `ctcdocs-access-smoke`                                                             | anonymous requests must be denied and a service token admitted        | anonymous requests must succeed; no service token needed |
+|                                                                                    | `private`                                                              | `public`                                       |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------- |
+| `public/robots.txt`                                                                | must disallow every crawler                                            | must not disallow every crawler                |
+| `public/_headers` on `/*.md`, `/llms.txt`, `/*/llms.txt` and `/assets/generated/*` | `Cache-Control: private` and an `X-Robots-Tag`                         | must not carry `noindex`                       |
+| every page                                                                         | carries `<meta name="robots" content="noindex, nofollow, noarchive">`  | carries no robots meta                         |
+| `wrangler.jsonc`                                                                   | serves the build through the platform's Worker, which signs readers in | serves the build directly                      |
+| `ctcdocs-access-smoke`                                                             | anonymous requests must be denied and a machine key admitted           | anonymous requests must succeed; no key needed |
 
 Two scoping rules:
 
 - **The built site follows the production environment.** `robots.txt`, the
   response headers and the meta tag are one artifact deployed everywhere, so
   they take the posture of the environment an unauthenticated reader can reach.
+  Behind the Worker, Cloudflare does not apply `_headers`; the Worker sets the
+  same headers itself, and `_headers` is still checked so the two cannot
+  disagree. See [Cloudflare setup](CLOUDFLARE_SETUP.md#response-headers).
 - **A smoke run follows the environment it probes**, matched by hostname. An
   address the configuration does not know is treated as private.
 
@@ -98,6 +106,31 @@ an agent decodes every non-ASCII title wrongly. The access smoke test checks
 both after a deployment. See [ADR-033](ADR/033-publish-llms-txt-indexes.md).
 
 See [ADR-016](ADR/016-deployment-visibility.md).
+
+## Signing in
+
+A private deployment signs its readers in itself, with Google, in the
+platform's Worker
+([ADR-038](ADR/038-a-private-deployment-signs-readers-in-itself-with-google.md)):
+
+```json
+"signIn": {
+  "workspaceDomains": ["example.com", "example.org"]
+}
+```
+
+`workspaceDomains` lists every domain of the organization, the primary one and
+any secondary ones. A Google account is admitted only when its ID token says
+it belongs to one of them, and only while the directory snapshot lists it as
+active. Domains are compared without regard to case; an empty list, a repeated
+domain or an unknown key is an error. When there is exactly one domain, Google
+is asked to offer only that domain's accounts.
+
+`ctcdocs-sync validate` requires `signIn` on a private deployment, and requires
+`wrangler.jsonc` and `wrangler.directory.jsonc` to deploy the platform's two
+Workers — see [Cloudflare setup](CLOUDFLARE_SETUP.md). The Google client ID is
+a variable in `wrangler.jsonc`; its secret and the rest are Worker secrets, not
+configuration.
 
 ## Who may read which folder
 
@@ -135,17 +168,24 @@ A private deployment may close folders to everyone but named Google groups:
   before. The section is refused while any environment is public, and an
   unknown key in it is an error.
 
-Rules take effect only where the deployment's Worker enforces them. Until a
-deployment has one, rules already decide what the site's indexes say: the
-`llms.txt` indexes describe a document only in an index of its own class, and
-a home page folder card takes its description only from a document every
-member may read. See [ADR-039](ADR/039-open-a-folder-only-to-the-google-groups-its-rule-names.md).
+The deployment's Worker enforces the rules on every request. The build follows
+them too: the `llms.txt` indexes describe a document only in an index of its
+own class, and a home page folder card takes its description only from a
+document every member may read. See
+[ADR-039](ADR/039-open-a-folder-only-to-the-google-groups-its-rule-names.md).
+
+**A document never gains readers silently.** The manifest records the readers
+each document was last published with. When a sync would widen them — its
+folder moved out from under a narrower rule, or a rule changed — the document
+keeps its earlier readers and is listed under Fix now on the content health
+page until a rule names its folder. Narrowing takes effect at once.
 
 Every build writes `.ctcdocs/access-map.json`, outside `dist`, naming the
 access class of every file it built, and one search bundle per class:
 `/pagefind/` for every member and `/pagefind-<class>/` for each other class.
 The search box merges the bundles the Worker lists for the reader at
-`/_kb/classes`; without a Worker it searches `/pagefind/` alone. Once rules
+`/_kb/classes`; where that route does not answer, it searches `/pagefind/`
+alone. Once rules
 exist, a built file the map cannot place fails the build, and so does a file
 that repeats eight words or more of a document its readers may not open.
 Add `.ctcdocs/` to the project's `.gitignore`.
@@ -235,9 +275,11 @@ Two consequences worth knowing:
 ## What is not in the configuration file
 
 **Secrets and per-environment addresses** are environment variables, listed in
-[LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md#environment). `SYNC_SITE_BASE_URL`,
-`SYNC_DEFAULT_LOCALE` and `CTCDOCS_BASE_URL` fall back to this file and only need
-a value when a run should target something else, such as a separate test corpus.
+[LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md#environment), or Worker secrets,
+listed in [CLOUDFLARE_SETUP.md](CLOUDFLARE_SETUP.md#the-site-worker).
+`SYNC_SITE_BASE_URL`, `SYNC_DEFAULT_LOCALE` and `CTCDOCS_BASE_URL` fall back to
+this file and only need a value when a run should target something else, such
+as a separate test corpus.
 
 **Brand artwork and color** are files, not values:
 
@@ -254,11 +296,12 @@ regression, so measure a replacement accent against the two grounds named in
 that owns the wiki, and sit alongside the generated corpus rather than inside
 it.
 
-**The deployment target itself** — `wrangler.jsonc` — is
-hand-written, because Wrangler reads its own configuration file and cannot be
-handed values from elsewhere. `ctcdocs-sync validate` fails when its Worker
-name or either custom domain disagrees with `site.config.json`, so the
-two cannot drift apart silently.
+**The deployment target itself** — `wrangler.jsonc`, and on a private
+deployment `wrangler.directory.jsonc` — is hand-written, because Wrangler reads
+its own configuration file and cannot be handed values from elsewhere.
+`ctcdocs-sync validate` fails when a Worker name or a custom domain disagrees
+with `site.config.json`, or when a private deployment's files lack any part of
+the gate, so the two cannot drift apart silently.
 
 ## Standing a project up
 
@@ -267,8 +310,9 @@ is its identity, its brand, its content and its workflows — the list in the
 [README](../README.md#what-a-project-looks-like).
 
 1. Write `site.config.json`.
-2. Write `wrangler.jsonc` with the same Worker name and hostnames.
-   `ctcdocs-sync validate` tells you if you missed one.
+2. Write `wrangler.jsonc` with the same Worker name and hostnames, and on a
+   private deployment `wrangler.directory.jsonc`. `ctcdocs-sync validate` tells
+   you if you missed one.
 3. List every generated path in `.prettierignore`, following
    [NEW_PROJECT.md](NEW_PROJECT.md#4-the-rest-of-the-files).
    `ctcdocs-sync validate` names any the formatter would still check.
@@ -276,8 +320,10 @@ is its identity, its brand, its content and its workflows — the list in the
 5. Point the sync at the Shared Drive with `GOOGLE_DRIVE_ID` and
    `GOOGLE_ROOT_FOLDER_ID`, following
    [GOOGLE_WORKSPACE_SETUP.md](GOOGLE_WORKSPACE_SETUP.md).
-6. Create the Cloudflare Access application and custom domains, following
-   [CLOUDFLARE_SETUP.md](CLOUDFLARE_SETUP.md).
+6. For a private deployment, create the sign-in client and the directory
+   reader, following [GOOGLE_WORKSPACE_SETUP.md](GOOGLE_WORKSPACE_SETUP.md#sign-in),
+   then the KV namespace, the Workers' secrets and the custom domains,
+   following [CLOUDFLARE_SETUP.md](CLOUDFLARE_SETUP.md).
 7. Set the repository and environment secrets and variables listed in
    [DEPLOYMENT.md](DEPLOYMENT.md).
 8. Run a first sync, then the project's own gate:

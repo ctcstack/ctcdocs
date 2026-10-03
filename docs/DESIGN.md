@@ -224,8 +224,8 @@ background band.
 
 Both are self-hosted as per-subset woff2 with `unicode-range`, imported from
 `src/components/Head.astro` so the dependency is a traceable module edge. There
-is no external font CDN: the site sits behind Cloudflare Access and must not
-depend on a third-party origin. An English page never downloads Cyrillic, and a
+is no external font CDN: a private site sits behind its own sign-in, and its
+Content Security Policy admits no third-party origin. An English page never downloads Cyrillic, and a
 document without code never downloads the monospace family.
 
 **Character:** Neutral, dense, and unfussy. Inter is chosen for its Cyrillic
@@ -499,5 +499,5 @@ date remains.
 - **Don't** wrap a wide table in an extra scroll container — the overflow lives on
   the table element and the UX suite asserts that exact pair.
 - **Don't** load fonts, icons, or scripts from a third-party origin. Everything is
-  self-hosted; the site sits behind Cloudflare Access.
+  self-hosted; a private site's Content Security Policy refuses anything else.
 - **Don't** hand-edit generated files to fix a presentation problem.

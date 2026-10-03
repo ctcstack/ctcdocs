@@ -1,260 +1,270 @@
 # Cloudflare environment setup
 
-## Approved boundary
+## The boundary
 
-The two protected deployment targets are:
+A private deployment is served through the platform's Worker, which runs
+before every asset and decides every request itself (ADR-038): readers sign in
+with Google, machines present a key, and each file is served only to the
+readers its access class names (ADR-039). There is no Cloudflare Access
+application in front of it, and no public origin behind it.
 
-```text
-Zone: example.com
-Development hostname: docs-dev.example.com
-Development Worker: example-docs-development
-Production hostname: docs.example.com
-Production Worker: example-docs-production
-Application type: Cloudflare Access self-hosted
-Identity provider: CTCStack Google Workspace
-```
+The wiki, static assets, Pagefind bundles, `robots.txt`, the 404 page,
+generated Markdown at `/<slug>/index.md`, originals under `/assets/generated/`
+and the `llms.txt` indexes all sit behind that one Worker. None may be exposed
+through a second hostname, a `workers.dev` address or a version preview URL.
 
-The hostnames and Worker name above come from `site.config.json`; see
+A deployment is two Workers per environment and one KV namespace:
+
+| Piece                    | Configuration              | What it holds                                                    |
+| ------------------------ | -------------------------- | ---------------------------------------------------------------- |
+| The site Worker          | `wrangler.jsonc`           | The build, the access map, the Google client, the session secret |
+| The directory Worker     | `wrangler.directory.jsonc` | The directory reader's key; a schedule; no route                 |
+| The `KB_STATE` namespace | both files                 | The directory snapshot and the groups' pinned IDs                |
+
+A public deployment is a plain Workers Static Assets site with neither Worker
+nor namespace; most of this page does not apply to it.
+
+The hostnames and the Worker name come from `site.config.json`; see
 [Configuration](CONFIGURATION.md) before pointing this platform at a different
 zone.
 
-The wiki, static assets, Pagefind index, `robots.txt`, and 404 page share one
-authorization boundary. There is no public application origin.
+## Plan
 
-Generated document Markdown at `/<stable-slug>/index.md`, its original images
-under `/assets/generated/`, and the `llms.txt` indexes at `/llms.txt` and
-`/<section>/llms.txt` are part of the same boundary. They must never be exposed
-through a separate hostname or Access bypass.
+Use **Workers Paid**. Behind the Worker every request — each page, script,
+image and search fragment — is a Worker request, and the free plan stops at
+100,000 a day. The directory refresh also makes a few requests per group, and
+the free plan allows 50 per run.
 
-## Worker configuration
+## The site Worker
 
-`wrangler.jsonc` is the source of truth. It defines named
-`development` and `production` environments with separate custom domains:
+`wrangler.jsonc` is hand-written, because Wrangler reads it itself.
+`ctcdocs-sync validate` fails when it disagrees with `site.config.json` or
+lacks any part of the gate:
 
 ```jsonc
 {
   "name": "example-docs",
+  "main": "node_modules/@ctcstack/ctcdocs/worker/index.ts",
+  "compatibility_date": "2026-07-30",
   "workers_dev": false,
   "preview_urls": false,
-  "env": {
-    "development": {
-      "workers_dev": false,
-      "preview_urls": false,
-      "routes": [
-        {
-          "pattern": "docs-dev.example.com",
-          "custom_domain": true,
-        },
-      ],
-    },
-    "production": {
-      "workers_dev": false,
-      "preview_urls": false,
-      "routes": [
-        {
-          "pattern": "docs.example.com",
-          "custom_domain": true,
-        },
-      ],
-    },
+  "alias": {
+    "ctcdocs-access-map": "./.ctcdocs/access-map.json",
   },
   "assets": {
     "directory": "./dist",
     "not_found_handling": "404-page",
     "html_handling": "auto-trailing-slash",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+  },
+  "env": {
+    "production": {
+      "workers_dev": false,
+      "preview_urls": false,
+      "routes": [{ "pattern": "docs.example.com", "custom_domain": true }],
+      "kv_namespaces": [{ "binding": "KB_STATE", "id": "<namespace ID>" }],
+      "vars": { "GOOGLE_CLIENT_ID": "<client ID>.apps.googleusercontent.com" },
+    },
   },
 }
 ```
 
-Wrangler creates or updates each custom-domain binding. `workers_dev=false`
-removes the `workers.dev` routes and `preview_urls=false` prevents public
-version URLs. Every command must select a named environment explicitly.
+- `main` and the `ctcdocs-access-map` alias bundle the platform's Worker with
+  the access map of the build it serves, so the two deploy and roll back
+  together.
+- `run_worker_first` sends every request to the Worker, including requests for
+  files that exist.
+- `workers_dev: false` and `preview_urls: false` leave the custom domain as the
+  only address. Validation refuses anything else.
+- `GOOGLE_CLIENT_ID` is not a secret, so it is a variable.
 
-Validate without uploading:
+Each environment's secrets are set once, with the environment named:
 
 ```bash
-pnpm build
-pnpm deploy:dry-run:development
-pnpm deploy:dry-run:production
+pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET --env production
 ```
 
-## Browser caching and navigation prefetch
+| Secret                    | Value                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------- |
+| `GOOGLE_CLIENT_SECRET`    | The OAuth client's secret, from [Google Workspace setup](GOOGLE_WORKSPACE_SETUP.md)         |
+| `SESSION_SECRET`          | At least 32 random characters, for example `openssl rand -base64 48`; one per environment   |
+| `SESSION_SECRET_PREVIOUS` | Optional. The secret being rotated out; see [Operations](OPERATIONS.md#credential-rotation) |
+| `MACHINE_KEYS`            | Optional. The list of machine key records `ctcdocs-machine-key` prints, as one JSON array   |
 
-`public/_headers` is copied into the static build and controls browser
-caching for responses served by Workers Static Assets. Protected HTML routes use
-`Cache-Control: private, max-age=60, must-revalidate` so rapid back-and-forth
-navigation can reuse the browser cache while Access revocation and content
-updates have at most a short local freshness window.
+Without the client or the session secret the Worker admits no one and says the
+site is not configured; it never falls open.
 
-Raw Markdown and generated images use the same private, short-lived cache policy
-plus `X-Robots-Tag: noindex, noarchive` and `X-Content-Type-Options: nosniff`.
-This covers both the `/assets/generated/` originals and the fingerprinted image
-files that Astro emits under `/_astro/`, so an image keeps the same policy
-whichever route serves it.
+## The directory Worker
 
-`/*.md` additionally declares `Content-Type: text/markdown; charset=utf-8`. A
-static Astro build writes each endpoint's body to a file and discards the
-`Content-Type` the endpoint set, so the asset server would otherwise derive the
-type from the `.md` extension alone. Without an explicit charset a browser falls
-back to a legacy single-byte encoding and corrupts every non-ASCII character in
-the document. This is invisible in local development, because the local asset
-server appends the charset on its own; only the deployed response proves it, so
-the post-deploy smoke asserts the full content type.
+`wrangler.directory.jsonc` deploys the scheduled Worker that keeps the
+directory snapshot (ADR-040). It has no route, so the one credential it holds
+is never in the Worker that parses readers' requests:
 
-Astro-fingerprinted JavaScript, CSS, and font files under `/_astro/` use a
-one-year immutable cache lifetime. The policy intentionally does not apply to
-generated images or Pagefind data because those assets can contain internal wiki
-content and must not remain fresh in a browser cache for a year.
-
-`/favicon.svg` is brand artwork rather than wiki content and is requested by
-every document page, so it uses a one-day public lifetime. Without it the
-browser revalidates the icon on every navigation.
-
-Every navigation is a full document load because Starlight is a multi-page
-application. Browser developer tools therefore list all subresources of the new
-page on each navigation, including the ones answered from the browser cache.
-Read the size and time columns — `(memory cache)`, `(disk cache)`, or `304` mean
-no payload was transferred — rather than the number of rows.
-
-Starlight enables prefetching for all internal links. The Astro configuration
-changes the default strategy from `hover` to `tap`, which avoids speculative
-requests when a pointer merely crosses the sidebar while preserving a prefetch
-immediately before an intentional navigation.
-
-Cloudflare Access login and denial responses are not static asset responses and
-are not affected by `_headers`. Keep `Disable cache` cleared when validating in
-browser developer tools; otherwise the browser will intentionally bypass these
-rules.
-
-## Access application
-
-Create one self-hosted application per hostname:
-
-```text
-docs-dev.example.com/*
-docs.example.com/*
+```jsonc
+{
+  "name": "example-docs-directory",
+  "main": "node_modules/@ctcstack/ctcdocs/worker/directory/index.ts",
+  "compatibility_date": "2026-07-30",
+  "workers_dev": false,
+  "preview_urls": false,
+  "alias": {
+    "ctcdocs-access-map": "./.ctcdocs/access-map.json",
+  },
+  "triggers": { "crons": ["*/10 * * * *"] },
+  "env": {
+    "production": {
+      "workers_dev": false,
+      "preview_urls": false,
+      "kv_namespaces": [{ "binding": "KB_STATE", "id": "<namespace ID>" }],
+    },
+  },
+}
 ```
 
-Recommended session duration:
+Its name is the site Worker's with `-directory` appended, it binds the same
+namespace in each environment, and validation checks both. Its only secret is
+the directory reader's service account key, as the JSON file Google issued:
 
-```text
-24 hours
+```bash
+pnpm exec wrangler secret put DIRECTORY_KEY --config wrangler.directory.jsonc --env production < directory-reader.json
 ```
 
-The employee policy is:
+Delete the file afterwards. The key exists in the secret and nowhere else.
 
-```text
-Action: Allow
-Include: Login Methods = CTCStack Google Workspace
+## The KV namespace
+
+Create one namespace per environment and put its ID in both files:
+
+```bash
+pnpm exec wrangler kv namespace create example-docs-production-state
 ```
 
-Accept only the configured Workspace identity provider. Do not add `Everyone`,
-One-time PIN, a broad email suffix, or a permanent `Bypass Everyone` policy.
-No separate employee group is required because the approved product decision
-grants access to every identity in the Workspace organization, including
-secondary Workspace domains.
+Only the directory Worker writes it. The deploy token below cannot.
 
-If account-wide **Require Access protection** is considered, audit every
-public hostname in the Cloudflare account first. That setting is deny-by-default
-for the entire account and must not be enabled casually on an account serving
-other public applications.
+## Response headers
 
-## Machine smoke policy
+Cloudflare does not apply `_headers` to a response a Worker returns, so behind
+the Worker the policy lives in the Worker:
 
-Create a separate Access service token and policy for each environment:
+| Response                                                              | `Cache-Control`                        |
+| --------------------------------------------------------------------- | -------------------------------------- |
+| Fingerprinted scripts, styles and fonts under `/_astro/`              | `public, max-age=31556952, immutable`  |
+| Everything else the build holds: pages, Markdown, images, search data | `private, max-age=60, must-revalidate` |
+| Anything that depends on who asks: sign-in, `/_kb/*`, refusals        | `no-store`                             |
 
-```text
-Action: Service Auth
-Include: Service Token = <wiki smoke token>
+Every response also carries `X-Robots-Tag: noindex, nofollow, noarchive`,
+`X-Content-Type-Options: nosniff` and `Referrer-Policy: same-origin`. Markdown
+is served as `text/markdown; charset=utf-8` and `llms.txt` as
+`text/plain; charset=utf-8`, because a static build discards the type an
+endpoint set and a browser without a charset corrupts every non-ASCII
+character. Every HTML page carries a Content Security Policy admitting the
+site's own scripts, the inline scripts the build hashed, and nothing else.
+
+The short private lifetime lets back-and-forth navigation reuse the browser
+cache while a revoked reader or an updated document is stale for a minute at
+most. Generated images and search data are never immutable, because they can
+contain internal content.
+
+`public/_headers` is still validated against the declared visibility, and still
+governs a public deployment, which has no Worker.
+
+Starlight prefetches internal links; the preset changes the strategy from
+`hover` to `tap`, so a pointer crossing the sidebar does not fetch pages.
+Keep **Disable cache** cleared when inspecting caching in browser developer
+tools.
+
+## Machine keys
+
+The smoke test, and any agent a team runs, read the site with a machine key
+rather than a browser session. A key belongs to the environment that issued
+it, has a name, an owner, the groups it reads as and an expiry, and is never an
+administrator. Issue one with:
+
+```bash
+pnpm exec ctcdocs-machine-key --name smoke --owner ops@example.com --days 90
 ```
 
-Store each client ID and secret only in the matching GitHub
-`development-smoke` or `production-smoke` environment, or an ignored local
-`.env`. The smoke client sends:
+The command prints the key once and the record to add to `MACHINE_KEYS`. The
+deployment keeps only the record, which holds the key's hash. A smoke key needs
+no group: it reads what every member reads.
 
-```text
-CF-Access-Client-Id
-CF-Access-Client-Secret
-```
-
-The service token must not be placed in the Astro bundle, Wrangler
-configuration, repository variables, workflow artifacts, or documentation.
+Never put a key in the Astro bundle, Wrangler configuration, repository
+variables, workflow artifacts or documentation.
 
 ## Deploy API token
 
 Create a dedicated Cloudflare API token for each deployment environment. Start
-from the **Edit Cloudflare Workers** template, then restrict each token to:
+from the **Edit Cloudflare Workers** template, then:
 
-- the project's Cloudflare account;
-- the project's zone;
-- Worker script deployment;
-- Worker route/custom-domain management required by the committed route.
+- restrict it to the project's account and zone;
+- keep Worker script deployment and the Worker route or custom-domain
+  permission the committed route needs;
+- **remove Workers KV Storage**. Deploying a Worker with a KV binding does not
+  need it, and without it the token cannot write the snapshot.
 
-Do not grant Access Apps and Policies, Access Service Tokens, broad DNS
-administration, account administration, or access to unrelated accounts and
-zones. Store each token only as `CLOUDFLARE_API_TOKEN` in its matching
-`development-deploy` or `production-deploy` environment; store the non-secret
-account ID as an environment variable.
+Do not grant Access, broad DNS administration, account administration, or
+access to unrelated accounts and zones. Store each token only as
+`CLOUDFLARE_API_TOKEN` in its matching `<environment>-deploy` GitHub
+environment, with the non-secret account ID as a variable.
 
-## Bootstrap Worker migration
+## Moving a deployment off Cloudflare Access
 
-The Phase 0 synthetic deployment used `ctc-wiki-synthetic-staging` on the
-production hostname. Before the first named-environment production deployment:
+A deployment that stood behind an Access application moves in this order, so
+there is no moment when content is served unprotected:
 
-1. keep its Access application active;
-2. run the anonymous and service-token preflight against the hostname;
-3. remove the custom-domain binding from the bootstrap Worker if Cloudflare
-   reports a route conflict;
-4. immediately deploy `example-docs-production` with the committed configuration;
-5. run the post-deploy smoke;
-6. delete the obsolete bootstrap Worker only after the new deployment is
-   protected and recoverable.
+1. Set up the Google client, the directory reader, the namespace, both Workers'
+   configuration and every secret above. Add `CTCDOCS_MACHINE_KEY` to the smoke
+   environment beside the Access service token; the smoke test sends both.
+2. Deploy the directory Worker, put its key, and wait for its first refresh:
+   `pnpm exec wrangler tail example-docs-directory-production` shows
+   `directory-refreshed`. With no snapshot the site Worker admits no session.
+3. Deploy the site normally. Access still stands in front; readers sign in
+   twice for a moment, once to Access and once to the site.
+4. Sign in as a member, as a member of a restricted group and as an admin;
+   check `/_kb/status` as the admin.
+5. Delete the Access application and its service token, and remove
+   `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET` from the smoke
+   environment.
+6. Run the deployment again, so the smoke test proves the boundary with the
+   Worker alone, and add the scheduled anonymous probe.
 
-Never detach Access while transferring the custom domain.
-
-The first development custom-domain binding has a separate synthetic bootstrap
-procedure because the preflight cannot reach a hostname that does not exist
-yet. Follow [Development and production deployment](DEPLOYMENT.md) exactly.
+Never roll back to a version deployed before step 3 once Access is gone: it
+serves everything to everyone. The rollback workflow refuses any version
+without the gate's mark.
 
 ## Verification
 
-Local or protected-environment preflight:
+Before and after a deployment the smoke test requires, of a private
+environment:
 
-```bash
-pnpm test:access:preflight
-```
+- anonymous denial — 401, or a redirect to `/auth/sign-in` — for the home
+  page, raw Markdown, the favicon, the Pagefind runtime, the agent index and a
+  missing route;
+- machine-key admission to the home page and to the Markdown of a document
+  every member may read, with `noindex` metadata, the private cache policy and
+  the Markdown content type;
+- the Pagefind runtime, the agent index, the favicon, a restrictive
+  `robots.txt` and the custom 404 page, read with the key.
 
-Post-deploy black-box verification:
-
-```bash
-pnpm test:access:post-deploy
-```
-
-The checks require:
-
-- anonymous denial for HTML, raw Markdown, Pagefind, SVG, and a missing route;
-- successful service-token admission;
-- protected home page and `noindex` metadata;
-- protected Pagefind JavaScript;
-- protected Markdown with the expected content type and metadata;
-- protected favicon;
-- restrictive `robots.txt`;
-- protected custom 404 handling.
+`ctcdocs-verify-gate` checks every built file against its class before the
+deployment, without a network. `project-probe.yml` repeats the anonymous
+checks on a schedule.
 
 In the Cloudflare dashboard, also verify:
 
-- the only wiki domains are the approved development and production domains;
-- `workers.dev` routes are disabled for both Workers;
-- Preview URLs are disabled for both Workers;
-- there is no public Pages project, GitHub Pages site, or legacy Worker route;
-- Access authentication logs show the Workspace and service-token policies.
+- the only wiki domains are the configured ones;
+- `workers.dev` routes and Preview URLs are disabled for every Worker;
+- the directory Worker has no route and a ten-minute cron trigger;
+- there is no public Pages project, GitHub Pages site, or legacy Worker route.
 
 ## Official references
 
 - [Workers Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)
 - [Wrangler environments](https://developers.cloudflare.com/workers/wrangler/environments/)
+- [Static Assets: run the Worker first](https://developers.cloudflare.com/workers/static-assets/binding/#run_worker_first)
+- [Workers secrets](https://developers.cloudflare.com/workers/configuration/secrets/)
+- [Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/)
+- [Workers authorization and bindings](https://developers.cloudflare.com/workers/authorization/workers/)
+- [Workers limits](https://developers.cloudflare.com/workers/platform/limits/)
 - [Workers Preview URLs](https://developers.cloudflare.com/workers/versions-and-deployments/preview-urls/)
-- [Workers GitHub Actions](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/)
-- [Access self-hosted applications](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/)
-- [Access service tokens](https://developers.cloudflare.com/cloudflare-one/access-controls/service-credentials/service-tokens/)
-- [Require Access protection](https://developers.cloudflare.com/cloudflare-one/access-controls/access-settings/require-access-protection/)

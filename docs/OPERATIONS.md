@@ -14,9 +14,9 @@ Google Drive
 
 When generated output changes, the sync workflow passes the exact committed
 SHA to the reusable production deployment workflow. The deployment workflow
-never reads Google Drive. A failed sync, verification, Access preflight,
-build, deployment, or post-deploy smoke leaves the previous generated commit
-or Worker version available for recovery.
+never reads Google Drive. A failed sync, verification, denial suite, boundary
+check, build, deployment, or post-deploy smoke leaves the previous generated
+commit or Worker version available for recovery.
 
 Promotion through a development environment is a project's choice: it calls
 the deployment workflow once per environment, and makes production `needs:` the
@@ -53,14 +53,13 @@ Variable:
 CTCDOCS_BASE_URL=https://docs-dev.example.com
 ```
 
-Secrets:
+Secret:
 
 ```text
-CF_ACCESS_CLIENT_ID
-CF_ACCESS_CLIENT_SECRET
+CTCDOCS_MACHINE_KEY
 ```
 
-Use a development-only Access service token.
+Use a development-only smoke key; see [Machine keys](#machine-keys).
 
 ### `production-sync`
 
@@ -100,9 +99,10 @@ CLOUDFLARE_API_TOKEN
 ```
 
 Scope the token to the project's account and project's zone. It may deploy
-the `example-docs-production` Worker and manage its configured custom-domain
-binding, but it must not manage Access identities, service tokens, unrelated
-Workers, broad DNS administration, or account settings.
+the `example-docs-production` Workers and manage the configured custom-domain
+binding, but it must not hold Workers KV permissions — deploying a binding does
+not need them, and without them it cannot write the directory snapshot — nor
+manage unrelated Workers, broad DNS administration, or account settings.
 
 ### `production-smoke`
 
@@ -112,15 +112,14 @@ Variable:
 CTCDOCS_BASE_URL=https://docs.example.com
 ```
 
-Secrets:
+Secret:
 
 ```text
-CF_ACCESS_CLIENT_ID
-CF_ACCESS_CLIENT_SECRET
+CTCDOCS_MACHINE_KEY
 ```
 
-This service token needs only a Cloudflare Access `Service Auth` policy for the
-wiki application. It does not need Cloudflare API access.
+The smoke key reads what every member reads, and nothing else. It is not a
+Cloudflare credential and grants no API access.
 
 ## Scheduled and manual sync
 
@@ -460,21 +459,23 @@ exports every document again, because the converter version changed.
 
 Every push to `main` starts `.github/workflows/deploy.yml`:
 
-1. run the canonical verification gate;
+1. run the canonical verification gate, then the denial suite, which asks the
+   platform's gate for every built file as different readers;
 2. deploy and verify the same commit on a development environment first, if
    the project declares one and gates on it;
 3. prove that production anonymous requests are denied and its separate smoke
-   service token passes Access;
+   key is admitted;
 4. rebuild from the exact commit without transferring build artifacts;
-5. deploy `dist` to `example-docs-production` through Wrangler;
-6. verify protected HTML, raw Markdown, Pagefind, SVG, `robots.txt`, and the 404
-   response.
+5. deploy the site Worker, tagged `ctcdocs-gate-v1`, and the directory Worker
+   through Wrangler;
+6. verify protected HTML, raw Markdown and its headers, Pagefind, the agent
+   index, `robots.txt`, and the 404 response.
 
 A Worker deployment reaches every edge location shortly after Wrangler reports
 success, so a route added by the deployed commit can still answer from the
 previous version. Step 6 therefore retries each unsatisfied check against a
 single shared 90-second deadline and logs every wait. Anonymous-denial and
-service-token assertions are never retried: an Access finding fails the run
+machine-key assertions are never retried: a boundary finding fails the run
 immediately.
 
 The committed Wrangler configuration disables both `workers.dev` and version
@@ -485,14 +486,87 @@ Before the first real-content deployment, run:
 
 ```bash
 pnpm verify
-pnpm test:access:preflight
+pnpm exec ctcdocs-verify-gate
+pnpm exec ctcdocs-access-smoke --preflight
 ```
 
-Do not run `pnpm deploy:production` with real content from a feature branch or
-before the Access preflight passes.
+Do not deploy real content from a feature branch or before the boundary check
+passes.
 
 The complete bootstrap and release procedure is maintained in
 [Development and production deployment](DEPLOYMENT.md).
+
+## Sign-in and the directory
+
+A private deployment decides every request in its Worker against a snapshot
+of group membership that its directory Worker refreshes every ten minutes
+(ADR-038, ADR-040). Nothing about a reader's groups is stored in their session.
+
+### When a reader leaves or changes groups
+
+Membership changes in Google take effect at the next refresh plus up to a
+minute of caching in the Worker: about ten minutes. A suspended or deleted
+user loses every session at the same moment, because a session is honored only
+for a user the snapshot lists as active. A session otherwise lasts twelve
+hours, and **Sign out** ends it on the site without signing the reader out of
+Google.
+
+### The directory snapshot
+
+An admin reads its state at `/_kb/status`: when it was taken, its age, whether
+it is stale, the number of active users, and each named group's member count
+with the reason, if any, it admits no one. It holds no addresses or IDs.
+
+| What you see                                  | What it means                                                                                         | What to do                                                                                                   |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| The site says the directory has not been read | There is no snapshot; no session is admitted                                                          | Read the directory Worker's logs: a missing or wrong `DIRECTORY_KEY`, a disabled API, or a role not assigned |
+| `stale: true`                                 | No refresh has succeeded for two hours                                                                | Signed-in readers read only what every member reads until one does; read the logs                            |
+| `directory-refresh-refused` in the logs       | The result lost more than a fifth, and at least five, of the users or of a group                      | If a failed read, fix it. If a genuine departure, delete the snapshot, as below                              |
+| A group with `admitsNoOne`                    | It is nested, holds the organization, lets people join themselves, admits outsiders, or was recreated | Fix the group in Google; for a recreated group, reset its pin, as below                                      |
+
+The directory Worker's logs carry counts and durations, never an address, an ID
+or a membership:
+
+```bash
+pnpm exec wrangler tail example-docs-directory-production
+```
+
+**Accepting a large departure.** Delete the snapshot; the next run, within ten
+minutes, writes a new one without comparing it to anything. Until then no
+session is admitted.
+
+```bash
+pnpm exec wrangler kv key delete directory-snapshot --binding KB_STATE --env production --remote
+```
+
+**Resetting a group's pin.** The refresh records each group's Google ID the
+first time it reads it, and a different group later found under the same
+address admits no one. After confirming the new group is the intended one,
+remove its entry from the `directory-pins` value:
+
+```bash
+pnpm exec wrangler kv key get directory-pins --binding KB_STATE --env production --remote
+pnpm exec wrangler kv key put directory-pins '<the same JSON without that address>' --binding KB_STATE --env production --remote
+```
+
+Both commands need a token or login with KV permissions; the deploy token does
+not have them.
+
+### Machine keys
+
+The smoke test and any agent a team runs read the site with a machine key.
+Issue one per use, per environment:
+
+```bash
+pnpm exec ctcdocs-machine-key --name <name> --owner <who answers for it> --group <address> --days 90
+```
+
+It prints the key once and a record. Add the record to the JSON list in the
+environment's `MACHINE_KEYS` secret and give the key to its user. A key reads
+as the groups its record names — none means what every member reads — never as
+an administrator, and stops working at its expiry, at most a year away.
+
+To revoke a key, remove its record from `MACHINE_KEYS`. Nothing else holds it.
 
 ## Failure handling
 
@@ -646,19 +720,25 @@ deployment. To restore a known-good version:
 5. Approve the `production-deploy` environment gate.
 6. Wait for the post-rollback protected smoke test.
 
-The workflow runs an Access preflight before `wrangler rollback`, sends 100% of
+The workflow checks the boundary before `wrangler rollback`, refuses a version
+of a private deployment that lacks the `ctcdocs-gate-v1` tag, sends 100% of
 traffic to the selected version, and verifies the protected surface
 afterwards. Record the incident, restored version, root cause, and subsequent
 fix in a private issue or incident system.
 
-If the Access boundary fails:
+If the boundary fails — the probe or a smoke test finds content served
+anonymously, or a reader sees what their groups should not:
 
-1. stop sync and deployment workflows;
-2. remove or disable any public alternate route;
-3. restore the Access application and policies;
-4. revoke exposed deploy or service-token credentials;
+1. take the custom domain off the site Worker in the Cloudflare dashboard; the
+   site is then unreachable rather than open;
+2. stop sync and deployment workflows;
+3. remove or disable any public alternate route;
+4. rotate `SESSION_SECRET` without keeping the previous one, which ends every
+   session, and revoke exposed deploy tokens or machine keys;
 5. inspect Cloudflare, GitHub, and Google audit logs;
-6. re-enable deployment only after the anonymous negative smoke passes.
+6. restore the domain on a gated version only after `ctcdocs-verify-gate`
+   reproduces the failure and passes with the fix, and the anonymous smoke
+   passes.
 
 ## Credential rotation
 
@@ -670,7 +750,8 @@ If the Access boundary fails:
 4. run a sync dry-run;
 5. remove the old impersonation binding.
 
-Do not introduce a service account JSON key during routine rotation.
+Do not introduce a service account JSON key for the synchronization identity
+during routine rotation. The directory reader is the only identity with a key.
 
 ### Cloudflare deploy token
 
@@ -679,13 +760,39 @@ Do not introduce a service account JSON key during routine rotation.
 3. run a manual production deployment;
 4. revoke the previous token after the protected smoke succeeds.
 
-### Access service token
+### Session secret
 
-1. create the replacement service token;
-2. add it to the existing `Service Auth` policy;
-3. replace both secrets in `production-smoke`;
-4. run `pnpm test:access:preflight` through the environment;
-5. delete the old service token.
+Every session and sign-in in flight is sealed with `SESSION_SECRET`. To rotate
+it without signing everyone out:
+
+1. copy the current value into `SESSION_SECRET_PREVIOUS`;
+2. put a new random value of at least 32 characters into `SESSION_SECRET`;
+3. after twelve hours — the longest a session lasts — delete
+   `SESSION_SECRET_PREVIOUS`.
+
+To sign everyone out at once, replace `SESSION_SECRET` and delete the previous
+one. Each environment has its own.
+
+### Google client secret
+
+1. add a second secret to the OAuth client in Google Cloud;
+2. replace `GOOGLE_CLIENT_SECRET` on each environment's site Worker;
+3. sign in once per environment;
+4. delete the old secret in Google Cloud.
+
+### Directory reader key
+
+1. create a new JSON key for the directory reader's service account;
+2. replace `DIRECTORY_KEY` on each environment's directory Worker, from the
+   file, then delete the file;
+3. confirm the next run logs `directory-refreshed`;
+4. delete the old key in Google Cloud.
+
+### Smoke key
+
+Issue a new key as in [Machine keys](#machine-keys), add its record to
+`MACHINE_KEYS` beside the old one, replace `CTCDOCS_MACHINE_KEY` in the smoke
+environment, run a deployment, then remove the old record.
 
 ## Dependency maintenance
 

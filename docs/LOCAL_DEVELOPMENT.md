@@ -42,21 +42,24 @@ A project installs `@ctcstack/ctcdocs` and `@ctcstack/ctcdocs-sync` and runs the
 commands they provide. Its `package.json` scripts wrap them; the names below are
 the ones the reusable workflows call.
 
-| Command                                            | Purpose                                                       |
-| -------------------------------------------------- | ------------------------------------------------------------- |
-| `astro dev`                                        | Development server                                            |
-| `astro check && astro build`                       | Type-check and build the static site                          |
-| `ctcdocs-sync validate`                            | Check configuration, content and deployment invariants        |
-| `ctcdocs-sync sync --dry-run`                      | Export, convert and stage without writing                     |
-| `ctcdocs-sync sync`                                | Replace generated output after validation                     |
-| `ctcdocs-sync sync --full`                         | Force re-export of every selected document                    |
-| `ctcdocs-sync sync --file <id>`                    | Re-export one document without unrelated deletion             |
-| `ctcdocs-sync sync --reseed-slug <id>`             | Change one stable URL and leave a redirect behind             |
-| `ctcdocs-verify-search`                            | Exercise the built Pagefind index                             |
-| `ctcdocs-access-smoke --preflight`                 | Prove the boundary before deploying                           |
-| `ctcdocs-access-smoke --post-deploy`               | Prove the deployed surface answers as its visibility declares |
-| `playwright test --config playwright.ux.config.ts` | Accessibility and interface checks                            |
-| `wrangler deploy --env production --dry-run`       | Validate the deployment target without uploading              |
+| Command                                            | Purpose                                                                                                            |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `astro dev`                                        | Development server                                                                                                 |
+| `astro check && astro build`                       | Type-check and build the static site                                                                               |
+| `ctcdocs-sync validate`                            | Check configuration, content and deployment invariants                                                             |
+| `ctcdocs-sync sync --dry-run`                      | Export, convert and stage without writing                                                                          |
+| `ctcdocs-sync sync`                                | Replace generated output after validation                                                                          |
+| `ctcdocs-sync sync --full`                         | Force re-export of every selected document                                                                         |
+| `ctcdocs-sync sync --file <id>`                    | Re-export one document without unrelated deletion                                                                  |
+| `ctcdocs-sync sync --reseed-slug <id>`             | Change one stable URL and leave a redirect behind                                                                  |
+| `ctcdocs-verify-search`                            | Exercise the built Pagefind index, one bundle per access class                                                     |
+| `ctcdocs-verify-gate`                              | Ask the platform's gate for every built file as different readers, offline                                         |
+| `ctcdocs-access-smoke --preflight`                 | Prove the boundary before deploying                                                                                |
+| `ctcdocs-access-smoke --post-deploy`               | Prove the deployed surface answers as its visibility declares                                                      |
+| `ctcdocs-access-smoke --anonymous`                 | Prove only that anonymous requests are refused                                                                     |
+| `ctcdocs-machine-key`                              | Issue a machine key and the record its environment keeps                                                           |
+| `playwright test --config playwright.ux.config.ts` | Accessibility and interface checks                                                                                 |
+| `wrangler deploy --env production --dry-run`       | Validate the deployment target without uploading; add `--config wrangler.directory.jsonc` for the directory Worker |
 
 Add `--json` to a sync command only when a report containing file names and
 paths is appropriate for the security context you are in. The normal log carries
@@ -87,9 +90,18 @@ The access smoke test:
 
 ```text
 CTCDOCS_BASE_URL
-CF_ACCESS_CLIENT_ID
-CF_ACCESS_CLIENT_SECRET
+CTCDOCS_MACHINE_KEY
 ```
+
+`CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET` are read too, for a
+deployment that still stands behind Cloudflare Access.
+
+The Worker's own secrets live in Cloudflare, set with `wrangler secret put`,
+never in a file. The gate answers only on the hostnames the configuration
+names, so it is exercised locally through `ctcdocs-verify-gate`, which runs the
+real gate against the real build with made-up readers, rather than through
+`wrangler dev`. If you do run `wrangler dev`, its `.dev.vars` stays ignored and
+holds placeholders, never an environment's secrets.
 
 Deployment, which Wrangler reads from its own `.env` in the directory holding
 `wrangler.jsonc`:
