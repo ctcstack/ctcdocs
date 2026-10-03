@@ -5,6 +5,7 @@ import {
   accessToken,
   DirectoryError,
   namedGroups,
+  parsePins,
   parseServiceAccountKey,
   plausible,
   readDirectory,
@@ -98,16 +99,65 @@ describe('readDirectory', () => {
     });
   });
 
-  it('fails as a whole when a group cannot be read', async () => {
-    await expect(
-      readDirectory({
-        fetch: directory(routes),
+  it('closes a group it cannot read and reads everything else', async () => {
+    const { read, pins } = await readDirectory({
+      fetch: directory(routes),
+      token: 't',
+      groups: ['team@example.com', 'missing@example.com'],
+      domains: ['example.com'],
+      pins: {},
+    });
+    expect(read.groups['missing@example.com']).toEqual({
+      id: '',
+      members: [],
+      admitsNoOne: 'cannot be read',
+    });
+    expect(read.groups['team@example.com']?.members).toEqual(['u1', 'u2']);
+    expect(read.users).toEqual({ u1: true, u2: true });
+    expect(read.inactive).toEqual({ u7: true, u8: true });
+    expect(pins).toEqual({ 'team@example.com': 'g-team' });
+  });
+
+  it('closes a group whose settings cannot be read', async () => {
+    const withoutSettings = Object.fromEntries(
+      Object.entries(routes).filter(
+        ([path]) => path !== `${settingsPath}/team@example.com`,
+      ),
+    );
+    const { read } = await readDirectory({
+      fetch: directory(withoutSettings),
+      token: 't',
+      groups: ['team@example.com'],
+      domains: ['example.com'],
+      pins: {},
+    });
+    expect(read.groups['team@example.com']?.admitsNoOne).toBe(
+      'its settings could not be read',
+    );
+  });
+
+  it('stops on a failure that may pass, and never names a group in it', async () => {
+    const outage = (path: string): typeof fetch =>
+      (async (input: RequestInfo | URL) =>
+        decodeURIComponent(new URL(String(input)).pathname).startsWith(path)
+          ? new Response('{}', { status: 503 })
+          : directory(routes)(input)) as typeof fetch;
+    for (const [path, stage] of [
+      [`${groupsPath}/team@example.com`, 'group'],
+      [`${settingsPath}/team@example.com`, 'settings'],
+      ['/admin/directory/v1/users', 'users'],
+    ] as const) {
+      const failure = await readDirectory({
+        fetch: outage(path),
         token: 't',
-        groups: ['team@example.com', 'missing@example.com'],
+        groups: ['team@example.com'],
         domains: ['example.com'],
         pins: {},
-      }),
-    ).rejects.toThrow(DirectoryError);
+      }).catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(DirectoryError);
+      expect(failure).toMatchObject({ stage, status: 503 });
+      expect(String((failure as Error).message)).not.toContain('example.com');
+    }
   });
 });
 
@@ -131,6 +181,7 @@ describe('plausible', () => {
       plausible(
         {
           users: users(29),
+          inactive: {},
           groups: {
             'team@example.com': { id: 'g', members: ids(19) },
             'pair@example.com': { id: 'p', members: ids(2) },
@@ -139,19 +190,20 @@ describe('plausible', () => {
         previous,
       ),
     ).toBe(undefined);
-    expect(plausible({ users: {}, groups: {} }, undefined)).toMatch(
-      /no active user/u,
-    );
+    expect(
+      plausible({ users: {}, inactive: {}, groups: {} }, undefined),
+    ).toMatch(/no active user/u);
   });
 
   it('refuses a sharp drop in users or in a group', () => {
-    expect(plausible({ users: users(23), groups: {} }, previous)).toMatch(
-      /fell from 30 to 23/u,
-    );
+    expect(
+      plausible({ users: users(23), inactive: {}, groups: {} }, previous),
+    ).toMatch(/fell from 30 to 23/u);
     expect(
       plausible(
         {
           users: users(30),
+          inactive: {},
           groups: { 'team@example.com': { id: 'g', members: ids(10) } },
         },
         previous,
@@ -159,11 +211,46 @@ describe('plausible', () => {
     ).toMatch(/group fell from 20 to 10/u);
   });
 
+  it('counts people the listing names as suspended as gone, not lost', () => {
+    const suspended = Object.fromEntries(
+      ids(30)
+        .slice(23)
+        .map((id) => [id, true as const]),
+    );
+    expect(
+      plausible(
+        {
+          users: users(23),
+          inactive: suspended,
+          groups: { 'team@example.com': { id: 'g', members: ids(20) } },
+        },
+        previous,
+      ),
+    ).toBe(undefined);
+    expect(
+      plausible(
+        {
+          users: users(30),
+          inactive: {},
+          groups: {
+            'team@example.com': {
+              id: 'g',
+              members: [],
+              admitsNoOne: 'cannot be read',
+            },
+          },
+        },
+        previous,
+      ),
+    ).toBe(undefined);
+  });
+
   it('accepts a small group losing a member, which is no sign of failure', () => {
     expect(
       plausible(
         {
           users: users(30),
+          inactive: {},
           groups: { 'pair@example.com': { id: 'p', members: ids(1) } },
         },
         previous,
@@ -245,8 +332,19 @@ describe('namedGroups and snapshotOf', () => {
         },
       }),
     ).toEqual(['admins@example.com', 'team@example.com']);
-    expect(snapshotOf({ users: {}, groups: {} }, NOW).takenAt).toBe(
-      '2026-10-03T12:00:00.000Z',
-    );
+    expect(
+      snapshotOf({ users: {}, inactive: {}, groups: {} }, NOW).takenAt,
+    ).toBe('2026-10-03T12:00:00.000Z');
+  });
+});
+
+describe('parsePins', () => {
+  it('keeps well-formed pins and drops the rest', () => {
+    expect(parsePins({ 'a@example.com': 'g1', 'b@example.com': 2 })).toEqual({
+      'a@example.com': 'g1',
+    });
+    expect(parsePins('broken')).toEqual({});
+    expect(parsePins(null)).toEqual({});
+    expect(parsePins(['g1'])).toEqual({});
   });
 });

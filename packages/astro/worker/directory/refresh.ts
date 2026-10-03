@@ -12,8 +12,25 @@
 import { base64url } from '../seal.js';
 import type { DirectorySnapshot, SnapshotGroup } from '../snapshot.js';
 
+/**
+ * A refresh that cannot go on. Its message names the stage and the status,
+ * never a group's address: it ends up in the Worker's logs.
+ */
 export class DirectoryError extends Error {
   override readonly name = 'DirectoryError';
+
+  constructor(
+    message: string,
+    readonly stage = 'key',
+    readonly status?: number,
+  ) {
+    super(message);
+  }
+}
+
+/** Google could not answer now; a later run may. */
+function transient(status: number): boolean {
+  return status === 429 || status >= 500;
 }
 
 export interface ServiceAccountKey {
@@ -125,6 +142,8 @@ export async function accessToken(
   if (!response.ok || typeof body.access_token !== 'string') {
     throw new DirectoryError(
       `Google refused the directory key (${typeof body.error === 'string' ? body.error : response.status}).`,
+      'token',
+      response.status,
     );
   }
   return body.access_token;
@@ -134,18 +153,25 @@ async function getJson(
   fetchImplementation: typeof fetch,
   token: string,
   url: string,
+  stage: string,
 ): Promise<Record<string, unknown>> {
-  const response = await fetchImplementation(url, {
-    headers: { authorization: `Bearer ${token}` },
-  });
+  let response: Response;
+  try {
+    response = await fetchImplementation(url, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+  } catch {
+    throw new DirectoryError(`${stage}: network`, stage);
+  }
   const body = (await response.json().catch(() => ({}))) as Record<
     string,
     unknown
   >;
   if (!response.ok) {
-    const error = body.error as { message?: unknown } | undefined;
     throw new DirectoryError(
-      `${new URL(url).pathname}: ${response.status} ${typeof error?.message === 'string' ? error.message : ''}`.trim(),
+      `${stage}: ${response.status}`,
+      stage,
+      response.status,
     );
   }
   return body;
@@ -159,13 +185,121 @@ interface Member {
 
 export interface DirectoryRead {
   readonly users: Record<string, true>;
+  /** Users the listing names as suspended or archived: gone, not lost. */
+  readonly inactive: Record<string, true>;
   readonly groups: Record<string, SnapshotGroup>;
 }
 
+/** One named group: its direct members, and why it admits no one, if it does not. */
+async function readGroup(
+  options: { fetch: typeof fetch; token: string },
+  address: string,
+  pinned: string | undefined,
+): Promise<{ group: SnapshotGroup; id: string | undefined }> {
+  const { fetch: fetchImplementation, token } = options;
+  const path = `${DIRECTORY}/groups/${encodeURIComponent(address)}`;
+  let id: string;
+  const members: Member[] = [];
+  try {
+    const group = await getJson(
+      fetchImplementation,
+      token,
+      `${path}?fields=id`,
+      'group',
+    );
+    id = String(group.id ?? '');
+    let pageToken = '';
+    do {
+      const page = await getJson(
+        fetchImplementation,
+        token,
+        `${path}/members?maxResults=200&fields=members(id,type,status),nextPageToken${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`,
+        'members',
+      );
+      members.push(...((page.members as Member[] | undefined) ?? []));
+      pageToken =
+        typeof page.nextPageToken === 'string' ? page.nextPageToken : '';
+    } while (pageToken);
+  } catch (error: unknown) {
+    // Deleted, renamed or out of the role's sight: that group admits no
+    // one, and the rest of the directory is still read.
+    if (
+      error instanceof DirectoryError &&
+      error.status !== undefined &&
+      !transient(error.status)
+    ) {
+      return {
+        group: { id: pinned ?? '', members: [], admitsNoOne: 'cannot be read' },
+        id: undefined,
+      };
+    }
+    throw error;
+  }
+
+  const reasons: string[] = [];
+  if (pinned !== undefined && pinned !== id) {
+    reasons.push(
+      'recreated under the same address; reset its pin to accept it',
+    );
+  }
+  if (members.some((member) => member.type === 'CUSTOMER')) {
+    reasons.push('holds the whole organization');
+  }
+  if (members.some((member) => member.type === 'GROUP')) {
+    reasons.push('holds another group, which is not read');
+  }
+  try {
+    const settings = await getJson(
+      fetchImplementation,
+      token,
+      `${SETTINGS}/${encodeURIComponent(address)}?alt=json`,
+      'settings',
+    );
+    if (
+      ['ANYONE_CAN_JOIN', 'ALL_IN_DOMAIN_CAN_JOIN'].includes(
+        String(settings.whoCanJoin),
+      )
+    ) {
+      reasons.push('lets people join themselves');
+    }
+    if (String(settings.allowExternalMembers) === 'true') {
+      reasons.push('admits members from outside the organization');
+    }
+  } catch (error: unknown) {
+    // Unchecked is not the same as safe: the group waits for a reading.
+    if (
+      error instanceof DirectoryError &&
+      (error.status === undefined || transient(error.status))
+    ) {
+      throw error;
+    }
+    reasons.push('its settings could not be read');
+  }
+  return {
+    group: {
+      id: pinned ?? id,
+      members: members
+        .filter(
+          (member) =>
+            member.type === 'USER' &&
+            member.status !== 'SUSPENDED' &&
+            member.id,
+        )
+        .map((member) => member.id as string)
+        .sort(),
+      ...(reasons.length > 0 ? { admitsNoOne: reasons.join('; ') } : {}),
+    },
+    id,
+  };
+}
+
 /**
- * Reads the named groups and the active users of each domain. `pins` holds
- * the Google ID each address resolved to the first time; an address that now
- * resolves to another ID admits no one until an operator resets its pin.
+ * Reads the named groups and the users of each domain. `pins` holds the
+ * Google ID each address resolved to the first time; an address that now
+ * resolves to another ID admits no one until an operator resets its pin. A
+ * group that cannot be read admits no one; a failure that may pass — a quota,
+ * an outage, the network — stops the whole reading, and the last snapshot
+ * stays.
  */
 export async function readDirectory(options: {
   fetch: typeof fetch;
@@ -178,74 +312,15 @@ export async function readDirectory(options: {
   const pins: Record<string, string> = { ...options.pins };
   const groups: Record<string, SnapshotGroup> = {};
   for (const address of [...options.groups].sort()) {
-    const group = await getJson(
-      fetchImplementation,
-      token,
-      `${DIRECTORY}/groups/${encodeURIComponent(address)}?fields=id`,
-    );
-    const id = String(group.id ?? '');
-    const members: Member[] = [];
-    let pageToken = '';
-    do {
-      const page = await getJson(
-        fetchImplementation,
-        token,
-        `${DIRECTORY}/groups/${encodeURIComponent(address)}/members?maxResults=200&fields=members(id,type,status),nextPageToken${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`,
-      );
-      members.push(...((page.members as Member[] | undefined) ?? []));
-      pageToken =
-        typeof page.nextPageToken === 'string' ? page.nextPageToken : '';
-    } while (pageToken);
-
-    const reasons: string[] = [];
-    if (pins[address] !== undefined && pins[address] !== id) {
-      reasons.push(
-        'recreated under the same address; reset its pin to accept it',
-      );
-    } else {
+    const { group, id } = await readGroup(options, address, pins[address]);
+    groups[address] = group;
+    if (id && pins[address] === undefined) {
       pins[address] = id;
     }
-    if (members.some((member) => member.type === 'CUSTOMER')) {
-      reasons.push('holds the whole organization');
-    }
-    if (members.some((member) => member.type === 'GROUP')) {
-      reasons.push('holds another group, which is not read');
-    }
-    try {
-      const settings = await getJson(
-        fetchImplementation,
-        token,
-        `${SETTINGS}/${encodeURIComponent(address)}?alt=json`,
-      );
-      if (
-        ['ANYONE_CAN_JOIN', 'ALL_IN_DOMAIN_CAN_JOIN'].includes(
-          String(settings.whoCanJoin),
-        )
-      ) {
-        reasons.push('lets people join themselves');
-      }
-      if (String(settings.allowExternalMembers) === 'true') {
-        reasons.push('admits members from outside the organization');
-      }
-    } catch {
-      // Settings are checked where the API answers; the runbook covers the rest.
-    }
-    groups[address] = {
-      id,
-      members: members
-        .filter(
-          (member) =>
-            member.type === 'USER' &&
-            member.status !== 'SUSPENDED' &&
-            member.id,
-        )
-        .map((member) => member.id as string)
-        .sort(),
-      ...(reasons.length > 0 ? { admitsNoOne: reasons.join('; ') } : {}),
-    };
   }
 
   const users: Record<string, true> = {};
+  const inactive: Record<string, true> = {};
   for (const domain of options.domains) {
     let pageToken = '';
     do {
@@ -253,11 +328,17 @@ export async function readDirectory(options: {
         fetchImplementation,
         token,
         `${DIRECTORY}/users?domain=${encodeURIComponent(domain)}&maxResults=500&fields=users(id,suspended,archived),nextPageToken${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`,
+        'users',
       );
       for (const user of (page.users as
         | Array<{ id?: string; suspended?: boolean; archived?: boolean }>
         | undefined) ?? []) {
-        if (user.id && !user.suspended && !user.archived) {
+        if (!user.id) {
+          continue;
+        }
+        if (user.suspended || user.archived) {
+          inactive[user.id] = true;
+        } else {
           users[user.id] = true;
         }
       }
@@ -265,12 +346,14 @@ export async function readDirectory(options: {
         typeof page.nextPageToken === 'string' ? page.nextPageToken : '';
     } while (pageToken);
   }
-  return { read: { users, groups }, pins };
+  return { read: { users, inactive, groups }, pins };
 }
 
 /**
  * Whether a refresh looks like the directory rather than a failure: some
- * active users, and no sharp drop against the last snapshot.
+ * active users, and no sharp drop against the last snapshot. Someone the
+ * listing names as suspended or archived has left, which is no sign of a
+ * failed read, and a group that cannot be read already admits no one.
  */
 export function plausible(
   read: DirectoryRead,
@@ -283,14 +366,22 @@ export function plausible(
   if (!previous) {
     return undefined;
   }
-  const before = Object.keys(previous.users).length;
-  if (sharpDrop(before, active)) {
-    return `active users fell from ${before} to ${active}`;
+  const vanished = (ids: readonly string[], kept: (id: string) => boolean) =>
+    ids.filter((id) => !kept(id) && !read.inactive[id]).length;
+  const before = Object.keys(previous.users);
+  const lostUsers = vanished(before, (id) => read.users[id] === true);
+  if (sharpDrop(before.length, before.length - lostUsers)) {
+    return `active users fell from ${before.length} to ${active}`;
   }
   for (const [address, group] of Object.entries(read.groups)) {
-    const earlier = previous.groups[address]?.members.length ?? 0;
-    if (sharpDrop(earlier, group.members.length)) {
-      return `a group fell from ${earlier} to ${group.members.length} members`;
+    if (group.admitsNoOne === 'cannot be read') {
+      continue;
+    }
+    const earlier = previous.groups[address]?.members ?? [];
+    const current = new Set(group.members);
+    const lost = vanished(earlier, (id) => current.has(id));
+    if (sharpDrop(earlier.length, earlier.length - lost)) {
+      return `a group fell from ${earlier.length} to ${group.members.length} members`;
     }
   }
   return undefined;
@@ -312,6 +403,19 @@ export function namedGroups(map: {
     }
   }
   return [...groups].sort();
+}
+
+/** Pins as stored, keeping only entries of the right shape. */
+export function parsePins(value: unknown): Record<string, string> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, string] =>
+        typeof entry[1] === 'string' && entry[1].length > 0,
+    ),
+  );
 }
 
 export function snapshotOf(
