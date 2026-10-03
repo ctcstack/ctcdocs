@@ -145,13 +145,17 @@ keeps OpenAI's `id`, `title` and `url`, and adds:
 - `path` — the folders from the corpus root to the document, from the build;
 - `modified` — when the document last changed in Drive.
 
-**A passage is shown only where its text may go.** A result appears only for
-a document the build lists and the reader may open, as before. Each passage
-is also checked on its own: the class its chunk carries in the index must be
-one the reader may read. The index's filter and its cache are not trusted
-with either. A passage can come from an earlier version of a document the
-reader may still open, until AI Search has synced the change; it never
-reaches a reader outside the class of the text it was taken from.
+**A document is found only through text its reader may read.** A chunk
+counts only when its document is one the build lists and the reader may
+open, as before, and the class the chunk carries in the index is one the
+reader may read. A chunk that fails either is skipped before its document
+takes a place among the ten, so a match on text the reader may not read
+neither shows the document, which would say that it matched, nor pushes out
+a document they may read. Every result therefore has at least one passage.
+The index's filter and its cache are not trusted with any of it. A passage
+can come from an earlier version of a document the reader may still open,
+until AI Search has synced the change; it never reaches a reader outside the
+class of the text it was taken from.
 
 **An empty answer says so.** With nothing to return, `results` is empty and
 the text item says that no document the person may open matches, and to try
