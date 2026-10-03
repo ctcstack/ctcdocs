@@ -14,7 +14,7 @@ import type { CorpusDocument } from '@ctcstack/ctcdocs-core';
 
 import type { FileClass } from './access-map.js';
 
-export interface AgentDocument {
+interface AgentDocument {
   /** The permanent short ID: the tool's `id` and the R2 object's name. */
   readonly id: string;
   readonly title: string;

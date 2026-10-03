@@ -74,7 +74,7 @@ function idOf(key: string): string | undefined {
 }
 
 /** The permanent link a citation uses, which survives a rename (ADR-022). */
-export function permanentLink(origin: string, id: string): string {
+function permanentLink(origin: string, id: string): string {
   return `${origin}/d/${id}/`;
 }
 

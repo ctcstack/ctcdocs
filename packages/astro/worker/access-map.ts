@@ -26,7 +26,7 @@ export interface AccessMapEnvironment {
 }
 
 /** A document the MCP server publishes to R2 (ADR-041). */
-export interface AgentDocument {
+interface AgentDocument {
   readonly id: string;
   readonly title: string;
   readonly markdown: string;
