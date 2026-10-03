@@ -148,6 +148,8 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
       // Carets rather than arrows on the previous and next links.
       Pagination: '@ctcstack/ctcdocs/components/Pagination.astro',
       SiteTitle: '@ctcstack/ctcdocs/components/SiteTitle.astro',
+      // A private deployment's header and mobile menu offer Sign out.
+      SocialIcons: '@ctcstack/ctcdocs/components/SocialIcons.astro',
       SkipLink: '@ctcstack/ctcdocs/components/SkipLink.astro',
     },
     // Source provenance is reported under the title from googleModifiedTime,

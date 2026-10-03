@@ -541,6 +541,21 @@ test('generated images are served from the protected asset route', async ({
   expect(asset.headers()['content-type']).toMatch(/^image\//u);
 });
 
+test('a private deployment offers Sign out as a form the Worker accepts', async ({
+  page,
+}) => {
+  test.skip(
+    siteConfiguration.deployment.environments.production.visibility !==
+      'private',
+    'A public deployment has no session to end.',
+  );
+  await page.goto('/');
+  const form = page.locator('header form.sign-out');
+  await expect(form).toHaveAttribute('method', 'post');
+  await expect(form).toHaveAttribute('action', '/auth/sign-out');
+  await expect(form.getByRole('button', { name: 'Sign out' })).toBeVisible();
+});
+
 test('crawler defenses are present in the built site', async ({
   page,
   request,
