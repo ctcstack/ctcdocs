@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseSiteConfiguration } from './site-configuration.js';
+import { MCP_DEFAULTS, parseSiteConfiguration } from './site-configuration.js';
 
 function configuration(access: unknown, visibility?: string) {
   return {
@@ -183,6 +183,7 @@ describe('MCP configuration', () => {
   it('turns the server on for a private deployment that signs readers in', () => {
     expect(parseSiteConfiguration(withMcp({ enabled: true })).mcp).toEqual({
       enabled: true,
+      ...MCP_DEFAULTS,
     });
   });
 
@@ -190,7 +191,104 @@ describe('MCP configuration', () => {
     expect(
       parseSiteConfiguration(withMcp({ enabled: false }, { signIn: false }))
         .mcp,
-    ).toEqual({ enabled: false });
+    ).toEqual({ enabled: false, ...MCP_DEFAULTS });
+  });
+
+  it('takes the search settings a project sets, and defaults the rest', () => {
+    const mcp = parseSiteConfiguration(
+      withMcp({
+        enabled: true,
+        search: {
+          chunks: 30,
+          vectorThreshold: 0.35,
+          keywordMatch: 'and',
+          reranking: { threshold: 0.25 },
+          results: 5,
+        },
+        fetchCharacters: 60_000,
+      }),
+    ).mcp;
+    expect(mcp).toEqual({
+      enabled: true,
+      search: {
+        ...MCP_DEFAULTS.search,
+        chunks: 30,
+        vectorThreshold: 0.35,
+        keywordMatch: 'and',
+        reranking: { ...MCP_DEFAULTS.search.reranking, threshold: 0.25 },
+        results: 5,
+      },
+      fetchCharacters: 60_000,
+    });
+  });
+
+  it('starts from the values ADR-042 records', () => {
+    expect(MCP_DEFAULTS).toEqual({
+      search: {
+        chunks: 50,
+        vectorThreshold: 0.2,
+        keywordMatch: 'or',
+        contextChunks: 1,
+        reranking: {
+          enabled: true,
+          model: '@cf/baai/bge-reranker-base',
+          threshold: 0,
+        },
+        results: 10,
+        passagesPerResult: 3,
+        passageCharacters: 24_000,
+      },
+      fetchCharacters: 100_000,
+    });
+  });
+
+  it.each([
+    [{ chunks: 0 }, /mcp\.search\.chunks must be a whole number from 1 to 50/u],
+    [
+      { chunks: 51 },
+      /mcp\.search\.chunks must be a whole number from 1 to 50/u,
+    ],
+    [{ chunks: 2.5 }, /mcp\.search\.chunks must be a whole number/u],
+    [{ vectorThreshold: 1.5 }, /vectorThreshold must be a number from 0 to 1/u],
+    [{ keywordMatch: 'any' }, /keywordMatch must be "and" or "or"/u],
+    [{ contextChunks: 4 }, /contextChunks must be a whole number from 0 to 3/u],
+    [
+      { reranking: { enabled: 'yes' } },
+      /reranking\.enabled must be true or false/u,
+    ],
+    [
+      { reranking: { model: ' ' } },
+      /reranking\.model must be a non-empty string/u,
+    ],
+    [
+      { reranking: { threshold: -0.1 } },
+      /reranking\.threshold must be a number from 0 to 1/u,
+    ],
+    [
+      { reranking: { extra: 1 } },
+      /mcp\.search\.reranking\.extra is not a known/u,
+    ],
+    [{ chunks: 5, results: 6 }, /results must be a whole number from 1 to 5/u],
+    [
+      { passagesPerResult: 0 },
+      /passagesPerResult must be a whole number of at least 1/u,
+    ],
+    [
+      { passageCharacters: 999 },
+      /passageCharacters must be a whole number of at least 1000/u,
+    ],
+    [{ extra: 1 }, /mcp\.search\.extra is not a known/u],
+    ['many', /mcp\.search must be an object/u],
+  ])('rejects the search setting %j', (search, message) => {
+    expect(() =>
+      parseSiteConfiguration(withMcp({ enabled: true, search })),
+    ).toThrow(message);
+  });
+
+  it('refuses a fetch limit under 1,000 characters', () => {
+    expect(() =>
+      parseSiteConfiguration(withMcp({ enabled: true, fetchCharacters: 500 })),
+    ).toThrow(/mcp\.fetchCharacters must be a whole number of at least 1000/u);
   });
 
   it.each([

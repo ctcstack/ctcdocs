@@ -2,12 +2,20 @@
  * Test doubles for the MCP server's bucket and index, and a map with three
  * classes: everyone, one team, and admins only.
  */
-import type { AccessMapFile } from '../access-map.js';
+import { MCP_DEFAULTS } from '@ctcstack/ctcdocs-core';
+
+import type { AccessMapFile, AgentSearchSettings } from '../access-map.js';
 import type { Reader } from '../decide.js';
 import type { DocumentIndex, IndexedChunk } from './documents.js';
 import { MemoryStore } from './memory-store.js';
 
 export const ORIGIN = 'https://docs.example.com';
+
+/** How the build resolves `mcp` for a project that sets only `enabled`. */
+export const agentSettings = {
+  search: MCP_DEFAULTS.search,
+  fetchCharacters: MCP_DEFAULTS.fetchCharacters,
+};
 
 export const agentMap: AccessMapFile = {
   schemaVersion: 1,
@@ -39,6 +47,7 @@ export const agentMap: AccessMapFile = {
     '/unruled/notes/index.md': 'admins',
   },
   agents: {
+    ...agentSettings,
     digest: 'digest-1',
     documents: [
       {
@@ -102,7 +111,11 @@ export function chunkOf(
 
 /** An index that answers every query with the same chunks. */
 export class FixedIndex implements DocumentIndex {
-  readonly queries: { query: string; classes: readonly string[] }[] = [];
+  readonly queries: {
+    query: string;
+    classes: readonly string[];
+    settings: AgentSearchSettings;
+  }[] = [];
   syncs = 0;
   failSync = false;
   private readonly chunks: readonly IndexedChunk[];
@@ -114,8 +127,12 @@ export class FixedIndex implements DocumentIndex {
     );
   }
 
-  async search(query: string, classes: readonly string[]) {
-    this.queries.push({ query, classes });
+  async search(
+    query: string,
+    classes: readonly string[],
+    settings: AgentSearchSettings,
+  ) {
+    this.queries.push({ query, classes, settings });
     return this.chunks;
   }
 

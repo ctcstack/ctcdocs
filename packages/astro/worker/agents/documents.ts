@@ -27,6 +27,7 @@ import {
   PERMANENT_LINK_PREFIX,
   type AccessMapFile,
   type AgentDocument,
+  type AgentSearchSettings,
 } from '../access-map.js';
 import { mayRead, type Reader } from '../decide.js';
 
@@ -66,10 +67,14 @@ export interface IndexedChunk {
 
 /** The part of an AI Search instance the server uses. */
 export interface DocumentIndex {
-  /** Chunks matching `query` among documents of these classes, best first. */
+  /**
+   * Chunks matching `query` among documents of these classes, best first,
+   * asked for as the project's settings say.
+   */
   search(
     query: string,
     classes: readonly string[],
+    settings: AgentSearchSettings,
   ): Promise<readonly IndexedChunk[]>;
   /** Starts a sync of the bucket; throws when one cannot start now. */
   sync(): Promise<void>;
@@ -77,18 +82,8 @@ export interface DocumentIndex {
 
 export const DOCUMENT_PREFIX = 'docs/';
 const DOCUMENT_SUFFIX = '.md';
-/** Documents a search returns at most. */
-const MAX_RESULTS = 10;
-/** Passages each document shows at most. */
-const PASSAGES_PER_RESULT = 3;
-/** Characters of passage text a search returns at most: about 6,000 tokens. */
-const PASSAGE_BUDGET = 24_000;
-/** Characters one passage shows at most, so that all ten fit the budget. */
-const PASSAGE_LIMIT = PASSAGE_BUDGET / MAX_RESULTS;
 /** Between two passages of one document. */
 const PASSAGE_SEPARATOR = '\n\n…\n\n';
-/** Text `fetch` returns at most: about 25,000 tokens. */
-export const FETCH_LIMIT = 100_000;
 
 export function documentKey(id: string): string {
   return `${DOCUMENT_PREFIX}${id}${DOCUMENT_SUFFIX}`;
@@ -201,10 +196,18 @@ export async function searchDocuments(
   query: string,
 ): Promise<SearchResult[]> {
   const { map, reader, stale, origin, index } = access;
+  const settings = map.agents?.search;
   const classes = readableClasses(map, reader, stale);
-  if (classes.length === 0 || query.trim().length === 0) {
+  if (!settings || classes.length === 0 || query.trim().length === 0) {
     return [];
   }
+  const {
+    results: maxResults,
+    passagesPerResult,
+    passageCharacters,
+  } = settings;
+  // Each passage short enough that every result's best one fits the budget.
+  const passageLimit = Math.floor(passageCharacters / maxResults);
   const readable = new Set(classes);
 
   // The documents found through chunks that count, in rank order.
@@ -212,7 +215,7 @@ export async function searchDocuments(
     string,
     { readonly document: AgentDocument; readonly passages: string[] }
   >();
-  for (const chunk of await index.search(query, classes)) {
+  for (const chunk of await index.search(query, classes, settings)) {
     const id = idOf(chunk.key);
     // Judged before the chunk's document takes a place among the results.
     if (
@@ -226,15 +229,15 @@ export async function searchDocuments(
     let entry = found.get(id);
     if (!entry) {
       const document =
-        found.size < MAX_RESULTS ? readableDocument(access, id) : undefined;
+        found.size < maxResults ? readableDocument(access, id) : undefined;
       if (!document) {
         continue;
       }
       entry = { document, passages: [] };
       found.set(id, entry);
     }
-    if (entry.passages.length < PASSAGES_PER_RESULT) {
-      entry.passages.push(excerpt(chunk.text, PASSAGE_LIMIT));
+    if (entry.passages.length < passagesPerResult) {
+      entry.passages.push(excerpt(chunk.text, passageLimit));
     }
   }
 
@@ -242,8 +245,8 @@ export async function searchDocuments(
   const shown = new Map<string, string[]>(
     [...found.keys()].map((id) => [id, []]),
   );
-  let budget = PASSAGE_BUDGET;
-  for (let rank = 0; rank < PASSAGES_PER_RESULT; rank += 1) {
+  let budget = passageCharacters;
+  for (let rank = 0; rank < passagesPerResult; rank += 1) {
     for (const [id, { passages }] of found) {
       const passage = passages[rank];
       if (passage !== undefined && passage.length <= budget) {
@@ -277,7 +280,8 @@ export async function fetchDocument(
   id: string,
 ): Promise<FetchedDocument | undefined> {
   const document = readableDocument(access, id);
-  if (!document) {
+  const limit = access.map.agents?.fetchCharacters;
+  if (!document || limit === undefined) {
     return undefined;
   }
   const object = await access.store.get(documentKey(id));
@@ -286,11 +290,11 @@ export async function fetchDocument(
     return undefined;
   }
   const text = await object.text();
-  const truncated = text.length > FETCH_LIMIT;
+  const truncated = text.length > limit;
   return {
     id,
     title: document.title,
-    text: truncated ? text.slice(0, FETCH_LIMIT) : text,
+    text: truncated ? text.slice(0, limit) : text,
     url: permanentLink(access.origin, id),
     metadata: {
       ...(document.modified ? { modified: document.modified } : {}),

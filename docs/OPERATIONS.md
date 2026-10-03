@@ -644,7 +644,10 @@ and with a low vector threshold, reranks them with `bge-reranker-base` without
 dropping any, and returns up to ten documents with their best passages, their
 folders and their date
 ([ADR-042](ADR/042-an-assistants-search-returns-the-passages-that-match.md)).
-All of it is set in each request, so the instance needs no setting of its own.
+All of it is set in each request, so the instance needs no setting of its own,
+and every number is the project's `mcp.search` setting, with these defaults
+([configuration](CONFIGURATION.md#ai-assistants-mcp)): to tune search, change
+it and deploy.
 The Worker checks every passage against the person asking, so the instance's
 similarity cache, on by default, cannot show one person another's results.
 

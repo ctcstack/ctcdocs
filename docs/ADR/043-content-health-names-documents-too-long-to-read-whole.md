@@ -44,9 +44,9 @@ counted the same way on every run, so the notes are deterministic.
   sets another line, about 10,000 tokens of English — a Google Doc is noted
   under **Improve**: split it into a folder of shorter documents, one subject
   each, so that people and assistants find and read the part they need.
-- Over the limit at which `fetch` cuts a document, 100,000 characters, it is
-  noted under **Fix next**: assistants read only its first 100,000
-  characters, and do not see the rest.
+- Over the limit at which `fetch` cuts a document, `mcp.fetchCharacters`,
+  100,000 characters by default, it is noted under **Fix next**: assistants
+  read only its beginning, and do not see the rest.
 
 **A PDF is noted, not told to split.** A PDF over either line is noted under
 Improve with its length, and, over the second, that assistants read only its
@@ -55,12 +55,12 @@ beginning.
 **The check runs whether or not the MCP server is on.** A long document is as
 hard to read on the site.
 
-**The line is the project's; the limit is the platform's.**
-`sync.largeDocumentCharacters` is optional, a whole number above 0 and no
-greater than the limit; anything else is a configuration error. The limit is
-one constant in the core, which the Worker restates, as it restates the
-others it shares with the core, and a test keeps the two equal, so that the
-note and the cut cannot drift apart.
+**Both lines are the project's.** `sync.largeDocumentCharacters` is
+optional, a whole number above 0 and no greater than the limit; anything else
+is a configuration error. The limit is `mcp.fetchCharacters`, the cut `fetch`
+makes (ADR-042), 100,000 unless the project sets another; with MCP off, its
+default. The note and the cut read the same setting, so they cannot drift
+apart.
 
 **Each new note code is ranked** on the content health page, as ADR-037
 requires of every code, and the unit test that reads the fixture reports

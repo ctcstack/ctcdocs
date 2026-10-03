@@ -65,22 +65,6 @@ const STATE_CACHE_MS = 60_000;
 let cached: { at: number; value: DirectorySnapshot | undefined } | undefined;
 let cachedKeys: { at: number; value: unknown } | undefined;
 
-/**
- * How AI Search is asked (ADR-042): broadly, so that exact terms reach the
- * ranking, and the Worker keeps a short answer. As many chunks as it returns;
- * a vector threshold low enough that a keyword match whose meaning is far from
- * the question survives it, since the threshold applies to vector similarity
- * alone; any word of the query, rather than all of them, for BM25; a
- * neighbouring chunk around each, so that a passage reads as a paragraph; and
- * reranking, which orders the chunks and, for now, removes none. Starting
- * values, to tune with the evaluation ADR-042 calls for.
- */
-const SEARCH_CHUNKS = 50;
-const MATCH_THRESHOLD = 0.2;
-const CONTEXT_CHUNKS = 1;
-const RERANKER = '@cf/baai/bge-reranker-base';
-const RERANK_THRESHOLD = 0;
-
 const googleKeys = new GoogleKeys(
   (input, init) => fetch(input, init),
   () => Date.now(),
@@ -91,21 +75,22 @@ const log = (event: Readonly<Record<string, unknown>>) =>
 
 function documentIndex(search: AiSearch): DocumentIndex {
   return {
-    search: async (query, classes) => {
+    // As the project's `mcp.search` says (ADR-042).
+    search: async (query, classes, settings) => {
       const response = await search.search({
         query,
         ai_search_options: {
           retrieval: {
-            max_num_results: SEARCH_CHUNKS,
-            match_threshold: MATCH_THRESHOLD,
-            keyword_match_mode: 'or',
-            context_expansion: CONTEXT_CHUNKS,
+            max_num_results: settings.chunks,
+            match_threshold: settings.vectorThreshold,
+            keyword_match_mode: settings.keywordMatch,
+            context_expansion: settings.contextChunks,
             filters: { class: { $in: [...classes] } },
           },
           reranking: {
-            enabled: true,
-            model: RERANKER,
-            match_threshold: RERANK_THRESHOLD,
+            enabled: settings.reranking.enabled,
+            model: settings.reranking.model,
+            match_threshold: settings.reranking.threshold,
           },
         },
       });

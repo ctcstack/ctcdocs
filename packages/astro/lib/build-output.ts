@@ -494,7 +494,15 @@ export async function writeBuildOutput({
     files: Object.fromEntries(
       [...files].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
     ),
-    ...(agents ? { agents } : {}),
+    ...(agents && site.mcp
+      ? {
+          agents: {
+            ...agents,
+            search: site.mcp.search,
+            fetchCharacters: site.mcp.fetchCharacters,
+          },
+        }
+      : {}),
   };
   const target = accessMapPath(projectRoot);
   await mkdir(dirname(target), { recursive: true });

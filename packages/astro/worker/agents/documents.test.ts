@@ -4,7 +4,6 @@ import type { AccessMapFile } from '../access-map.js';
 import type { Reader } from '../decide.js';
 import {
   excerpt,
-  FETCH_LIMIT,
   fetchDocument,
   readableClasses,
   searchDocuments,
@@ -12,6 +11,7 @@ import {
 } from './documents.js';
 import {
   agentMap,
+  agentSettings,
   chunkOf,
   FixedIndex,
   ORIGIN,
@@ -63,7 +63,11 @@ describe('search', () => {
       'plan',
     );
     expect(index.queries).toEqual([
-      { query: 'plan', classes: ['members', 'team0001'] },
+      {
+        query: 'plan',
+        classes: ['members', 'team0001'],
+        settings: agentSettings.search,
+      },
     ]);
     expect(results).toEqual([
       {
@@ -162,7 +166,7 @@ describe('search', () => {
     }));
     const map: AccessMapFile = {
       ...agentMap,
-      agents: { digest: 'digest-many', documents },
+      agents: { ...agentSettings, digest: 'digest-many', documents },
     };
     const index = new FixedIndex(
       documents.map((document) => ({
@@ -224,7 +228,7 @@ describe('passages', () => {
     }));
     const map: AccessMapFile = {
       ...agentMap,
-      agents: { digest: 'digest-stale', documents },
+      agents: { ...agentSettings, digest: 'digest-stale', documents },
     };
     const index = new FixedIndex(
       documents.map((document, n) => ({
@@ -263,7 +267,7 @@ describe('passages', () => {
     }));
     const map: AccessMapFile = {
       ...agentMap,
-      agents: { digest: 'digest-long', documents },
+      agents: { ...agentSettings, digest: 'digest-long', documents },
     };
     const long = `${'A sentence of the passage. '.repeat(200)}`;
     const index = new FixedIndex(
@@ -302,6 +306,57 @@ describe('passages', () => {
     expect(excerpt('  Short.  ', 300)).toBe('Short.');
     // One sentence longer than the limit is cut as it is.
     expect(excerpt('x'.repeat(500), 300)).toHaveLength(300);
+  });
+});
+
+describe('settings', () => {
+  const catalog = agentMap.agents ?? {
+    ...agentSettings,
+    digest: '',
+    documents: [],
+  };
+
+  it('searches and answers as the project sets', async () => {
+    const search = {
+      ...agentSettings.search,
+      chunks: 5,
+      results: 1,
+      passagesPerResult: 1,
+      passageCharacters: 120,
+    };
+    const map: AccessMapFile = {
+      ...agentMap,
+      agents: { ...catalog, search },
+    };
+    const index = new FixedIndex([
+      chunkOf('docs/aaaaaa.md', {
+        text: `${'Long sentence here. '.repeat(20)}`,
+      }),
+      chunkOf('docs/aaaaaa.md', { text: 'Second passage.' }),
+      'docs/bbbbbb.md',
+    ]);
+    const results = await searchDocuments(
+      access(readers.team, { index, map }),
+      'x',
+    );
+    // The index is asked with the project's settings.
+    expect(index.queries[0]?.settings).toEqual(search);
+    expect(ids(results)).toEqual(['aaaaaa']);
+    expect(results[0]?.text.length).toBeLessThanOrEqual(120);
+    expect(results[0]?.text).not.toContain('Second passage.');
+  });
+
+  it('cuts a document where the project says', async () => {
+    const map: AccessMapFile = {
+      ...agentMap,
+      agents: { ...catalog, fetchCharacters: 5 },
+    };
+    const document = await fetchDocument(
+      access(readers.member, { map }),
+      'aaaaaa',
+    );
+    expect(document?.text).toBe('# Han');
+    expect(document?.metadata.truncated).toBe(true);
   });
 });
 
@@ -377,16 +432,20 @@ describe('fetch', () => {
 
   it('cuts a very long document and says so', async () => {
     const store = publishedStore();
-    store.seed('docs/cccccc.md', 'x'.repeat(FETCH_LIMIT + 10), {
-      title: 'Unruled notes',
-      markdown: '/unruled/notes/index.md',
-      hash: 'h-notes',
-    });
+    store.seed(
+      'docs/cccccc.md',
+      'x'.repeat(agentSettings.fetchCharacters + 10),
+      {
+        title: 'Unruled notes',
+        markdown: '/unruled/notes/index.md',
+        hash: 'h-notes',
+      },
+    );
     const document = await fetchDocument(
       access(readers.admin, { store }),
       'cccccc',
     );
-    expect(document?.text).toHaveLength(FETCH_LIMIT);
+    expect(document?.text).toHaveLength(agentSettings.fetchCharacters);
     expect(document?.metadata).toEqual({ truncated: true });
   });
 });
