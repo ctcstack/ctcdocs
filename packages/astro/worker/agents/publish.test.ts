@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import type { AccessMapFile } from '../access-map.js';
 import { publishDocuments, PUBLISHED_KEY } from './publish.js';
+import { MemoryStore } from './memory-store.js';
 import {
   agentMap,
   FixedIndex,
-  MemoryStore,
   ORIGIN,
   publishedStore,
 } from './test-support.js';
