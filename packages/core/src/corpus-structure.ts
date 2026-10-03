@@ -33,6 +33,10 @@ export interface CorpusDocument {
    * on its new chain to be confirmed.
    */
   readonly publishedReaders?: '*' | readonly string[];
+  /** The permanent short ID (ADR-022), the title and Drive's modified time. */
+  readonly shortId?: string;
+  readonly title?: string;
+  readonly modified?: string;
 }
 
 export interface CorpusStructure {
@@ -101,11 +105,22 @@ export function parseCorpusStructure(manifest: unknown): CorpusStructure {
   const documents = new Map<string, CorpusDocument>();
   for (const [id, raw] of entries(source.documents, 'documents')) {
     const path = `documents.${id}`;
-    const published = (raw as Record<string, unknown>).publishedReaders;
+    const record = raw as Record<string, unknown>;
+    const published = record.publishedReaders;
+    const optional = (key: string) =>
+      typeof record[key] === 'string' && record[key].length > 0
+        ? record[key]
+        : undefined;
+    const shortId = optional('shortId');
+    const title = optional('displayTitle');
+    const modified = optional('googleModifiedTime');
     documents.set(id, {
       id,
       parentId: field(raw, 'googleParentId', path, true),
       slug: field(raw, 'stableSlug', path) ?? '',
+      ...(shortId ? { shortId } : {}),
+      ...(title ? { title } : {}),
+      ...(modified ? { modified } : {}),
       ...(published === '*' ||
       (Array.isArray(published) &&
         published.every((group) => typeof group === 'string'))

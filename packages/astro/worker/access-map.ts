@@ -25,12 +25,24 @@ export interface AccessMapEnvironment {
   readonly visibility: 'private' | 'public';
 }
 
+/** A document the MCP server publishes to R2 (ADR-041). */
+export interface AgentDocument {
+  readonly id: string;
+  readonly title: string;
+  readonly markdown: string;
+  readonly modified: string | null;
+  readonly hash: string;
+}
+
 export interface AccessMapFile {
   readonly schemaVersion: number;
   readonly site: {
     readonly environments: Readonly<Record<string, AccessMapEnvironment>>;
     readonly workspaceDomains: readonly string[];
     readonly title: string;
+    readonly description?: string;
+    /** Whether the Worker serves the MCP server and its OAuth routes. */
+    readonly mcp?: boolean;
   };
   readonly csp: { readonly scriptHashes: readonly string[] };
   readonly enabled: boolean;
@@ -40,6 +52,11 @@ export interface AccessMapFile {
   >;
   readonly bundles: Readonly<Record<string, string>>;
   readonly files: Readonly<Record<string, FileClass>>;
+  /** Present when the MCP server is on. */
+  readonly agents?: {
+    readonly digest: string;
+    readonly documents: readonly AgentDocument[];
+  };
 }
 
 /** The environment a request reached, by its host; none for any other host. */
