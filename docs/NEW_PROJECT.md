@@ -720,6 +720,22 @@ Without this step, everyone who can sign in reads everything.
 [CONFIGURATION.md](CONFIGURATION.md#who-may-read-which-folder) has the full
 rules.
 
+## Step 16. Let AI assistants read the site (optional)
+
+People can then read the site from claude.ai, ChatGPT, Claude Code, Cursor and
+other assistants, each seeing what they may open here.
+
+1. Add `"mcp": { "enabled": true }` to `site.config.json`.
+2. In Cloudflare, create the OAuth namespace, the documents bucket, the
+   account's AI Search service token once, and the AI Search instance, and add
+   their bindings, the compatibility flag and the cron to `wrangler.jsonc`, as
+   [Cloudflare setup](CLOUDFLARE_SETUP.md#the-mcp-server) shows.
+3. Commit and push. Within five minutes of the deploy the Worker publishes the
+   documents and starts the first index.
+4. Connect an assistant to `https://<host>/mcp`, as
+   [Operations](OPERATIONS.md#connecting-an-assistant) describes, and ask it
+   something the site answers.
+
 ## Moving an existing site off Cloudflare Access
 
 If the site already runs behind a Cloudflare Access application, do not detach

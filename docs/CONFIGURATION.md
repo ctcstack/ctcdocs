@@ -135,6 +135,31 @@ it too, without sign-in. The Google client ID is
 a variable in `wrangler.jsonc`; its secret and the rest are Worker secrets, not
 configuration.
 
+## AI assistants (MCP)
+
+A private deployment can serve an MCP server through which people read the
+site from their AI assistants — claude.ai, ChatGPT, Claude Code, Cursor and
+others — as themselves
+([ADR-041](ADR/041-agents-read-the-site-through-an-mcp-server-as-their-reader.md)):
+
+```json
+"mcp": {
+  "enabled": true
+}
+```
+
+A person adds `https://<host>/mcp` to their assistant, allows it once, and
+signs in with Google as on the site. The assistant then finds and reads exactly
+what that person may open, decided again on every request, so a change of
+groups or a departure applies within the directory's refresh. Any client may
+connect, from any account; the sign-in decides who reads.
+
+`mcp` needs `signIn` and is refused while any environment is public. With it
+on, `ctcdocs-sync validate` requires the bindings, schedule and compatibility
+flag in [Cloudflare setup](CLOUDFLARE_SETUP.md#the-mcp-server), and the build
+lists every document in the access map for the Worker to publish. Turned off,
+or absent, the Worker serves no MCP or OAuth route.
+
 ## Who may read which folder
 
 A private deployment may close folders to everyone but named Google groups:

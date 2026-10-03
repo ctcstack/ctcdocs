@@ -590,6 +590,74 @@ expiry is further. Changes reach every location within about a minute.
 To revoke a key, remove its record from the list the same way, by its `name`.
 Nothing else holds it, and a rollback does not bring it back.
 
+## AI assistants
+
+With `mcp.enabled`, people read the site from their AI assistants through
+`https://<host>/mcp`
+([ADR-041](ADR/041-agents-read-the-site-through-an-mcp-server-as-their-reader.md)).
+
+### Connecting an assistant
+
+Each person connects their own assistant, from any account:
+
+- **claude.ai or Claude Desktop:** Settings → Connectors → Add custom
+  connector, with the URL above. On a Team or Enterprise plan an owner can add
+  it once for everyone; each person still connects with their own sign-in.
+- **ChatGPT:** Settings → Apps → Advanced → Developer mode, then create an app
+  with the URL. On Business or Enterprise an admin can publish it for the
+  workspace.
+- **Claude Code:** `claude mcp add --transport http <name> https://<host>/mcp`,
+  then `/mcp` and **Authenticate**.
+- **Cursor and other clients:** add the URL as a remote MCP server.
+
+The site asks once whether to connect the named assistant, then signs the
+person in with Google unless they are already signed in. The assistant reads
+what that person may open, decided on every request: a change of groups or a
+departure applies within the directory's refresh. A connection lasts 30 days,
+then the person connects again. Signing out of the site does not disconnect an
+assistant.
+
+### Publishing and search
+
+Every five minutes the site Worker checks whether the documents in its
+`KB_DOCUMENTS` bucket match its build, and when they do not, rewrites what
+changed and starts an AI Search sync. Its log shows `agents-published` with
+the counts written and deleted, or `agents-publish-incomplete` when a
+projection could not be read; the last published digest is the
+`agents-published` key in `KB_STATE`. To publish everything again, delete that
+key; the next run compares every document and syncs:
+
+```bash
+pnpm exec wrangler kv key delete agents-published --binding KB_STATE --env production --remote
+```
+
+AI Search's own jobs show whether the index has caught up:
+
+```bash
+pnpm exec wrangler ai-search jobs list <instance name>
+```
+
+The Worker logs each tool call by tool and outcome only, never the query, the
+person or the document.
+
+### Disconnecting assistants
+
+A departure or a removal from a group needs nothing: the next request is
+judged against the directory. To end connections themselves:
+
+- **One person:** their grants and tokens are the keys starting
+  `grant:<Google user ID>:` and `token:<Google user ID>:` in the `OAUTH_KV`
+  namespace. The user ID is the person's ID in the Admin console, the same
+  one the directory snapshot lists. List them with
+  `wrangler kv key list --namespace-id <OAuth namespace ID> --prefix "grant:<ID>:"`,
+  do the same for `token:<ID>:`, and delete each key.
+- **Everyone:** create a new OAuth namespace, put its ID in `wrangler.jsonc`
+  and deploy. Every grant stays in the old namespace, unreachable; delete it
+  afterwards.
+- **The server itself:** set `mcp.enabled` to `false` and deploy. `/mcp` and
+  the OAuth routes stop answering; turning it back on revives the grants that
+  have not expired, so pair it with a new namespace if that is not wanted.
+
 ## Failure handling
 
 The sync workflow reports aggregate counts through `$GITHUB_STEP_SUMMARY`.
@@ -746,7 +814,9 @@ The workflow checks the boundary before `wrangler rollback`, refuses a version
 of a gated deployment that lacks the `ctcdocs-gate-v1` tag, refuses — unless
 run with `restore_older_secrets` — a version older than a change to the
 Worker's secrets, which a rollback would bring back, sends 100% of traffic to
-the selected version, and verifies the protected surface afterwards. Record the incident, restored version, root cause, and subsequent
+the selected version, and verifies the protected surface afterwards. With
+the MCP server on, the restored version publishes its own documents to the
+bucket within five minutes. Record the incident, restored version, root cause, and subsequent
 fix in a private issue or incident system.
 
 If the boundary fails — the probe or a smoke test finds content served
@@ -757,7 +827,9 @@ anonymously, or a reader sees what their groups should not:
 2. stop sync and deployment workflows;
 3. remove or disable any public alternate route;
 4. rotate `SESSION_SECRET` without keeping the previous one, which ends every
-   session, and revoke exposed deploy tokens or machine keys;
+   session; with the MCP server on, move to a new OAuth namespace, which ends
+   every assistant's connection (see [Disconnecting assistants](#disconnecting-assistants));
+   and revoke exposed deploy tokens or machine keys;
 5. inspect Cloudflare, GitHub, and Google audit logs;
 6. restore the domain on a gated version only after `ctcdocs-verify-gate`
    reproduces the failure and passes with the fix, and the anonymous smoke

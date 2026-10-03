@@ -1,6 +1,6 @@
 # ADR-041: Agents read the site through an MCP server, as their reader
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-03
 - Owners: CTCDocs maintainers
 - Supersedes: ADR-038 in part: what may be specific to Cloudflare (an OAuth
@@ -133,18 +133,24 @@ their keys.
 
 ### Documents in R2, search in AI Search
 
-**Each deploy publishes the documents to R2.** After the Worker is deployed,
-the deploy job writes every document's Markdown projection to the
-deployment's private bucket as `docs/<short ID>.md`, with its class, title,
-Markdown address and dates as object metadata, through R2's S3-compatible API
-with a token for that bucket only. It deletes the objects of documents that
-are gone, then starts an AI Search sync, and waits and retries while an
-earlier sync is still running.
+**The Worker publishes the documents to R2 itself.** The build lists every
+document with a Markdown projection and one class — short ID, title, Markdown
+address, modified time, and a hash of projection, class and title — in the
+access map, with a digest of the list. On a schedule, every five minutes, the
+Worker compares that digest with the one it last published, kept in the
+state namespace. When they differ, it writes each document whose hash the
+bucket does not hold, from the projection in its own assets, to the
+deployment's private bucket as `docs/<short ID>.md` with its class, title,
+short ID, Markdown address, modified time and hash as object metadata;
+deletes the objects of documents that are gone; and starts an AI Search sync,
+trying again on the next run while an earlier sync is still running. A
+rollback is published the same way, because its digest differs, so the
+bucket always follows the version that serves. No credential leaves
+Cloudflare for this: the deploy job is unchanged.
 
 **AI Search indexes that bucket**: one instance per deployment, hybrid search,
 `class`, `title` and `short_id` as its custom metadata fields, and a
-15-minute sync interval as a backstop for a deploy whose sync could not
-start.
+15-minute sync interval as a backstop for a sync the Worker could not start.
 
 **The Worker's own access map still decides.** AI Search is asked with a
 filter on the reader's classes, or none for an admin. Every result, and every
@@ -181,15 +187,17 @@ about 100,000 characters is cut there, and `metadata` says so.
 routes answer `404`. It requires `signIn` and a gated deployment. Validation
 then requires the `OAUTH_KV` namespace, the R2 bucket and AI Search bindings,
 and the `global_fetch_strictly_public` compatibility flag the library needs
-to read client metadata documents. The deploy job gains an R2 token for the
-bucket and permission to start an AI Search sync. Setting up a deployment
-creates the account's AI Search service token once, then the instance with
-its metadata fields.
+to read client metadata documents, and the five-minute publishing schedule.
+Deploying with these bindings needs no permission beyond the deploy token's.
+Setting up a deployment creates the account's AI Search service token once,
+then the instance with its metadata fields.
 
-The access smoke test checks that `/mcp` answers an anonymous request with
-`401` and a pointer to the metadata. The denial suite asks both tools, as each
-of its readers, for every document. The Worker logs each tool call by tool and
-outcome only.
+The access smoke test and the scheduled probe check that `/mcp` answers an
+anonymous request with `401` and a pointer to the metadata. The denial suite
+publishes the build into a bucket in memory and asks both tools, as each of
+its readers, for every document, against an index that returns everything.
+The Worker logs each tool call by tool and outcome only. Search keeps chunks
+scoring at least 0.4, a first value to tune with the real corpus.
 
 ## Consequences
 
@@ -214,8 +222,8 @@ outcome only.
   replacing them, beyond ADR-038's four adapters.
 - AI Search is in beta and its price is not announced. `search` keeps its own
   interface, so a plain keyword index over the same bucket can replace it.
-- Search lags a deploy until AI Search finishes syncing. `fetch` reads the
-  bucket and is current.
+- The bucket follows a deploy within the five-minute schedule, and search
+  follows the bucket once AI Search has synced. `fetch` reads the bucket.
 - People connect again every 30 days. Signing out of the site does not
   disconnect an assistant; a departure or a group change does.
 - What an assistant has read stays in that assistant's history.
@@ -225,17 +233,9 @@ outcome only.
 ### Follow-up
 
 - The spike did not run long enough to see an assistant refresh its token
-  (an hour). Refresh rotation passed locally; watch each assistant's first
+  (an hour). Refresh rotation is tested locally; watch each assistant's first
   refresh after the release.
-- Pick the minimum relevance score with the real corpus.
-- On acceptance:
-  - strike from `AGENTS.md` the invariants this ADR lifts: no semantic search
-    or vector storage; a Worker that never renders a file and keeps no state
-    beyond the snapshot, the pins and the machine keys;
-  - mark ADR-038 superseded in part;
-  - describe connecting an assistant in the setup guide;
-  - add to the runbook how to disconnect everyone (turn `mcp` off and clear
-    `OAUTH_KV`) and how to revoke one reader's grants.
+- Tune the minimum relevance score with the real corpus.
 - A `browse` tool, by folder, if people ask for it.
 - A rate limit for readers and machine keys, if abuse appears.
 - Moving generated content from Git to R2, in its own ADR.

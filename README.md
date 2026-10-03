@@ -31,7 +31,9 @@ choice:
   follow it.
 - **Machines get plain Markdown.** Every page is also served as `.md`, and
   `/llms.txt` lists every document in the reader's order, so an agent can find
-  and read the documentation without scraping HTML.
+  and read the documentation without scraping HTML. A private site can also
+  serve an MCP server, through which people read it from claude.ai, ChatGPT,
+  Claude Code or Cursor as themselves, seeing exactly what they may open.
 - **Operators get a boring system.** Generated output is committed, so a bad
   sync is a revert. Two runs over unchanged input produce zero diff.
 
