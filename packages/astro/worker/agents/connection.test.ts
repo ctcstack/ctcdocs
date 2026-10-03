@@ -394,6 +394,28 @@ describe('discovery', () => {
     });
   });
 
+  it('takes only /mcp itself: a page named so is served at /mcp/', async () => {
+    const withPage = {
+      ...agentMap,
+      files: { ...agentMap.files, '/mcp/': 'members' },
+    };
+    const session = await seal(await sealKeys('session', SECRET), {
+      aud: ORIGIN,
+      exp: Math.floor(NOW / 1000) + 3600,
+      iat: Math.floor(NOW / 1000),
+      sub: 'user-member',
+      email: 'user-member@example.com',
+    });
+    const response = await call(
+      new Request(`${ORIGIN}/mcp/`, {
+        headers: { Cookie: `${SESSION_COOKIE}=${session}` },
+      }),
+      withPage,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('asset');
+  });
+
   it('leaves every MCP route to the gate when the server is off', async () => {
     const off = { ...agentMap, site: { ...agentMap.site, mcp: false } };
     const response = await call(

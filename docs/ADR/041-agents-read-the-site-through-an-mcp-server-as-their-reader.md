@@ -101,8 +101,10 @@ accepts both CIMD and DCR, so any MCP client can connect, and keeps no list of
 allowed clients: who may read is decided by the sign-in, not by the client.
 Its endpoints sit under `/auth/` beside the sign-in routes, its metadata under
 `/.well-known/`. The gate hands these and `/mcp` to the library after its host
-and HTTPS checks, and their answers carry the gate's headers. `mcp` becomes a
-reserved slug, as `auth` is.
+and HTTPS checks, and their answers carry the gate's headers. `mcp` is not a
+reserved slug: the server answers `/mcp` exactly, and a page or a folder
+named so is served at `/mcp/`, so a corpus that has one keeps it whether or
+not the server is on.
 
 **Authorizing is one confirmation and the usual sign-in:**
 
