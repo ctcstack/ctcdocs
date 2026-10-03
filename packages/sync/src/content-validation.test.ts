@@ -513,6 +513,72 @@ describe('a deployment anyone may read', () => {
     ).toContain(`${deployment.workerName}-directory`);
   });
 
+  it('requires the bindings, flag and schedule of the MCP server once it is on', async () => {
+    const withMcp = parseSiteConfiguration({
+      ...TEST_SITE_CONFIGURATION_INPUT,
+      mcp: { enabled: true },
+    });
+    const root = await createProject();
+    const errorsFor = async () =>
+      (
+        await validateRepositoryContent(createSyncContext(root, withMcp))
+      ).errors.join('\n');
+    expect(await errorsFor()).toContain(
+      `the ${PLATFORM_WORKERS.oauthBinding} KV namespace`,
+    );
+
+    const path = join(root, PROJECT_LAYOUT.wranglerConfigurationFile);
+    const wrangler = JSON.parse(await readFile(path, 'utf8')) as {
+      env: { production: Record<string, unknown> };
+    } & Record<string, unknown>;
+    const production = wrangler.env.production;
+    const complete = {
+      ...wrangler,
+      compatibility_flags: [PLATFORM_WORKERS.oauthCompatibilityFlag],
+      triggers: { crons: [PLATFORM_WORKERS.publishSchedule] },
+      env: {
+        production: {
+          ...production,
+          // The state namespace is found by its binding, in any position.
+          kv_namespaces: [
+            { binding: PLATFORM_WORKERS.oauthBinding, id: 'kv-oauth' },
+            { binding: PLATFORM_WORKERS.stateBinding, id: 'kv-production' },
+          ],
+          r2_buckets: [
+            {
+              binding: PLATFORM_WORKERS.documentsBinding,
+              bucket_name: 'example-documents',
+            },
+          ],
+          ai_search: [
+            {
+              binding: PLATFORM_WORKERS.searchBinding,
+              instance_name: 'example-search',
+            },
+          ],
+        },
+      },
+    };
+    await writeFile(path, JSON.stringify(complete));
+    expect(await errorsFor()).not.toContain(PLATFORM_WORKERS.oauthBinding);
+
+    await writeFile(
+      path,
+      JSON.stringify({ ...complete, compatibility_flags: [] }),
+    );
+    expect(await errorsFor()).toContain(
+      PLATFORM_WORKERS.oauthCompatibilityFlag,
+    );
+
+    const twoStates = structuredClone(complete);
+    twoStates.env.production.kv_namespaces = [
+      { binding: PLATFORM_WORKERS.stateBinding, id: 'kv-production' },
+      { binding: PLATFORM_WORKERS.stateBinding, id: 'kv-other' },
+    ];
+    await writeFile(path, JSON.stringify(twoStates));
+    expect(await errorsFor()).toContain(PLATFORM_WORKERS.oauthBinding);
+  });
+
   it('gates a deployment whose production is public but another environment is private', async () => {
     const root = await createProject({ visibility: 'public' });
     const mixed = parseSiteConfiguration({
