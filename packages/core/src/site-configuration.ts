@@ -166,9 +166,20 @@ export interface SignInConfiguration {
   readonly workspaceDomains: readonly string[];
 }
 
+/**
+ * The MCP server through which AI assistants read the site as the person who
+ * connected them (ADR-041). It needs the Worker's sign-in, so it is accepted
+ * only on a deployment whose every environment is private.
+ */
+export interface McpConfiguration {
+  readonly enabled: boolean;
+}
+
 export interface SiteConfiguration {
   /** Required to serve a private environment through the platform's Worker. */
   readonly signIn?: SignInConfiguration;
+  /** Absent or disabled, the Worker serves no MCP or OAuth route. */
+  readonly mcp?: McpConfiguration;
   /**
    * Who may read which folder (ADR-039). Absent, every document is open to
    * every reader the deployment admits, as before access rules existed.
@@ -538,8 +549,37 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
     signIn = { workspaceDomains: Object.freeze(parsed) };
   }
 
+  let mcp: McpConfiguration | undefined;
+  if (root.mcp !== undefined) {
+    const source = record(root.mcp, 'mcp');
+    for (const key of Object.keys(source)) {
+      if (key !== 'enabled') {
+        fail(`mcp.${key}`, 'is not a known setting');
+      }
+    }
+    if (typeof source.enabled !== 'boolean') {
+      fail('mcp.enabled', 'must be true or false');
+    }
+    if (source.enabled) {
+      if (!signIn) {
+        fail('mcp', 'needs signIn: assistants sign in as the site does');
+      }
+      const publicEnvironment = Object.entries(deployment.environments).find(
+        ([, environment]) => environment.visibility === 'public',
+      );
+      if (publicEnvironment) {
+        fail(
+          'mcp',
+          `must not be enabled while the ${publicEnvironment[0]} environment is public`,
+        );
+      }
+    }
+    mcp = { enabled: source.enabled };
+  }
+
   return {
     ...(signIn ? { signIn } : {}),
+    ...(mcp ? { mcp } : {}),
     ...(access ? { access } : {}),
     brand,
     deployment,
