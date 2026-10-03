@@ -2,7 +2,7 @@
 
 All three packages share a version and are released together.
 
-## Unreleased
+## 0.16.1
 
 ### Fixed
 
