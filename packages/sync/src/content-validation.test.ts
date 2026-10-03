@@ -577,6 +577,106 @@ describe('a deployment anyone may read', () => {
     ];
     await writeFile(path, JSON.stringify(twoStates));
     expect(await errorsFor()).toContain(PLATFORM_WORKERS.oauthBinding);
+
+    // OAuth state in the namespace that holds the snapshot and machine keys.
+    const sharedState = structuredClone(complete);
+    sharedState.env.production.kv_namespaces = [
+      { binding: PLATFORM_WORKERS.stateBinding, id: 'kv-production' },
+      { binding: PLATFORM_WORKERS.oauthBinding, id: 'kv-production' },
+    ];
+    await writeFile(path, JSON.stringify(sharedState));
+    expect(await errorsFor()).toContain(
+      `the production environment's ${PLATFORM_WORKERS.oauthBinding} must be a KV namespace of its own`,
+    );
+  });
+
+  it('gives each environment its own bucket, index and OAuth namespace', async () => {
+    const twoEnvironments = parseSiteConfiguration({
+      ...TEST_SITE_CONFIGURATION_INPUT,
+      mcp: { enabled: true },
+      deployment: {
+        ...TEST_SITE_CONFIGURATION_INPUT.deployment,
+        environments: {
+          ...TEST_SITE_CONFIGURATION_INPUT.deployment.environments,
+          staging: { url: 'https://docs-staging.example.com' },
+        },
+      },
+    });
+    const root = await createProject();
+    const path = join(root, PROJECT_LAYOUT.wranglerConfigurationFile);
+    const wrangler = JSON.parse(await readFile(path, 'utf8')) as {
+      env: { production: Record<string, unknown> };
+    } & Record<string, unknown>;
+    const environment = (suffix: string, hostname: string) => ({
+      ...wrangler.env.production,
+      routes: [{ pattern: hostname, custom_domain: true }],
+      kv_namespaces: [
+        { binding: PLATFORM_WORKERS.stateBinding, id: `kv-state-${suffix}` },
+        { binding: PLATFORM_WORKERS.oauthBinding, id: `kv-oauth-${suffix}` },
+      ],
+      r2_buckets: [
+        {
+          binding: PLATFORM_WORKERS.documentsBinding,
+          bucket_name: `documents-${suffix}`,
+        },
+      ],
+      ai_search: [
+        {
+          binding: PLATFORM_WORKERS.searchBinding,
+          instance_name: `search-${suffix}`,
+        },
+      ],
+    });
+    const production = environment(
+      'production',
+      TEST_SITE_CONFIGURATION_INPUT.deployment.environments.production.url.slice(
+        'https://'.length,
+      ),
+    );
+    const staging = environment('staging', 'docs-staging.example.com');
+    const write = (env: Record<string, unknown>) =>
+      writeFile(
+        path,
+        JSON.stringify({
+          ...wrangler,
+          compatibility_flags: [PLATFORM_WORKERS.oauthCompatibilityFlag],
+          triggers: { crons: [PLATFORM_WORKERS.publishSchedule] },
+          env,
+        }),
+      );
+    const errorsFor = async () =>
+      (
+        await validateRepositoryContent(
+          createSyncContext(root, twoEnvironments),
+        )
+      ).errors.join('\n');
+
+    await write({ production, staging });
+    expect(await errorsFor()).not.toContain('environments share');
+
+    await write({
+      production,
+      staging: { ...staging, r2_buckets: production.r2_buckets },
+    });
+    expect(await errorsFor()).toContain(
+      `the production and staging environments share the ${PLATFORM_WORKERS.documentsBinding} bucket documents-production`,
+    );
+
+    await write({
+      production,
+      staging: {
+        ...staging,
+        ai_search: production.ai_search,
+        kv_namespaces: [staging.kv_namespaces[0], production.kv_namespaces[1]],
+      },
+    });
+    const errors = await errorsFor();
+    expect(errors).toContain(
+      `share the ${PLATFORM_WORKERS.searchBinding} instance search-production`,
+    );
+    expect(errors).toContain(
+      `share the ${PLATFORM_WORKERS.oauthBinding} namespace kv-oauth-production`,
+    );
   });
 
   it('gates a deployment whose production is public but another environment is private', async () => {

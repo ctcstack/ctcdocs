@@ -120,7 +120,9 @@ environment needs three more resources:
 | An R2 bucket          | `KB_DOCUMENTS` | `docs/<short ID>.md` per document, with its class as metadata; private |
 | An AI Search instance | `KB_SEARCH`    | The index of that bucket                                               |
 
-Create them once per environment:
+Create them once per environment. Validation refuses two environments that
+share a bucket, an instance or an `OAUTH_KV` namespace, since each one
+publishes its own build, and an `OAUTH_KV` that is the `KB_STATE` namespace:
 
 ```bash
 pnpm exec wrangler kv namespace create example-docs-production-oauth
