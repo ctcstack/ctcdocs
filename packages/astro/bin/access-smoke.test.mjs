@@ -15,6 +15,7 @@ import {
   parseWikiBaseUrl,
   verifyAccessPreflight,
   verifyAnonymousDenial,
+  verifyMcpChallenge,
   verifyPostDeploy,
 } from './access-smoke.mjs';
 
@@ -506,4 +507,62 @@ test('the probe fails when an anonymous request is admitted', async () => {
     }),
     /Anonymous request was admitted: \/llms\.txt/u,
   );
+});
+
+test('the MCP server must challenge an anonymous assistant', async () => {
+  const origin = 'https://docs.example.com';
+  const withMcp = { ...siteConfig, mcp: { enabled: true } };
+  const server =
+    ({ mcpStatus = 401, challenge = true, issuer = origin } = {}) =>
+    async (url) => {
+      const path = new URL(url).pathname;
+      if (path === '/mcp') {
+        return new Response('', {
+          status: mcpStatus,
+          headers: challenge
+            ? {
+                'www-authenticate': `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource/mcp"`,
+              }
+            : {},
+        });
+      }
+      if (path === '/.well-known/oauth-protected-resource/mcp') {
+        return Response.json({ resource: `${origin}/mcp` });
+      }
+      if (path === '/.well-known/oauth-authorization-server') {
+        return Response.json({ issuer });
+      }
+      return new Response('', { status: 404 });
+    };
+
+  await verifyMcpChallenge({
+    baseUrl: origin,
+    site: withMcp,
+    fetchImplementation: server(),
+  });
+  // Off: nothing is asked.
+  await verifyMcpChallenge({
+    baseUrl: origin,
+    site: siteConfig,
+    fetchImplementation: async () => {
+      throw new Error('asked');
+    },
+  });
+  for (const [broken, message] of [
+    [{ mcpStatus: 200 }, /was not challenged \(200\)/u],
+    [{ challenge: false }, /was not challenged \(401\)/u],
+    [
+      { issuer: 'https://other.example' },
+      /oauth-authorization-server did not name/u,
+    ],
+  ]) {
+    await assert.rejects(
+      verifyMcpChallenge({
+        baseUrl: origin,
+        site: withMcp,
+        fetchImplementation: server(broken),
+      }),
+      message,
+    );
+  }
 });

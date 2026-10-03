@@ -8,11 +8,19 @@
 // Secrets, set with `wrangler secret put`: GOOGLE_CLIENT_SECRET,
 // SESSION_SECRET, and optionally SESSION_SECRET_PREVIOUS. Machine keys are
 // records in the KB_STATE namespace, which the deploy token cannot write.
+//
+// With MCP on (ADR-041) the Worker also keeps the OAuth library's state in
+// OAUTH_KV, publishes each document's Markdown to the KB_DOCUMENTS bucket on
+// its schedule, and searches it through the KB_SEARCH AI Search instance.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "example-docs",
   "main": "node_modules/@ctcstack/ctcdocs/worker/index.ts",
   "compatibility_date": "2026-07-30",
+  "compatibility_flags": ["global_fetch_strictly_public"],
+  "triggers": {
+    "crons": ["*/5 * * * *"],
+  },
   "workers_dev": false,
   "preview_urls": false,
   "alias": {
@@ -37,6 +45,13 @@
       ],
       "kv_namespaces": [
         { "binding": "KB_STATE", "id": "00000000000000000000000000000000" },
+        { "binding": "OAUTH_KV", "id": "11111111111111111111111111111111" },
+      ],
+      "r2_buckets": [
+        { "binding": "KB_DOCUMENTS", "bucket_name": "example-docs-documents" },
+      ],
+      "ai_search": [
+        { "binding": "KB_SEARCH", "instance_name": "example-docs-search" },
       ],
       "vars": {
         "GOOGLE_CLIENT_ID": "example.apps.googleusercontent.com",
