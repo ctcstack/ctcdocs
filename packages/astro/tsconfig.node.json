@@ -19,7 +19,8 @@
     "playwright.ts",
     "lib/folder-anchor.ts",
     "lib/project.ts",
-    "tests/**/*.ts"
+    "tests/**/*.ts",
+    "worker/*.ts"
   ],
-  "exclude": ["node_modules", "dist-node", "**/*.test.ts"]
+  "exclude": ["node_modules", "dist-node", "**/*.test.ts", "worker/index.ts"]
 }
