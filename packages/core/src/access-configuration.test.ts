@@ -133,3 +133,30 @@ describe('access configuration', () => {
     ).toThrow(/access must not be set while the production environment/u);
   });
 });
+
+describe('sign-in configuration', () => {
+  const withSignIn = (signIn: unknown) => ({
+    ...configuration(undefined),
+    signIn,
+  });
+
+  it('lowercases the Workspace domains', () => {
+    expect(
+      parseSiteConfiguration(
+        withSignIn({ workspaceDomains: ['Example.com', 'example.org'] }),
+      ).signIn,
+    ).toEqual({ workspaceDomains: ['example.com', 'example.org'] });
+  });
+
+  it.each([
+    [{ workspaceDomains: [] }, /must be a non-empty array of domains/u],
+    [{ workspaceDomains: ['not a domain'] }, /must be a domain such as/u],
+    [{ workspaceDomains: ['a.com', 'A.com'] }, /must not repeat a domain/u],
+    [
+      { workspaceDomains: ['a.com'], extra: 1 },
+      /signIn\.extra is not a known/u,
+    ],
+  ])('rejects %j', (signIn, message) => {
+    expect(() => parseSiteConfiguration(withSignIn(signIn))).toThrow(message);
+  });
+});

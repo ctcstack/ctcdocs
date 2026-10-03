@@ -15,6 +15,11 @@ export const PROJECT_LAYOUT = {
   configurationFile: 'site.config.json',
   /** Deployment target. Wrangler reads it itself, so it cannot be generated. */
   wranglerConfigurationFile: 'wrangler.jsonc',
+  /**
+   * The scheduled Worker that keeps the directory snapshot of a private
+   * deployment (ADR-040), deployed beside the site's own Worker.
+   */
+  directoryWranglerConfigurationFile: 'wrangler.directory.jsonc',
   /** Secret-scanning configuration, whose exemptions `validate` checks. */
   gitleaksConfigurationFile: '.gitleaks.toml',
   /** Served verbatim by the Worker. */
@@ -64,6 +69,19 @@ export const PLATFORM_ROUTES = {
    * docs/ADR/024-content-health-page.md.
    */
   contentHealth: 'content-health',
+} as const;
+
+/**
+ * The platform's Workers, as a project's Wrangler configuration names them
+ * (ADR-038, ADR-040), and the alias under which they import the build's
+ * access map.
+ */
+export const PLATFORM_WORKERS = {
+  gate: 'node_modules/@ctcstack/ctcdocs/worker/index.ts',
+  directory: 'node_modules/@ctcstack/ctcdocs/worker/directory/index.ts',
+  accessMapAlias: 'ctcdocs-access-map',
+  stateBinding: 'KB_STATE',
+  directorySchedule: '*/10 * * * *',
 } as const;
 
 /**

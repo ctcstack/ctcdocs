@@ -2,16 +2,27 @@
 // from site.config.json. The Worker name and the custom domain are mirrored
 // from it instead, and `ctcdocs-sync validate` fails if the two disagree.
 // Change the configuration first, then this file.
+//
+// A private deployment is served through the platform's Worker, which runs
+// before every asset and is bundled with the build's access map (ADR-038).
+// Secrets, set with `wrangler secret put`: GOOGLE_CLIENT_SECRET,
+// SESSION_SECRET, and optionally SESSION_SECRET_PREVIOUS and MACHINE_KEYS.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "example-docs",
+  "main": "node_modules/@ctcstack/ctcdocs/worker/index.ts",
   "compatibility_date": "2026-07-30",
   "workers_dev": false,
   "preview_urls": false,
+  "alias": {
+    "ctcdocs-access-map": "./.ctcdocs/access-map.json",
+  },
   "assets": {
     "directory": "./dist",
     "not_found_handling": "404-page",
     "html_handling": "auto-trailing-slash",
+    "binding": "ASSETS",
+    "run_worker_first": true,
   },
   "env": {
     "production": {
@@ -23,6 +34,12 @@
           "custom_domain": true,
         },
       ],
+      "kv_namespaces": [
+        { "binding": "KB_STATE", "id": "00000000000000000000000000000000" },
+      ],
+      "vars": {
+        "GOOGLE_CLIENT_ID": "example.apps.googleusercontent.com",
+      },
     },
   },
 }

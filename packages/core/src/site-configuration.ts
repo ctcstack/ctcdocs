@@ -156,7 +156,19 @@ export interface NavigationConfiguration {
 
 export type AddressPolicy = 'stable' | 'follow-names';
 
+/**
+ * How a private deployment signs readers in (ADR-038): with Google, admitting
+ * only accounts whose `hd` is one of these Workspace domains. An organization
+ * with secondary domains lists each, since `hd` names the domain of a
+ * reader's own primary address.
+ */
+export interface SignInConfiguration {
+  readonly workspaceDomains: readonly string[];
+}
+
 export interface SiteConfiguration {
+  /** Required to serve a private environment through the platform's Worker. */
+  readonly signIn?: SignInConfiguration;
   /**
    * Who may read which folder (ADR-039). Absent, every document is open to
    * every reader the deployment admits, as before access rules existed.
@@ -493,7 +505,41 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
     access = parseAccessConfiguration(root.access, fail);
   }
 
+  let signIn: SignInConfiguration | undefined;
+  if (root.signIn !== undefined) {
+    const source = record(root.signIn, 'signIn');
+    for (const key of Object.keys(source)) {
+      if (key !== 'workspaceDomains') {
+        fail(`signIn.${key}`, 'is not a known setting');
+      }
+    }
+    const domains = source.workspaceDomains;
+    if (!Array.isArray(domains) || domains.length === 0) {
+      fail('signIn.workspaceDomains', 'must be a non-empty array of domains');
+    }
+    const parsed = domains.map((domain: unknown, index: number) => {
+      const value =
+        typeof domain === 'string' ? domain.trim().toLowerCase() : '';
+      if (
+        !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/u.test(
+          value,
+        )
+      ) {
+        fail(
+          `signIn.workspaceDomains[${index}]`,
+          'must be a domain such as "example.com"',
+        );
+      }
+      return value;
+    });
+    if (new Set(parsed).size !== parsed.length) {
+      fail('signIn.workspaceDomains', 'must not repeat a domain');
+    }
+    signIn = { workspaceDomains: Object.freeze(parsed) };
+  }
+
   return {
+    ...(signIn ? { signIn } : {}),
     ...(access ? { access } : {}),
     brand,
     deployment,

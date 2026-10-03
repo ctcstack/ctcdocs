@@ -14,7 +14,7 @@
     "validate": "ctcdocs-sync validate",
     "test:search": "ctcdocs-verify-search",
     "test:ux": "playwright test --config playwright.ux.config.ts",
-    "deploy:dry-run": "wrangler deploy --env production --dry-run"
+    "deploy:dry-run": "wrangler deploy --env production --dry-run && wrangler deploy --config wrangler.directory.jsonc --env production --dry-run"
   },
   "dependencies": {
     "@astrojs/starlight": "0.41.5",

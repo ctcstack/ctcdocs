@@ -38,6 +38,7 @@ const TEST_SITE_CONFIGURATION_INPUT = {
     commitBotName: 'example-sync[bot]',
     defaultLocale: 'en',
   },
+  signIn: { workspaceDomains: ['example.com'] },
 } as const;
 
 export const testSiteConfiguration: SiteConfiguration = parseSiteConfiguration(
