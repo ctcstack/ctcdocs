@@ -73,5 +73,8 @@ Rejected
 - ADR-040: a Worker cron keeps a snapshot of group membership.
 - ADR-041: agents read the site through an MCP server, as their reader.
   Supersedes ADR-038 in part.
+- ADR-042: an assistant's search returns the passages that match. Proposed;
+  supersedes ADR-041 in part once accepted.
+- ADR-043: content health names documents too long to read whole. Proposed.
 
 Create a new ADR by copying `000-template.md`.
