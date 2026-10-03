@@ -128,10 +128,14 @@ function google(person: () => { sub: string; nonce: string }): typeof fetch {
   }) as typeof fetch;
 }
 
-function snapshotWith(users: string[], team: string[] = []): DirectorySnapshot {
+function snapshotWith(
+  users: string[],
+  team: string[] = [],
+  age = 60_000,
+): DirectorySnapshot {
   return {
     schemaVersion: 1,
-    takenAt: new Date(NOW - 60_000).toISOString(),
+    takenAt: new Date(NOW - age).toISOString(),
     users: Object.fromEntries(users.map((user) => [user, true])),
     groups: {
       'team@example.com': { id: 'g1', members: team },
@@ -639,6 +643,34 @@ describe('an assistant reading', () => {
     // Leaving the directory ends it.
     snapshot = snapshotWith([]);
     expect((await mcp(token, 'tools/list')).status).toBe(403);
+  });
+
+  it('reads only what every member reads while the directory is stale', async () => {
+    snapshot = snapshotWith(['user-member'], ['user-member']);
+    const { tokens } = await connect('user-member');
+    const token = tokens.access_token;
+    expect(
+      (await tool(token, 'fetch', { id: 'bbbbbb' })).body.result
+        ?.structuredContent,
+    ).toMatchObject({ id: 'bbbbbb' });
+
+    // Three hours without a refresh: the team's document closes.
+    snapshot = snapshotWith(['user-member'], ['user-member'], 3 * 60 * 60_000);
+    expect(
+      (await tool(token, 'fetch', { id: 'bbbbbb' })).body.result?.isError,
+    ).toBe(true);
+    expect(
+      (await tool(token, 'search', { query: 'plan' })).body.result
+        ?.structuredContent,
+    ).toEqual({
+      results: [
+        { id: 'aaaaaa', title: 'Handbook', url: `${ORIGIN}/d/aaaaaa/` },
+      ],
+    });
+
+    // No directory at all: nobody is served.
+    snapshot = undefined;
+    expect((await mcp(token, 'tools/list')).status).toBe(503);
   });
 
   it('keeps reading after a refresh, with a rotated refresh token', async () => {
