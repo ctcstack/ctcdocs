@@ -186,11 +186,12 @@ about 100,000 characters is cut there, and `metadata` says so.
 
 ### Configuration and checks
 
-**An `mcp` section switches the server on.** Turned off, `/mcp` and the OAuth
-routes answer `404`. It requires `signIn` and a gated deployment. Validation
-then requires the `OAUTH_KV` namespace, the R2 bucket and AI Search bindings,
-and the `global_fetch_strictly_public` compatibility flag the library needs
-to read client metadata documents, and the five-minute publishing schedule.
+**An `mcp` section switches the server on.** Turned off, the Worker serves
+no MCP or OAuth route, and the bindings may stay. It requires `signIn` and a
+gated deployment. Validation then requires the `OAUTH_KV` namespace, the R2
+bucket and AI Search bindings, and the `global_fetch_strictly_public`
+compatibility flag the library needs to read client metadata documents, and
+the five-minute publishing schedule.
 Deploying with these bindings needs no permission beyond the deploy token's.
 Setting up a deployment creates the account's AI Search service token once,
 then the instance with its metadata fields.

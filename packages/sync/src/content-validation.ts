@@ -157,13 +157,26 @@ function protectedEnvironmentSchema(
       )
       .length(1),
   };
+  /*
+   * With MCP off its bindings may stay, so that turning the server off is one
+   * change to the site configuration, and turning it on again finds them.
+   */
+  const agentBindings = agents
+    ? agentEnvironmentSchema
+    : {
+        kv_namespaces: z.union([
+          stateNamespaceSchema,
+          agentEnvironmentSchema.kv_namespaces,
+        ]),
+        r2_buckets: agentEnvironmentSchema.r2_buckets.optional(),
+        ai_search: agentEnvironmentSchema.ai_search.optional(),
+      };
   return gated
     ? z
         .object({
           ...base,
-          kv_namespaces: stateNamespaceSchema,
           vars: z.object({ GOOGLE_CLIENT_ID: z.string().min(1) }).strict(),
-          ...(agents ? agentEnvironmentSchema : {}),
+          ...agentBindings,
         })
         .strict()
     : z.object(base).strict();
