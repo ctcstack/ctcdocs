@@ -10,6 +10,7 @@
  */
 import {
   authorizationErrorRedirect,
+  insufficientScope,
   OAuthAuthorizationServer,
   OAuthResourceServer,
 } from '@cloudflare/workers-oauth-provider';
@@ -92,8 +93,11 @@ export function agentOAuth({
         validateToken: (environment) => (resource, token) =>
           server.validateToken<GrantProps>(resource, token, environment),
         handler: {
+          // The library advertises the required scopes; enforcing them is ours.
           fetch: (_request, _environment, context) =>
-            handler(context.props.sub),
+            REQUIRED_SCOPES.every((scope) => context.auth.scope.includes(scope))
+              ? handler(context.props.sub)
+              : insufficientScope(context.auth, [...REQUIRED_SCOPES]),
         },
       }).fetch(request, env, executionContext),
   };

@@ -124,13 +124,14 @@ advertised so that clients keep refreshing.
 
 ### Every request is checked like a page
 
-A token must be ours, unexpired and bound to `/mcp`. Its `sub` must be active
-in the snapshot, and the reader's groups — so their classes — are read from
-the snapshot on each request, not from the grant. A change of groups or a
-departure applies within the snapshot's refresh, about ten minutes, plus the
-minute or two a KV write takes to spread, and nothing stored in a grant can
-widen what it reads. An admin reads what an
-admin reads on the site.
+A token must be ours, unexpired, bound to `/mcp` and carry `kb:read`, which
+consent always grants, so that a client asking for no scope can read. Its
+`sub` must be active in the snapshot, and the reader's groups — so their
+classes — are read from the snapshot on each request, not from the grant. A
+change of groups or a departure applies within the snapshot's refresh, about
+ten minutes, plus the minute or two a KV write takes to spread, and nothing
+stored in a grant can widen what it reads. An admin reads what an admin reads
+on the site.
 
 Machine keys are not accepted at `/mcp`. Bots keep reading over HTTP with
 their keys.
