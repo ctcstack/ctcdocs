@@ -34,6 +34,14 @@ import {
   type BuiltPage,
   type FileClass,
 } from './access-map.js';
+import {
+  findLeaks,
+  htmlSegments,
+  textSegments,
+  words,
+  type LeakDocument,
+  type LeakFile,
+} from './leak-check.js';
 
 /** Version of the access map's shape, for the Worker that reads it. */
 const ACCESS_MAP_VERSION = 1;
@@ -156,6 +164,88 @@ async function writeBundle(
   return written;
 }
 
+const DOCUMENT_SOURCES = new Set(['google-doc', 'drive-pdf']);
+
+/**
+ * Reads every text file the build wrote, with the bodies of its documents and
+ * the strings that may appear anywhere — page titles, headings of a page's
+ * own title, navigation, folder names, addresses, the site's own wording —
+ * and returns the files that say more than their readers may know.
+ */
+async function readLeaks({
+  distRoot,
+  files,
+  pages,
+  pageHtml,
+  allowed,
+  readers,
+}: {
+  distRoot: string;
+  files: Readonly<Record<string, FileClass>>;
+  pages: readonly BuiltPage[];
+  pageHtml: ReadonlyMap<string, string>;
+  allowed: readonly string[];
+  readers: Parameters<typeof findLeaks>[0]['readers'];
+}) {
+  const documents: LeakDocument[] = [];
+  const allowedText = [...allowed];
+  for (const page of pages) {
+    const html = pageHtml.get(page.path) ?? '';
+    const cls = files[page.path];
+    if (
+      page.source &&
+      DOCUMENT_SOURCES.has(page.source) &&
+      typeof cls === 'string'
+    ) {
+      documents.push({
+        path: page.path,
+        cls,
+        segments: htmlSegments(html, '[data-pagefind-body]'),
+      });
+    }
+    const $ = cheerio.load(html);
+    allowedText.push(
+      $('title').text(),
+      ...$('h1')
+        .toArray()
+        .map((heading) => $(heading).text()),
+      ...htmlSegments(
+        html,
+        'nav, .pagination-links, a[rel="prev"], a[rel="next"]',
+      ),
+    );
+  }
+  const leakFiles: LeakFile[] = [];
+  for (const [path, cls] of Object.entries(files)) {
+    if (typeof cls !== 'string') {
+      continue;
+    }
+    if (pageHtml.has(path)) {
+      leakFiles.push({
+        path,
+        cls,
+        segments: htmlSegments(pageHtml.get(path) as string),
+      });
+      continue;
+    }
+    if (!/\.(?:md|txt)$/u.test(path)) {
+      continue;
+    }
+    const text = await readFile(resolve(distRoot, path.slice(1)), 'utf8');
+    leakFiles.push({
+      path,
+      cls,
+      segments: textSegments(text, path.endsWith('.md')),
+    });
+  }
+  return findLeaks({
+    documents,
+    files: leakFiles,
+    allowed: allowedText.filter((text) => words(text).length > 0),
+    readers,
+  });
+}
+
 export interface BuildOutputOptions {
   readonly projectRoot: string;
   readonly distRoot: string;
@@ -184,6 +274,7 @@ export async function writeBuildOutput({
 
   const builtFiles = await walk(distRoot);
   const pages: BuiltPage[] = [];
+  const pageHtml = new Map<string, string>();
   const pageSources = new Map<string, string>();
   const otherFiles: string[] = [];
   const stylesheetReferences = new Set<string>();
@@ -193,6 +284,7 @@ export async function writeBuildOutput({
       const html = await readFile(resolve(distRoot, file), 'utf8');
       pages.push(readBuiltPage(path, html));
       pageSources.set(path, file);
+      pageHtml.set(path, html);
       continue;
     }
     if (/\.(?:css|js|mjs)$/u.test(file)) {
@@ -231,6 +323,39 @@ export async function writeBuildOutput({
     throw new BuildOutputError(
       `A page that is not a document shows images a restricted document also shows: ${map.sharedImages.slice(0, 20).join(', ')} (ADR-039).`,
     );
+  }
+  if (model.enabled) {
+    const leaks = await readLeaks({
+      distRoot,
+      files: map.files,
+      pages,
+      pageHtml,
+      allowed: [
+        site.brand.name,
+        site.brand.siteTitle,
+        site.brand.siteDescription,
+        site.home.lede,
+        ...[...corpus.folders.values()].flatMap((folder) => [
+          folder.name,
+          folder.label,
+          folder.slug ?? '',
+        ]),
+        ...[...corpus.documents.values()].map((document) => document.slug),
+      ],
+      readers: (cls) => model.classes[cls]?.readers,
+    });
+    if (leaks.length > 0) {
+      const listed = leaks
+        .slice(0, 10)
+        .map(
+          (leak) =>
+            `${leak.file} (${leak.fileClass}) repeats ${leak.document} (${leak.documentClass}) from word ${leak.offset}`,
+        )
+        .join('; ');
+      throw new BuildOutputError(
+        `${leaks.length} files repeat text of documents their readers may not open: ${listed} (ADR-039).`,
+      );
+    }
   }
 
   /*

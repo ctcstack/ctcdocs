@@ -146,8 +146,9 @@ access class of every file it built, and one search bundle per class:
 `/pagefind/` for every member and `/pagefind-<class>/` for each other class.
 The search box merges the bundles the Worker lists for the reader at
 `/_kb/classes`; without a Worker it searches `/pagefind/` alone. Once rules
-exist, a built file the map cannot place fails the build. Add `.ctcdocs/` to
-the project's `.gitignore`.
+exist, a built file the map cannot place fails the build, and so does a file
+that repeats eight words or more of a document its readers may not open.
+Add `.ctcdocs/` to the project's `.gitignore`.
 
 ## Environments
 
