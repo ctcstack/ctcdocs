@@ -111,8 +111,10 @@ not the server is on.
 1. One page, from the library's consent helpers, names the client and where
    it returns, with one button. It cannot be framed, and its CSP lets the form
    lead only to Google and to that client's redirect URI.
-2. The person signs in with Google (ADR-038), or their live session is used,
-   and the snapshot must list them as active (ADR-040).
+2. Their live site session is used or, without one, they sign in exactly as
+   on the site (ADR-038), which returns them to `/auth/connect`. Google's
+   callback is the site's alone, and the snapshot must list them as active
+   (ADR-040).
 3. The grant is completed with the person's `sub` as its user and nothing
    else.
 

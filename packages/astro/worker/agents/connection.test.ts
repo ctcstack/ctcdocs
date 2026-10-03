@@ -271,13 +271,28 @@ function answer(jar: Jar, handle: string, decision = 'approve') {
   );
 }
 
-/** Connects an assistant for `sub`, signing in with Google; returns tokens. */
+/** Follows a redirect within the site, with the browser's cookies. */
+async function follow(jar: Jar, response: Response): Promise<Response> {
+  const next = await call(
+    new Request(new URL(response.headers.get('Location') ?? '/', ORIGIN), {
+      headers: { Cookie: jar.header() },
+    }),
+  );
+  jar.take(next);
+  return next;
+}
+
+/**
+ * Connects an assistant for `sub`: consent, then the site's own sign-in with
+ * Google, which returns to `/auth/connect`. Returns each step and the tokens.
+ */
 async function connect(sub: string) {
   const clientId = await register();
   const jar = new Jar();
   const { handle } = await consent(jar, clientId);
-  const toGoogle = await answer(jar, handle);
-  jar.take(toGoogle);
+  const approved = await answer(jar, handle);
+  jar.take(approved);
+  const toGoogle = await follow(jar, approved);
   const googleUrl = new URL(toGoogle.headers.get('Location') ?? '');
   googlePerson = { sub, nonce: googleUrl.searchParams.get('nonce') ?? '' };
   const back = await call(
@@ -286,7 +301,9 @@ async function connect(sub: string) {
       { headers: { Cookie: jar.header() } },
     ),
   );
-  const redirect = new URL(back.headers.get('Location') ?? 'https://x/');
+  jar.take(back);
+  const finished = back.status === 302 ? await follow(jar, back) : back;
+  const redirect = new URL(finished.headers.get('Location') ?? 'https://x/');
   const token = await call(
     new Request(`${ORIGIN}/auth/token`, {
       method: 'POST',
@@ -303,6 +320,8 @@ async function connect(sub: string) {
   );
   return {
     clientId,
+    jar,
+    approved,
     googleUrl,
     back,
     redirect,
@@ -441,13 +460,22 @@ describe('connecting an assistant', () => {
     );
   });
 
-  it('signs the person in with Google, then hands the assistant a code', async () => {
-    const { googleUrl, back, redirect, tokens } = await connect('user-member');
+  it('signs the person in as the site does, then hands the assistant a code', async () => {
+    const { approved, googleUrl, back, redirect, tokens } =
+      await connect('user-member');
+    const signIn = new URL(approved.headers.get('Location') ?? '', ORIGIN);
+    expect(signIn.pathname).toBe('/auth/sign-in');
+    expect(signIn.searchParams.get('return')).toMatch(
+      /^\/auth\/connect\?state=[\w-]+$/u,
+    );
     expect(googleUrl.origin).toBe('https://accounts.google.com');
     expect(googleUrl.searchParams.get('redirect_uri')).toBe(
       `${ORIGIN}/auth/callback`,
     );
     expect(back.status).toBe(302);
+    expect(back.headers.get('Location')).toBe(
+      signIn.searchParams.get('return'),
+    );
     expect(`${redirect.origin}${redirect.pathname}`).toBe(CALLBACK);
     expect(redirect.searchParams.get('state')).toBe('client-state');
     expect(redirect.searchParams.get('iss')).toBe(ORIGIN);
@@ -510,13 +538,40 @@ describe('connecting an assistant', () => {
     expect(await back.text()).toContain('not in the directory');
   });
 
-  it('leaves a site sign-in to the site', async () => {
-    const response = await call(
+  it('leaves every Google callback to the site’s sign-in', async () => {
+    const tampered = await call(
       new Request(`${ORIGIN}/auth/callback?code=x&state=site-state-123`, {
         headers: { Cookie: '__Host-kb-sign-in-site-state-1=tampered' },
       }),
     );
-    expect(await response.text()).toContain('Sign-in did not work');
+    expect(await tampered.text()).toContain('Sign-in did not work');
+    // A site sign-in whose transaction expired is still the site's.
+    const expired = await call(
+      new Request(`${ORIGIN}/auth/callback?code=x&state=site-state-123`),
+    );
+    expect(await expired.text()).toContain('This sign-in expired');
+  });
+
+  it('finishes a connection only in the browser that started it', async () => {
+    const clientId = await register();
+    const jar = new Jar();
+    const { handle } = await consent(jar, clientId);
+    const approved = await answer(jar, handle);
+    jar.take(approved);
+    const back = new URL(
+      approved.headers.get('Location') ?? '',
+      ORIGIN,
+    ).searchParams.get('return');
+    const elsewhere = await call(new Request(`${ORIGIN}${back}`));
+    expect(elsewhere.status).toBe(400);
+    expect(elsewhere.headers.get('Location')).toBe(null);
+    // In that browser, without a site session, the assistant is refused.
+    const unsigned = await call(
+      new Request(`${ORIGIN}${back}`, { headers: { Cookie: jar.header() } }),
+    );
+    const location = new URL(unsigned.headers.get('Location') ?? '');
+    expect(`${location.origin}${location.pathname}`).toBe(CALLBACK);
+    expect(location.searchParams.get('error')).toBe('access_denied');
   });
 });
 

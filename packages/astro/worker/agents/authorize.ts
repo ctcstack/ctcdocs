@@ -4,9 +4,10 @@
  *
  * The OAuth library validates the request and keeps it server-side; this
  * module is the part it leaves to the application. One page names the
- * assistant and where access goes. Once the person allows it, they are signed
- * in with Google as on the site, unless their session already holds, and the
- * directory has to list them. The grant then carries their Google `sub` and
+ * assistant and where access goes. Once the person allows it, their site
+ * session completes the connection; without one, they sign in exactly as on
+ * the site and come back to `/auth/connect`, which finishes it. The directory
+ * has to list them either way. The grant then carries their Google `sub` and
  * nothing else: what they may read is decided again on every request.
  *
  * Any client may connect; the sign-in decides who reads.
@@ -18,25 +19,14 @@ import type {
   OAuthHelpers,
 } from '@cloudflare/workers-oauth-provider';
 
-import {
-  authorizationUrl,
-  codeChallenge,
-  exchangeCode,
-  SignInError,
-  verifyIdToken,
-  type GoogleKeys,
-} from '../oidc.js';
-import {
-  connectionFailedPage,
-  consentPage,
-  notInDirectoryPage,
-  unavailablePage,
-} from '../pages.js';
-import { randomToken } from '../seal.js';
+import { connectionFailedPage, consentPage } from '../pages.js';
 
 /** Everything the server can grant, and what any access needs. */
 export const SCOPES = ['kb:read', 'offline_access'] as const;
 export const REQUIRED_SCOPES = ['kb:read'] as const;
+
+/** Where the site's sign-in returns a person who is connecting an assistant. */
+export const CONNECT_ROUTE = '/auth/connect';
 
 /** The library's helpers this step uses. */
 type AuthorizationApi = Pick<
@@ -77,34 +67,12 @@ export interface GrantProps {
   readonly sub: string;
 }
 
-type Admission = 'admitted' | 'no-directory' | 'not-in-directory';
-
 export interface AuthorizeContext {
   readonly oauth: AgentOAuth;
-  readonly origin: string;
   readonly site: string;
-  readonly google: {
-    readonly clientId: string;
-    readonly clientSecret: string;
-    readonly keys: GoogleKeys;
-    readonly domains: readonly string[];
-    readonly fetch: typeof fetch;
-    readonly now: number;
-  };
   /** The person whose site session holds, if the directory admits them. */
   readonly signedIn: () => Promise<{ sub: string } | undefined>;
-  readonly admits: (sub: string) => Promise<Admission>;
-  /** A site session cookie for a person who just signed in with Google. */
-  readonly sessionCookie: (who: {
-    sub: string;
-    email: string;
-  }) => Promise<string>;
   readonly log: (event: Readonly<Record<string, unknown>>) => void;
-}
-
-interface UpstreamData {
-  readonly verifier: string;
-  readonly nonce: string;
 }
 
 function errorNamed(
@@ -135,10 +103,6 @@ function failure(context: AuthorizeContext, error: unknown): Response {
       context.site,
       'The assistant’s published identity could not be read.',
     );
-  }
-  if (error instanceof SignInError) {
-    context.log({ event: 'sign-in-failed', reason: error.message });
-    return connectionFailedPage(context.site, error.message);
   }
   throw error;
 }
@@ -206,7 +170,11 @@ export async function showConsent(
   }
 }
 
-/** POST: the person's answer. */
+/**
+ * POST: the person's answer. Allowed, it completes the connection for their
+ * site session, or keeps the request and sends them through the site's own
+ * sign-in, which returns them to `/auth/connect`.
+ */
 export async function answerConsent(
   request: Request,
   context: AuthorizeContext,
@@ -231,24 +199,12 @@ export async function answerConsent(
         approved.headers,
       );
     }
-    const data: UpstreamData = {
-      verifier: randomToken(48),
-      nonce: randomToken(),
-    };
     const { state, headers } = await api.beginUpstream(approved.request, {
-      data,
       headers: approved.headers,
     });
-    const { domains, clientId } = context.google;
+    const back = `${CONNECT_ROUTE}?${new URLSearchParams({ state })}`;
     return redirect(
-      authorizationUrl({
-        clientId,
-        redirectUri: `${context.origin}/auth/callback`,
-        state,
-        nonce: data.nonce,
-        challenge: await codeChallenge(data.verifier),
-        domainHint: domains.length === 1 ? domains[0] : undefined,
-      }),
+      `/auth/sign-in?${new URLSearchParams({ return: back })}`,
       headers,
     );
   } catch (error: unknown) {
@@ -256,54 +212,27 @@ export async function answerConsent(
   }
 }
 
-/** Google's answer, for a connection rather than a site sign-in. */
+/** GET `/auth/connect`: back from the site's sign-in, the connection ends. */
 export async function finishConnection(
   request: Request,
   context: AuthorizeContext,
 ): Promise<Response> {
   try {
-    const { api } = context.oauth;
-    const resumed = await api.finishUpstream<UpstreamData>(request);
-    const url = new URL(request.url);
-    const code = url.searchParams.get('code');
-    if (url.searchParams.get('error') || !code) {
+    const resumed = await context.oauth.api.finishUpstream(request);
+    const person = await context.signedIn();
+    if (!person) {
+      // The sign-in did not hold: the assistant is told, and may ask again.
       return redirect(
         context.oauth.errorRedirect(resumed.request, 'access_denied'),
         resumed.headers,
       );
     }
-    const { google } = context;
-    const who = await verifyIdToken(
-      await exchangeCode({
-        fetch: google.fetch,
-        clientId: google.clientId,
-        clientSecret: google.clientSecret,
-        redirectUri: `${context.origin}/auth/callback`,
-        code,
-        verifier: resumed.data.verifier,
-      }),
-      {
-        keys: google.keys,
-        clientId: google.clientId,
-        nonce: resumed.data.nonce,
-        domains: google.domains,
-        now: google.now,
-      },
+    return await complete(
+      context,
+      resumed.request,
+      person.sub,
+      resumed.headers,
     );
-    const admission = await context.admits(who.sub);
-    if (admission === 'no-directory') {
-      return unavailablePage(
-        context.site,
-        'The directory of groups has not been read yet. Try again in a few minutes.',
-      );
-    }
-    if (admission === 'not-in-directory') {
-      context.log({ event: 'sign-in-refused', reason: 'not in the directory' });
-      return notInDirectoryPage(context.site);
-    }
-    // Signing in to connect an assistant signs in to the site as well.
-    resumed.headers.append('Set-Cookie', await context.sessionCookie(who));
-    return await complete(context, resumed.request, who.sub, resumed.headers);
   } catch (error: unknown) {
     return failure(context, error);
   }
