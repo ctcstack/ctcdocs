@@ -4,20 +4,26 @@
  *
  * The product record treats AI agents as an equal class of consumer, but until
  * now nothing on the site told anyone the machine-readable surface existed.
- * Everything named here is served today and sits behind the same Cloudflare
- * Access boundary as the pages: the `llms.txt` indexes (ADR-033), the Markdown
- * projection at `/<slug>/index.md` and the clipboard action on every document.
+ * Everything named here is served today and sits behind the same boundary as
+ * the pages: the `llms.txt` indexes (ADR-033), the Markdown projection at
+ * `/<slug>/index.md` and the clipboard action on every document. On a private
+ * deployment an agent reads with a machine key, never a person's session
+ * (ADR-038), and an index describes only the documents of its own access class
+ * (ADR-039), so the copy promises descriptions for those alone.
  *
  * `data/docs-index.json` is deliberately not mentioned. It lives in the Git
  * repository and is not published, and naming an endpoint the site does not
  * serve would send agents to a 404.
  */
 import type { CorpusDocument } from '../../lib/corpus';
+import { siteConfiguration } from '../../lib/project';
 
 type Props = { documents: CorpusDocument[] };
 
 const { documents } = Astro.props;
 const example = documents[0];
+const isPrivate =
+  siteConfiguration.deployment.environments.production.visibility === 'private';
 ---
 
 <section aria-labelledby="home-agents" class="agents">
@@ -26,9 +32,10 @@ const example = documents[0];
   <div class="agents-body">
     <p>
       Start at <a href="/llms.txt"><code>/llms.txt</code></a>: it lists every
-      document in the order the navigation shows them, with its description and
-      the address of its Markdown version. A top-level section with a page of
-      its own has an index of its own at the same name under that page.
+      document in the order the navigation shows them, with the address of its
+      Markdown version, and describes each document every member may read. A
+      top-level section with a page of its own has an index of its own at the
+      same name under that page.
     </p>
 
     <p>
@@ -54,6 +61,16 @@ const example = documents[0];
       Each page also carries <strong>Copy as Markdown</strong> beside its title, which
       puts the same text on the clipboard for pasting into a prompt.
     </p>
+
+    {
+      isPrivate && (
+        <p>
+          An agent reads this site with a machine key, sent as a bearer token,
+          which the site's administrators issue for it. It reads what the groups
+          named on its key may read.
+        </p>
+      )
+    }
   </div>
 </section>
 
