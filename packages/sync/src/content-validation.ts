@@ -78,6 +78,68 @@ const agentEnvironmentSchema = {
     .length(1),
 };
 
+/** An environment's MCP resources, once the schema above has accepted them. */
+interface AgentResources {
+  readonly kv_namespaces: readonly { binding: string; id: string }[];
+  readonly r2_buckets: readonly { bucket_name: string }[];
+  readonly ai_search: readonly { instance_name: string }[];
+}
+
+/**
+ * Each environment publishes its own build and keeps its own grants
+ * (ADR-041). Two environments sharing a bucket or an index would overwrite
+ * each other's documents on every scheduled run, and OAuth state kept in the
+ * namespace that holds the snapshot and the machine keys would mix records
+ * any client can create with the ones that decide access.
+ */
+function agentResourceErrors(
+  environments: Readonly<Record<string, AgentResources>>,
+): string[] {
+  const file = PROJECT_LAYOUT.wranglerConfigurationFile;
+  const errors: string[] = [];
+  const owners = new Map<string, string>();
+  const sorted = Object.entries(environments).sort(([a], [b]) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  );
+  for (const [name, environment] of sorted) {
+    const namespaces = new Map(
+      environment.kv_namespaces.map((namespace) => [
+        namespace.binding,
+        namespace.id,
+      ]),
+    );
+    const oauth = namespaces.get(PLATFORM_WORKERS.oauthBinding) ?? '';
+    if (oauth === namespaces.get(PLATFORM_WORKERS.stateBinding)) {
+      errors.push(
+        `${file}: the ${name} environment's ${PLATFORM_WORKERS.oauthBinding} must be a KV namespace of its own, not the ${PLATFORM_WORKERS.stateBinding} namespace`,
+      );
+    }
+    const resources: [string, string][] = [
+      [
+        `the ${PLATFORM_WORKERS.documentsBinding} bucket`,
+        environment.r2_buckets[0]?.bucket_name ?? '',
+      ],
+      [
+        `the ${PLATFORM_WORKERS.searchBinding} instance`,
+        environment.ai_search[0]?.instance_name ?? '',
+      ],
+      [`the ${PLATFORM_WORKERS.oauthBinding} namespace`, oauth],
+    ];
+    for (const [resource, value] of resources) {
+      const key = JSON.stringify([resource, value]);
+      const owner = owners.get(key);
+      if (owner === undefined) {
+        owners.set(key, name);
+      } else {
+        errors.push(
+          `${file}: the ${owner} and ${name} environments share ${resource} ${value}; each environment needs its own`,
+        );
+      }
+    }
+  }
+  return errors;
+}
+
 function protectedEnvironmentSchema(
   pattern: string,
   gated: boolean,
@@ -557,6 +619,13 @@ export async function validateRepositoryContent(
   const gated = isGated(site);
   try {
     wranglerConfigurationSchema(site).parse(wrangler);
+    if (gated && site.mcp?.enabled === true) {
+      errors.push(
+        ...agentResourceErrors(
+          (wrangler as { env: Record<string, AgentResources> }).env,
+        ),
+      );
+    }
   } catch {
     errors.push(
       gated

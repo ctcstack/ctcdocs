@@ -148,8 +148,8 @@ rollback is published the same way, because its digest differs, so the
 bucket always follows the version that serves. No credential leaves
 Cloudflare for this: the deploy job is unchanged.
 
-**AI Search indexes that bucket**: one instance per deployment, hybrid search,
-`class`, `title` and `short_id` as its custom metadata fields, and a
+**AI Search indexes that bucket**: one instance per environment, hybrid
+search, `class`, `title` and `short_id` as its custom metadata fields, and a
 15-minute sync interval as a backstop for a sync the Worker could not start.
 
 **The Worker's own access map still decides.** AI Search is asked with a
