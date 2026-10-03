@@ -22,6 +22,7 @@ import {
   fetchDocument,
   searchDocuments,
 } from '../dist-node/worker/agents/documents.js';
+import { MemoryStore } from '../dist-node/worker/agents/memory-store.js';
 import { publishDocuments } from '../dist-node/worker/agents/publish.js';
 import { handle, SESSION_COOKIE } from '../dist-node/worker/handler.js';
 import { sitePath } from '../dist-node/worker/paths.js';
@@ -84,6 +85,23 @@ function assetsFrom(distRoot) {
 
 function readersOf(map, fileClass) {
   return typeof fileClass === 'string' ? [fileClass] : fileClass;
+}
+
+/**
+ * Whether a reader in `groups` may open a file of this class, worked out
+ * independently of the gate's own code: the file is open to members, or one
+ * of its classes names one of the groups.
+ */
+function groupsMayRead(map, fileClass, groups) {
+  return readersOf(map, fileClass).some((cls) => {
+    if (cls === 'members' || cls === 'platform') {
+      return true;
+    }
+    const readers = map.classes[cls]?.readers;
+    return (
+      Array.isArray(readers) && groups.some((group) => readers.includes(group))
+    );
+  });
 }
 
 export async function verifyGate({ projectRoot, distRoot }) {
@@ -171,7 +189,6 @@ export async function verifyGate({ projectRoot, distRoot }) {
   const files = Object.entries(map.files);
   for (const [path, fileClass] of files) {
     const classes = readersOf(map, fileClass);
-    const open = classes.some((cls) => cls === 'members' || cls === 'platform');
 
     const anonymous = await ask(path);
     assert.equal(
@@ -182,17 +199,7 @@ export async function verifyGate({ projectRoot, distRoot }) {
     requests += 1;
 
     for (const { name, groups, key } of keys) {
-      // Independent of the gate's own code: a key reads a file when the file
-      // is open to members, or one of its classes names the key's group.
-      const allowed =
-        open ||
-        classes.some((cls) => {
-          const readers = map.classes[cls]?.readers;
-          return (
-            Array.isArray(readers) &&
-            groups.some((group) => readers.includes(group))
-          );
-        });
+      const allowed = groupsMayRead(map, fileClass, groups);
       const response = await ask(path, { Authorization: `Bearer ${key}` });
       requests += 1;
       assert.equal(
@@ -266,36 +273,6 @@ export async function verifyGate({ projectRoot, distRoot }) {
   return { files: files.length, requests };
 }
 
-/** A bucket in memory, as far as publishing and the tools use one. */
-function memoryStore() {
-  const objects = new Map();
-  return {
-    objects,
-    async get(key) {
-      const object = objects.get(key);
-      return object
-        ? { text: async () => object.text, customMetadata: object.metadata }
-        : null;
-    },
-    async put(key, text, options) {
-      objects.set(key, { text, metadata: options.customMetadata });
-    },
-    async list({ prefix }) {
-      return {
-        objects: [...objects]
-          .filter(([key]) => key.startsWith(prefix))
-          .map(([key, object]) => ({ key, customMetadata: object.metadata })),
-        truncated: false,
-      };
-    },
-    async delete(keys) {
-      for (const key of keys) {
-        objects.delete(key);
-      }
-    },
-  };
-}
-
 /**
  * The MCP server's tools (ADR-041), against the same build: the documents
  * are published from `dist` as the Worker's schedule would, then every reader
@@ -307,7 +284,7 @@ async function verifyAgents({ map, distRoot, environment, keys }) {
   if (map.site.mcp !== true || !map.agents) {
     return 0;
   }
-  const store = memoryStore();
+  const store = new MemoryStore();
   const everything = () => [...store.objects.keys()];
   const index = {
     search: async () => everything(),
@@ -364,13 +341,8 @@ async function verifyAgents({ map, distRoot, environment, keys }) {
     requests += 1;
     for (const document of map.agents.documents) {
       const fileClass = map.files[document.markdown];
-      const readers = map.classes[fileClass]?.readers;
-      // Independent of the gate's code, as for files above.
       const allowed =
-        name === 'admin' ||
-        fileClass === 'members' ||
-        (Array.isArray(readers) &&
-          reader.groups.some((group) => readers.includes(group)));
+        name === 'admin' || groupsMayRead(map, fileClass, reader.groups);
       const fetched = await fetchDocument(access, document.id);
       requests += 1;
       assert.equal(

@@ -4,7 +4,8 @@
  */
 import type { AccessMapFile } from '../access-map.js';
 import type { Reader } from '../decide.js';
-import type { DocumentIndex, DocumentStore } from './documents.js';
+import type { DocumentIndex } from './documents.js';
+import { MemoryStore } from './memory-store.js';
 
 export const ORIGIN = 'https://docs.example.com';
 
@@ -75,66 +76,6 @@ export const readers = {
     groups: ['admins@example.com'],
   },
 } as const satisfies Record<string, Reader>;
-
-interface StoredObject {
-  text: string;
-  customMetadata: Record<string, string>;
-}
-
-export class MemoryStore implements DocumentStore {
-  readonly objects = new Map<string, StoredObject>();
-  /** How many objects one `list` page returns, to exercise the cursor. */
-  constructor(private readonly pageSize = 1000) {}
-
-  seed(key: string, text: string, customMetadata: Record<string, string>) {
-    this.objects.set(key, { text, customMetadata });
-  }
-
-  async get(key: string) {
-    const object = this.objects.get(key);
-    return object
-      ? {
-          text: async () => object.text,
-          customMetadata: object.customMetadata,
-        }
-      : null;
-  }
-
-  async put(
-    key: string,
-    value: string,
-    options: { customMetadata: Record<string, string> },
-  ) {
-    this.objects.set(key, {
-      text: value,
-      customMetadata: options.customMetadata,
-    });
-    return null;
-  }
-
-  async list(options: { prefix: string; cursor?: string }) {
-    const keys = [...this.objects.keys()]
-      .filter((key) => key.startsWith(options.prefix))
-      .sort();
-    const start = Number(options.cursor ?? 0);
-    const page = keys.slice(start, start + this.pageSize);
-    const truncated = start + this.pageSize < keys.length;
-    return {
-      objects: page.map((key) => ({
-        key,
-        customMetadata: this.objects.get(key)?.customMetadata ?? {},
-      })),
-      truncated,
-      ...(truncated ? { cursor: String(start + this.pageSize) } : {}),
-    };
-  }
-
-  async delete(keys: string[]) {
-    for (const key of keys) {
-      this.objects.delete(key);
-    }
-  }
-}
 
 /** An index that answers every query with the same chunks. */
 export class FixedIndex implements DocumentIndex {
