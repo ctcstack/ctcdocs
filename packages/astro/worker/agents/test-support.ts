@@ -67,12 +67,11 @@ export const agentMap: AccessMapFile = {
 };
 
 export const readers = {
-  member: { kind: 'person', sub: 'm', email: '', groups: [] },
-  team: { kind: 'person', sub: 't', email: '', groups: ['team@example.com'] },
+  member: { kind: 'person', sub: 'm', groups: [] },
+  team: { kind: 'person', sub: 't', groups: ['team@example.com'] },
   admin: {
     kind: 'person',
     sub: 'a',
-    email: '',
     groups: ['admins@example.com'],
   },
 } as const satisfies Record<string, Reader>;

@@ -261,11 +261,7 @@ async function finishSignIn(
       now: gate.now,
     });
     // A session is only worth issuing to someone the directory admits.
-    const person = personFrom(
-      await gate.context.snapshot(),
-      who.sub,
-      who.email,
-    );
+    const person = personFrom(await gate.context.snapshot(), who.sub);
     if (person === 'no-directory') {
       return ending(unavailablePage(site, NO_DIRECTORY));
     }
@@ -328,7 +324,7 @@ async function serveAgent(
 ): Promise<Response> {
   const { context } = gate;
   const snapshot = await context.snapshot();
-  const reader = personFrom(snapshot, sub, '');
+  const reader = personFrom(snapshot, sub);
   if (reader === 'no-directory') {
     return new Response(NO_DIRECTORY, { status: 503 });
   }
@@ -392,7 +388,6 @@ type Identified = Reader | 'no-directory' | 'not-in-directory' | undefined;
 function personFrom(
   snapshot: DirectorySnapshot | undefined,
   sub: string,
-  email: string,
 ): Reader | 'no-directory' | 'not-in-directory' {
   if (!snapshot) {
     return 'no-directory';
@@ -400,7 +395,7 @@ function personFrom(
   if (!isActive(snapshot, sub)) {
     return 'not-in-directory';
   }
-  return { kind: 'person', sub, email, groups: groupsOf(snapshot, sub) };
+  return { kind: 'person', sub, groups: groupsOf(snapshot, sub) };
 }
 
 async function identify(
@@ -435,11 +430,7 @@ async function identify(
   if (!claims || typeof claims.sub !== 'string' || claims.sub.length === 0) {
     return undefined;
   }
-  return personFrom(
-    snapshot,
-    claims.sub,
-    typeof claims.email === 'string' ? claims.email : '',
-  );
+  return personFrom(snapshot, claims.sub);
 }
 
 function statusOf(snapshot: DirectorySnapshot | undefined, now: number) {

@@ -20,7 +20,6 @@ export type Reader =
   | {
       readonly kind: 'person';
       readonly sub: string;
-      readonly email: string;
       readonly groups: readonly string[];
     }
   | {

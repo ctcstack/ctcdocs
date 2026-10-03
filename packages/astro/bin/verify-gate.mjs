@@ -312,7 +312,7 @@ async function verifyAgents({ map, distRoot, environment, keys }) {
 
   const people = keys.map(({ name, groups }) => ({
     name,
-    reader: { kind: 'person', sub: name, email: '', groups },
+    reader: { kind: 'person', sub: name, groups },
   }));
   if (map.admins[0]) {
     people.push({
@@ -320,7 +320,6 @@ async function verifyAgents({ map, distRoot, environment, keys }) {
       reader: {
         kind: 'person',
         sub: 'admin',
-        email: '',
         groups: [map.admins[0]],
       },
     });
