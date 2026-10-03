@@ -125,14 +125,23 @@ function redirect(location: string, headers: Headers): Response {
   return new Response(null, { status: 302, headers });
 }
 
-/** Where the consent form may lead: back here, to Google, to the client. */
+/**
+ * Where the consent form may lead: back here, to Google, to the client. A
+ * Content Security Policy cannot name an IPv6 address, and a browser ignores
+ * one it is given, so such a redirect URI is allowed by its scheme; the
+ * library accepts one only over `http` on the loopback address, or `https`.
+ */
 function consentPolicy(redirectUri: string): string {
+  const client = new URL(redirectUri);
+  const target = client.hostname.startsWith('[')
+    ? client.protocol
+    : client.origin;
   return [
     "default-src 'none'",
     "style-src 'unsafe-inline'",
     "base-uri 'none'",
     "frame-ancestors 'none'",
-    `form-action 'self' https://accounts.google.com ${new URL(redirectUri).origin}`,
+    `form-action 'self' https://accounts.google.com ${target}`,
   ].join('; ');
 }
 

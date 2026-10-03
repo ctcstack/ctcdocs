@@ -223,14 +223,14 @@ beforeEach(() => {
   events = [];
 });
 
-async function register(): Promise<string> {
+async function register(redirectUri = CALLBACK): Promise<string> {
   const response = await call(
     new Request(`${ORIGIN}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         client_name: 'Example Assistant',
-        redirect_uris: [CALLBACK],
+        redirect_uris: [redirectUri],
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
@@ -244,11 +244,11 @@ async function register(): Promise<string> {
 const VERIFIER = 'a-pkce-verifier-that-is-long-enough-for-the-rules-0123456789';
 const CHALLENGE = createHash('sha256').update(VERIFIER).digest('base64url');
 
-function authorizeUrl(clientId: string): string {
+function authorizeUrl(clientId: string, redirectUri = CALLBACK): string {
   return `${ORIGIN}/auth/authorize?${new URLSearchParams({
     response_type: 'code',
     client_id: clientId,
-    redirect_uri: CALLBACK,
+    redirect_uri: redirectUri,
     scope: 'kb:read offline_access',
     state: 'client-state',
     code_challenge: CHALLENGE,
@@ -257,9 +257,11 @@ function authorizeUrl(clientId: string): string {
   })}`;
 }
 
-async function consent(jar: Jar, clientId: string) {
+async function consent(jar: Jar, clientId: string, redirectUri = CALLBACK) {
   const page = await call(
-    new Request(authorizeUrl(clientId), { headers: { Cookie: jar.header() } }),
+    new Request(authorizeUrl(clientId, redirectUri), {
+      headers: { Cookie: jar.header() },
+    }),
   );
   jar.take(page);
   const html = await page.text();
@@ -483,6 +485,24 @@ describe('connecting an assistant', () => {
     expect(policy).toContain(
       "form-action 'self' https://accounts.google.com https://assistant.example",
     );
+  });
+
+  it('lets the form lead to an app on this computer, IPv6 included', async () => {
+    for (const [redirectUri, target] of [
+      ['http://127.0.0.1:3000/callback', 'http://127.0.0.1:3000'],
+      // A policy cannot name an IPv6 address; the scheme stands in.
+      ['http://[::1]:3000/callback', 'http:'],
+    ] as const) {
+      const { page, html } = await consent(
+        new Jar(),
+        await register(redirectUri),
+        redirectUri,
+      );
+      expect(html).toContain('Access goes to an app on this computer');
+      expect(page.headers.get('Content-Security-Policy')).toContain(
+        `form-action 'self' https://accounts.google.com ${target}`,
+      );
+    }
   });
 
   it('signs the person in as the site does, then hands the assistant a code', async () => {
