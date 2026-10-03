@@ -55,6 +55,38 @@ Claude's connector authentication
 `workers-oauth-provider` (<https://github.com/cloudflare/workers-oauth-provider>)
 and AI Search (<https://developers.cloudflare.com/ai-search/>).
 
+### What a spike showed
+
+A spike on 2026-10-03 ran this design on a test hostname, with
+`workers-oauth-provider` 1.2.1, `createMcpHandler` (Agents SDK 0.26), the
+Workspace's Google sign-in and an AI Search instance over an R2 bucket of
+synthetic documents in two classes.
+
+- **claude.ai, Claude Code, Claude Desktop and ChatGPT** each connected
+  through their published CIMD identity, showed the consent page, signed in
+  with a Workspace account and answered from a document, citing its permanent
+  link. Claude Code opened with `server/discover`, the current revision's
+  first call. CIMD documents resolve when fetched from Cloudflare's network,
+  although `chatgpt.com` refuses the same fetch from a local `wrangler dev`.
+- **Classes are read per request.** A restricted document was neither found
+  nor fetched. When its class opened, the same connected assistant read it
+  without reconnecting, and lost it again when the class closed, each time
+  within one or two minutes of the change: the time a KV write takes to
+  reach every location.
+- **Search matches meaning and language.** Paraphrased questions found the
+  right document, and a Russian question found an English one. With nothing
+  readable to match, search returned a loosely related document instead of
+  nothing.
+- **What is needed once per account:** an AI Search service token, without
+  which an instance cannot read R2. Wrangler's `r2 object put` cannot set
+  custom metadata. A newly created instance starts a sync at once, and a sync
+  started while another runs is refused (`sync_in_cooldown`).
+- **The consent page's CSP** has to let its form lead to Google and to the
+  client's callback: `form-action 'self' https://accounts.google.com` plus
+  the redirect URI's origin.
+- **Size:** the Worker with the library, the SDK and the tools is 1.4 MB, or
+  259 KB gzipped, and starts in 41 ms.
+
 ## Decision
 
 ### Connecting
@@ -76,7 +108,7 @@ reserved slug, as `auth` is.
 
 1. One page, from the library's consent helpers, names the client and where
    it returns, with one button. It cannot be framed, and its CSP lets the form
-   return to that client's redirect URI.
+   lead only to Google and to that client's redirect URI.
 2. The person signs in with Google (ADR-038), or their live session is used,
    and the snapshot must list them as active (ADR-040).
 3. The grant is completed with the person's `sub` as its user and nothing
@@ -91,8 +123,9 @@ advertised so that clients keep refreshing.
 A token must be ours, unexpired and bound to `/mcp`. Its `sub` must be active
 in the snapshot, and the reader's groups — so their classes — are read from
 the snapshot on each request, not from the grant. A change of groups or a
-departure applies within the snapshot's refresh, about ten minutes, and
-nothing stored in a grant can widen what it reads. An admin reads what an
+departure applies within the snapshot's refresh, about ten minutes, plus the
+minute or two a KV write takes to spread, and nothing stored in a grant can
+widen what it reads. An admin reads what an
 admin reads on the site.
 
 Machine keys are not accepted at `/mcp`. Bots keep reading over HTTP with
@@ -103,11 +136,15 @@ their keys.
 **Each deploy publishes the documents to R2.** After the Worker is deployed,
 the deploy job writes every document's Markdown projection to the
 deployment's private bucket as `docs/<short ID>.md`, with its class, title,
-Markdown address and dates as object metadata. It deletes the objects of
-documents that are gone, then starts an AI Search sync.
+Markdown address and dates as object metadata, through R2's S3-compatible API
+with a token for that bucket only. It deletes the objects of documents that
+are gone, then starts an AI Search sync, and waits and retries while an
+earlier sync is still running.
 
 **AI Search indexes that bucket**: one instance per deployment, hybrid search,
-`class` among its custom metadata fields.
+`class`, `title` and `short_id` as its custom metadata fields, and a
+15-minute sync interval as a backstop for a deploy whose sync could not
+start.
 
 **The Worker's own access map still decides.** AI Search is asked with a
 filter on the reader's classes, or none for an admin. Every result, and every
@@ -125,7 +162,9 @@ title, and descriptions built from the site's name and description so that an
 assistant knows when to use them:
 
 - `search` — a `query` in; `{ results: [{ id, title, url }] }` out, one entry
-  per document, best first;
+  per document, best first, and none below a minimum relevance score, so a
+  question the reader's documents do not answer gets no results rather than
+  a near miss;
 - `fetch` — an `id` in; `{ id, title, text, url, metadata }` out: the
   document's Markdown projection as `text`, its folder and dates in
   `metadata`.
@@ -142,8 +181,10 @@ about 100,000 characters is cut there, and `metadata` says so.
 routes answer `404`. It requires `signIn` and a gated deployment. Validation
 then requires the `OAUTH_KV` namespace, the R2 bucket and AI Search bindings,
 and the `global_fetch_strictly_public` compatibility flag the library needs
-to read client metadata documents. The deploy token gains write access to the
-bucket and permission to start an AI Search sync.
+to read client metadata documents. The deploy job gains an R2 token for the
+bucket and permission to start an AI Search sync. Setting up a deployment
+creates the account's AI Search service token once, then the instance with
+its metadata fields.
 
 The access smoke test checks that `/mcp` answers an anonymous request with
 `401` and a pointer to the metadata. The denial suite asks both tools, as each
@@ -183,9 +224,10 @@ outcome only.
 
 ### Follow-up
 
-- A spike on a test hostname before implementation. claude.ai, ChatGPT and
-  Claude Code connect, sign in, return through the consent page and refresh.
-  AI Search returns only a reader's classes, and latency is recorded.
+- The spike did not run long enough to see an assistant refresh its token
+  (an hour). Refresh rotation passed locally; watch each assistant's first
+  refresh after the release.
+- Pick the minimum relevance score with the real corpus.
 - On acceptance:
   - strike from `AGENTS.md` the invariants this ADR lifts: no semantic search
     or vector storage; a Worker that never renders a file and keeps no state
