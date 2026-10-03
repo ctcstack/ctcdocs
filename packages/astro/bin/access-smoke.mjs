@@ -353,12 +353,15 @@ export async function verifyAnonymousDenial({
  * The version serving need not be the one checked out: after a rollback, or
  * on the schedule between a change and its deploy. One without the server
  * refuses the POST before anything else, as it refuses every write, and has
- * no MCP boundary to check.
+ * no MCP boundary to check. Right after a deploy of the checked-out version,
+ * `serverRequired`, that refusal means the server is missing: a retryable
+ * failure while the deploy propagates, then a failed check.
  */
 export async function verifyMcpChallenge({
   baseUrl,
   site,
   fetchImplementation = fetch,
+  serverRequired = false,
 }) {
   if (site.mcp?.enabled !== true) {
     return;
@@ -374,6 +377,12 @@ export async function verifyMcpChallenge({
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
   });
   if (anonymous.status === 405) {
+    if (serverRequired) {
+      throw new AccessSmokeError(
+        'The deployed version does not serve the MCP server (405).',
+        { retryable: true },
+      );
+    }
     console.log('The version serving has no MCP server; nothing to check.');
     return;
   }
@@ -435,6 +444,8 @@ export async function verifyPostDeploy({
   fetchImplementation = fetch,
   propagationTimeoutMs = PROPAGATION_TIMEOUT_MS,
   propagationPollIntervalMs = PROPAGATION_POLL_INTERVAL_MS,
+  // After a rollback the version serving predates the checked-out one.
+  rollback = false,
 }) {
   const origin = parseWikiBaseUrl(baseUrl);
   const headers = serviceHeaders(clientId, clientSecret, machineKey);
@@ -561,7 +572,17 @@ export async function verifyPostDeploy({
     site,
     fetchImplementation,
   });
-  await verifyMcpChallenge({ baseUrl, site, fetchImplementation });
+  await pollUntilPropagated({
+    deadline,
+    pollIntervalMs: propagationPollIntervalMs,
+    attempt: () =>
+      verifyMcpChallenge({
+        baseUrl,
+        site,
+        fetchImplementation,
+        serverRequired: !rollback,
+      }),
+  });
 }
 
 /**
@@ -635,7 +656,10 @@ async function main() {
     return;
   }
   if (mode === '--post-deploy') {
-    await verifyPostDeploy(options);
+    await verifyPostDeploy({
+      ...options,
+      rollback: process.env.CTCDOCS_ROLLBACK === 'true',
+    });
     return;
   }
   if (mode === '--anonymous') {

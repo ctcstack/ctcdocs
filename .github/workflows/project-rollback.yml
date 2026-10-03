@@ -314,4 +314,6 @@ jobs:
           CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
           CTCDOCS_MACHINE_KEY: ${{ secrets.CTCDOCS_MACHINE_KEY }}
+          # The version restored may predate the MCP server checked out here.
+          CTCDOCS_ROLLBACK: 'true'
         run: pnpm exec ctcdocs-access-smoke --post-deploy
