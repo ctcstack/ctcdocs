@@ -2,6 +2,17 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Fixed
+
+- A signed-in reader who asks for a missing address gets the 404 page again,
+  not a plain "Not found". The Worker asked the asset store for `/404.html`,
+  which `auto-trailing-slash` answers with a redirect the Worker does not
+  follow; it now asks for `/404`, and fetches any `.html` file by the address
+  the store serves it at. The denial suite's asset store now redirects as the
+  real one does, and checks that a missing page is the 404 page.
+
 ## 0.16.0
 
 A private deployment now signs its readers in itself and opens each folder
