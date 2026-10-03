@@ -457,6 +457,7 @@ export async function writeBuildOutput({
   const agents = mcp
     ? await buildAgentCatalog({
         documents: [...corpus.documents.values()],
+        folders: corpus.folders,
         files,
         readMarkdown: (path) =>
           readFile(resolve(distRoot, path.slice(1)), 'utf8').catch(

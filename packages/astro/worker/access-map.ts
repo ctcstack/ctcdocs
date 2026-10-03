@@ -33,6 +33,8 @@ export interface AgentDocument {
   readonly title: string;
   readonly markdown: string;
   readonly modified: string | null;
+  /** The folders from the corpus root to the document (ADR-042). */
+  readonly path: readonly string[];
   readonly hash: string;
 }
 

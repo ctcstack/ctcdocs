@@ -6,11 +6,13 @@
  * short ID, title, Markdown address, modified time and a hash of everything
  * that would change the stored object. The Worker compares those hashes with
  * the bucket and rewrites only what changed; the digest tells it, cheaply,
- * whether anything did.
+ * whether anything did. Each entry also names the folders the document sits
+ * in, which search returns with it (ADR-042) and which the bucket does not
+ * hold.
  */
 import { createHash } from 'node:crypto';
 
-import type { CorpusDocument } from '@ctcstack/ctcdocs-core';
+import type { CorpusDocument, CorpusFolder } from '@ctcstack/ctcdocs-core';
 
 import type { FileClass } from './access-map.js';
 import { markdownProjectionPath } from './projection.js';
@@ -22,6 +24,8 @@ interface AgentDocument {
   /** The Markdown projection's address, as the access map lists it. */
   readonly markdown: string;
   readonly modified: string | null;
+  /** The folders from the corpus root to the document, as the site names them. */
+  readonly path: readonly string[];
   /** SHA-256 of the projection, its class and its title. */
   readonly hash: string;
 }
@@ -35,12 +39,30 @@ function sha256(text: string): string {
   return createHash('sha256').update(text).digest('hex');
 }
 
+/** The labels of a document's folders, outermost first, without the root. */
+function folderPath(
+  document: CorpusDocument,
+  folders: ReadonlyMap<string, CorpusFolder>,
+): string[] {
+  const labels: string[] = [];
+  const seen = new Set<string>();
+  let folder = document.parentId ? folders.get(document.parentId) : undefined;
+  while (folder && folder.parentId !== null && !seen.has(folder.id)) {
+    seen.add(folder.id);
+    labels.unshift(folder.label);
+    folder = folders.get(folder.parentId);
+  }
+  return labels;
+}
+
 export async function buildAgentCatalog({
   documents,
+  folders,
   files,
   readMarkdown,
 }: {
   readonly documents: Iterable<CorpusDocument>;
+  readonly folders: ReadonlyMap<string, CorpusFolder>;
   readonly files: ReadonlyMap<string, FileClass>;
   /** The built projection at a site path; `undefined` when there is none. */
   readonly readMarkdown: (path: string) => Promise<string | undefined>;
@@ -66,6 +88,7 @@ export async function buildAgentCatalog({
       title,
       markdown,
       modified: document.modified ?? null,
+      path: folderPath(document, folders),
       hash: sha256(JSON.stringify([text, fileClass, title])),
     });
   }

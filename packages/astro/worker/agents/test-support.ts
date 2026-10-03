@@ -4,7 +4,7 @@
  */
 import type { AccessMapFile } from '../access-map.js';
 import type { Reader } from '../decide.js';
-import type { DocumentIndex } from './documents.js';
+import type { DocumentIndex, IndexedChunk } from './documents.js';
 import { MemoryStore } from './memory-store.js';
 
 export const ORIGIN = 'https://docs.example.com';
@@ -46,6 +46,7 @@ export const agentMap: AccessMapFile = {
         title: 'Handbook',
         markdown: '/handbook/index.md',
         modified: '2026-10-01T00:00:00.000Z',
+        path: [],
         hash: 'h-handbook',
       },
       {
@@ -53,6 +54,7 @@ export const agentMap: AccessMapFile = {
         title: 'Team plan',
         markdown: '/team/plan/index.md',
         modified: null,
+        path: ['Team'],
         hash: 'h-plan',
       },
       {
@@ -60,6 +62,7 @@ export const agentMap: AccessMapFile = {
         title: 'Unruled notes',
         markdown: '/unruled/notes/index.md',
         modified: null,
+        path: ['Unruled'],
         hash: 'h-notes',
       },
     ],
@@ -76,17 +79,44 @@ export const readers = {
   },
 } as const satisfies Record<string, Reader>;
 
+/**
+ * A chunk of `agentMap`'s document at `key`, with the class the build gives
+ * it, as AI Search would return it; `overrides` stand in for a stale or a
+ * foreign index.
+ */
+export function chunkOf(
+  key: string,
+  overrides: Partial<IndexedChunk> = {},
+): IndexedChunk {
+  const document = agentMap.agents?.documents.find(
+    (entry) => `docs/${entry.id}.md` === key,
+  );
+  const fileClass = document ? agentMap.files[document.markdown] : undefined;
+  return {
+    key,
+    text: `A passage of ${document?.title ?? key}.`,
+    class: typeof fileClass === 'string' ? fileClass : undefined,
+    ...overrides,
+  };
+}
+
 /** An index that answers every query with the same chunks. */
 export class FixedIndex implements DocumentIndex {
   readonly queries: { query: string; classes: readonly string[] }[] = [];
   syncs = 0;
   failSync = false;
+  private readonly chunks: readonly IndexedChunk[];
 
-  constructor(private readonly keys: readonly string[]) {}
+  /** Each key becomes its document's chunk; a chunk is taken as it is. */
+  constructor(chunks: readonly (string | IndexedChunk)[]) {
+    this.chunks = chunks.map((chunk) =>
+      typeof chunk === 'string' ? chunkOf(chunk) : chunk,
+    );
+  }
 
   async search(query: string, classes: readonly string[]) {
     this.queries.push({ query, classes });
-    return this.keys;
+    return this.chunks;
   }
 
   async sync() {

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { AccessMapFile } from '../access-map.js';
 import type { Reader } from '../decide.js';
 import {
+  excerpt,
   FETCH_LIMIT,
   fetchDocument,
   readableClasses,
@@ -11,6 +12,7 @@ import {
 } from './documents.js';
 import {
   agentMap,
+  chunkOf,
   FixedIndex,
   ORIGIN,
   publishedStore,
@@ -64,8 +66,21 @@ describe('search', () => {
       { query: 'plan', classes: ['members', 'team0001'] },
     ]);
     expect(results).toEqual([
-      { id: 'aaaaaa', title: 'Handbook', url: `${ORIGIN}/d/aaaaaa/` },
-      { id: 'bbbbbb', title: 'Team plan', url: `${ORIGIN}/d/bbbbbb/` },
+      {
+        id: 'aaaaaa',
+        title: 'Handbook',
+        url: `${ORIGIN}/d/aaaaaa/`,
+        text: 'A passage of Handbook.',
+        path: [],
+        modified: '2026-10-01T00:00:00.000Z',
+      },
+      {
+        id: 'bbbbbb',
+        title: 'Team plan',
+        url: `${ORIGIN}/d/bbbbbb/`,
+        text: 'A passage of Team plan.',
+        path: ['Team'],
+      },
     ]);
   });
 
@@ -118,7 +133,13 @@ describe('search', () => {
     expect(
       await searchDocuments(access(readers.team, { index, store }), 'x'),
     ).toEqual([
-      { id: 'bbbbbb', title: 'Team plan', url: `${ORIGIN}/d/bbbbbb/` },
+      {
+        id: 'bbbbbb',
+        title: 'Team plan',
+        url: `${ORIGIN}/d/bbbbbb/`,
+        text: 'A passage of Team plan.',
+        path: ['Team'],
+      },
     ]);
   });
 
@@ -136,6 +157,7 @@ describe('search', () => {
       title: `Page ${n}`,
       markdown: '/handbook/index.md',
       modified: null,
+      path: [],
       hash: `h-${n}`,
     }));
     const map: AccessMapFile = {
@@ -148,6 +170,104 @@ describe('search', () => {
     expect(
       await searchDocuments(access(readers.member, { index, map }), 'x'),
     ).toHaveLength(10);
+  });
+});
+
+describe('passages', () => {
+  const text = (results: readonly { id: string; text: string }[]) =>
+    Object.fromEntries(results.map((result) => [result.id, result.text]));
+
+  it('shows up to three passages a document, best first', async () => {
+    const index = new FixedIndex([
+      chunkOf('docs/aaaaaa.md', { text: 'First.' }),
+      chunkOf('docs/bbbbbb.md', { text: 'Plan.' }),
+      chunkOf('docs/aaaaaa.md', { text: 'Second.' }),
+      chunkOf('docs/aaaaaa.md', { text: 'Third.' }),
+      chunkOf('docs/aaaaaa.md', { text: 'Fourth.' }),
+    ]);
+    const results = await searchDocuments(access(readers.team, { index }), 'x');
+    expect(ids(results)).toEqual(['aaaaaa', 'bbbbbb']);
+    expect(text(results)).toEqual({
+      aaaaaa: 'First.\n\n…\n\nSecond.\n\n…\n\nThird.',
+      bbbbbb: 'Plan.',
+    });
+  });
+
+  it('shows a passage only when its own class is one the reader may read', async () => {
+    // A stale or foreign index: the document is the reader's, the text not.
+    const index = new FixedIndex([
+      chunkOf('docs/aaaaaa.md', { text: 'Team text.', class: 'team0001' }),
+      chunkOf('docs/aaaaaa.md', { text: 'Unclassed.', class: undefined }),
+      chunkOf('docs/aaaaaa.md', { text: 'Members text.' }),
+    ]);
+    const results = await searchDocuments(
+      access(readers.member, { index }),
+      'x',
+    );
+    expect(text(results)).toEqual({ aaaaaa: 'Members text.' });
+  });
+
+  it('never shows a passage of a document the reader cannot open', async () => {
+    // The chunk claims a class the reader has; the build says otherwise.
+    const index = new FixedIndex([
+      chunkOf('docs/bbbbbb.md', { text: 'Team plan.', class: 'members' }),
+      chunkOf('docs/cccccc.md', { text: 'Notes.', class: 'members' }),
+    ]);
+    expect(
+      await searchDocuments(access(readers.member, { index }), 'x'),
+    ).toEqual([]);
+  });
+
+  it('gives every document its best passage before any a second', async () => {
+    const documents = Array.from({ length: 10 }, (_, n) => ({
+      id: `${n}`.padStart(6, 'f'),
+      title: `Page ${n}`,
+      markdown: '/handbook/index.md',
+      modified: null,
+      path: [],
+      hash: `h-${n}`,
+    }));
+    const map: AccessMapFile = {
+      ...agentMap,
+      agents: { digest: 'digest-long', documents },
+    };
+    const long = `${'A sentence of the passage. '.repeat(200)}`;
+    const index = new FixedIndex(
+      documents.flatMap((document) =>
+        [1, 2, 3].map((n) => ({
+          key: `docs/${document.id}.md`,
+          text: `${n} ${long}`,
+          class: 'members',
+        })),
+      ),
+    );
+    const results = await searchDocuments(
+      access(readers.member, { index, map }),
+      'x',
+    );
+    expect(results).toHaveLength(10);
+    const lengths = results.map((result) => result.text.length);
+    expect(lengths.every((length) => length > 0 && length <= 2_400)).toBe(true);
+    expect(
+      lengths.reduce((sum, length) => sum + length, 0),
+    ).toBeLessThanOrEqual(24_000);
+    expect(results.every((result) => !result.text.includes('…'))).toBe(true);
+  });
+
+  it('cuts a long passage around its middle, at sentence boundaries', () => {
+    const sentences = Array.from(
+      { length: 40 },
+      (_, n) => `Sentence ${n} of the passage.`,
+    );
+    const passage = sentences.join(' ');
+    const cut = excerpt(passage, 300);
+    expect(cut.length).toBeLessThanOrEqual(300);
+    expect(cut.startsWith('Sentence ')).toBe(true);
+    expect(cut.endsWith('passage.')).toBe(true);
+    expect(cut).toContain('Sentence 20 of the passage.');
+    expect(excerpt('  Short.  ', 300)).toBe('Short.');
+    // One sentence longer than the limit is cut as it is.
+    expect(excerpt('x'.repeat(500), 300)).toHaveLength(300);
   });
 });
 

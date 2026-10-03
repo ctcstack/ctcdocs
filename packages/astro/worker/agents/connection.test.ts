@@ -335,6 +335,7 @@ async function mcp(token: string, method: string, params: object = {}) {
       result?: {
         tools?: { name: string; annotations?: { readOnlyHint?: boolean } }[];
         structuredContent?: Record<string, unknown>;
+        content?: { type: string; text?: string }[];
         isError?: boolean;
       };
     },
@@ -666,7 +667,14 @@ describe('an assistant reading', () => {
     const found = await tool(token, 'search', { query: 'plan' });
     expect(found.body.result?.structuredContent).toEqual({
       results: [
-        { id: 'aaaaaa', title: 'Handbook', url: `${ORIGIN}/d/aaaaaa/` },
+        {
+          id: 'aaaaaa',
+          title: 'Handbook',
+          url: `${ORIGIN}/d/aaaaaa/`,
+          text: 'A passage of Handbook.',
+          path: [],
+          modified: '2026-10-01T00:00:00.000Z',
+        },
       ],
     });
     expect(
@@ -706,7 +714,14 @@ describe('an assistant reading', () => {
         ?.structuredContent,
     ).toEqual({
       results: [
-        { id: 'aaaaaa', title: 'Handbook', url: `${ORIGIN}/d/aaaaaa/` },
+        {
+          id: 'aaaaaa',
+          title: 'Handbook',
+          url: `${ORIGIN}/d/aaaaaa/`,
+          text: 'A passage of Handbook.',
+          path: [],
+          modified: '2026-10-01T00:00:00.000Z',
+        },
       ],
     });
 
@@ -798,6 +813,17 @@ describe('an assistant reading', () => {
     for (const token of ['kbk_not-for-mcp', 'made-up']) {
       expect((await mcp(token, 'tools/list')).status).toBe(401);
     }
+  });
+
+  it('says what to do when nothing matches, beside the empty list', async () => {
+    const { tokens } = await connect('user-member');
+    index = new FixedIndex([]);
+    const found = await tool(tokens.access_token, 'search', { query: 'x' });
+    expect(found.body.result?.isError).not.toBe(true);
+    expect(found.body.result?.structuredContent).toEqual({ results: [] });
+    const [json, note] = found.body.result?.content ?? [];
+    expect(JSON.parse(json?.text ?? '')).toEqual({ results: [] });
+    expect(note?.text).toContain('No document this person may open matches');
   });
 
   it('answers a failing index plainly, and logs it by name', async () => {

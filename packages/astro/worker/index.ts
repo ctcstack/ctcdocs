@@ -31,10 +31,18 @@ interface AiSearch {
       retrieval: {
         max_num_results: number;
         match_threshold: number;
+        keyword_match_mode: 'and' | 'or';
+        context_expansion: number;
         filters: { class: { $in: string[] } };
       };
+      reranking: { enabled: boolean; model: string; match_threshold: number };
     };
-  }): Promise<{ chunks?: { item: { key: string } }[] }>;
+  }): Promise<{
+    chunks?: {
+      text?: string;
+      item: { key: string; metadata?: Record<string, unknown> };
+    }[];
+  }>;
   readonly jobs: { create(): Promise<unknown> };
 }
 
@@ -58,11 +66,20 @@ let cached: { at: number; value: DirectorySnapshot | undefined } | undefined;
 let cachedKeys: { at: number; value: unknown } | undefined;
 
 /**
- * Chunks AI Search returns per query, before the Worker keeps one per
- * document, and the score below which a chunk is not a match.
+ * How AI Search is asked (ADR-042): broadly, so that exact terms reach the
+ * ranking, and the Worker keeps a short answer. As many chunks as it returns;
+ * a vector threshold low enough that a keyword match whose meaning is far from
+ * the question survives it, since the threshold applies to vector similarity
+ * alone; any word of the query, rather than all of them, for BM25; a
+ * neighbouring chunk around each, so that a passage reads as a paragraph; and
+ * reranking, which orders the chunks and, for now, removes none. Starting
+ * values, to tune with the evaluation ADR-042 calls for.
  */
-const SEARCH_CHUNKS = 30;
-const MATCH_THRESHOLD = 0.4;
+const SEARCH_CHUNKS = 50;
+const MATCH_THRESHOLD = 0.2;
+const CONTEXT_CHUNKS = 1;
+const RERANKER = '@cf/baai/bge-reranker-base';
+const RERANK_THRESHOLD = 0;
 
 const googleKeys = new GoogleKeys(
   (input, init) => fetch(input, init),
@@ -81,11 +98,25 @@ function documentIndex(search: AiSearch): DocumentIndex {
           retrieval: {
             max_num_results: SEARCH_CHUNKS,
             match_threshold: MATCH_THRESHOLD,
+            keyword_match_mode: 'or',
+            context_expansion: CONTEXT_CHUNKS,
             filters: { class: { $in: [...classes] } },
+          },
+          reranking: {
+            enabled: true,
+            model: RERANKER,
+            match_threshold: RERANK_THRESHOLD,
           },
         },
       });
-      return (response.chunks ?? []).map((chunk) => chunk.item.key);
+      return (response.chunks ?? []).map((chunk) => {
+        const cls = chunk.item.metadata?.class;
+        return {
+          key: chunk.item.key,
+          text: chunk.text ?? '',
+          class: typeof cls === 'string' ? cls : undefined,
+        };
+      });
     },
     sync: async () => {
       await search.jobs.create();
