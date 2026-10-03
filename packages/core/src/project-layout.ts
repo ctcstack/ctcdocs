@@ -96,9 +96,17 @@ export const PLATFORM_ROUTE_HREFS = {
   contentHealth: `/${PLATFORM_ROUTES.contentHealth}/`,
 } as const;
 
-export const RESERVED_SLUGS: readonly string[] = Object.freeze(
-  Object.values(PLATFORM_ROUTES),
-);
+/**
+ * Top-level addresses the platform serves beside the corpus: the Worker's
+ * sign-in routes (ADR-038), the search bundles, `/pagefind/` and
+ * `/pagefind-<class>/` (ADR-039), and the original files under `/assets/`.
+ */
+const SERVED_ADDRESSES = ['auth', 'pagefind', 'assets'] as const;
+
+export const RESERVED_SLUGS: readonly string[] = Object.freeze([
+  ...Object.values(PLATFORM_ROUTES),
+  ...SERVED_ADDRESSES,
+]);
 
 /**
  * A short ID: lowercase hexadecimal, six characters unless six collided with

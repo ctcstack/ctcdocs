@@ -371,6 +371,21 @@ export async function writeBuildOutput({
     MEMBERS_CLASS,
     ...Object.keys(map.searchPages),
   ]);
+  /*
+   * A bundle's directory is cleared before it is written, so it must hold
+   * nothing the build made: a folder whose address a bundle takes would lose
+   * its pages after the map had listed them.
+   */
+  const builtPaths = Object.keys(map.files);
+  for (const cls of classesToIndex) {
+    const bundle = searchBundlePath(cls);
+    const clash = builtPaths.find((path) => path.startsWith(bundle));
+    if (clash) {
+      throw new BuildOutputError(
+        `${clash} sits where the search bundle ${bundle} is written; rename its folder in Drive (ADR-039).`,
+      );
+    }
+  }
   try {
     for (const cls of [...classesToIndex].sort()) {
       const bundle = searchBundlePath(cls);

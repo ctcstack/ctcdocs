@@ -116,7 +116,9 @@ describe('segments', () => {
         <img alt="An image description">
       </body></html>`,
     );
-    expect(segments).toEqual([
+    expect(
+      segments.map((segment) => segment.replace(/\s+/gu, ' ').trim()),
+    ).toEqual([
       'Plan',
       'A description of the plan.',
       '{"description":"Linked data."}',
@@ -124,6 +126,32 @@ describe('segments', () => {
       'One inline paragraph.',
       'An image description',
     ]);
+  });
+
+  it('keeps line breaks and alt text inside their paragraph', () => {
+    expect(
+      htmlSegments(
+        '<p>the quarterly payroll<br>adjustment applies <img alt="to every"> contractor</p>',
+      ),
+    ).toEqual([
+      'the quarterly payroll adjustment applies  to every  contractor',
+    ]);
+  });
+
+  it('finds a description written from a paragraph broken across lines', () => {
+    const paragraph = htmlSegments(
+      '<p>the quarterly payroll adjustment<br>applies to every contractor<br>in the northern region</p>',
+    );
+    expect(
+      findLeaks({
+        documents: [
+          { path: '/finance/payroll/', cls: 'finance', segments: paragraph },
+        ],
+        files: [{ path: '/finance/', cls: 'members', segments: [secret] }],
+        allowed: [],
+        readers: (cls) => readers[cls],
+      }),
+    ).toHaveLength(1);
   });
 
   it('reads only the part a selector names', () => {

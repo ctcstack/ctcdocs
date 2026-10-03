@@ -15,6 +15,7 @@ import { getCollection } from 'astro:content';
 
 import PdfFile from './PdfFile.astro';
 import SectionListing from './SectionListing.astro';
+import { classOfDocument, classOfFolderSlug } from '../lib/access-source';
 import { sectionListingRows, type ListedPage } from '../lib/section-listing';
 
 const { entry } = Astro.locals.starlightRoute;
@@ -24,13 +25,22 @@ async function loadRows() {
     return undefined;
   }
   const docs = await getCollection('docs');
+  /*
+   * A document whose move waits for a rule has fewer readers than this page
+   * (ADR-039), so it is listed by title alone: its description is its text.
+   */
+  const pageClass = classOfFolderSlug(entry.id);
   const pages = new Map<string, ListedPage>(
     docs.map((doc) => [
       doc.id,
       {
         sourceType: doc.data.sourceType,
         title: doc.data.title,
-        description: doc.data.description,
+        description:
+          doc.data.sourceType === 'section-index' ||
+          classOfDocument(doc.data.googleFileId) === pageClass
+            ? doc.data.description
+            : undefined,
         googleModifiedTime: doc.data.googleModifiedTime,
       },
     ]),

@@ -164,6 +164,30 @@ describe('buildAccessMap', () => {
     expect(map.sharedImages).toEqual(['/_astro/plan.webp']);
     expect(map.files['/_astro/plan.webp']).toBe(MEMBERS_CLASS);
   });
+
+  it('finds a listing that shows an admins-only document’s image', () => {
+    const closed = computeAccessModel(
+      {
+        ...access,
+        rules: access.rules.filter((rule) => rule.folder !== 'team'),
+      },
+      corpus,
+    );
+    expect(closed.documents['doc-team']).toBe(ADMINS_CLASS);
+    const map = buildAccessMap({
+      ...input,
+      model: closed,
+      pages: [
+        ...input.pages,
+        page({
+          path: '/news/',
+          source: 'manual',
+          images: ['/_astro/plan.webp'],
+        }),
+      ],
+    });
+    expect(map.sharedImages).toEqual(['/_astro/plan.webp']);
+  });
 });
 
 describe('readBuiltPage', () => {

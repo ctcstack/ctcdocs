@@ -65,11 +65,21 @@ const manifestDocumentSchema = z.object({
   imageVersion: z.number().int().positive().optional(),
   /**
    * The readers the document was last published with, when access rules
-   * exist (ADR-039): `"*"` or group addresses. A move or a rule change that
-   * would widen them is held back until a rule names the document's folder.
+   * exist (ADR-039): `"*"` or group addresses, and the folder chain it was
+   * published from. A move in Drive that would widen them keeps the readers
+   * both places allow until a rule on the new chain is added or changed;
+   * `readersHeld` records that chain and its rules while the move waits.
    */
   publishedReaders: z
     .union([z.literal('*'), z.array(z.string().min(1))])
+    .optional(),
+  publishedChain: z.array(z.string().min(1)).optional(),
+  readersHeld: z
+    .object({
+      chain: z.array(z.string().min(1)),
+      rules: z.string().regex(/^[a-f0-9]{16}$/u),
+    })
+    .strict()
     .optional(),
 });
 

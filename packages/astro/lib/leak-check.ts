@@ -40,7 +40,6 @@ const BLOCK = new Set([
   'article',
   'aside',
   'blockquote',
-  'br',
   'dd',
   'details',
   'dialog',
@@ -90,13 +89,7 @@ const BLOCK = new Set([
   'svg',
 ]);
 const SKIPPED = new Set(['script', 'style', 'template', 'noscript']);
-const TEXT_ATTRIBUTES = [
-  'alt',
-  'title',
-  'aria-label',
-  'content',
-  'placeholder',
-];
+const TEXT_ATTRIBUTES = ['title', 'aria-label', 'content', 'placeholder'];
 
 /** The words of a text, as search would read them. */
 export function words(text: string): string[] {
@@ -119,8 +112,10 @@ function runs(segment: readonly string[]): string[] {
 /**
  * Blocks of text in an HTML page: block elements break a block, inline ones
  * do not; attributes that people or agents read are blocks of their own, and
- * JSON-LD is read as text, since it carries a page's description. With
- * `selector`, only that part of the page is read.
+ * JSON-LD is read as text, since it carries a page's description. A line
+ * break and an image's alt text stay inside their block, as they do in the
+ * description the sync writes from the same paragraph. With `selector`, only
+ * that part of the page is read.
  */
 export function htmlSegments(html: string, selector?: string): string[] {
   const $ = cheerio.load(html);
@@ -139,6 +134,13 @@ export function htmlSegments(html: string, selector?: string): string[] {
     }
     const name = node.name?.toLowerCase() ?? '';
     const attributes = node.attribs ?? {};
+    if (name === 'br') {
+      current += ' ';
+      return;
+    }
+    if (attributes.alt) {
+      current += ` ${attributes.alt} `;
+    }
     for (const attribute of TEXT_ATTRIBUTES) {
       const value = attributes[attribute];
       if (value) {

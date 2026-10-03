@@ -4,12 +4,15 @@ import { describe, expect, it } from 'vitest';
 import type { AccessConfiguration } from './access-configuration.js';
 import {
   ADMINS_CLASS,
+  chainRules,
   classIdentifiers,
   computeAccessModel,
   documentClass,
+  folderChain,
   folderClass,
   intersectReaders,
   MEMBERS_CLASS,
+  nextPublishedReaders,
   widensReaders,
 } from './access-classes.js';
 import { parseCorpusStructure } from './corpus-structure.js';
@@ -250,5 +253,89 @@ describe('published readers', () => {
     ).toBe(true);
     expect(widensReaders([], ['a@example.com'])).toBe(false);
     expect(intersectReaders('*', ['a@example.com'])).toEqual(['a@example.com']);
+  });
+});
+
+describe('published readers', () => {
+  const rule = (folder: string, readers: string[]) => ({
+    folder,
+    label: folder,
+    readers,
+  });
+
+  it('walks a folder chain to the root and signs its rules', () => {
+    expect(folderChain('team-sub', corpus)).toEqual([
+      'team-sub',
+      'team',
+      'root',
+    ]);
+    expect(folderChain(null, corpus)).toEqual(['root']);
+    const chain = folderChain('team-sub', corpus);
+    const rules = new Map([
+      ['team', rule('team', ['b@example.com', 'a@example.com'])],
+    ]);
+    const relabelled = new Map([
+      [
+        'team',
+        { ...rule('team', ['a@example.com', 'b@example.com']), label: 'Other' },
+      ],
+    ]);
+    expect(chainRules(chain, rules)).toMatch(/^[0-9a-f]{16}$/u);
+    expect(chainRules(chain, relabelled)).toBe(chainRules(chain, rules));
+    expect(
+      chainRules(chain, new Map([['team', rule('team', ['a@example.com'])]])),
+    ).not.toBe(chainRules(chain, rules));
+    expect(chainRules(['open', 'root'], rules)).toBe(chainRules([], rules));
+  });
+
+  it('applies rule changes at once and holds widening moves', () => {
+    const at = (readers: '*' | string[], chain: string[], rules = 'r1') => ({
+      readers,
+      chain,
+      rules,
+    });
+    // First publication, and a rule change in place, wider or narrower.
+    expect(nextPublishedReaders(at(['a'], ['x']), undefined).held).toBe(false);
+    expect(
+      nextPublishedReaders(at('*', ['x'], 'r2'), {
+        readers: ['a'],
+        chain: ['x'],
+      }).published.readers,
+    ).toBe('*');
+    // A widening move waits with the readers both places allow.
+    const waiting = nextPublishedReaders(at(['a', 'b'], ['y']), {
+      readers: ['a'],
+      chain: ['x'],
+    });
+    expect(waiting).toEqual({
+      published: {
+        readers: ['a'],
+        chain: ['x'],
+        held: { chain: ['y'], rules: 'r1' },
+      },
+      held: true,
+    });
+    // It goes on waiting until the new chain's rules change.
+    expect(
+      nextPublishedReaders(at(['a', 'b'], ['y']), waiting.published).held,
+    ).toBe(true);
+    expect(
+      nextPublishedReaders(at(['a', 'b'], ['y'], 'r2'), waiting.published)
+        .published.readers,
+    ).toEqual(['a', 'b']);
+    // Moving on again starts a new wait; moving back settles.
+    expect(
+      nextPublishedReaders(at(['b'], ['z'], 'r2'), waiting.published),
+    ).toEqual({
+      published: {
+        readers: [],
+        chain: ['x'],
+        held: { chain: ['z'], rules: 'r2' },
+      },
+      held: true,
+    });
+    expect(nextPublishedReaders(at(['a'], ['x']), waiting.published).held).toBe(
+      false,
+    );
   });
 });

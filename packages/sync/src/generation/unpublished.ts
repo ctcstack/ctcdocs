@@ -103,9 +103,9 @@ export const UNPUBLISHED_REASONS: readonly UnpublishedReason[] = [
   {
     code: 'readers-widened',
     title: 'More people would read the document than before',
-    action: 'Add an access rule for its folder',
+    action: 'Confirm its readers in an access rule',
     instruction:
-      "The document moved, or a rule changed, so that more people would read it than it was published to. It stays with its earlier readers until the site's configuration names its folder in an access rule. Ask whoever maintains the site to add one, or move the document back.",
+      'The document moved in Drive to a folder whose access rules would let more people read it. Until someone who maintains the site adds or changes an access rule on its new folder or a folder above it, it is published only to the readers both folders allow. Ask them to confirm who may read it, or move the document back.',
   },
   {
     code: 'pdf-no-text',
