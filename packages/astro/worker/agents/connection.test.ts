@@ -11,6 +11,7 @@ import { handle, SESSION_COOKIE, type WorkerContext } from '../handler.js';
 import { GoogleKeys } from '../oidc.js';
 import { base64url, seal, sealKeys } from '../seal.js';
 import type { DirectorySnapshot } from '../snapshot.js';
+import type { DocumentIndex } from './documents.js';
 import { agentOAuth } from './oauth.js';
 import {
   agentMap,
@@ -195,19 +196,23 @@ function context(map = agentMap): WorkerContext {
           log: (event) => events.push(event),
         }),
       store: publishedStore(),
-      index: new FixedIndex([
-        'docs/aaaaaa.md',
-        'docs/bbbbbb.md',
-        'docs/cccccc.md',
-      ]),
+      index,
     },
   };
 }
+
+/** An index standing in for AI Search, swapped by a test that breaks it. */
+let index: DocumentIndex;
 
 const call = (request: Request, map = agentMap) =>
   handle(request, context(map));
 
 beforeEach(() => {
+  index = new FixedIndex([
+    'docs/aaaaaa.md',
+    'docs/bbbbbb.md',
+    'docs/cccccc.md',
+  ]);
   kv = new MemoryKv();
   snapshot = snapshotWith(['user-member']);
   googlePerson = { sub: 'user-member', nonce: '' };
@@ -662,6 +667,23 @@ describe('an assistant reading', () => {
     for (const token of ['kbk_not-for-mcp', 'made-up']) {
       expect((await mcp(token, 'tools/list')).status).toBe(401);
     }
+  });
+
+  it('answers a failing index plainly, and logs it by name', async () => {
+    const { tokens } = await connect('user-member');
+    index = {
+      search: () =>
+        Promise.reject(new RangeError('instance example-search: filter')),
+      sync: () => Promise.resolve(),
+    };
+    const found = await tool(tokens.access_token, 'search', { query: 'x' });
+    expect(found.body.result?.isError).toBe(true);
+    expect(JSON.stringify(found.body)).not.toContain('example-search');
+    expect(events).toContainEqual({
+      event: 'tool-failed',
+      tool: 'search',
+      error: 'RangeError',
+    });
   });
 
   it('logs tool calls without the query, the person or the document', async () => {

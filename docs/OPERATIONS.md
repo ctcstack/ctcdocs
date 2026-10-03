@@ -638,7 +638,8 @@ pnpm exec wrangler ai-search jobs list <instance name>
 ```
 
 The Worker logs each tool call by tool and outcome only, never the query, the
-person or the document.
+person or the document. A `tool-failed` event names a tool whose bucket or
+index failed, by the error's name; the assistant is told only to try again.
 
 ### Disconnecting assistants
 
