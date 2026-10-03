@@ -158,7 +158,8 @@ connect, from any account; the sign-in decides who reads.
 on, `ctcdocs-sync validate` requires the bindings, schedule and compatibility
 flag in [Cloudflare setup](CLOUDFLARE_SETUP.md#the-mcp-server), and the build
 lists every document in the access map for the Worker to publish. Turned off,
-or absent, the Worker serves no MCP or OAuth route.
+or absent, the Worker serves no MCP or OAuth route, and the bindings may stay
+in `wrangler.jsonc` so that turning it on again is one change.
 
 ## Who may read which folder
 

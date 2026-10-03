@@ -562,6 +562,19 @@ describe('a deployment anyone may read', () => {
     await writeFile(path, JSON.stringify(complete));
     expect(await errorsFor()).not.toContain(PLATFORM_WORKERS.oauthBinding);
 
+    // Turning the server off is one change: its bindings may stay.
+    for (const mcp of [{ enabled: false }, undefined]) {
+      const off = parseSiteConfiguration({
+        ...TEST_SITE_CONFIGURATION_INPUT,
+        ...(mcp ? { mcp } : {}),
+      });
+      expect(
+        (
+          await validateRepositoryContent(createSyncContext(root, off))
+        ).errors.join('\n'),
+      ).not.toContain(PROJECT_LAYOUT.wranglerConfigurationFile);
+    }
+
     await writeFile(
       path,
       JSON.stringify({ ...complete, compatibility_flags: [] }),

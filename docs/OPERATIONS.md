@@ -654,9 +654,10 @@ judged against the directory. To end connections themselves:
 - **Everyone:** create a new OAuth namespace, put its ID in `wrangler.jsonc`
   and deploy. Every grant stays in the old namespace, unreachable; delete it
   afterwards.
-- **The server itself:** set `mcp.enabled` to `false` and deploy. `/mcp` and
-  the OAuth routes stop answering; turning it back on revives the grants that
-  have not expired, so pair it with a new namespace if that is not wanted.
+- **The server itself:** set `mcp.enabled` to `false` and deploy; the
+  bindings in `wrangler.jsonc` may stay. `/mcp` and the OAuth routes stop
+  answering; turning it back on revives the grants that have not expired, so
+  pair it with a new namespace if that is not wanted.
 
 ## Failure handling
 
