@@ -407,6 +407,22 @@ describe('discovery', () => {
     }
   });
 
+  it('lets a browser client read the resource metadata at either path', async () => {
+    for (const path of [
+      '/.well-known/oauth-protected-resource/mcp',
+      '/.well-known/oauth-protected-resource',
+    ]) {
+      const response = await call(
+        new Request(`${ORIGIN}${path}`, {
+          headers: { Origin: 'https://inspector.example' },
+        }),
+      );
+      expect(response.headers.get('Access-Control-Allow-Origin')).toBe(
+        'https://inspector.example',
+      );
+    }
+  });
+
   it('serves the authorization server metadata', async () => {
     const response = await call(
       new Request(`${ORIGIN}/.well-known/oauth-authorization-server`),
