@@ -123,6 +123,10 @@ jobs:
         if: steps.corpus.outputs.present == 'true'
         run: pnpm build
 
+      - name: Ask the gate for every built file as different readers
+        if: steps.corpus.outputs.present == 'true'
+        run: pnpm exec ctcdocs-verify-gate
+
       - name: Verify search
         if: steps.corpus.outputs.present == 'true'
         run: pnpm test:search

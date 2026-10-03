@@ -227,9 +227,13 @@ jobs:
           restore-keys: |
             ctcdocs-astro-assets-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-
 
+      # The denial suite asks the platform's gate for every built file as
+      # different readers (ADR-038); a public deployment has nothing to refuse.
       - name: Verify the site the new content produces
         id: build
-        run: pnpm verify
+        run: |
+          pnpm verify
+          pnpm exec ctcdocs-verify-gate
 
       - name: Revalidate the generated diff after verification
         id: final_validation
