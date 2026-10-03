@@ -71,9 +71,19 @@ const accessMapAliasSchema = z
  * project declares, the set of environments has to match exactly, and no
  * environment may fall back to a public workers.dev or preview hostname.
  */
+/**
+ * Whether the deployment is served through the platform's Worker: when any
+ * environment is private, since the Worker is one artifact for them all.
+ */
+function isGated(site: SiteConfiguration): boolean {
+  return Object.values(site.deployment.environments).some(
+    (environment) => environment.visibility === 'private',
+  );
+}
+
 function wranglerConfigurationSchema(site: SiteConfiguration) {
   const { deployment } = site;
-  const gated = deployment.environments.production.visibility === 'private';
+  const gated = isGated(site);
   const environments = Object.fromEntries(
     Object.entries(deployment.environments).map(([name, environment]) => [
       name,
@@ -146,6 +156,9 @@ function directoryWranglerSchema(
   return z.object({
     name: z.literal(`${site.deployment.workerName}-directory`),
     main: z.literal(PLATFORM_WORKERS.directory),
+    // Environments inherit a top-level route; this Worker has none.
+    route: z.never().optional(),
+    routes: z.never().optional(),
     workers_dev: z.literal(false),
     preview_urls: z.literal(false),
     alias: accessMapAliasSchema,
@@ -189,6 +202,24 @@ export interface ValidationResult {
    * decides whether that is expected.
    */
   hasCorpus: boolean;
+}
+
+/**
+ * Whether Git ignores a path in the repository, or `undefined` where Git
+ * cannot say: not installed, or not a repository.
+ */
+async function gitIgnores(
+  repositoryRoot: string,
+  path: string,
+): Promise<boolean | undefined> {
+  try {
+    await runCommand('git', ['check-ignore', '--quiet', '--no-index', path], {
+      cwd: repositoryRoot,
+    });
+    return true;
+  } catch (error: unknown) {
+    return (error as { code?: unknown }).code === 1 ? false : undefined;
+  }
 }
 
 async function pathExists(path: string): Promise<boolean> {
@@ -452,7 +483,7 @@ export async function validateRepositoryContent(
   checkedFiles += 1;
   const wrangler: unknown = parseJsonWithComments(wranglerContent);
   const names = Object.keys(site.deployment.environments).sort().join(', ');
-  const gated = visibility === 'private';
+  const gated = isGated(site);
   try {
     wranglerConfigurationSchema(site).parse(wrangler);
   } catch {
@@ -464,6 +495,16 @@ export async function validateRepositoryContent(
   }
 
   if (gated) {
+    /*
+     * The asset store applies `_redirects` before it serves a file, so a rule
+     * there could answer one path with another file's bytes; the Worker
+     * refuses such answers, and validation keeps them from being written.
+     */
+    if (await pathExists(resolve(repositoryRoot, 'public', '_redirects'))) {
+      errors.push(
+        'public/_redirects is not allowed on a private deployment: the Worker serves only the file it judged, and the platform writes its own redirects',
+      );
+    }
     if (!site.signIn) {
       errors.push(
         `${PROJECT_LAYOUT.configurationFile} must name the Workspace domains readers sign in with (signIn.workspaceDomains) for a private deployment`,
@@ -507,6 +548,14 @@ export async function validateRepositoryContent(
 
   errors.push(...(await validateSecretScanExemptions(repositoryRoot)));
   checkedFiles += 1;
+
+  if (
+    (await gitIgnores(repositoryRoot, PROJECT_LAYOUT.accessMapFile)) === false
+  ) {
+    errors.push(
+      `${PROJECT_LAYOUT.accessMapFile} is not ignored by Git; add ${PROJECT_LAYOUT.accessMapFile.split('/')[0]}/ to .gitignore, or every build leaves a change outside the generated paths`,
+    );
+  }
 
   errors.push(
     ...(await validateFormatterIgnoresGeneratedPaths(repositoryRoot)),

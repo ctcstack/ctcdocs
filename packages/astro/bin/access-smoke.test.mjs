@@ -6,9 +6,12 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { parseCorpusStructure } from '@ctcstack/ctcdocs-core';
+
 import {
   AccessSmokeError,
   markdownPathFromDocsIndex,
+  membersDocumentSlugs,
   parseWikiBaseUrl,
   verifyAccessPreflight,
   verifyAnonymousDenial,
@@ -440,13 +443,47 @@ test('the Markdown read is a document every member may open', () => {
     documents: [{ slug: 'team/plan' }, { slug: 'handbook/guide' }],
   };
   assert.equal(
-    markdownPathFromDocsIndex(index, {
-      enabled: true,
-      files: { '/team/plan/': '0a1b2c3d', '/handbook/guide/': 'members' },
-    }),
+    markdownPathFromDocsIndex(index, new Set(['handbook/guide'])),
     '/handbook/guide/index.md',
   );
   assert.equal(markdownPathFromDocsIndex(index), '/team/plan/index.md');
+});
+
+test('members documents are found from the configuration and the manifest', () => {
+  const corpus = parseCorpusStructure({
+    rootFolderId: 'root',
+    folders: {
+      root: { googleParentId: null, googleName: 'R', displayLabel: 'R' },
+      team: {
+        googleParentId: 'root',
+        googleName: 'Team',
+        displayLabel: 'Team',
+        stableSlug: 'team',
+      },
+      open: {
+        googleParentId: 'root',
+        googleName: 'Open',
+        displayLabel: 'Open',
+        stableSlug: 'handbook',
+      },
+    },
+    documents: {
+      plan: { googleParentId: 'team', stableSlug: 'team/plan' },
+      guide: { googleParentId: 'open', stableSlug: 'handbook/guide' },
+    },
+  });
+  const access = {
+    admins: ['admins@example.com'],
+    rules: [
+      { folder: 'team', label: 'Team', readers: ['team@example.com'] },
+      { folder: 'open', label: 'Open', readers: ['*'] },
+    ],
+  };
+  assert.deepEqual(
+    [...membersDocumentSlugs({ access }, corpus)],
+    ['handbook/guide'],
+  );
+  assert.equal(membersDocumentSlugs({}, corpus), undefined);
 });
 
 test('the probe fails when an anonymous request is admitted', async () => {

@@ -3,11 +3,16 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
+import { parseEnv } from 'node:util';
 
 import {
+  computeAccessModel,
+  documentClass,
   findProjectRoot,
   loadSiteConfiguration,
+  MEMBERS_CLASS,
   PROJECT_LAYOUT,
+  readCorpusStructure,
 } from '@ctcstack/ctcdocs-core';
 
 const MAX_RESPONSE_BYTES = 1_048_576;
@@ -61,10 +66,10 @@ export function parseWikiBaseUrl(value) {
 
 /**
  * The Markdown route the checks read: the first document every member may
- * read, when the build's access map says so (ADR-039), so a smoke key that
- * reads the members class alone can fetch it. Without a map, the first.
+ * read, when access rules say which those are (ADR-039), so a smoke key that
+ * reads the members class alone can fetch it. Without rules, the first.
  */
-export function markdownPathFromDocsIndex(value, accessMap = undefined) {
+export function markdownPathFromDocsIndex(value, openSlugs = undefined) {
   if (
     typeof value !== 'object' ||
     value === null ||
@@ -74,9 +79,8 @@ export function markdownPathFromDocsIndex(value, accessMap = undefined) {
     throw new AccessSmokeError('The AI document index is invalid.');
   }
   const open = (document) =>
-    typeof document?.slug === 'string' &&
-    accessMap?.files?.[`/${document.slug}/`] === 'members';
-  const first = accessMap?.enabled
+    typeof document?.slug === 'string' && openSlugs?.has(document.slug);
+  const first = openSlugs
     ? (value.documents.find(open) ?? value.documents[0])
     : value.documents[0];
   if (
@@ -501,20 +505,54 @@ export async function verifyPostDeploy({
   });
 }
 
+/**
+ * The documents every member may read, from the configuration and the
+ * manifest rather than a build, which the smoke jobs do not run. Without
+ * access rules, undefined: every document is.
+ */
+export function membersDocumentSlugs(site, corpus) {
+  if (!site.access) {
+    return undefined;
+  }
+  const model = computeAccessModel(site.access, corpus);
+  return new Set(
+    [...corpus.documents.values()]
+      .filter((document) => documentClass(model, document.id) === MEMBERS_CLASS)
+      .map((document) => document.slug),
+  );
+}
+
+/**
+ * Values from the project's ignored `.env`, for a run on a workstation; what
+ * the environment already holds wins, so CI is never overridden.
+ */
+async function loadProjectEnv(projectRoot) {
+  const text = await readFile(resolve(projectRoot, '.env'), 'utf8').catch(
+    () => undefined,
+  );
+  for (const [name, value] of Object.entries(text ? parseEnv(text) : {})) {
+    if (process.env[name] === undefined) {
+      process.env[name] = value;
+    }
+  }
+}
+
 async function main() {
   const mode = process.argv[2];
   const projectRoot = findProjectRoot();
+  await loadProjectEnv(projectRoot);
   const siteConfig = loadSiteConfiguration(projectRoot);
-  const docsIndex = JSON.parse(
-    await readFile(
-      resolve(projectRoot, PROJECT_LAYOUT.documentIndexFile),
-      'utf8',
-    ),
-  );
-  const accessMap = await readFile(
-    resolve(projectRoot, PROJECT_LAYOUT.accessMapFile),
+  // A project that has never synchronized has no index; the anonymous probe
+  // still has the routes every deployment serves to ask for.
+  const docsIndex = await readFile(
+    resolve(projectRoot, PROJECT_LAYOUT.documentIndexFile),
     'utf8',
   ).then(JSON.parse, () => undefined);
+  if (!docsIndex && mode !== '--anonymous') {
+    throw new AccessSmokeError(
+      'The AI document index is missing; synchronize before checking a deployment.',
+    );
+  }
   const options = {
     // `||` rather than `??`: an `.env` copied from `.env.example` leaves the
     // override defined but empty, which is not an origin to probe.
@@ -524,7 +562,12 @@ async function main() {
     clientId: process.env.CF_ACCESS_CLIENT_ID,
     clientSecret: process.env.CF_ACCESS_CLIENT_SECRET,
     machineKey: process.env.CTCDOCS_MACHINE_KEY || undefined,
-    markdownPath: markdownPathFromDocsIndex(docsIndex, accessMap),
+    markdownPath: docsIndex
+      ? markdownPathFromDocsIndex(
+          docsIndex,
+          membersDocumentSlugs(siteConfig, readCorpusStructure(projectRoot)),
+        )
+      : undefined,
     site: siteConfig,
   };
 

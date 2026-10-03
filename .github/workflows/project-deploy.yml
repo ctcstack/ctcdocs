@@ -303,6 +303,40 @@ jobs:
       - name: Build static assets from the verified commit
         run: pnpm build
 
+      # The scheduled Worker that keeps the directory snapshot (ADR-040),
+      # bundled with the same access map as the site. It goes first: it only
+      # reads more groups, so the site is never ahead of the groups it names,
+      # and if it cannot be deployed the site is left as it was.
+      - name: Deploy the directory refresh
+        if: hashFiles('wrangler.directory.jsonc') != ''
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DEPLOY_COMMIT: ${{ inputs.candidate_sha || github.sha }}
+          WRANGLER_ENVIRONMENT: ${{ inputs.wrangler_environment }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for attempt in 1 2 3
+          do
+            if pnpm exec wrangler deploy --config wrangler.directory.jsonc \
+              --env "${WRANGLER_ENVIRONMENT}" \
+              --message "GitHub commit ${DEPLOY_COMMIT}"
+            then
+              exit 0
+            fi
+
+            if [[ "${attempt}" == "3" ]]; then
+              echo "::error::The directory refresh failed to deploy after ${attempt} attempts."
+              exit 1
+            fi
+
+            delay=$((attempt * 15))
+            echo "::warning::Directory deployment attempt ${attempt} failed; retrying in ${delay}s."
+            sleep "${delay}"
+          done
+
       - name: Deploy with Wrangler
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -313,10 +347,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          # A private deployment's versions carry the gate's mark, which the
-          # rollback workflow requires of any version it restores (ADR-038).
+          # A gated deployment's versions — any environment private — carry
+          # the gate's mark, which the rollback workflow requires of any
+          # version it restores (ADR-038).
           tag=()
-          if [[ "$(jq -r --arg env "${WRANGLER_ENVIRONMENT}" '.deployment.environments[$env].visibility // "private"' site.config.json)" == "private" ]]; then
+          if [[ "$(jq -r '[.deployment.environments[] | .visibility // "private"] | any(. == "private")' site.config.json)" == "true" ]]; then
             tag=(--tag ctcdocs-gate-v1)
           fi
 
@@ -339,20 +374,6 @@ jobs:
             echo "::warning::Deployment attempt ${attempt} failed; retrying in ${delay}s."
             sleep "${delay}"
           done
-
-      # The scheduled Worker that keeps the directory snapshot (ADR-040),
-      # bundled with the same access map as the Worker just deployed.
-      - name: Deploy the directory refresh
-        if: hashFiles('wrangler.directory.jsonc') != ''
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          DEPLOY_COMMIT: ${{ inputs.candidate_sha || github.sha }}
-          WRANGLER_ENVIRONMENT: ${{ inputs.wrangler_environment }}
-        run: >-
-          pnpm exec wrangler deploy --config wrangler.directory.jsonc
-          --env "${WRANGLER_ENVIRONMENT}"
-          --message "GitHub commit ${DEPLOY_COMMIT}"
 
       - name: Record deployment metadata
         env:
