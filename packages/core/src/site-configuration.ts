@@ -508,11 +508,12 @@ function mcpSearch(value: unknown): McpSearchConfiguration {
       ),
     };
   }
+  // The default, like a set value, is no more than the chunks asked for.
   const results = optionalNumber(
     source,
     'results',
     'mcp.search.results',
-    defaults.results,
+    Math.min(defaults.results, chunks),
     { min: 1, max: chunks, whole: true },
   );
   return {

@@ -222,6 +222,20 @@ describe('MCP configuration', () => {
     });
   });
 
+  it.each([
+    [1, 1],
+    [5, 5],
+    [20, 10],
+  ])(
+    'returns no more results by default than the %d chunks it asks for',
+    (chunks, results) => {
+      const mcp = parseSiteConfiguration(
+        withMcp({ enabled: true, search: { chunks } }),
+      ).mcp;
+      expect(mcp?.search.results).toBe(results);
+    },
+  );
+
   it('starts from the values ADR-042 records', () => {
     expect(MCP_DEFAULTS).toEqual({
       search: {

@@ -196,7 +196,7 @@ Every setting is optional, and the defaults are the values shown:
 | `mcp.search.reranking.enabled`   | Whether AI Search reranks the chunks before the Worker groups them.                                                            |
 | `mcp.search.reranking.model`     | The reranking model.                                                                                                           |
 | `mcp.search.reranking.threshold` | Reranking score, 0 to 1, below which a chunk is dropped; 0 keeps every chunk.                                                  |
-| `mcp.search.results`             | Documents a search returns at most; no more than `chunks`.                                                                     |
+| `mcp.search.results`             | Documents a search returns at most: no more than `chunks`, which is also the default when it is under 10.                      |
 | `mcp.search.passagesPerResult`   | Passages each document shows at most.                                                                                          |
 | `mcp.search.passageCharacters`   | Characters of passage text a search returns in all; at least 100 for each result.                                              |
 | `mcp.fetchCharacters`            | Characters `fetch` returns at most, 1,000 or more; a longer document is cut there.                                             |
