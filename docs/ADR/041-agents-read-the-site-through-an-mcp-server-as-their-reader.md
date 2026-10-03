@@ -197,7 +197,9 @@ Setting up a deployment creates the account's AI Search service token once,
 then the instance with its metadata fields.
 
 The access smoke test and the scheduled probe check that `/mcp` answers an
-anonymous request with `401` and a pointer to the metadata. The denial suite
+anonymous request with `401` and a pointer to the metadata, or, from a
+version without the server, after a rollback or before a deploy, refuses it
+as any other write. The denial suite
 publishes the build into a bucket in memory and asks both tools, as each of
 its readers, for every document, against an index that returns everything.
 The Worker logs each tool call by tool and outcome only. Search keeps chunks

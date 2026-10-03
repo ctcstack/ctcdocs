@@ -548,8 +548,15 @@ test('the MCP server must challenge an anonymous assistant', async () => {
       throw new Error('asked');
     },
   });
+  // A version without the server, after a rollback or before a deploy.
+  await verifyMcpChallenge({
+    baseUrl: origin,
+    site: withMcp,
+    fetchImplementation: server({ mcpStatus: 405, challenge: false }),
+  });
   for (const [broken, message] of [
     [{ mcpStatus: 200 }, /was not challenged \(200\)/u],
+    [{ mcpStatus: 200, challenge: false }, /was not challenged \(200\)/u],
     [{ challenge: false }, /was not challenged \(401\)/u],
     [
       { issuer: 'https://other.example' },

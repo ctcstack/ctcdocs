@@ -349,6 +349,11 @@ export async function verifyAnonymousDenial({
  * The MCP server's boundary (ADR-041): an assistant without a token is told
  * where to sign in, and nothing more. The metadata both OAuth documents name
  * is public by design; it says how to connect, not what the site holds.
+ *
+ * The version serving need not be the one checked out: after a rollback, or
+ * on the schedule between a change and its deploy. One without the server
+ * refuses the POST before anything else, as it refuses every write, and has
+ * no MCP boundary to check.
  */
 export async function verifyMcpChallenge({
   baseUrl,
@@ -368,6 +373,10 @@ export async function verifyMcpChallenge({
     },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
   });
+  if (anonymous.status === 405) {
+    console.log('The version serving has no MCP server; nothing to check.');
+    return;
+  }
   const challenge = anonymous.headers.get('www-authenticate') ?? '';
   const metadata = `${origin}/.well-known/oauth-protected-resource/mcp`;
   if (
