@@ -32,7 +32,57 @@ const stateNamespaceSchema = z
   )
   .length(1);
 
-function protectedEnvironmentSchema(pattern: string, gated: boolean) {
+/**
+ * What a private environment needs for the MCP server (ADR-041): the OAuth
+ * library's own KV namespace beside the state namespace, the bucket the Worker
+ * publishes each document's Markdown to, and the AI Search instance that
+ * indexes it.
+ */
+const agentEnvironmentSchema = {
+  kv_namespaces: z
+    .array(
+      z
+        .object({
+          binding: z.enum([
+            PLATFORM_WORKERS.stateBinding,
+            PLATFORM_WORKERS.oauthBinding,
+          ]),
+          id: z.string().min(1),
+        })
+        .strict(),
+    )
+    .length(2)
+    .refine(
+      (namespaces) =>
+        new Set(namespaces.map((namespace) => namespace.binding)).size === 2,
+    ),
+  r2_buckets: z
+    .array(
+      z
+        .object({
+          binding: z.literal(PLATFORM_WORKERS.documentsBinding),
+          bucket_name: z.string().min(1),
+        })
+        .strict(),
+    )
+    .length(1),
+  ai_search: z
+    .array(
+      z
+        .object({
+          binding: z.literal(PLATFORM_WORKERS.searchBinding),
+          instance_name: z.string().min(1),
+        })
+        .strict(),
+    )
+    .length(1),
+};
+
+function protectedEnvironmentSchema(
+  pattern: string,
+  gated: boolean,
+  agents: boolean,
+) {
   const base = {
     workers_dev: z.literal(false),
     preview_urls: z.literal(false),
@@ -51,6 +101,7 @@ function protectedEnvironmentSchema(pattern: string, gated: boolean) {
           ...base,
           kv_namespaces: stateNamespaceSchema,
           vars: z.object({ GOOGLE_CLIENT_ID: z.string().min(1) }).strict(),
+          ...(agents ? agentEnvironmentSchema : {}),
         })
         .strict()
     : z.object(base).strict();
@@ -84,10 +135,11 @@ function isGated(site: SiteConfiguration): boolean {
 function wranglerConfigurationSchema(site: SiteConfiguration) {
   const { deployment } = site;
   const gated = isGated(site);
+  const agents = gated && site.mcp?.enabled === true;
   const environments = Object.fromEntries(
     Object.entries(deployment.environments).map(([name, environment]) => [
       name,
-      protectedEnvironmentSchema(environment.hostname, gated),
+      protectedEnvironmentSchema(environment.hostname, gated, agents),
     ]),
   );
   const assets = {
@@ -113,6 +165,25 @@ function wranglerConfigurationSchema(site: SiteConfiguration) {
           run_worker_first: z.literal(true),
         }),
         env: z.object(environments).strict(),
+        /*
+         * The MCP server's Worker publishes the build's documents to R2 on a
+         * schedule, and its OAuth library fetches client metadata documents
+         * only under this flag (ADR-041).
+         */
+        ...(agents
+          ? {
+              compatibility_flags: z
+                .array(z.string())
+                .refine((flags) =>
+                  flags.includes(PLATFORM_WORKERS.oauthCompatibilityFlag),
+                ),
+              triggers: z
+                .object({
+                  crons: z.tuple([z.literal(PLATFORM_WORKERS.publishSchedule)]),
+                })
+                .strict(),
+            }
+          : {}),
       })
     : z.object({
         name: z.literal(deployment.workerName),
@@ -489,7 +560,7 @@ export async function validateRepositoryContent(
   } catch {
     errors.push(
       gated
-        ? `${PROJECT_LAYOUT.wranglerConfigurationFile} must deploy Worker ${site.deployment.workerName} with main ${PLATFORM_WORKERS.gate}, the ASSETS binding, run_worker_first, the ${PLATFORM_WORKERS.accessMapAlias} alias, and in each environment its configured hostname, public Worker URLs disabled, the ${PLATFORM_WORKERS.stateBinding} KV namespace and a GOOGLE_CLIENT_ID var: ${names}`
+        ? `${PROJECT_LAYOUT.wranglerConfigurationFile} must deploy Worker ${site.deployment.workerName} with main ${PLATFORM_WORKERS.gate}, the ASSETS binding, run_worker_first, the ${PLATFORM_WORKERS.accessMapAlias} alias, and in each environment its configured hostname, public Worker URLs disabled, the ${PLATFORM_WORKERS.stateBinding} KV namespace and a GOOGLE_CLIENT_ID var${site.mcp?.enabled ? `; with MCP on, also the ${PLATFORM_WORKERS.oauthCompatibilityFlag} compatibility flag, the cron ${PLATFORM_WORKERS.publishSchedule}, and in each environment the ${PLATFORM_WORKERS.oauthBinding} KV namespace, the ${PLATFORM_WORKERS.documentsBinding} R2 bucket and the ${PLATFORM_WORKERS.searchBinding} AI Search instance` : ''}: ${names}`
         : `${PROJECT_LAYOUT.wranglerConfigurationFile} must deploy Worker ${site.deployment.workerName} to exactly these environments and their configured hostnames, with public Worker URLs disabled: ${names}`,
     );
   }
@@ -514,11 +585,13 @@ export async function validateRepositoryContent(
       Object.entries(
         ((wrangler as { env?: Record<string, unknown> }).env ?? {}) as Record<
           string,
-          { kv_namespaces?: Array<{ id?: string }> }
+          { kv_namespaces?: Array<{ binding?: string; id?: string }> }
         >,
       ).map(([name, environment]) => [
         name,
-        environment.kv_namespaces?.[0]?.id ?? '',
+        environment.kv_namespaces?.find(
+          (namespace) => namespace.binding === PLATFORM_WORKERS.stateBinding,
+        )?.id ?? '',
       ]),
     );
     const directoryPath = resolve(
