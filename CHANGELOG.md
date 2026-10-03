@@ -32,6 +32,12 @@ All three packages share a version and are released together.
   class's bundle and checks that no narrower document is found in
   `/pagefind/`.
 
+- Once rules exist, the build fails when a file readable by a wider class
+  repeats a run of eight words found only in documents of a narrower class —
+  an index description, a listing excerpt, a quoted heading. Titles, folder
+  names, navigation and addresses are not counted, and the failure names the
+  file, the document and the word offset, never the words.
+
 ### Upgrade note
 
 - Add `.ctcdocs/` to the project's `.gitignore`.
