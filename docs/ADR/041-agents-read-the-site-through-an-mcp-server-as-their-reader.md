@@ -84,8 +84,9 @@ synthetic documents in two classes.
 - **The consent page's CSP** has to let its form lead to Google and to the
   client's callback: `form-action 'self' https://accounts.google.com` plus
   the redirect URI's origin. A policy cannot name an IPv6 address, and
-  Chrome ignores one, so a loopback `http://[::1]` callback is allowed by its
-  scheme, `http:`.
+  Chrome ignores one, so a callback at an IPv6 address is allowed by its
+  scheme instead: `http:` for the loopback `http://[::1]` native apps use,
+  the only address the library accepts over `http`, and `https:` otherwise.
 - **Size:** the Worker with the library, the SDK and the tools is 1.4 MB, or
   259 KB gzipped, and starts in 41 ms.
 
