@@ -27,3 +27,13 @@ overrides:
   # names the pinned version, so the override stops applying once Miniflare
   # pins another; drop it then.
   'miniflare>undici@7.29.0': 7.29.1
+
+auditConfig:
+  ignoreGhsas:
+    # http-cache-semantics through 4.2.0 can let a shared cache hand one
+    # user's response to another (high). It reaches only Astro's build-time
+    # cache of remote images, `astro/dist/assets/build/remote.js`, which one
+    # build process reads alone: there is no shared cache and no second user.
+    # No patched version is published; drop this once one is and the lockfile
+    # takes it.
+    - GHSA-ch52-4w7c-c8xp
