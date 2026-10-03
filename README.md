@@ -12,7 +12,10 @@ server-side rendering and no editing surface: the Google Doc is the source of
 truth, and everything the site serves is a file somebody can read in a diff.
 
 > **Status: 0.x.** The packages are used in production by their first
-> deployment, and the API is still allowed to move between minor versions.
+> deployment, and the API is still allowed to move between minor versions: a
+> minor release may break, and says how in the changelog. 1.0 comes with sign-in
+> and per-folder access, the MCP server for agents, and the rest of the agent
+> roadmap in place.
 
 ## Why it exists
 

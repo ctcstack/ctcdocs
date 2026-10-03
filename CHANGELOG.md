@@ -2,7 +2,7 @@
 
 All three packages share a version and are released together.
 
-## Unreleased
+## 0.16.0
 
 A private deployment now signs its readers in itself and opens each folder
 only to the Google groups allowed to read it. Cloudflare Access is no longer
@@ -12,6 +12,23 @@ part of the platform. See
 and
 [ADR-040](docs/ADR/040-a-worker-cron-keeps-a-snapshot-of-group-membership.md),
 which supersede ADR-004.
+
+### Breaking
+
+- A deployment with any private environment must be served through the
+  platform's Worker: `ctcdocs-sync validate` fails until `site.config.json`
+  has `signIn`, `wrangler.jsonc` deploys the gate, and
+  `wrangler.directory.jsonc` exists. Move off Cloudflare Access as the
+  upgrade note below describes; a rollback refuses any version deployed
+  before the gate.
+- `.ctcdocs/` must be ignored by Git on every deployment, and a private one
+  may not have `public/_redirects`.
+- `auth`, `pagefind` and `assets` are reserved addresses; a corpus already
+  holding one fails validation until the source is renamed in Drive.
+- The smoke environments take `CTCDOCS_MACHINE_KEY`, and the rollback caller
+  passes a `restore_older_secrets` input.
+- The manifest gains `publishedReaders`, `publishedChain` and `readersHeld`
+  when an `access` section exists; older manifests still load.
 
 ### Changed
 
