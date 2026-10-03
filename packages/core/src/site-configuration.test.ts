@@ -10,6 +10,7 @@ import {
 } from './ownership-markers.js';
 import { PROJECT_LAYOUT } from './project-layout.js';
 import {
+  fetchCharacterLimit,
   loadSiteConfiguration,
   parseSiteConfiguration,
 } from './site-configuration.js';
@@ -349,6 +350,61 @@ describe('parseSiteConfiguration', () => {
     expect(() => parseSiteConfiguration(raw)).toThrow(
       /sync\.largeImageMegabytes must be a number of megabytes above 0/u,
     );
+  });
+
+  it('notes documents over 40,000 characters unless a project sets its own line', () => {
+    expect(
+      parseSiteConfiguration(validConfiguration()).sync.largeDocumentCharacters,
+    ).toBe(40_000);
+
+    const raw = validConfiguration();
+    (raw.sync as Record<string, unknown>).largeDocumentCharacters = 25_000;
+    expect(parseSiteConfiguration(raw).sync.largeDocumentCharacters).toBe(
+      25_000,
+    );
+  });
+
+  it.each<[unknown, string]>([
+    [0, 'a line every document is over'],
+    [1500.5, 'a part of a character'],
+    ['25000', 'a number written as text'],
+    [100_001, 'a line past what an assistant reads'],
+  ])('rejects %s as a large document line (%s)', (value) => {
+    const raw = validConfiguration();
+    (raw.sync as Record<string, unknown>).largeDocumentCharacters = value;
+
+    expect(() => parseSiteConfiguration(raw)).toThrow(
+      /sync\.largeDocumentCharacters must be a whole number from 1 to 100000/u,
+    );
+  });
+
+  it('keeps the large document line within the cut fetch makes', () => {
+    const raw: Record<string, unknown> = {
+      ...validConfiguration(),
+      signIn: { workspaceDomains: ['example.com'] },
+      mcp: { enabled: true, fetchCharacters: 30_000 },
+    };
+    // Unset, the line is the cut, where the cut is lower than 40,000.
+    expect(parseSiteConfiguration(raw).sync.largeDocumentCharacters).toBe(
+      30_000,
+    );
+
+    (raw.sync as Record<string, unknown>).largeDocumentCharacters = 30_001;
+    expect(() => parseSiteConfiguration(raw)).toThrow(
+      /sync\.largeDocumentCharacters must be a whole number from 1 to 30000/u,
+    );
+  });
+
+  it('measures a document against the default cut while the MCP server is off', () => {
+    const raw: Record<string, unknown> = {
+      ...validConfiguration(),
+      mcp: { enabled: false, fetchCharacters: 30_000 },
+    };
+    (raw.sync as Record<string, unknown>).largeDocumentCharacters = 60_000;
+
+    const parsed = parseSiteConfiguration(raw);
+    expect(parsed.sync.largeDocumentCharacters).toBe(60_000);
+    expect(fetchCharacterLimit(parsed.mcp)).toBe(100_000);
   });
 
   it('lets a project keep the index off its home page', () => {

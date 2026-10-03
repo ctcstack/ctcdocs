@@ -112,6 +112,8 @@ const PRIORITY_BY_CODE: Readonly<Record<string, Priority>> = {
   'duplicate-name': 'fix-next',
   'table-merge-removed': 'fix-next',
   'formatting-removed': 'fix-next',
+  // AI agents read only its beginning (ADR-043).
+  'document-over-agent-limit': 'fix-next',
 
   // Easier to find and to understand, for people, search and agents.
   'image-undescribed': 'improve',
@@ -120,6 +122,8 @@ const PRIORITY_BY_CODE: Readonly<Record<string, Priority>> = {
   'link-outside-site': 'improve',
   'heading-link-shortened': 'improve',
   'pdf-text-truncated': 'improve',
+  'document-long': 'improve',
+  'pdf-long': 'improve',
   'heading-skips-level': 'improve',
   'heading-repeated': 'improve',
   'several-landing-documents': 'improve',

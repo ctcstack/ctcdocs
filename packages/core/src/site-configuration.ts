@@ -121,6 +121,13 @@ export interface SyncConfigurationDefaults {
    * project sets the line it wants numbers for. Defaults to 2.
    */
   readonly largeImageMegabytes: number;
+  /**
+   * The length, in characters of a document's Markdown body, above which the
+   * sync report notes the document as worth splitting (ADR-043). No greater
+   * than the characters an assistant reads of a document; defaults to 40,000,
+   * or to that limit where it is lower.
+   */
+  readonly largeDocumentCharacters: number;
 }
 
 export interface NavigationConfiguration {
@@ -229,6 +236,18 @@ export const MCP_DEFAULTS: Omit<McpConfiguration, 'enabled'> = Object.freeze({
   }),
   fetchCharacters: 100_000,
 });
+
+/**
+ * The characters an assistant reads of a document: the cut `fetch` makes
+ * (ADR-042), or its default while the MCP server is off. The content health
+ * note reads this one value, so it cannot drift from the cut (ADR-043).
+ */
+export function fetchCharacterLimit(mcp: McpConfiguration | undefined): number {
+  return mcp?.enabled ? mcp.fetchCharacters : MCP_DEFAULTS.fetchCharacters;
+}
+
+/** About 10,000 tokens of English: a starting value, not a measured one. */
+const LARGE_DOCUMENT_CHARACTERS = 40_000;
 
 /** A passage of fewer characters than this says too little to judge by. */
 const SHORTEST_PASSAGE = 100;
@@ -769,6 +788,7 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
       ),
     };
   }
+  const fetchLimit = fetchCharacterLimit(mcp);
 
   return {
     ...(signIn ? { signIn } : {}),
@@ -822,6 +842,13 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
         'largeImageMegabytes',
         'sync.largeImageMegabytes',
         2,
+      ),
+      largeDocumentCharacters: optionalNumber(
+        syncSource,
+        'largeDocumentCharacters',
+        'sync.largeDocumentCharacters',
+        Math.min(LARGE_DOCUMENT_CHARACTERS, fetchLimit),
+        { min: 1, max: fetchLimit, whole: true },
       ),
     },
   };

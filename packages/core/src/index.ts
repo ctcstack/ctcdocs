@@ -63,6 +63,7 @@ export type {
 export { accessFindings } from './access-findings.js';
 export type { AccessFinding } from './access-findings.js';
 export {
+  fetchCharacterLimit,
   loadSiteConfiguration,
   MCP_DEFAULTS,
   parseSiteConfiguration,

@@ -41,7 +41,8 @@ name of its own; they read this file. The rationale is recorded in
     "generatedBy": "CTCDOCS SYNC",
     "commitBotName": "ctcdocs-sync[bot]",
     "defaultLocale": "en",
-    "largeImageMegabytes": 2
+    "largeImageMegabytes": 2,
+    "largeDocumentCharacters": 40000
   }
 }
 ```
@@ -66,6 +67,7 @@ name of its own; they read this file. The rationale is recorded in
 | `sync.commitBotName`                   | Git author the sync workflow commits generated output as.                                                                                |
 | `sync.defaultLocale`                   | Fallback locale for documents whose language cannot be determined.                                                                       |
 | `sync.largeImageMegabytes`             | Optional. Megabytes (a million bytes each) above which the content health page notes an image. Above 0; defaults to 2.                   |
+| `sync.largeDocumentCharacters`         | Optional. Characters of a document's text above which the content health page suggests splitting it. See below.                          |
 | `signIn.workspaceDomains`              | The organization's Google Workspace domains, whose accounts may sign in. Required on a private deployment. See below.                    |
 | `access`                               | Optional. Who may read which folder, by Google group. Only on a deployment whose every environment is private. See below.                |
 
@@ -199,7 +201,7 @@ Every setting is optional, and the defaults are the values shown:
 | `mcp.search.results`             | Documents a search returns at most: no more than `chunks`, which is also the default when it is under 10.                      |
 | `mcp.search.passagesPerResult`   | Passages each document shows at most.                                                                                          |
 | `mcp.search.passageCharacters`   | Characters of passage text a search returns in all; at least 100 for each result.                                              |
-| `mcp.fetchCharacters`            | Characters `fetch` returns at most, 1,000 or more; a longer document is cut there.                                             |
+| `mcp.fetchCharacters`            | Characters `fetch` returns at most, 1,000 or more; a longer document is cut there, and the content health page names it.       |
 
 The build writes the resolved values into the access map, so a change takes
 effect with the project's next deploy.
@@ -299,6 +301,8 @@ than reaching a deployment:
 - `navigation.nameScripts`, where present, must be a non-empty list of distinct
   Unicode script names that a `\p{Script=…}` escape accepts, such as `Latin`
   or `Cyrillic`;
+- `sync.largeDocumentCharacters`, where present, must be a whole number from 1
+  to the characters an assistant reads of a document (see below);
 - no required value may be empty.
 
 ### Changing `sync.generatedBy`
@@ -307,6 +311,29 @@ This one is not cosmetic. The marker is written into every generated file, so
 changing it rewrites the whole generated corpus. Do it deliberately, in its own
 commit, by running a full sync (`ctcdocs-sync sync --full`) rather than by
 editing generated files.
+
+## Documents too long to read whole
+
+The content health page names a document too long for people and assistants
+to read whole, by the length of its text: the characters of the Markdown body
+the sync writes, which the page's Markdown version serves and `fetch` returns
+([ADR-043](ADR/043-content-health-names-documents-too-long-to-read-whole.md)).
+Two lines decide the note:
+
+- over `sync.largeDocumentCharacters`, a Google Doc is noted under Improve, as
+  worth splitting into a folder of shorter documents;
+- over the characters an assistant reads of a document, `mcp.fetchCharacters`,
+  it is noted under Fix next, because assistants read only its beginning.
+  With the MCP server off, the line is that setting's default, 100,000.
+
+A document over both gets the one note, under Fix next. A PDF, whose editor
+usually cannot split it, is noted under Improve over either line, with its
+length and whether assistants read it whole.
+
+`sync.largeDocumentCharacters` is 40,000 unless the project sets it, about
+10,000 tokens of English, and never more than the second line: unset, it is
+that line where that line is lower; set above it, the configuration fails.
+Both take effect on the next sync, without exporting anything again.
 
 ## What the home page shows
 

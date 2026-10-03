@@ -21,7 +21,7 @@ import type {
   InventorySelection,
   SelectedInventoryItem,
 } from '../inventory/inventory-graph.js';
-import type { SyncManifest } from '../manifest.js';
+import type { SyncedDocumentRecord, SyncManifest } from '../manifest.js';
 import { plural } from '../plural.js';
 import { slugifySegment } from '../slug.js';
 import { describeFileType, driveUrl, folderLabels } from './unpublished.js';
@@ -41,6 +41,9 @@ export type NoteCode =
   | 'formatting-removed'
   | 'code-block-unclosed'
   | 'pdf-text-truncated'
+  | 'document-over-agent-limit'
+  | 'document-long'
+  | 'pdf-long'
   | 'image-undescribed'
   | 'image-large'
   | 'summary-missing';
@@ -126,6 +129,27 @@ export const NOTE_KINDS: readonly NoteKind[] = [
       'The PDF holds more text than the site indexes, a million characters, so search finds only its first part. The file itself is complete. Split it if all of it should be found.',
   },
   {
+    code: 'document-over-agent-limit',
+    title: 'AI agents read only the beginning of a document',
+    action: 'Split it into shorter documents',
+    instruction:
+      'The document is longer than an AI agent is given when it reads one, so an agent reads only its beginning and does not know what the rest says. Split it into a folder of shorter documents, one subject each: each part then has its own page, title and search results, and is read whole. Keep the document itself for one of the parts, so its address and permanent link still lead to it.',
+  },
+  {
+    code: 'document-long',
+    title: 'A document is long enough to split',
+    action: 'Split it into shorter documents',
+    instruction:
+      'The document is longer than the length this site notes. People scroll past most of it to find their part, and an AI agent reads all of it to answer about one, which costs it and makes its answers worse. Split it into a folder of shorter documents, one subject each: each part then has its own page, title and search results. Keep the document itself for one of the parts, so its address and permanent link still lead to it.',
+  },
+  {
+    code: 'pdf-long',
+    title: 'A PDF is long to read whole',
+    action: 'Nothing, if it must stay a PDF',
+    instruction:
+      'The PDF holds more text than the length this site notes. The site publishes a PDF as it is, so this is a note rather than a task: an AI agent reads all of it to answer about one part, and past the length an agent is given at once it reads only the beginning. If the PDF was saved from a Google Doc, publishing the document instead, split into shorter ones, lets people and agents read the part they need.',
+  },
+  {
     code: 'image-undescribed',
     title: 'An image has no description',
     action: 'Add alt text',
@@ -198,11 +222,27 @@ const ISSUE_NOTES: Readonly<Record<string, NoteCode>> = {
 };
 
 /** The sizes of the images each page publishes, and the size to note. */
-export interface PublishedImageSizes {
+interface PublishedImageSizes {
   /** From the project configuration: `sync.largeImageMegabytes`. */
   largeImageMegabytes: number;
   /** Bytes of each image file a document publishes, by Google file ID. */
   imageBytes: ReadonlyMap<string, readonly number[]>;
+}
+
+/** The length of each page's text, and the two lines to note (ADR-043). */
+interface PublishedDocumentLengths {
+  /** From the project configuration: `sync.largeDocumentCharacters`. */
+  largeDocumentCharacters: number;
+  /** The characters an AI agent reads of a document: the cut `fetch` makes. */
+  fetchCharacters: number;
+  /** Characters of each page's Markdown body, by Google file ID. */
+  characters: ReadonlyMap<string, number>;
+}
+
+/** What the run published, measured from its output. */
+export interface PublishedSizes {
+  images?: PublishedImageSizes;
+  documents?: PublishedDocumentLengths;
 }
 
 export interface ReportNote {
@@ -247,6 +287,10 @@ const quoted = (name: string) => `“${name}”`;
 /** One decimal, the way a file size reads: `4.3 MB`. */
 const megabytes = (bytes: number) => `${(bytes / 1_000_000).toFixed(1)} MB`;
 
+/** Thousands apart, the way a count reads: `52,341`. */
+const grouped = (count: number) =>
+  String(count).replace(/\B(?=(\d{3})+$)/gu, ',');
+
 function largeImages(
   bytes: readonly number[],
   images: PublishedImageSizes,
@@ -265,15 +309,45 @@ function largeImages(
 }
 
 /**
+ * A page longer than the line, or than an AI agent reads, gets one note: the
+ * one that matters more. A PDF's editor usually cannot split it, so its note
+ * says how long it is and whether agents read it whole, and asks nothing.
+ */
+function longDocument(
+  record: SyncedDocumentRecord,
+  lengths: PublishedDocumentLengths,
+): { code: NoteCode; detail: string } | undefined {
+  const characters = lengths.characters.get(record.googleFileId);
+  if (characters === undefined) {
+    return undefined;
+  }
+  const cut = characters > lengths.fetchCharacters;
+  if (!cut && characters <= lengths.largeDocumentCharacters) {
+    return undefined;
+  }
+  const detail = cut
+    ? `${grouped(characters)} characters; AI agents read the first ${grouped(lengths.fetchCharacters)}`
+    : `${grouped(characters)} characters, over ${grouped(lengths.largeDocumentCharacters)}`;
+  const code: NoteCode =
+    record.exportMode === 'pdf'
+      ? 'pdf-long'
+      : cut
+        ? 'document-over-agent-limit'
+        : 'document-long';
+  return { code, detail };
+}
+
+/**
  * The notes for the corpus as it is published: `selection` is the inventory
- * the run published from, `manifest` what it published, and `images` the
- * sizes of the image files it published.
+ * the run published from, `manifest` what it published, and `sizes` the
+ * sizes of the image files and the lengths of the pages it published.
  */
 export function createNotes(
   selection: InventorySelection,
   manifest: SyncManifest,
-  images?: PublishedImageSizes,
+  sizes: PublishedSizes = {},
 ): ReportNote[] {
+  const { images, documents } = sizes;
   const itemsById = new Map<string, SelectedInventoryItem>(
     [...selection.folders, ...selection.documents].map((selected) => [
       selected.item.id,
@@ -314,6 +388,10 @@ export function createNotes(
       : undefined;
     if (large) {
       notes.push(noteFor(selected, 'image-large', record.stableSlug, large));
+    }
+    const long = documents ? longDocument(record, documents) : undefined;
+    if (long) {
+      notes.push(noteFor(selected, long.code, record.stableSlug, long.detail));
     }
     // A PDF's summary is its extracted text, which an editor cannot write.
     if (record.exportMode !== 'pdf' && !record.description) {
