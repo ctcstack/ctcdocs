@@ -112,28 +112,28 @@ describe('readDirectory', () => {
 });
 
 describe('plausible', () => {
+  const ids = (count: number) =>
+    Array.from({ length: count }, (_, index) => `u${index}`);
+  const users = (count: number) =>
+    Object.fromEntries(ids(count).map((id) => [id, true as const]));
   const previous: DirectorySnapshot = {
     schemaVersion: 1,
     takenAt: new Date(NOW - 600_000).toISOString(),
-    users: Object.fromEntries(
-      Array.from({ length: 10 }, (_, index) => [`u${index}`, true as const]),
-    ),
+    users: users(30),
     groups: {
-      'team@example.com': { id: 'g', members: ['u1', 'u2', 'u3', 'u4', 'u5'] },
+      'team@example.com': { id: 'g', members: ids(20) },
+      'pair@example.com': { id: 'p', members: ids(2) },
     },
   };
-  const users = (count: number) =>
-    Object.fromEntries(
-      Array.from({ length: count }, (_, index) => [`u${index}`, true as const]),
-    );
 
-  it('accepts a normal refresh and refuses an empty or shrunken one', () => {
+  it('accepts a normal refresh and refuses an empty one', () => {
     expect(
       plausible(
         {
-          users: users(9),
+          users: users(29),
           groups: {
-            'team@example.com': { id: 'g', members: ['u1', 'u2', 'u3', 'u4'] },
+            'team@example.com': { id: 'g', members: ids(19) },
+            'pair@example.com': { id: 'p', members: ids(2) },
           },
         },
         previous,
@@ -142,18 +142,33 @@ describe('plausible', () => {
     expect(plausible({ users: {}, groups: {} }, undefined)).toMatch(
       /no active user/u,
     );
-    expect(plausible({ users: users(7), groups: {} }, previous)).toMatch(
-      /fell from 10 to 7/u,
+  });
+
+  it('refuses a sharp drop in users or in a group', () => {
+    expect(plausible({ users: users(23), groups: {} }, previous)).toMatch(
+      /fell from 30 to 23/u,
     );
     expect(
       plausible(
         {
-          users: users(10),
-          groups: { 'team@example.com': { id: 'g', members: ['u1'] } },
+          users: users(30),
+          groups: { 'team@example.com': { id: 'g', members: ids(10) } },
         },
         previous,
       ),
-    ).toMatch(/group fell from 5 to 1/u);
+    ).toMatch(/group fell from 20 to 10/u);
+  });
+
+  it('accepts a small group losing a member, which is no sign of failure', () => {
+    expect(
+      plausible(
+        {
+          users: users(30),
+          groups: { 'pair@example.com': { id: 'p', members: ids(1) } },
+        },
+        previous,
+      ),
+    ).toBe(undefined);
   });
 });
 

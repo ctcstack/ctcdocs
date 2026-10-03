@@ -58,7 +58,10 @@ users are listed by domain.
 **A refresh writes everything or nothing.** If any named group cannot be read,
 the refresh writes nothing. A result with no active users, or one that loses
 more than a fifth of the active users or of a group's members since the last
-snapshot, is not written either; it is reported, and the last snapshot stays.
+snapshot — and at least five people, so a small group losing one member is not
+mistaken for a failed read — is not written either; it is reported, and the
+last snapshot stays. An operator accepts a genuine large departure by deleting
+the snapshot, which the next refresh writes afresh.
 
 **The snapshot is keyed by user ID.** It holds when it was taken, the active
 users by their Google ID — the `sub` a sign-in carries — and, for each named
