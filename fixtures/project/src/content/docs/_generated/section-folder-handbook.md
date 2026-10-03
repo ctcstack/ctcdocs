@@ -3,7 +3,7 @@
 "slug": "handbook"
 "shortId": "1a41cd"
 "sourceType": "section-index"
-"contentHash": "sha256:b9643a632a639a72593402f8a7d36d43933fa9f91c1ace0f543ad9e89c808f6c"
+"contentHash": "sha256:1770cd7ba6db939ea9c8de37e33a3204b9dda94cbec9c91ba9725bd03bfcb9a4"
 "folderPath": []
 "entries":
   - "kind": "document"
@@ -13,6 +13,10 @@
   - "kind": "document"
     "slug": "handbook/contacts"
   - "kind": "document"
+    "slug": "handbook/decision-log"
+  - "kind": "document"
+    "slug": "handbook/release-process"
+  - "kind": "document"
     "slug": "handbook/scanned-form"
 "pagefind": false
 ---
@@ -21,4 +25,6 @@
 - [Overview](/handbook/overview/) — The handbook collects the working agreements a new joiner needs in their first week: how documents are published, where drafts live, and which sections are maintained by which team.
 - [Tables and code](/handbook/tables-and-code/) — Two things a documentation platform gets wrong quietly: wide tables that push a phone layout sideways, and code blocks that lose their language.
 - [Contacts](/handbook/contacts/)
+- [Decision log](/handbook/decision-log/) — Every decision the platform team made this year, one section each, the oldest first. None of them is real.
+- [Release process](/handbook/release-process/) — A release moves what is merged on main to the production site. None of it is real: the steps are here so the handbook has a document long enough to be worth splitting.
 - [Scanned form](/handbook/scanned-form/)

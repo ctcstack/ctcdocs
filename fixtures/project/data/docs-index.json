@@ -18,6 +18,21 @@
       "format": "google-doc"
     },
     {
+      "id": "doc-decision-log",
+      "title": "Decision log",
+      "slug": "handbook/decision-log",
+      "markdownPath": "src/content/docs/_generated/doc-decision-log.md",
+      "sourceUrl": "https://docs.google.com/document/d/doc-decision-log/edit",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "syncedAt": "2026-02-10T06:00:00.000Z",
+      "contentHash": "sha256:c794f5c64db8586ed8c83a2f5ab301091f80992c93fe1f69a34bc42ed74f064c",
+      "folderPath": [
+        "Handbook"
+      ],
+      "language": "en",
+      "format": "google-doc"
+    },
+    {
       "id": "doc-overview",
       "title": "Overview",
       "slug": "handbook/overview",
@@ -26,6 +41,21 @@
       "googleModifiedTime": "2026-02-05T08:15:00.000Z",
       "syncedAt": "2026-02-10T06:00:00.000Z",
       "contentHash": "sha256:915987bb1a69f662bb889c1c207fa823901962fdcfcdfdbe0b40a54cbc27c178",
+      "folderPath": [
+        "Handbook"
+      ],
+      "language": "en",
+      "format": "google-doc"
+    },
+    {
+      "id": "doc-release-process",
+      "title": "Release process",
+      "slug": "handbook/release-process",
+      "markdownPath": "src/content/docs/_generated/doc-release-process.md",
+      "sourceUrl": "https://docs.google.com/document/d/doc-release-process/edit",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "syncedAt": "2026-02-10T06:00:00.000Z",
+      "contentHash": "sha256:ff913681012057cbd7a73ed4a546e9bc53ef4d73b6ab52993ea3a9669b3dde03",
       "folderPath": [
         "Handbook"
       ],
