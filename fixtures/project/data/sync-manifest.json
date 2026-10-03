@@ -22,7 +22,8 @@
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "markdown",
       "warnings": [],
-      "shortId": "46b556"
+      "shortId": "46b556",
+      "publishedReaders": "*"
     },
     "doc-cyrillic": {
       "googleFileId": "doc-cyrillic",
@@ -41,7 +42,8 @@
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "markdown",
       "warnings": [],
-      "shortId": "f18785"
+      "shortId": "f18785",
+      "publishedReaders": []
     },
     "doc-diagrams": {
       "googleFileId": "doc-diagrams",
@@ -60,7 +62,11 @@
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "markdown",
       "warnings": [],
-      "shortId": "48b067"
+      "shortId": "48b067",
+      "publishedReaders": [
+        "engineering@example.com",
+        "writers@example.com"
+      ]
     },
     "doc-getting-started": {
       "googleFileId": "doc-getting-started",
@@ -81,7 +87,8 @@
       "warnings": [
         "link:outside_site"
       ],
-      "shortId": "b970ca"
+      "shortId": "b970ca",
+      "publishedReaders": []
     },
     "doc-overview": {
       "googleFileId": "doc-overview",
@@ -100,7 +107,8 @@
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "markdown",
       "warnings": [],
-      "shortId": "76ff21"
+      "shortId": "76ff21",
+      "publishedReaders": "*"
     },
     "doc-screenshots": {
       "googleFileId": "doc-screenshots",
@@ -126,7 +134,11 @@
       "shortId": "d252ed",
       "undescribedImages": 1,
       "croppedImages": 1,
-      "imageVersion": 1
+      "imageVersion": 1,
+      "publishedReaders": [
+        "engineering@example.com",
+        "writers@example.com"
+      ]
     },
     "doc-style-guide": {
       "googleFileId": "doc-style-guide",
@@ -145,7 +157,10 @@
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "markdown",
       "warnings": [],
-      "shortId": "dbb1dc"
+      "shortId": "dbb1dc",
+      "publishedReaders": [
+        "writers@example.com"
+      ]
     },
     "doc-tables-and-code": {
       "googleFileId": "doc-tables-and-code",
@@ -169,7 +184,8 @@
       "shortId": "14062a",
       "undescribedImages": 0,
       "croppedImages": 0,
-      "imageVersion": 1
+      "imageVersion": 1,
+      "publishedReaders": "*"
     },
     "pdf-release-checklist": {
       "googleFileId": "pdf-release-checklist",
@@ -190,7 +206,11 @@
       "warnings": [],
       "shortId": "eda7da",
       "sourceChecksum": "sha256:c8c58dc6d6fd9f61f0164fd512fdc5e07bd8f121c6cc6392a832b3f1e2e50867",
-      "pdfTextVersion": 2
+      "pdfTextVersion": 2,
+      "publishedReaders": [
+        "engineering@example.com",
+        "writers@example.com"
+      ]
     },
     "pdf-scanned-form": {
       "googleFileId": "pdf-scanned-form",
@@ -212,7 +232,8 @@
       ],
       "shortId": "2a3aab",
       "sourceChecksum": "sha256:aa89a8a4d9205ce24edfac2453add7dc86d1ba534bf224d42938ed2bc4f0743e",
-      "pdfTextVersion": 2
+      "pdfTextVersion": 2,
+      "publishedReaders": "*"
     },
     "pdf-style-guide": {
       "googleFileId": "pdf-style-guide",
@@ -233,7 +254,10 @@
       "warnings": [],
       "shortId": "244fde",
       "sourceChecksum": "sha256:ad9cdb7398395ff58f4985c92e210fd339a10995ec6dafdb647f110ab67e4e60",
-      "pdfTextVersion": 2
+      "pdfTextVersion": 2,
+      "publishedReaders": [
+        "writers@example.com"
+      ]
     }
   },
   "folders": {

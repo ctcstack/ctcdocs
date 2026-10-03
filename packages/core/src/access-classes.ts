@@ -55,6 +55,22 @@ export type ChainReaders =
 const CLASS_ID_DOMAIN = 'ctcdocs-access-class/v1\n';
 const CLASS_ID_LENGTH = 8;
 
+/** The groups both reader sets admit; `"*"` admits every group. */
+export function intersectReaders(left: Readers, right: Readers): Readers {
+  return intersect(left, right);
+}
+
+/** Whether `current` admits a group that `previous` did not. */
+export function widensReaders(current: Readers, previous: Readers): boolean {
+  if (previous === EVERY_MEMBER) {
+    return false;
+  }
+  if (current === EVERY_MEMBER) {
+    return true;
+  }
+  return current.some((group) => !previous.includes(group));
+}
+
 function intersect(left: Readers, right: Readers): Readers {
   if (left === EVERY_MEMBER) {
     return right;
@@ -202,7 +218,13 @@ export function computeAccessModel(
   }
   const documentSets = new Map<string, Readers>();
   for (const document of corpus.documents.values()) {
-    documentSets.set(document.id, readersFor(document.parentId));
+    const readers = readersFor(document.parentId);
+    documentSets.set(
+      document.id,
+      document.publishedReaders === undefined
+        ? readers
+        : intersect(readers, document.publishedReaders),
+    );
   }
 
   const groupSets = [...folderSets.values(), ...documentSets.values()].filter(

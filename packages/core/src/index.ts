@@ -46,7 +46,9 @@ export {
   computeAccessModel,
   documentClass,
   folderClass,
+  intersectReaders,
   MEMBERS_CLASS,
+  widensReaders,
 } from './access-classes.js';
 export type {
   AccessClass,

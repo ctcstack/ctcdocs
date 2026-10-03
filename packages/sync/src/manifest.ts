@@ -63,6 +63,14 @@ const manifestDocumentSchema = z.object({
    * is exported again once (ADR-031).
    */
   imageVersion: z.number().int().positive().optional(),
+  /**
+   * The readers the document was last published with, when access rules
+   * exist (ADR-039): `"*"` or group addresses. A move or a rule change that
+   * would widen them is held back until a rule names the document's folder.
+   */
+  publishedReaders: z
+    .union([z.literal('*'), z.array(z.string().min(1))])
+    .optional(),
 });
 
 const legacyManifestFolderSchema = z.object({
