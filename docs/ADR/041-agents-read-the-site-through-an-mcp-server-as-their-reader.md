@@ -148,6 +148,8 @@ deployment's private bucket as `docs/<short ID>.md` with its class, title,
 short ID, Markdown address, modified time and hash as object metadata;
 deletes the objects of documents that are gone; and starts an AI Search sync,
 trying again on the next run while an earlier sync is still running. A
+document it cannot write yet is tried again on the next run without holding
+back the others. A
 rollback is published the same way, because its digest differs, so the
 bucket always follows the version that serves. No credential leaves
 Cloudflare for this: the deploy job is unchanged.
