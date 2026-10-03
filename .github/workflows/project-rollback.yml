@@ -9,6 +9,7 @@ name: CTCDocs project rollback
 #         with:
 #           version_id: ${{ inputs.version_id }}
 #           confirmation: ${{ inputs.confirmation }}
+#           restore_older_secrets: ${{ inputs.restore_older_secrets }}
 #           wrangler_environment: production
 #           deploy_environment: production-deploy
 #           smoke_environment: production-smoke

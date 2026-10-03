@@ -126,9 +126,12 @@ active. Domains are compared without regard to case; an empty list, a repeated
 domain or an unknown key is an error. When there is exactly one domain, Google
 is asked to offer only that domain's accounts.
 
-`ctcdocs-sync validate` requires `signIn` on a private deployment, and requires
-`wrangler.jsonc` and `wrangler.directory.jsonc` to deploy the platform's two
-Workers — see [Cloudflare setup](CLOUDFLARE_SETUP.md). The Google client ID is
+`ctcdocs-sync validate` requires `signIn` on a deployment with any private
+environment, and requires `wrangler.jsonc` and `wrangler.directory.jsonc` to
+deploy the platform's two Workers — see
+[Cloudflare setup](CLOUDFLARE_SETUP.md). The Worker is one artifact for every
+environment, so a public environment of such a deployment is served through
+it too, without sign-in. The Google client ID is
 a variable in `wrangler.jsonc`; its secret and the rest are Worker secrets, not
 configuration.
 
@@ -174,11 +177,14 @@ own class, and a home page folder card takes its description only from a
 document every member may read. See
 [ADR-039](ADR/039-open-a-folder-only-to-the-google-groups-its-rule-names.md).
 
-**A document never gains readers silently.** The manifest records the readers
-each document was last published with. When a sync would widen them — its
-folder moved out from under a narrower rule, or a rule changed — the document
-keeps its earlier readers and is listed under Fix now on the content health
-page until a rule names its folder. Narrowing takes effect at once.
+**A move in Drive never widens a document's readers by itself.** A change to
+these rules takes effect at once, wider or narrower: it is reviewed where this
+file is. A document moved — or under a folder moved — to a place whose rules
+would let more people read it is published to the readers both places allow,
+and listed under Fix now on the content health page, until a rule on its new
+folder or a folder above it is added or changed. Meanwhile its folder's page
+lists it by title alone. A move back, or a move that narrows, takes effect at
+once.
 
 Every build writes `.ctcdocs/access-map.json`, outside `dist`, naming the
 access class of every file it built, and one search bundle per class:
@@ -265,10 +271,11 @@ name at its heading in the full index. See
 
 Two consequences worth knowing:
 
-- `documents` is a reserved address. A new Drive folder or document named
-  "Documents" is allocated a suffixed slug instead, and a corpus that claimed
-  the address before this page existed fails `ctcdocs-sync validate` until the
-  source is renamed in Drive.
+- `documents` is a reserved address, as are `auth`, `pagefind` and `assets`,
+  which the Worker, search and original files use. A new Drive folder or
+  document named "Documents" is allocated a suffixed slug instead, and a corpus
+  that claimed the address before it was reserved fails `ctcdocs-sync validate`
+  until the source is renamed in Drive.
 - A project that passes its own `sidebarPrefix` to `ctcdocsConfig` links the
   page itself. The platform default links it under "Documentation".
 

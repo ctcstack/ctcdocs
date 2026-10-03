@@ -1,6 +1,6 @@
 # ADR-004: Cloudflare Access protects the complete wiki
 
-- Status: Accepted
+- Status: Superseded by [ADR-038](038-a-private-deployment-signs-readers-in-itself-with-google.md)
 - Date: 2026-07-30
 - Owners: CTCDocs maintainers
 - Supersedes: none

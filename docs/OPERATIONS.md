@@ -99,10 +99,11 @@ CLOUDFLARE_API_TOKEN
 ```
 
 Scope the token to the project's account and project's zone. It may deploy
-the `example-docs-production` Workers and manage the configured custom-domain
-binding, but it must not hold Workers KV permissions — deploying a binding does
-not need them, and without them it cannot write the directory snapshot — nor
-manage unrelated Workers, broad DNS administration, or account settings.
+`example-docs-production` and `example-docs-directory-production` and manage
+the configured custom-domain binding, but it must not hold Workers KV
+permissions — deploying a binding does not need them, and without them it can
+neither write the directory snapshot nor mint a machine key — nor manage
+unrelated Workers, broad DNS administration, or account settings.
 
 ### `production-smoke`
 
@@ -507,36 +508,42 @@ of group membership that its directory Worker refreshes every ten minutes
 Membership changes in Google take effect at the next refresh plus up to a
 minute of caching in the Worker: about ten minutes. A suspended or deleted
 user loses every session at the same moment, because a session is honored only
-for a user the snapshot lists as active. A session otherwise lasts twelve
-hours, and **Sign out** ends it on the site without signing the reader out of
-Google.
+for a user the snapshot lists as active; they, and a new account the directory
+has not been read for yet, see a page saying their account is not in the
+directory. A session otherwise lasts twelve hours, and **Sign out**, in the
+header and the mobile menu, ends it on the site and clears the browser's cache
+of it, without signing the reader out of Google.
 
 ### The directory snapshot
 
 An admin reads its state at `/_kb/status`: when it was taken, its age, whether
-it is stale, the number of active users, and each named group's member count
-with the reason, if any, it admits no one. It holds no addresses or IDs.
+it is stale, the number of active users, and each named group, by address,
+with its member count and the reason, if any, it admits no one. It names no
+person.
 
-| What you see                                  | What it means                                                                                         | What to do                                                                                                   |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| The site says the directory has not been read | There is no snapshot; no session is admitted                                                          | Read the directory Worker's logs: a missing or wrong `DIRECTORY_KEY`, a disabled API, or a role not assigned |
-| `stale: true`                                 | No refresh has succeeded for two hours                                                                | Signed-in readers read only what every member reads until one does; read the logs                            |
-| `directory-refresh-refused` in the logs       | The result lost more than a fifth, and at least five, of the users or of a group                      | If a failed read, fix it. If a genuine departure, delete the snapshot, as below                              |
-| A group with `admitsNoOne`                    | It is nested, holds the organization, lets people join themselves, admits outsiders, or was recreated | Fix the group in Google; for a recreated group, reset its pin, as below                                      |
+| What you see                                               | What it means                                                                                                                  | What to do                                                                                                                                                       |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The site says the directory has not been read              | There is no snapshot; no session is admitted                                                                                   | Read the directory Worker's logs for `directory-refresh-failed`: its `stage` and `status` say whether the key, the token, the users list or Google itself failed |
+| `stale: true`                                              | No refresh has succeeded for two hours                                                                                         | Signed-in readers read only what every member reads until one does; read the logs                                                                                |
+| `directory-refresh-refused` in the logs                    | The result lost more than a fifth, and at least five, of the users or of a group, beyond those listed as suspended or archived | If a failed read, fix it. If a genuine change, let the next refresh through, as below                                                                            |
+| A group with `admitsNoOne: cannot be read`                 | The directory refused the group: deleted, renamed, mistyped in a rule, or out of the role's sight                              | Fix the rule or the group; the next refresh reads it                                                                                                             |
+| A group with `admitsNoOne: its settings could not be read` | The Groups Settings API refused it, often because the API is disabled                                                          | Enable the API in the directory reader's Cloud project                                                                                                           |
+| Another `admitsNoOne` reason                               | It is nested, holds the organization, lets people join themselves, admits outsiders, or was recreated                          | Fix the group in Google; for a recreated group, reset its pin, as below                                                                                          |
 
-The directory Worker's logs carry counts and durations, never an address, an ID
-or a membership:
+The directory Worker's logs carry counts, durations, closed groups by their
+place in the sorted list with their reason, and failures by stage and status —
+never an address, an ID or a membership:
 
 ```bash
 pnpm exec wrangler tail example-docs-directory-production
 ```
 
-**Accepting a large departure.** Delete the snapshot; the next run, within ten
-minutes, writes a new one without comparing it to anything. Until then no
-session is admitted.
+**Accepting a large change.** Set `directory-accept-next`; the next run, within
+ten minutes, writes its reading without comparing it with the last, and clears
+the flag. Until then the last snapshot keeps deciding.
 
 ```bash
-pnpm exec wrangler kv key delete directory-snapshot --binding KB_STATE --env production --remote
+pnpm exec wrangler kv key put directory-accept-next yes --binding KB_STATE --env production --remote
 ```
 
 **Resetting a group's pin.** The refresh records each group's Google ID the
@@ -545,12 +552,14 @@ address admits no one. After confirming the new group is the intended one,
 remove its entry from the `directory-pins` value:
 
 ```bash
-pnpm exec wrangler kv key get directory-pins --binding KB_STATE --env production --remote
-pnpm exec wrangler kv key put directory-pins '<the same JSON without that address>' --binding KB_STATE --env production --remote
+pnpm exec wrangler kv key get directory-pins --binding KB_STATE --env production --remote > pins.json
+jq 'del(.["team@example.com"])' pins.json > pins.next.json
+pnpm exec wrangler kv key put directory-pins --path pins.next.json --binding KB_STATE --env production --remote
 ```
 
-Both commands need a token or login with KV permissions; the deploy token does
-not have them.
+A malformed entry is ignored rather than failing the refresh. These commands
+need a login or a token with KV permissions; the deploy token does not have
+them.
 
 ### Machine keys
 
@@ -561,12 +570,24 @@ Issue one per use, per environment:
 pnpm exec ctcdocs-machine-key --name <name> --owner <who answers for it> --group <address> --days 90
 ```
 
-It prints the key once and a record. Add the record to the JSON list in the
-environment's `MACHINE_KEYS` secret and give the key to its user. A key reads
-as the groups its record names — none means what every member reads — never as
-an administrator, and stops working at its expiry, at most a year away.
+It prints the key once and a record. Give the key to its user, and add the
+record to the `machine-keys` list in the environment's KV namespace — the
+list is the only copy of the records, and holds only hashes, so read it back
+from there:
 
-To revoke a key, remove its record from `MACHINE_KEYS`. Nothing else holds it.
+```bash
+pnpm exec wrangler kv key get machine-keys --binding KB_STATE --env production --remote > keys.json
+jq --argjson record '<the record>' '. + [$record]' keys.json > keys.next.json
+pnpm exec wrangler kv key put machine-keys --path keys.next.json --binding KB_STATE --env production --remote
+```
+
+The first time, start from `[]`. A key reads as the groups its record names —
+none means what every member reads — never as an administrator, and stops
+working at its expiry, at most 90 days away; the Worker refuses a record whose
+expiry is further. Changes reach every location within about a minute.
+
+To revoke a key, remove its record from the list the same way, by its `name`.
+Nothing else holds it, and a rollback does not bring it back.
 
 ## Failure handling
 
@@ -721,9 +742,10 @@ deployment. To restore a known-good version:
 6. Wait for the post-rollback protected smoke test.
 
 The workflow checks the boundary before `wrangler rollback`, refuses a version
-of a private deployment that lacks the `ctcdocs-gate-v1` tag, sends 100% of
-traffic to the selected version, and verifies the protected surface
-afterwards. Record the incident, restored version, root cause, and subsequent
+of a gated deployment that lacks the `ctcdocs-gate-v1` tag, refuses — unless
+run with `restore_older_secrets` — a version older than a change to the
+Worker's secrets, which a rollback would bring back, sends 100% of traffic to
+the selected version, and verifies the protected surface afterwards. Record the incident, restored version, root cause, and subsequent
 fix in a private issue or incident system.
 
 If the boundary fails — the probe or a smoke test finds content served
@@ -771,28 +793,33 @@ it without signing everyone out:
    `SESSION_SECRET_PREVIOUS`.
 
 To sign everyone out at once, replace `SESSION_SECRET` and delete the previous
-one. Each environment has its own.
+one. Each environment has its own. A rollback to a version from before a
+rotation brings the old secret back; the rollback workflow refuses that unless
+asked.
 
 ### Google client secret
 
-1. add a second secret to the OAuth client in Google Cloud;
-2. replace `GOOGLE_CLIENT_SECRET` on each environment's site Worker;
-3. sign in once per environment;
+1. add a second secret to the environment's OAuth client in Google Cloud;
+2. replace `GOOGLE_CLIENT_SECRET` on that environment's site Worker;
+3. sign in once;
 4. delete the old secret in Google Cloud.
 
 ### Directory reader key
 
+Rotate each environment's key at least every 90 days:
+
 1. create a new JSON key for the directory reader's service account;
-2. replace `DIRECTORY_KEY` on each environment's directory Worker, from the
+2. replace `DIRECTORY_KEY` on that environment's directory Worker, from the
    file, then delete the file;
 3. confirm the next run logs `directory-refreshed`;
 4. delete the old key in Google Cloud.
 
 ### Smoke key
 
-Issue a new key as in [Machine keys](#machine-keys), add its record to
-`MACHINE_KEYS` beside the old one, replace `CTCDOCS_MACHINE_KEY` in the smoke
-environment, run a deployment, then remove the old record.
+Before the smoke key expires, issue a new one as in
+[Machine keys](#machine-keys), add its record beside the old one, replace
+`CTCDOCS_MACHINE_KEY` in the smoke environment, run a deployment, then remove
+the old record.
 
 ## Dependency maintenance
 

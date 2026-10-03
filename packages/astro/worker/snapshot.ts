@@ -1,11 +1,12 @@
 /**
  * Who is in which group, as the directory refresh leaves it (ADR-040).
  *
- * The snapshot is keyed by Google user ID — the `sub` a sign-in carries — and
- * holds no addresses. A group that admits no one (recreated under the same
- * address, open to self-joining or to outsiders, or holding a group or the
- * whole organization as a member) keeps its record, so the status can say
- * why, but grants nothing.
+ * People are keyed by Google user ID — the `sub` a sign-in carries — and no
+ * person's address is held; groups are keyed by the address the rules name. A
+ * group that admits no one (recreated under the same address, open to
+ * self-joining or to outsiders, holding a group or the whole organization as a
+ * member, or unreadable) keeps its record, so the status can say why, but
+ * grants nothing.
  */
 
 export const SNAPSHOT_KEY = 'directory-snapshot';

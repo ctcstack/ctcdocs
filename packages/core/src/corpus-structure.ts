@@ -29,7 +29,8 @@ export interface CorpusDocument {
   readonly slug: string;
   /**
    * The readers the document was last published with (ADR-039). Its class
-   * never reaches beyond them until a rule names its folder.
+   * never reaches beyond them: a move that would widen them waits for a rule
+   * on its new chain to be confirmed.
    */
   readonly publishedReaders?: '*' | readonly string[];
 }

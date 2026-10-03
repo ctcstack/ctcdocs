@@ -46,12 +46,15 @@ regression in any of them is a security defect rather than a bug:
 - **A private deployment admits only the readers its rules name.** The Worker
   decides every request (ADR-038, ADR-039). It fails closed: without its
   secrets it admits no one, without a directory snapshot it admits no session,
-  and with a stale one a reader reads only what every member reads. Sessions
-  are sealed and bound to their purpose and environment; a machine key is
-  never an administrator. The build places every file it emits in an access
-  class or fails, keeps one search bundle per class, and fails when a file a
-  wider class reads repeats text found only in a narrower one. A document never
-  gains readers without a rule that names its folder.
+  and with a stale one a reader reads only what every member reads. It reads
+  nothing over plain HTTP and serves only the file it judged, following no
+  redirect. Sessions are signed and bound to their purpose and environment; a
+  machine key lives at most 90 days, is never an administrator, and is kept in
+  KV, where neither the deploy token nor a rollback can reach it. The build
+  places every file it emits in an access class or fails, keeps one search
+  bundle per class, and fails when a file a wider class reads repeats text
+  found only in a narrower one. A move in Drive never gives a document readers
+  it did not have until a rule on its new place is confirmed.
 - **The boundary is proven, not assumed.** `ctcdocs-verify-gate` asks the real
   gate for every built file as different readers before a deployment.
   `ctcdocs-access-smoke` requires a private deployment to refuse an anonymous

@@ -57,18 +57,18 @@ Never deploy internal content if:
 Each private environment needs, once:
 
 1. **The sign-in client and the directory reader** in Google, following
-   [Google Workspace setup](GOOGLE_WORKSPACE_SETUP.md#sign-in). One client can
-   serve every environment, with one redirect URI each.
+   [Google Workspace setup](GOOGLE_WORKSPACE_SETUP.md#sign-in): a client of its
+   own, with its redirect URI, and a key of its own for the directory reader.
 2. **A KV namespace**, its ID in both `wrangler.jsonc` and
    `wrangler.directory.jsonc`, following
    [Cloudflare setup](CLOUDFLARE_SETUP.md#the-kv-namespace).
 3. **A deploy API token** without KV permissions, following
    [Cloudflare setup](CLOUDFLARE_SETUP.md#deploy-api-token). Do not reuse one
    token across environments.
-4. **A smoke machine key**, issued with `ctcdocs-machine-key` and recorded in
-   that environment's `MACHINE_KEYS` secret, following
-   [Cloudflare setup](CLOUDFLARE_SETUP.md#machine-keys). Do not reuse one key
-   across environments: each must be revocable on its own.
+4. **A smoke machine key**, issued with `ctcdocs-machine-key`, its record added
+   to that environment's `machine-keys` in KV, following
+   [Operations](OPERATIONS.md#machine-keys). Do not reuse one key across
+   environments: each must be revocable on its own.
 
 Cloudflare API token resource scopes do not replace repository controls.
 GitHub environment branch rules and the explicit Wrangler environment are also
@@ -97,8 +97,8 @@ otherwise approved:
    configured. That is the safe state to start from.
 
 3. Put the secrets — `DIRECTORY_KEY` on the directory Worker;
-   `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET` and `MACHINE_KEYS` on the site
-   Worker — and wait for the first refresh:
+   `GOOGLE_CLIENT_SECRET` and `SESSION_SECRET` on the site Worker — add the
+   smoke key's record to `machine-keys`, and wait for the first refresh:
 
    ```bash
    pnpm exec wrangler tail example-docs-directory-development
@@ -115,8 +115,9 @@ otherwise approved:
 
    `401` is expected. A `200` with wiki content is a security failure.
 
-5. Put the hostname and the smoke key in the ignored repository-root `.env`,
-   which the smoke scripts load, then run:
+5. Put the hostname, as `CTCDOCS_BASE_URL`, and the smoke key, as
+   `CTCDOCS_MACHINE_KEY`, in the ignored repository-root `.env`, which the
+   smoke command reads without overriding the environment, then run:
 
    ```bash
    pnpm exec ctcdocs-access-smoke --preflight
@@ -229,9 +230,12 @@ requiring `production` to exist. Whatever `site.config.json` declares,
 `wrangler.jsonc` must match, and `ctcdocs-sync validate` fails when they
 disagree.
 
-The workflow deploys the site Worker and, when `wrangler.directory.jsonc`
-exists, the directory Worker, from the same build and therefore with the same
-access map. A private environment's versions are tagged `ctcdocs-gate-v1`.
+The workflow deploys, from the same build and therefore with the same access
+map, the directory Worker when `wrangler.directory.jsonc` exists, then the site
+Worker. The directory Worker goes first: it only reads more groups, so the site
+is never ahead of the groups it names, and if it cannot be deployed the site is
+left as it was. Every version of a gated deployment — any environment private
+— is tagged `ctcdocs-gate-v1`.
 
 ## The anonymous probe
 
@@ -341,8 +345,8 @@ is reserved for an approved incident procedure:
 
 ```bash
 pnpm exec ctcdocs-access-smoke --preflight
-pnpm exec wrangler deploy --env production --tag ctcdocs-gate-v1
 pnpm exec wrangler deploy --config wrangler.directory.jsonc --env production
+pnpm exec wrangler deploy --env production --tag ctcdocs-gate-v1
 pnpm exec ctcdocs-access-smoke --post-deploy
 ```
 
@@ -364,11 +368,22 @@ environment. Never paste tokens directly into shell commands.
 8. Wait for the post-rollback protected smoke test.
 9. Record the incident, restored version, root cause, and follow-up fix.
 
-A private deployment's rollback refuses a version without the
+A gated deployment's rollback refuses a version without the
 `ctcdocs-gate-v1` tag: such a version predates the Worker and would serve
-everything to everyone. A rollback restores the site Worker with its own
-access map; the directory Worker keeps reading the groups of the latest build,
-so a group only the older map names admits no one until the next deployment.
+everything to everyone.
+
+A version carries the Worker secrets it was deployed with, and a rollback
+brings them back. So the rollback also refuses a version older than a change
+to the secrets — a rotated `SESSION_SECRET` would revive the sessions its
+rotation ended — and a version older than the ten Wrangler lists, after which
+nothing shows what changed. When restoring the older secrets is intended, run
+it again with **restore_older_secrets**, then rotate them again on the
+restored version if they were rotated for a reason. Machine keys are in KV and
+are not touched by a rollback.
+
+A rollback restores the site Worker with its own access map; the directory
+Worker keeps reading the groups of the latest build, so a group only the older
+map names admits no one until the next deployment.
 
 If the boundary itself is failing, stop deployments and follow the security
 incident procedure in [Operations](OPERATIONS.md) instead of rolling
@@ -393,10 +408,9 @@ re-run the workflow.
 
 ### The smoke key is refused
 
-The key is not in that environment's `MACHINE_KEYS`, the record was pasted
-into the other environment, or it has expired. Issue a new one and replace
-both the record and `CTCDOCS_MACHINE_KEY`; see
-[Operations](OPERATIONS.md#machine-keys).
+The key's record is not in that environment's `machine-keys`, it was added to
+the other environment, or it has expired. Issue a new key and replace both the
+record and `CTCDOCS_MACHINE_KEY`; see [Operations](OPERATIONS.md#machine-keys).
 
 ### The site says the directory has not been read yet
 

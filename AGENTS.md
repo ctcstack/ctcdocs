@@ -60,12 +60,13 @@ deployment can move to another host without rewriting its gate.
   passwords, profiles or roles of its own, and group membership is read from
   Google into a snapshot (ADR-040).
 - Access per folder follows ADR-039: rules name Google groups by Drive folder,
-  a folder without a rule is closed to all but administrators, and a document
-  never gains readers without a rule that names its folder.
+  a folder without a rule is closed to all but administrators, and a move in
+  Drive never gives a document readers it did not have until a rule on its new
+  place is confirmed.
 - Do not add server-side rendering, a database, semantic search, vector
   storage, or an LLM content transformation. The Worker decides who may read a
-  file; it never renders or changes one. Its only state is the directory
-  snapshot in KV.
+  file; it never renders or changes one. Its only state is in KV: the
+  directory snapshot, the groups' pins and the machine keys.
 - Do not broaden scope to Sheets, Slides, comments, suggestions, webhooks, or
   bidirectional editing.
 
