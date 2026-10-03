@@ -22,9 +22,11 @@ committed, so a fresh clone has none.
 ## What belongs here
 
 This is a narrow tool, and the constraints in [AGENTS.md](AGENTS.md) are
-decisions rather than gaps: no database, no server-side rendering, no semantic
-search, no editing surface, no second content source. A change that widens the
-scope needs an ADR arguing the case before it needs an implementation.
+decisions rather than gaps: no database, no server-side rendering, no LLM
+rewriting of content, no editing surface, no second content source. A change
+that widens the scope needs an ADR arguing the case before it needs an
+implementation, as the MCP server's search did
+([ADR-041](docs/ADR/041-agents-read-the-site-through-an-mcp-server-as-their-reader.md)).
 
 Read [AGENTS.md](AGENTS.md) before a substantial change. It is written for
 coding agents, and it is the shortest accurate statement of the invariants this
