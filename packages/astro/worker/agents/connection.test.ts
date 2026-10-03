@@ -9,7 +9,8 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { handle, SESSION_COOKIE, type WorkerContext } from '../handler.js';
 import { GoogleKeys } from '../oidc.js';
-import { base64url, seal, sealKeys } from '../seal.js';
+import { fakeGoogle, type FakeGoogle } from '../google-test-support.js';
+import { seal, sealKeys } from '../seal.js';
 import type { DirectorySnapshot } from '../snapshot.js';
 import type { DocumentIndex } from './documents.js';
 import { agentOAuth } from './oauth.js';
@@ -65,67 +66,28 @@ class MemoryKv {
   }
 }
 
-let signingKey: CryptoKey;
-let publicJwk: JsonWebKey;
+let fake: FakeGoogle;
 
 beforeAll(async () => {
-  const pair = await crypto.subtle.generateKey(
-    {
-      name: 'RSASSA-PKCS1-v1_5',
-      modulusLength: 2048,
-      publicExponent: new Uint8Array([1, 0, 1]),
-      hash: 'SHA-256',
-    },
-    true,
-    ['sign', 'verify'],
-  );
-  signingKey = pair.privateKey;
-  publicJwk = {
-    ...(await crypto.subtle.exportKey('jwk', pair.publicKey)),
-    kid: 'k1',
-  } as JsonWebKey;
+  fake = await fakeGoogle();
 });
-
-async function idToken(claims: Record<string, unknown>): Promise<string> {
-  const encode = (value: unknown) =>
-    base64url(new TextEncoder().encode(JSON.stringify(value)));
-  const unsigned = `${encode({ alg: 'RS256', kid: 'k1', typ: 'JWT' })}.${encode(claims)}`;
-  const signature = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5',
-    signingKey,
-    new TextEncoder().encode(unsigned),
-  );
-  return `${unsigned}.${base64url(signature)}`;
-}
 
 /** Google, signing in whoever `person` names with the nonce it was sent. */
 function google(person: () => { sub: string; nonce: string }): typeof fetch {
-  return (async (input: RequestInfo | URL) => {
-    const url = String(input);
-    if (url.includes('/oauth2/v3/certs')) {
-      return Response.json(
-        { keys: [publicJwk] },
-        { headers: { 'cache-control': 'max-age=3600' } },
-      );
-    }
-    if (url.includes('oauth2.googleapis.com/token')) {
-      const { sub, nonce } = person();
-      return Response.json({
-        id_token: await idToken({
-          iss: 'https://accounts.google.com',
-          aud: CLIENT_ID,
-          exp: Math.floor(NOW / 1000) + 600,
-          iat: Math.floor(NOW / 1000),
-          nonce,
-          email: `${sub}@example.com`,
-          email_verified: true,
-          hd: 'example.com',
-          sub,
-        }),
-      });
-    }
-    return new Response('unexpected', { status: 500 });
-  }) as typeof fetch;
+  return fake.fetch(() => {
+    const { sub, nonce } = person();
+    return fake.idToken({
+      iss: 'https://accounts.google.com',
+      aud: CLIENT_ID,
+      exp: Math.floor(NOW / 1000) + 600,
+      iat: Math.floor(NOW / 1000),
+      nonce,
+      email: `${sub}@example.com`,
+      email_verified: true,
+      hd: 'example.com',
+      sub,
+    });
+  });
 }
 
 function snapshotWith(
