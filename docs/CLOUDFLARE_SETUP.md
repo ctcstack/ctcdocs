@@ -19,10 +19,16 @@ A deployment is two Workers per environment and one KV namespace:
 | ------------------------ | -------------------------- | ---------------------------------------------------------------- |
 | The site Worker          | `wrangler.jsonc`           | The build, the access map, the Google client, the session secret |
 | The directory Worker     | `wrangler.directory.jsonc` | The directory reader's key; a schedule; no route                 |
-| The `KB_STATE` namespace | both files                 | The directory snapshot and the groups' pinned IDs                |
+| The `KB_STATE` namespace | both files                 | The directory snapshot, the groups' pinned IDs, the machine keys |
 
-A public deployment is a plain Workers Static Assets site with neither Worker
-nor namespace; most of this page does not apply to it.
+A deployment is gated — served through the Worker — when any of its
+environments is private. A wholly public deployment is a plain Workers Static
+Assets site with neither Worker nor namespace; most of this page does not apply
+to it.
+
+Turn on **SSL/TLS → Edge Certificates → Always Use HTTPS** for the zone. The
+Worker also sends a page asked for over HTTP to HTTPS, refuses anything else
+there before it reads a cookie or a key, and sends `Strict-Transport-Security`.
 
 The hostnames and the Worker name come from `site.config.json`; see
 [Configuration](CONFIGURATION.md) before pointing this platform at a different
@@ -90,7 +96,9 @@ pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET --env production
 | `GOOGLE_CLIENT_SECRET`    | The OAuth client's secret, from [Google Workspace setup](GOOGLE_WORKSPACE_SETUP.md)         |
 | `SESSION_SECRET`          | At least 32 random characters, for example `openssl rand -base64 48`; one per environment   |
 | `SESSION_SECRET_PREVIOUS` | Optional. The secret being rotated out; see [Operations](OPERATIONS.md#credential-rotation) |
-| `MACHINE_KEYS`            | Optional. The list of machine key records `ctcdocs-machine-key` prints, as one JSON array   |
+
+Machine keys are not secrets of the Worker but records in the KV namespace; see
+[Machine keys](#machine-keys).
 
 Without the client or the session secret the Worker admits no one and says the
 site is not configured; it never falls open.
@@ -140,7 +148,10 @@ Create one namespace per environment and put its ID in both files:
 pnpm exec wrangler kv namespace create example-docs-production-state
 ```
 
-Only the directory Worker writes it. The deploy token below cannot.
+The directory Worker writes the snapshot and the pins; an operator writes the
+machine keys. The deploy token below can do neither, so these commands, and
+the KV commands in [Operations](OPERATIONS.md), run with a login or a token of
+their own that has **Workers KV Storage** permission.
 
 ## Response headers
 
@@ -154,7 +165,9 @@ the Worker the policy lives in the Worker:
 | Anything that depends on who asks: sign-in, `/_kb/*`, refusals        | `no-store`                             |
 
 Every response also carries `X-Robots-Tag: noindex, nofollow, noarchive`,
-`X-Content-Type-Options: nosniff` and `Referrer-Policy: same-origin`. Markdown
+`X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin` and
+`Strict-Transport-Security: max-age=31536000`. Signing out clears the
+browser's cache of the site. Markdown
 is served as `text/markdown; charset=utf-8` and `llms.txt` as
 `text/plain; charset=utf-8`, because a static build discards the type an
 endpoint set and a browser without a charset corrupts every non-ASCII
@@ -167,7 +180,11 @@ most. Generated images and search data are never immutable, because they can
 contain internal content.
 
 `public/_headers` is still validated against the declared visibility, and still
-governs a public deployment, which has no Worker.
+governs a wholly public deployment, which has no Worker; a public environment
+of a gated deployment gets the charset, `nosniff` and fingerprinted-asset
+headers from the Worker. A gated deployment has no `public/_redirects`:
+validation refuses one, because the asset store would apply it before the
+Worker's decision, and the Worker refuses any redirect the store answers with.
 
 Starlight prefetches internal links; the preset changes the strategy from
 `hover` to `tap`, so a pointer crossing the sidebar does not fetch pages.
@@ -178,16 +195,20 @@ tools.
 
 The smoke test, and any agent a team runs, read the site with a machine key
 rather than a browser session. A key belongs to the environment that issued
-it, has a name, an owner, the groups it reads as and an expiry, and is never an
-administrator. Issue one with:
+it, has a name, an owner, the groups it reads as and an expiry of at most 90
+days, and is never an administrator. Issue one with:
 
 ```bash
 pnpm exec ctcdocs-machine-key --name smoke --owner ops@example.com --days 90
 ```
 
-The command prints the key once and the record to add to `MACHINE_KEYS`. The
-deployment keeps only the record, which holds the key's hash. A smoke key needs
-no group: it reads what every member reads.
+The command prints the key once and a record. The deployment keeps only the
+records, which hold the keys' hashes, as one JSON list under the key
+`machine-keys` in the environment's KV namespace; adding, listing and revoking
+them is in [Operations](OPERATIONS.md#machine-keys). They live in KV rather
+than in a Worker secret because a rollback restores a version's secrets, and
+would bring a revoked key back. A smoke key needs no group: it reads what
+every member reads.
 
 Never put a key in the Astro bundle, Wrangler configuration, repository
 variables, workflow artifacts or documentation.
@@ -201,7 +222,8 @@ from the **Edit Cloudflare Workers** template, then:
 - keep Worker script deployment and the Worker route or custom-domain
   permission the committed route needs;
 - **remove Workers KV Storage**. Deploying a Worker with a KV binding does not
-  need it, and without it the token cannot write the snapshot.
+  need it, and without it the token cannot write the snapshot or mint a
+  machine key.
 
 Do not grant Access, broad DNS administration, account administration, or
 access to unrelated accounts and zones. Store each token only as
@@ -214,8 +236,9 @@ A deployment that stood behind an Access application moves in this order, so
 there is no moment when content is served unprotected:
 
 1. Set up the Google client, the directory reader, the namespace, both Workers'
-   configuration and every secret above. Add `CTCDOCS_MACHINE_KEY` to the smoke
-   environment beside the Access service token; the smoke test sends both.
+   configuration, every secret above and the smoke key's record. Add
+   `CTCDOCS_MACHINE_KEY` to the smoke environment beside the Access service
+   token; the smoke test sends both.
 2. Deploy the directory Worker, put its key, and wait for its first refresh:
    `pnpm exec wrangler tail example-docs-directory-production` shows
    `directory-refreshed`. With no snapshot the site Worker admits no session.

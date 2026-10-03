@@ -1,6 +1,6 @@
 # ADR-040: A Worker cron keeps a snapshot of group membership
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-02
 - Owners: CTCDocs maintainers
 - Supersedes: none
@@ -39,7 +39,7 @@ is assigned one custom admin role that grants read access to groups and to
 users. Its JSON key is a secret of the refresh Worker below and of nothing
 else, is rotated at least every 90 days, and is created under a narrow
 exemption where the organization's policy forbids service account keys by
-default. The Admin console's audit log names it as the actor of every read.
+default. Each environment has a key of its own.
 
 **A scheduled Worker of its own refreshes the snapshot every ten minutes.** It
 has no route, so the key never sits in the Worker that parses readers'
@@ -48,26 +48,34 @@ access token. For every group the access rules and admin groups name — and no
 other — it reads the group's immutable ID and its members through the
 Directory API. Groups hold people directly: a member that is itself a group, or
 the whole organization, admits no one through that group and is reported.
-Where the Groups Settings API answers it, it also reads whether members may
-join themselves or come from outside the organization. It reads the users of
-each configured Workspace domain with their ID, whether they are suspended or
-archived, and nothing else it does not need; the Directory API refuses the
-`my_customer` alias to a service account acting through an admin role, so
-users are listed by domain.
+Through the Groups Settings API it reads whether members may join themselves
+or come from outside the organization; a group that allows either, or whose
+settings cannot be read, admits no one. It reads the users of each configured
+Workspace domain with their ID, whether they are suspended or archived, and
+nothing else it does not need; the Directory API refuses the `my_customer`
+alias to a service account acting through an admin role, so users are listed
+by domain. The refresh Worker is deployed before the site, from the same
+build, so it already reads every group the site's map names.
 
-**A refresh writes everything or nothing.** If any named group cannot be read,
-the refresh writes nothing. A result with no active users, or one that loses
-more than a fifth of the active users or of a group's members since the last
-snapshot — and at least five people, so a small group losing one member is not
-mistaken for a failed read — is not written either; it is reported, and the
-last snapshot stays. An operator accepts a genuine large departure by deleting
-the snapshot, which the next refresh writes afresh.
+**A refresh writes everything or nothing.** A named group the directory
+refuses — deleted, renamed, mistyped in a rule, out of the role's sight —
+admits no one, and the rest of the directory is still written, departures
+included. A failure that may pass — a quota, an outage, the network — stops
+the refresh, which writes nothing and leaves the last snapshot. A result with
+no active users, or one that loses more than a fifth of the active users or of
+a group's members since the last snapshot — and at least five people, so a
+small group losing one member is not mistaken for a failed read — is not
+written either; it is reported, and the last snapshot stays. People the
+listing names as suspended or archived have left rather than gone missing,
+and do not count. An operator accepts a genuine large change by setting a flag
+in the namespace that lets the next refresh through once.
 
-**The snapshot is keyed by user ID.** It holds when it was taken, the active
-users by their Google ID — the `sub` a sign-in carries — and, for each named
-group, its pinned ID, its settings and its members by ID. It holds no
-addresses. It is one value in the environment's own KV namespace, which only
-the refresh Worker writes; the token CI deploys with cannot write it.
+**People are keyed by user ID.** The snapshot holds when it was taken, the
+active users by their Google ID — the `sub` a sign-in carries — and, under each
+named group's address, its pinned ID, its members by ID and why it admits no
+one, if it does not. It holds no person's address. It and the groups' pins are
+values in the environment's own KV namespace, which only the refresh Worker
+writes; the token CI deploys with cannot write it.
 
 **Every request is decided against the snapshot.** The serving Worker keeps
 the snapshot in memory for at most a minute. With no snapshot, no session is
@@ -77,10 +85,12 @@ an active user, but only the members class is served: every other class,
 admin groups included, is refused until a refresh succeeds. Machine keys
 follow the same rule.
 
-**Nothing personal is logged.** The refresh logs counts, durations and
-errors, never an address, an ID or a membership. The snapshot is never written
-to the repository, a report or a job summary. Operators see its age and counts
-on an admin-only status route under `/_kb/`.
+**Nothing personal is logged.** The refresh logs counts, durations, a closed
+group by its place in the sorted list with its reason, and a failure by its
+stage and status — never an address, an ID or a membership. The snapshot is
+never written to the repository, a report or a job summary. Operators see its
+age, its counts and each named group's member count and reason on an
+admin-only status route under `/_kb/`.
 
 ## Consequences
 
@@ -108,7 +118,9 @@ on an admin-only status route under `/_kb/`.
   refresh, up to a minute of in-memory cache and up to a minute of KV
   propagation.
 - When the directory cannot be read for two hours, readers of closed folders
-  lose access until it can. That is the chosen direction of failure.
+  lose access until it can. A group that cannot be read, or whose settings
+  cannot, closes its folders at once. That is the chosen direction of failure,
+  and the Groups Settings API must stay enabled.
 - A second Worker, Workers KV and two Google APIs become part of the deployment
   and its runbook.
 
@@ -120,8 +132,6 @@ on an admin-only status route under `/_kb/`.
   sign-in. The Groups Settings API answers it as well, so the refresh can
   read whether each named group is invitation-only and closed to outside
   members.
-- Add the key rotation, the role, the group policy and an alert on a stale
-  snapshot to the operations runbook.
-- Update `AGENTS.md` (Workers KV as runtime storage, and a second, read-only
-  Google identity), `README.md`, `docs/GOOGLE_WORKSPACE_SETUP.md` and
-  `docs/OPERATIONS.md`, which promise no long-lived Google key.
+- Alert on a stale snapshot. The status route is for admins in a browser, so
+  an alert needs either a machine-readable signal or log-based alerting on
+  `directory-refresh-failed`.

@@ -107,7 +107,9 @@ identity for both.
 ## Sign-in
 
 Readers sign in with Google through an OAuth client the deployment owns
-(ADR-038). In a Google Cloud project — the synchronization project will do:
+(ADR-038), one per environment, so each environment's secret can be rotated
+or revoked alone. In a Google Cloud project — the synchronization project will
+do:
 
 1. **Google Auth Platform → Branding**: the application name readers see, and
    a support address.
@@ -115,8 +117,8 @@ Readers sign in with Google through an OAuth client the deployment owns
    outside the organization before the site is reached, and the client needs
    no verification.
 3. **Data access**: `openid` and `email`. The Worker asks for nothing else.
-4. **Clients → Create client**: type **Web application**, and one authorized
-   redirect URI per environment:
+4. **Clients → Create client**: type **Web application**, with the
+   environment's redirect URI:
 
    ```text
    https://docs.example.com/auth/callback
@@ -140,19 +142,25 @@ The directory Worker reads group membership every ten minutes (ADR-040). It
 uses a service account of its own, separate from the synchronization identity:
 
 1. In the Cloud project, enable the **Admin SDK API** and the **Groups
-   Settings API**.
+   Settings API**. Both must stay enabled: a group whose settings cannot be
+   read admits no one.
 2. Create a service account with no roles in the project, and a JSON key for
-   it. Put the key into the `DIRECTORY_KEY` secret of the directory Worker and
-   delete the file.
-3. In the **Admin console → Account → Admin roles**, create a custom role with
-   only these Admin API privileges:
+   each environment. An organization whose policy forbids service account keys
+   (`iam.disableServiceAccountKeyCreation`, on by default for newer
+   organizations) needs an exception for this project. Put each key into the
+   `DIRECTORY_KEY` secret of that environment's directory Worker and delete the
+   file. Rotate the keys at least every 90 days; see
+   [Operations](OPERATIONS.md#directory-reader-key).
+3. In the **Admin console → Account → Admin roles**, a super administrator
+   creates a custom role with only these Admin API privileges:
 
    ```text
    Users → Read
    Groups → Read
    ```
 
-4. Assign the role to the service account by its address.
+4. The super administrator assigns the role to the service account by its
+   address.
 
 No domain-wide delegation, no Drive access and no other role. The Groups
 Settings API offers no read-only scope; the role, which grants only Read, is
@@ -173,7 +181,8 @@ a permission:
   refresh reports the group as admitting no one rather than guessing.
 - **Members join by invitation only**, and **no one from outside the
   organization** may be a member. The refresh reads both settings and treats a
-  group that allows either as admitting no one.
+  group that allows either, or whose settings it cannot read, as admitting no
+  one.
 - **The whole organization is never a member.** Use `"*"` in the rule instead.
 - **Administrators** are a group too — conventionally `kb-admins@` — named in
   `access.admins`. Its members read everything, including the content health

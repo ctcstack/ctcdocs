@@ -207,8 +207,9 @@ was going to check:
 
 A public deployment has no directory Worker, so its `deploy:dry-run` is the
 first command alone. Add `.ctcdocs/` and `.dev.vars` to `.gitignore`: the build
-writes the access map to the first, and the second is where Wrangler would read
-local secrets from.
+writes the access map to the first, and validation fails while Git would track
+it; the second is where Wrangler would read local secrets from. A private
+deployment has no `public/_redirects`; validation refuses one.
 
 `playwright.ux.config.ts` is a factory call, so the suites stay owned by the
 platform and run against whatever corpus you have:
@@ -242,7 +243,7 @@ Shared Drive, a Google Cloud project, a workload identity pool and provider
 bound to your repository, and a service account that is a Viewer on the Drive
 and has no roles anywhere else. A private deployment also needs an OAuth client
 for sign-in and a directory reader with a read-only admin role — the part that
-needs a Workspace administrator.
+needs a Workspace super administrator.
 
 Then run a synchronization. The first one replaces the stubs from step 3.
 

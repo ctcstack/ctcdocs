@@ -1,6 +1,6 @@
 # ADR-039: Open a folder only to the Google groups its rule names
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-02
 - Owners: CTCDocs maintainers
 - Supersedes: ADR-033 in part: what `llms.txt` may say about a document of
@@ -35,7 +35,7 @@ Body text reaches these files beyond a document's page:
 Titles and addresses alone reach navigation, previous and next links, the full
 index, the home page's recent updates, the sitemap, permanent links and
 redirects. A folder page lists only its direct children, which share its
-folder.
+folder's readers unless a move is waiting, below.
 
 The project repository holds every generated document and its history.
 
@@ -66,13 +66,19 @@ A label that no longer matches its folder's name, a rule whose folder has gone,
 and every folder without a rule are listed on the content health page and in
 the sync job summary instead.
 
-**A document whose readers would widen keeps its earlier ones.** The manifest
-records the readers each document was last published with, and a document's
-class never reaches beyond them. When a sync finds that a document would gain
-readers — its folder moved out from under a narrower rule, or a rule changed —
-it keeps the earlier readers and lists the document under Fix now, until a
-rule names the document's folder. The document's content keeps being
-published, to its earlier readers only. Narrowing takes effect at once.
+**A move never widens a document's readers by itself.** A change to the rules
+is reviewed where the configuration is, so it takes effect at once, wider or
+narrower. A move in Drive is not reviewed. The manifest records, for each
+document, the readers it was last published with and the folder chain it was
+published from. When a sync finds a document on another chain that would give
+it readers it did not have — the document or a folder above it moved out from
+under a narrower rule — the document is published to the readers both places
+allow, and listed under Fix now. The manifest records the chain it moved to and
+a digest of the rules on that chain; when a rule on it is added or changed,
+the move is confirmed and the document takes the new chain's readers. A move
+back, or a move that narrows, takes effect at once. While a move waits, the
+document is narrower than its folder's page, so that page and the folder's
+section index list it by title alone.
 
 ### Groups
 
@@ -81,8 +87,8 @@ immutable ID the first time it resolves the address. If the address later
 resolves to another ID — the group was deleted and recreated — the group
 admits no one, and the status reports it, until an operator resets the pin. A
 group whose settings let members join themselves, or admit members from outside
-the organization, admits no one either, where the snapshot can read those
-settings. Named groups are created by an administrator and joined by
+the organization, admits no one either, and so does one whose settings or
+members cannot be read. Named groups are created by an administrator and joined by
 invitation; that is part of the operations runbook, because the groups are the
 access control.
 
@@ -103,8 +109,9 @@ canonical path:
   `/assets/generated/<file ID>/` belong to the document's class.
 - An optimized image belongs to every page that references it, and a reader may
   load it when they may open one of them. The build fails when a page that is
-  not a document's own references an image that a document of a narrower class
-  also references. An image no page references is readable by admins only.
+  not a document's own references an image that a document with fewer readers
+  also references, an admins-only document included. An image no page
+  references is readable by admins only.
 - A folder page belongs to its folder's class.
 - `/llms.txt` belongs to the members class. A top-level folder's `llms.txt`
   belongs to that folder's class. Each gives descriptions only of documents of
@@ -122,21 +129,22 @@ canonical path:
 **Search is split by class.** Starlight's own Pagefind run is turned off. The
 platform indexes each class into its own bundle: the members class at
 `/pagefind/`, every other class at `/pagefind-<class>/`, each with Pagefind's
-runtime. The platform's search component asks the Worker which classes the
+runtime. The sync reserves the address `pagefind`, and the build fails if a
+bundle would overwrite a built page. The platform's search component asks the Worker which classes the
 reader may open, at a `no-store` route under `/_kb/`, and merges those bundles
 in the browser with Pagefind's `mergeIndex`; the Worker still refuses every
 bundle the reader may not open. The 404 page's search does the same. Where no
 Worker answers that route, the component merges nothing beyond the members
 bundle.
 
-**Rules take effect only where the Worker enforces them** (ADR-038). A build
-with rules but without the Worker closes nothing, and its search covers the
-members class only, so a deployment names closed folders only once its Worker
-is live.
+**Rules take effect where the Worker enforces them** (ADR-038), which
+validation requires of every private deployment.
 
 **A build check keeps body text inside its class.** The build fails when a
-file readable by a wider class contains a run of words found only in documents
-of a narrower class, beyond titles and addresses.
+file readable by a wider class contains a run of eight words found only in
+documents of a narrower class, beyond titles and addresses. Text is compared
+block by block, with line breaks and image alt text inside their paragraph, as
+the descriptions the sync writes have them.
 
 ### Decisions on requests
 
@@ -161,8 +169,8 @@ admin group.
 ### Positive
 
 - A folder can be closed without changing how editors work in Drive. A rename
-  changes nothing, and a move can only narrow access until someone confirms
-  otherwise.
+  changes nothing, and a move can only narrow access until a rule on its new
+  place is confirmed; a rule change takes effect at once.
 - Folders without a rule fail closed, and the reports say so.
 - The site is still a build. On a production-sized build, a term from a
   restricted class was absent from every fragment of the members bundle, and
@@ -181,8 +189,10 @@ admin group.
   this boundary.
 - The rules are a second statement of access next to Drive's own sharing, and
   the two can disagree until rules are read from Drive.
-- A new folder stays invisible until someone adds a rule, and a widened
-  document waits for one. Both are deliberate, and both add a step.
+- A new folder stays invisible until someone adds a rule, and a document moved
+  to wider readers waits for a rule on its new place to be added or changed.
+  Both are deliberate, and both add a step; confirming a move whose rules are
+  already right means touching one of them.
 - The content health page leaves members' view.
 - Folder IDs are harder to review than paths; the labels exist for that.
 - The search component becomes a platform override of Starlight's, which a

@@ -55,7 +55,7 @@ wrong tool, and it is cheaper to find that out now:
   never reads a service-account key file, by design.
 - A private deployment's readers sign in with **Google Workspace** accounts,
   and its folder rules name **Google groups**. Reading group membership needs
-  a Workspace administrator to create a read-only admin role, once.
+  a Workspace super administrator to create a read-only admin role, once.
 - **Node 22.12 or newer** (below 23) and **pnpm 11**.
 
 Standing a project up involves a Google Workspace administrator and a

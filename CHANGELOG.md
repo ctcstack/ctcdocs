@@ -10,58 +10,73 @@ part of the platform. See
 [ADR-038](docs/ADR/038-a-private-deployment-signs-readers-in-itself-with-google.md),
 [ADR-039](docs/ADR/039-open-a-folder-only-to-the-google-groups-its-rule-names.md)
 and
-[ADR-040](docs/ADR/040-a-worker-cron-keeps-a-snapshot-of-group-membership.md).
+[ADR-040](docs/ADR/040-a-worker-cron-keeps-a-snapshot-of-group-membership.md),
+which supersede ADR-004.
 
 ### Changed
 
-- **A private deployment is served through the platform's Worker**,
-  `@ctcstack/ctcdocs/worker`, which runs before every asset. Readers sign in
-  with Google — an OAuth client of the organization's own, with an Internal
-  consent screen — and are identified by their Google user ID; a session lasts
-  twelve hours and is honored only while the directory lists the reader as
-  active. Every file is served only to the readers its access class names,
-  with the response headers `_headers` used to set and a Content Security
-  Policy. The Worker uses web-standard APIs only, with Cloudflare confined to
-  its entry point.
-- `ctcdocs-sync validate` requires of a private deployment a `signIn` section,
-  a `wrangler.jsonc` that deploys the platform's Worker with
-  `run_worker_first`, the access map alias, a `KB_STATE` namespace and a
-  `GOOGLE_CLIENT_ID` variable in each environment, and a
-  `wrangler.directory.jsonc`.
+- **A deployment with any private environment is served through the
+  platform's Worker**, `@ctcstack/ctcdocs/worker`, which runs before every
+  asset. Readers sign in with Google — an OAuth client of the organization's
+  own, with an Internal consent screen — and are identified by their Google
+  user ID; a session lasts twelve hours and is honored only while the directory
+  lists the reader as active. Every file is served only to the readers its
+  access class names, over HTTPS only, with the response headers `_headers`
+  used to set, `Strict-Transport-Security` and a Content Security Policy; the
+  Worker follows no redirect from the asset store. The Worker uses
+  web-standard APIs only, with Cloudflare confined to its entry points.
+- `ctcdocs-sync validate` requires of such a deployment a `signIn` section, a
+  `wrangler.jsonc` that deploys the platform's Worker with `run_worker_first`,
+  the access map alias, a `KB_STATE` namespace and a `GOOGLE_CLIENT_ID`
+  variable in each environment, and a `wrangler.directory.jsonc` with no route;
+  it refuses `public/_redirects` there. Every project must keep
+  `.ctcdocs/` out of Git.
 - `ctcdocs-access-smoke` proves admission with a machine key
   (`CTCDOCS_MACHINE_KEY`), and also sends an Access service token while one is
-  configured; a redirect to sign-in counts as a denial. The Playwright access
-  suite does the same.
+  configured; a redirect to sign-in counts as a denial. It picks a document
+  every member may read from the configuration and the manifest, reads the
+  project's `.env` without overriding the environment, and `--anonymous` runs
+  on a project that has not synchronized yet. The Playwright access suite
+  takes either credential.
 - The deployment workflow runs the denial suite, deploys the directory Worker
-  beside the site, and tags a private environment's versions
-  `ctcdocs-gate-v1`. The rollback workflow refuses a version of a private
-  environment without that tag. Both read the visibility of the environment
-  they act on.
+  before the site, with retries, and tags every version of a gated deployment
+  `ctcdocs-gate-v1`. The rollback workflow refuses a version without that tag,
+  passes the smoke key to its boundary check, and refuses a version older than
+  a change to the Worker's secrets — which a rollback restores — unless called
+  with `restore_older_secrets`. The reusable CI and sync workflows run the
+  denial suite too.
+- `auth`, `pagefind` and `assets` are reserved addresses.
 
 ### Added
 
 - `signIn.workspaceDomains` in `site.config.json`: the organization's domains,
   whose accounts may sign in.
 - A directory Worker, `@ctcstack/ctcdocs/worker/directory`, which reads the
-  members of every group the rules name, and the active users of each domain,
-  every ten minutes through the Directory and Groups Settings APIs, and writes
-  one snapshot to KV — all or nothing, refusing a result that loses more than
-  a fifth and at least five of the users or of a group's members. Groups are
-  pinned to their Google IDs; a nested group, one people can join themselves,
-  one with outside members or one recreated under the same address admits no
-  one. With no snapshot no session is admitted; with one older than two hours
-  a reader reads only what every member reads.
+  members of every group the rules name, and the users of each domain, every
+  ten minutes through the Directory and Groups Settings APIs, and writes one
+  snapshot to KV. Groups are pinned to their Google IDs. A group that is
+  nested, holds the organization, lets people join themselves, admits
+  outsiders, was recreated, or whose members or settings cannot be read admits
+  no one, and the rest is still written. A failure that may pass stops the run
+  and keeps the last snapshot, and so does a result that loses more than a
+  fifth, and at least five, of the users or of a group's members beyond those
+  listed as suspended or archived — unless an operator sets
+  `directory-accept-next`. With no snapshot no session is admitted; with one
+  older than two hours a reader reads only what every member reads. Failures
+  are logged by stage and status, never by address.
 - Machine keys for the smoke test and for agents: `ctcdocs-machine-key`
-  issues one and prints the record the environment's `MACHINE_KEYS` secret
-  keeps — a hash, a name, an owner, groups and an expiry. A key is never an
-  administrator.
+  issues one, valid for at most 90 days, and prints the record the
+  environment's `machine-keys` list in KV keeps — a hash, a name, an owner,
+  groups and an expiry. A key is never an administrator.
 - `/auth/sign-in`, `/auth/callback`, `/auth/sign-out` and `/auth/signed-out`;
-  `/_kb/classes`, which lists a reader's search bundles; and `/_kb/status`,
-  where an administrator reads the snapshot's age and counts.
+  **Sign out** in the header and the mobile menu, which also clears the
+  browser's cache of the site; a page for someone the directory does not list,
+  who gets no session; `/_kb/classes`, which lists a reader's search bundles;
+  and `/_kb/status`, where an administrator reads the snapshot's age and
+  counts.
 - `ctcdocs-verify-gate`, the denial suite: the real gate in front of the real
   build, asked for every file as nobody, a members-only key, a key per
-  restricted class and an administrator, without a network. The reusable CI,
-  sync and deployment workflows run it.
+  restricted class and an administrator, without a network.
 - `project-probe.yml`, a reusable workflow that asks production anonymously
   for a page, a Markdown file, the agent index and the search runtime, on the
   caller's schedule, and fails when any is admitted.
@@ -70,21 +85,25 @@ and
   it, or `"*"` for every member. A document's readers are the groups every
   rule on its folder chain names; a folder with no rule is closed to all but
   the admins.
-- A document never gains readers silently. The manifest records the readers
-  each document was last published with; a sync that would widen them keeps
-  the earlier ones and lists the document under Fix now ("More people would
-  read the document than before") until a rule names its folder. Narrowing
-  takes effect at once.
+- A move in Drive never widens a document's readers by itself. A rule change
+  takes effect at once; a document moved to a place whose rules would let more
+  people read it is published to the readers both places allow, listed under
+  Fix now ("More people would read the document than before") and shown by
+  title alone on its folder's page, until a rule on its new chain is added or
+  changed. The manifest records `publishedReaders`, `publishedChain` and, while
+  a move waits, `readersHeld`.
 - The content health page and the sync job summary list folders closed for
   want of a rule, rules whose label no longer matches the folder, rules for a
   folder the corpus does not have, and groups a rule names that the rule above
-  does not. The content health page is readable by administrators only.
+  does not. With an `access` section, the content health page is readable by
+  administrators only.
 - The `llms.txt` indexes describe a document only in an index of its own
   access class and list the rest by title and address, and a home page folder
   card takes its description only from a document every member may read.
 - Every build writes an access map, `.ctcdocs/access-map.json`, outside
   `dist`: the access class of every built file, which the Worker is bundled
-  with. Once rules exist, a file the map cannot place fails the build.
+  with. Once rules exist, a file the map cannot place fails the build, and so
+  does a listing that shows an image of a document with fewer readers.
 - Search is split by access class: Starlight's own Pagefind run is off, and
   the platform writes `/pagefind/` for every member and `/pagefind-<class>/`
   for each other class. The search box and the 404 page merge the bundles the
@@ -95,8 +114,9 @@ and
 - Once rules exist, the build fails when a file readable by a wider class
   repeats a run of eight words found only in documents of a narrower class —
   an index description, a listing excerpt, a quoted heading. Titles, folder
-  names, navigation and addresses are not counted, and the failure names the
-  file, the document and the word offset, never the words.
+  names, navigation and addresses are not counted, line breaks and alt text
+  stay inside their paragraph, and the failure names the file, the document
+  and the word offset, never the words.
 
 ### Upgrade note
 
@@ -105,21 +125,23 @@ Cloudflare Access. Follow
 [Cloudflare setup](docs/CLOUDFLARE_SETUP.md#moving-a-deployment-off-cloudflare-access),
 which keeps Access in front until the Worker is proven. In short:
 
-- In Google: an OAuth client with an Internal consent screen and a redirect
-  URI per environment; a directory-reader service account with a JSON key, a
-  custom admin role granting Users → Read and Groups → Read, the Admin SDK and
-  Groups Settings APIs enabled; an administrators group. See
+- In Google: per environment, an OAuth client with an Internal consent screen
+  and its redirect URI; a directory-reader service account with a JSON key per
+  environment, a custom admin role granting Users → Read and Groups → Read
+  assigned by a super administrator, the Admin SDK and Groups Settings APIs
+  enabled; an administrators group. See
   [Google Workspace setup](docs/GOOGLE_WORKSPACE_SETUP.md#sign-in).
-- In Cloudflare: Workers Paid; a KV namespace per environment; the secrets
-  `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET` and `MACHINE_KEYS` on the site
-  Worker and `DIRECTORY_KEY` on the directory Worker; a deploy token without
-  Workers KV permissions.
+- In Cloudflare: Workers Paid; Always Use HTTPS; a KV namespace per
+  environment; the secrets `GOOGLE_CLIENT_SECRET` and `SESSION_SECRET` on the
+  site Worker and `DIRECTORY_KEY` on the directory Worker; the smoke key's
+  record in `machine-keys`; a deploy token without Workers KV permissions.
 - In the project: `signIn` and, if folders are to be closed, `access` in
   `site.config.json`; `wrangler.jsonc` and a new `wrangler.directory.jsonc`
   following the fixture project; `.ctcdocs/` and `.dev.vars` in `.gitignore`;
-  `deploy:dry-run` covering both Workers.
-- In GitHub: `CTCDOCS_MACHINE_KEY` in each smoke environment, a caller of
-  `project-probe.yml` on a schedule, and, once Access is gone,
+  no `public/_redirects`; `deploy:dry-run` covering both Workers.
+- In GitHub: `CTCDOCS_MACHINE_KEY` in each smoke environment; the rollback
+  caller passing a `restore_older_secrets` input; a caller of
+  `project-probe.yml` on a schedule; and, once Access is gone,
   `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET` removed.
 - A public deployment needs only `.ctcdocs/` in `.gitignore`.
 

@@ -94,10 +94,13 @@ CTCDOCS_MACHINE_KEY
 ```
 
 `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET` are read too, for a
-deployment that still stands behind Cloudflare Access.
+deployment that still stands behind Cloudflare Access. The command reads them
+from the project root's `.env` itself, without overriding what the environment
+already holds, so CI is never affected by a stray file.
 
 The Worker's own secrets live in Cloudflare, set with `wrangler secret put`,
-never in a file. The gate answers only on the hostnames the configuration
+never in a file, and machine keys are records in the environment's KV
+namespace. The gate answers only on the hostnames the configuration
 names, so it is exercised locally through `ctcdocs-verify-gate`, which runs the
 real gate against the real build with made-up readers, rather than through
 `wrangler dev`. If you do run `wrangler dev`, its `.dev.vars` stays ignored and
