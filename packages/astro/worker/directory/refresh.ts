@@ -32,8 +32,19 @@ const TOKEN_URI = 'https://oauth2.googleapis.com/token';
 const DIRECTORY = 'https://admin.googleapis.com/admin/directory/v1';
 const SETTINGS = 'https://www.googleapis.com/groups/v1/groups';
 
-/** The share of users or of a group's members a refresh may lose at once. */
+/**
+ * A refresh is refused when it loses more than this share of the users, or of
+ * a group's members, at once — and at least `SMALLEST_LOSS` of them, so that
+ * a small group losing one member is not taken for a failed read.
+ */
 const LARGEST_LOSS = 0.2;
+const SMALLEST_LOSS = 5;
+
+function sharpDrop(before: number, after: number): boolean {
+  return (
+    before - after >= SMALLEST_LOSS && (before - after) / before > LARGEST_LOSS
+  );
+}
 
 export function parseServiceAccountKey(
   secret: string | undefined,
@@ -259,7 +270,7 @@ export async function readDirectory(options: {
 
 /**
  * Whether a refresh looks like the directory rather than a failure: some
- * active users, and no sudden loss against the last snapshot.
+ * active users, and no sharp drop against the last snapshot.
  */
 export function plausible(
   read: DirectoryRead,
@@ -273,15 +284,12 @@ export function plausible(
     return undefined;
   }
   const before = Object.keys(previous.users).length;
-  if (before > 0 && (before - active) / before > LARGEST_LOSS) {
+  if (sharpDrop(before, active)) {
     return `active users fell from ${before} to ${active}`;
   }
   for (const [address, group] of Object.entries(read.groups)) {
     const earlier = previous.groups[address]?.members.length ?? 0;
-    if (
-      earlier > 0 &&
-      (earlier - group.members.length) / earlier > LARGEST_LOSS
-    ) {
+    if (sharpDrop(earlier, group.members.length)) {
       return `a group fell from ${earlier} to ${group.members.length} members`;
     }
   }
