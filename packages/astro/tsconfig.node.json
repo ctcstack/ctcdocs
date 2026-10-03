@@ -31,6 +31,7 @@
     // The OAuth library imports Cloudflare's runtime, which Node cannot load.
     "worker/agents/oauth.ts",
     "worker/agents/cloudflare-workers.stub.ts",
-    "worker/agents/test-support.ts"
+    "worker/agents/test-support.ts",
+    "worker/google-test-support.ts"
   ]
 }

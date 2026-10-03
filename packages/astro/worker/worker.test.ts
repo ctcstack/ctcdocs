@@ -15,6 +15,7 @@ import {
 } from './access-map.js';
 import { handle, SESSION_COOKIE, type WorkerContext } from './handler.js';
 import { MACHINE_KEY_PREFIX } from './machine-keys.js';
+import { fakeGoogle, type FakeGoogle } from './google-test-support.js';
 import { GoogleKeys, verifyIdToken } from './oidc.js';
 import { canonicalPath, returnPath } from './paths.js';
 import { base64url, seal, sealKeys, unseal } from './seal.js';
@@ -83,57 +84,15 @@ const snapshot = (
   ...overrides,
 });
 
-let signingKey: CryptoKey;
-let publicJwk: JsonWebKey;
+let google: FakeGoogle;
 
 beforeAll(async () => {
-  const pair = await crypto.subtle.generateKey(
-    {
-      name: 'RSASSA-PKCS1-v1_5',
-      modulusLength: 2048,
-      publicExponent: new Uint8Array([1, 0, 1]),
-      hash: 'SHA-256',
-    },
-    true,
-    ['sign', 'verify'],
-  );
-  signingKey = pair.privateKey;
-  publicJwk = {
-    ...(await crypto.subtle.exportKey('jwk', pair.publicKey)),
-    kid: 'k1',
-  } as JsonWebKey;
+  google = await fakeGoogle();
 });
 
-async function idToken(
-  claims: Record<string, unknown>,
-  kid = 'k1',
-): Promise<string> {
-  const encode = (value: unknown) =>
-    base64url(new TextEncoder().encode(JSON.stringify(value)));
-  const unsigned = `${encode({ alg: 'RS256', kid, typ: 'JWT' })}.${encode(claims)}`;
-  const signature = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5',
-    signingKey,
-    new TextEncoder().encode(unsigned),
-  );
-  return `${unsigned}.${base64url(signature)}`;
-}
-
-function googleFetch(token: () => Promise<string>): typeof fetch {
-  return (async (input: RequestInfo | URL) => {
-    const url = String(input);
-    if (url.includes('/oauth2/v3/certs')) {
-      return Response.json(
-        { keys: [publicJwk] },
-        { headers: { 'cache-control': 'max-age=3600' } },
-      );
-    }
-    if (url.includes('oauth2.googleapis.com/token')) {
-      return Response.json({ id_token: await token() });
-    }
-    return new Response('unexpected', { status: 500 });
-  }) as typeof fetch;
-}
+const idToken = (claims: Record<string, unknown>, kid?: string) =>
+  google.idToken(claims, kid);
+const googleFetch = (token: () => Promise<string>) => google.fetch(token);
 
 function context(
   overrides: Partial<WorkerContext> = {},
