@@ -58,6 +58,7 @@
     "scripts",
     "styles.css",
     "tests",
+    "worker",
     "!**/*.test.ts",
     "!**/*.test.mjs"
   ],

@@ -7,6 +7,7 @@ import {
   GENERATED_DIRECTORY_ALLOWLIST,
   GENERATED_FILE_ALLOWLIST,
   isGeneratedPathAllowed,
+  PLATFORM_WORKERS,
   PROJECT_LAYOUT,
   type DeploymentVisibility,
   type SiteConfiguration,
@@ -19,22 +20,49 @@ import type { SyncContext } from './project-context.js';
 
 const runCommand = promisify(execFile);
 
-function protectedEnvironmentSchema(pattern: string) {
-  return z
-    .object({
-      workers_dev: z.literal(false),
-      preview_urls: z.literal(false),
-      routes: z
-        .array(
-          z.object({
-            pattern: z.literal(pattern),
-            custom_domain: z.literal(true),
-          }),
-        )
-        .length(1),
-    })
-    .strict();
+/** The KV namespace a private environment's Workers keep the snapshot in. */
+const stateNamespaceSchema = z
+  .array(
+    z
+      .object({
+        binding: z.literal(PLATFORM_WORKERS.stateBinding),
+        id: z.string().min(1),
+      })
+      .strict(),
+  )
+  .length(1);
+
+function protectedEnvironmentSchema(pattern: string, gated: boolean) {
+  const base = {
+    workers_dev: z.literal(false),
+    preview_urls: z.literal(false),
+    routes: z
+      .array(
+        z.object({
+          pattern: z.literal(pattern),
+          custom_domain: z.literal(true),
+        }),
+      )
+      .length(1),
+  };
+  return gated
+    ? z
+        .object({
+          ...base,
+          kv_namespaces: stateNamespaceSchema,
+          vars: z.object({ GOOGLE_CLIENT_ID: z.string().min(1) }).strict(),
+        })
+        .strict()
+    : z.object(base).strict();
 }
+
+const accessMapAliasSchema = z
+  .object({
+    [PLATFORM_WORKERS.accessMapAlias]: z.literal(
+      `./${PROJECT_LAYOUT.accessMapFile}`,
+    ),
+  })
+  .strict();
 
 /*
  * Wrangler reads its own configuration file, so the deployment target cannot be
@@ -45,22 +73,87 @@ function protectedEnvironmentSchema(pattern: string) {
  */
 function wranglerConfigurationSchema(site: SiteConfiguration) {
   const { deployment } = site;
+  const gated = deployment.environments.production.visibility === 'private';
   const environments = Object.fromEntries(
     Object.entries(deployment.environments).map(([name, environment]) => [
       name,
-      protectedEnvironmentSchema(environment.hostname),
+      protectedEnvironmentSchema(environment.hostname, gated),
     ]),
   );
+  const assets = {
+    directory: z.literal('./dist'),
+    not_found_handling: z.literal('404-page'),
+    html_handling: z.literal('auto-trailing-slash'),
+  };
 
+  /*
+   * A private deployment is served through the platform's Worker, which runs
+   * before every asset and is bundled with the build's access map (ADR-038).
+   */
+  return gated
+    ? z.object({
+        name: z.literal(deployment.workerName),
+        main: z.literal(PLATFORM_WORKERS.gate),
+        workers_dev: z.literal(false),
+        preview_urls: z.literal(false),
+        alias: accessMapAliasSchema,
+        assets: z.object({
+          ...assets,
+          binding: z.literal('ASSETS'),
+          run_worker_first: z.literal(true),
+        }),
+        env: z.object(environments).strict(),
+      })
+    : z.object({
+        name: z.literal(deployment.workerName),
+        workers_dev: z.literal(false),
+        preview_urls: z.literal(false),
+        assets: z.object(assets),
+        env: z.object(environments).strict(),
+      });
+}
+
+/**
+ * The scheduled Worker that refreshes the directory snapshot (ADR-040): no
+ * route and no public URL, the platform's entry, the same access map and the
+ * same KV namespace as the site's Worker in each environment.
+ */
+function directoryWranglerSchema(
+  site: SiteConfiguration,
+  namespaces: Readonly<Record<string, string>>,
+) {
+  const environments = Object.fromEntries(
+    Object.keys(site.deployment.environments).map((name) => [
+      name,
+      z
+        .object({
+          workers_dev: z.literal(false),
+          preview_urls: z.literal(false),
+          kv_namespaces: z
+            .array(
+              z
+                .object({
+                  binding: z.literal(PLATFORM_WORKERS.stateBinding),
+                  id: z.literal(namespaces[name] ?? ''),
+                })
+                .strict(),
+            )
+            .length(1),
+        })
+        .strict(),
+    ]),
+  );
   return z.object({
-    name: z.literal(deployment.workerName),
+    name: z.literal(`${site.deployment.workerName}-directory`),
+    main: z.literal(PLATFORM_WORKERS.directory),
     workers_dev: z.literal(false),
     preview_urls: z.literal(false),
-    assets: z.object({
-      directory: z.literal('./dist'),
-      not_found_handling: z.literal('404-page'),
-      html_handling: z.literal('auto-trailing-slash'),
-    }),
+    alias: accessMapAliasSchema,
+    triggers: z
+      .object({
+        crons: z.tuple([z.literal(PLATFORM_WORKERS.directorySchedule)]),
+      })
+      .strict(),
     env: z.object(environments).strict(),
   });
 }
@@ -357,15 +450,59 @@ export async function validateRepositoryContent(
     'utf8',
   );
   checkedFiles += 1;
+  const wrangler: unknown = parseJsonWithComments(wranglerContent);
+  const names = Object.keys(site.deployment.environments).sort().join(', ');
+  const gated = visibility === 'private';
   try {
-    wranglerConfigurationSchema(site).parse(
-      parseJsonWithComments(wranglerContent),
-    );
+    wranglerConfigurationSchema(site).parse(wrangler);
   } catch {
-    const names = Object.keys(site.deployment.environments).sort().join(', ');
     errors.push(
-      `${PROJECT_LAYOUT.wranglerConfigurationFile} must deploy Worker ${site.deployment.workerName} to exactly these environments and their configured hostnames, with public Worker URLs disabled: ${names}`,
+      gated
+        ? `${PROJECT_LAYOUT.wranglerConfigurationFile} must deploy Worker ${site.deployment.workerName} with main ${PLATFORM_WORKERS.gate}, the ASSETS binding, run_worker_first, the ${PLATFORM_WORKERS.accessMapAlias} alias, and in each environment its configured hostname, public Worker URLs disabled, the ${PLATFORM_WORKERS.stateBinding} KV namespace and a GOOGLE_CLIENT_ID var: ${names}`
+        : `${PROJECT_LAYOUT.wranglerConfigurationFile} must deploy Worker ${site.deployment.workerName} to exactly these environments and their configured hostnames, with public Worker URLs disabled: ${names}`,
     );
+  }
+
+  if (gated) {
+    if (!site.signIn) {
+      errors.push(
+        `${PROJECT_LAYOUT.configurationFile} must name the Workspace domains readers sign in with (signIn.workspaceDomains) for a private deployment`,
+      );
+    }
+    const namespaces = Object.fromEntries(
+      Object.entries(
+        ((wrangler as { env?: Record<string, unknown> }).env ?? {}) as Record<
+          string,
+          { kv_namespaces?: Array<{ id?: string }> }
+        >,
+      ).map(([name, environment]) => [
+        name,
+        environment.kv_namespaces?.[0]?.id ?? '',
+      ]),
+    );
+    const directoryPath = resolve(
+      repositoryRoot,
+      PROJECT_LAYOUT.directoryWranglerConfigurationFile,
+    );
+    const directoryContent = await readFile(directoryPath, 'utf8').catch(
+      () => undefined,
+    );
+    checkedFiles += 1;
+    if (directoryContent === undefined) {
+      errors.push(
+        `${PROJECT_LAYOUT.directoryWranglerConfigurationFile} is missing; a private deployment refreshes its directory snapshot with it`,
+      );
+    } else {
+      try {
+        directoryWranglerSchema(site, namespaces).parse(
+          parseJsonWithComments(directoryContent),
+        );
+      } catch {
+        errors.push(
+          `${PROJECT_LAYOUT.directoryWranglerConfigurationFile} must deploy Worker ${site.deployment.workerName}-directory with main ${PLATFORM_WORKERS.directory}, the ${PLATFORM_WORKERS.accessMapAlias} alias, the cron ${PLATFORM_WORKERS.directorySchedule}, no route or public URL, and in each environment the site Worker's ${PLATFORM_WORKERS.stateBinding} namespace: ${names}`,
+        );
+      }
+    }
   }
 
   errors.push(...(await validateSecretScanExemptions(repositoryRoot)));

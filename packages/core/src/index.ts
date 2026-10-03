@@ -4,6 +4,7 @@ export {
   GENERATED_FILE_ALLOWLIST,
   PLATFORM_ROUTE_HREFS,
   PLATFORM_ROUTES,
+  PLATFORM_WORKERS,
   permanentLinkPath,
   PROJECT_LAYOUT,
   RESERVED_SLUGS,
@@ -69,6 +70,7 @@ export type {
   DeploymentVisibility,
   HomeConfiguration,
   NavigationConfiguration,
+  SignInConfiguration,
   SiteConfiguration,
   SyncConfigurationDefaults,
 } from './site-configuration.js';

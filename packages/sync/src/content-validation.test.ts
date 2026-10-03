@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import {
   GENERATED_DIRECTORY_ALLOWLIST,
   GENERATED_FILE_ALLOWLIST,
+  PLATFORM_WORKERS,
   PROJECT_LAYOUT,
 } from '@ctcstack/ctcdocs-core';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -89,6 +90,10 @@ interface FixtureOptions {
   workersDev?: boolean;
   extraEnvironment?: boolean;
   withoutCorpus?: boolean;
+  /** Write a private deployment's Wrangler file without the Worker gate. */
+  withoutGate?: boolean;
+  withoutDirectory?: boolean;
+  directoryNamespace?: string;
 }
 
 async function createProject(options: FixtureOptions = {}): Promise<string> {
@@ -116,16 +121,22 @@ async function createProject(options: FixtureOptions = {}): Promise<string> {
     join(root, '.prettierignore'),
     options.prettierIgnore ?? prettierIgnore(GENERATED_PRETTIER_IGNORE),
   );
+  const gated = options.visibility !== 'public' && !options.withoutGate;
+  const alias = {
+    [PLATFORM_WORKERS.accessMapAlias]: `./${PROJECT_LAYOUT.accessMapFile}`,
+  };
   await writeFile(
     join(root, PROJECT_LAYOUT.wranglerConfigurationFile),
     JSON.stringify({
       name: deployment.workerName,
+      ...(gated ? { main: PLATFORM_WORKERS.gate, alias } : {}),
       workers_dev: options.workersDev ?? false,
       preview_urls: false,
       assets: {
         directory: './dist',
         not_found_handling: '404-page',
         html_handling: 'auto-trailing-slash',
+        ...(gated ? { binding: 'ASSETS', run_worker_first: true } : {}),
       },
       env: {
         production: {
@@ -139,6 +150,17 @@ async function createProject(options: FixtureOptions = {}): Promise<string> {
               custom_domain: true,
             },
           ],
+          ...(gated
+            ? {
+                kv_namespaces: [
+                  {
+                    binding: PLATFORM_WORKERS.stateBinding,
+                    id: 'kv-production',
+                  },
+                ],
+                vars: { GOOGLE_CLIENT_ID: 'client.apps.googleusercontent.com' },
+              }
+            : {}),
         },
         ...(options.extraEnvironment
           ? { public: { workers_dev: true, preview_urls: true } }
@@ -146,6 +168,31 @@ async function createProject(options: FixtureOptions = {}): Promise<string> {
       },
     }),
   );
+  if (options.visibility !== 'public' && !options.withoutDirectory) {
+    await writeFile(
+      join(root, PROJECT_LAYOUT.directoryWranglerConfigurationFile),
+      JSON.stringify({
+        name: `${deployment.workerName}-directory`,
+        main: PLATFORM_WORKERS.directory,
+        workers_dev: false,
+        preview_urls: false,
+        alias,
+        triggers: { crons: [PLATFORM_WORKERS.directorySchedule] },
+        env: {
+          production: {
+            workers_dev: false,
+            preview_urls: false,
+            kv_namespaces: [
+              {
+                binding: PLATFORM_WORKERS.stateBinding,
+                id: options.directoryNamespace ?? 'kv-production',
+              },
+            ],
+          },
+        },
+      }),
+    );
+  }
 
   if (!options.withoutCorpus) {
     await mkdir(join(root, PROJECT_LAYOUT.generatedDocumentsDirectory), {
@@ -395,5 +442,40 @@ describe('a deployment anyone may read', () => {
         'keeps a public deployment out of search indexes',
       ),
     ]);
+  });
+  it('requires the Worker gate, its directory Worker and sign-in on a private deployment', async () => {
+    const ungated = await createProject({ withoutGate: true });
+    expect(
+      (await validateRepositoryContent(testSyncContext(ungated))).errors.join(
+        '\n',
+      ),
+    ).toContain(`with main ${PLATFORM_WORKERS.gate}`);
+
+    const noDirectory = await createProject({ withoutDirectory: true });
+    expect(
+      (
+        await validateRepositoryContent(testSyncContext(noDirectory))
+      ).errors.join('\n'),
+    ).toContain(
+      `${PROJECT_LAYOUT.directoryWranglerConfigurationFile} is missing`,
+    );
+
+    const otherNamespace = await createProject({
+      directoryNamespace: 'kv-other',
+    });
+    expect(
+      (
+        await validateRepositoryContent(testSyncContext(otherNamespace))
+      ).errors.join('\n'),
+    ).toContain(`${deployment.workerName}-directory`);
+
+    const root = await createProject();
+    const withoutSignIn = { ...testSiteConfiguration };
+    delete (withoutSignIn as { signIn?: unknown }).signIn;
+    expect(
+      (
+        await validateRepositoryContent(createSyncContext(root, withoutSignIn))
+      ).errors.join('\n'),
+    ).toContain('signIn.workspaceDomains');
   });
 });

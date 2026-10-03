@@ -5,5 +5,14 @@
     ".github/workflows/project-*.yml",
     "packages/astro/playwright.ts"
   ],
-  "ignoreDependencies": ["prettier-plugin-astro"]
+  "ignoreDependencies": ["prettier-plugin-astro", "ctcdocs-access-map"],
+  "workspaces": {
+    ".": {},
+    "packages/astro": {
+      "entry": ["worker/index.ts", "worker/directory/index.ts"]
+    },
+    "packages/core": {},
+    "packages/sync": {},
+    "fixtures/project": {}
+  }
 }

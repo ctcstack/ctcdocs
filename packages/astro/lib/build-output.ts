@@ -16,6 +16,7 @@ import {
   rm,
   writeFile,
 } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { dirname, relative, resolve, sep } from 'node:path';
 
 import {
@@ -411,8 +412,46 @@ export async function writeBuildOutput({
     await close();
   }
 
+  /*
+   * What the Worker needs to know at run time and cannot read from the
+   * project: where each environment is served and who may sign in, and the
+   * inline scripts its Content Security Policy allows, by hash.
+   */
+  const scriptHashes = new Set<string>();
+  for (const html of pageHtml.values()) {
+    const $ = cheerio.load(html);
+    $('script:not([src])').each((_, element) => {
+      const type = ($(element).attr('type') ?? '').toLowerCase();
+      if (
+        type &&
+        !['module', 'text/javascript', 'application/javascript'].includes(type)
+      ) {
+        return;
+      }
+      scriptHashes.add(
+        `sha256-${createHash('sha256').update($(element).text()).digest('base64')}`,
+      );
+    });
+  }
   const accessMap = {
     schemaVersion: ACCESS_MAP_VERSION,
+    site: {
+      environments: Object.fromEntries(
+        Object.entries(site.deployment.environments).map(
+          ([name, environment]) => [
+            name,
+            {
+              origin: environment.url,
+              hostname: environment.hostname,
+              visibility: environment.visibility,
+            },
+          ],
+        ),
+      ),
+      workspaceDomains: site.signIn?.workspaceDomains ?? [],
+      title: site.brand.siteTitle,
+    },
+    csp: { scriptHashes: [...scriptHashes].sort() },
     enabled: model.enabled,
     admins: model.admins,
     classes: model.classes,

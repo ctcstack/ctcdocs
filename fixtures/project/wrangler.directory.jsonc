@@ -1,0 +1,27 @@
+// The scheduled Worker that keeps the directory snapshot of this private
+// deployment (ADR-040). It has no route: its only secret, DIRECTORY_KEY, the
+// directory reader's service account key, never sits in the Worker that
+// answers readers. `ctcdocs-sync validate` checks it against wrangler.jsonc.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "example-docs-directory",
+  "main": "node_modules/@ctcstack/ctcdocs/worker/directory/index.ts",
+  "compatibility_date": "2026-07-30",
+  "workers_dev": false,
+  "preview_urls": false,
+  "alias": {
+    "ctcdocs-access-map": "./.ctcdocs/access-map.json",
+  },
+  "triggers": {
+    "crons": ["*/10 * * * *"],
+  },
+  "env": {
+    "production": {
+      "workers_dev": false,
+      "preview_urls": false,
+      "kv_namespaces": [
+        { "binding": "KB_STATE", "id": "00000000000000000000000000000000" },
+      ],
+    },
+  },
+}
