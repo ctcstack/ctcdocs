@@ -128,8 +128,15 @@ passage reads as a paragraph rather than a fragment. The reranker orders the
 chunks and, for now, drops none: its threshold is set to 0. A weak match
 costs less than it did, since the assistant now reads why it matched; the
 first evaluation decides whether the reranker's score should cut. All of it
-is set in the request, so every deployment searches the same way without a
-setup step.
+is set in the request, so the instance needs no setting of its own.
+
+**The numbers are the project's to tune.** Every value in this record, from
+the chunks asked for to the characters `fetch` returns, is a default of the
+project's `mcp` section: `mcp.search` and `mcp.fetchCharacters` in
+`site.config.json`, each optional and checked against the range AI Search
+accepts. The build writes the resolved values into the access map, and the
+Worker holds no number of its own, so measuring and tuning a deployment's
+search takes a deploy of that project, not a release of the platform.
 
 **One result per document, with its best passages.** Chunks are grouped by
 document in reranked order: at most ten documents, each with up to three

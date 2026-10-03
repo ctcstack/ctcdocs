@@ -64,6 +64,7 @@ export { accessFindings } from './access-findings.js';
 export type { AccessFinding } from './access-findings.js';
 export {
   loadSiteConfiguration,
+  MCP_DEFAULTS,
   parseSiteConfiguration,
   SiteConfigurationError,
 } from './site-configuration.js';
@@ -76,6 +77,7 @@ export type {
   DeploymentVisibility,
   HomeConfiguration,
   McpConfiguration,
+  McpSearchConfiguration,
   NavigationConfiguration,
   SignInConfiguration,
   SiteConfiguration,

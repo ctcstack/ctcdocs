@@ -167,13 +167,71 @@ export interface SignInConfiguration {
 }
 
 /**
+ * How the MCP server searches and how much a search returns (ADR-042). Every
+ * value has a default, the starting point ADR-042 records, so that a project
+ * tunes it against its own corpus without a new version of the platform.
+ */
+export interface McpSearchConfiguration {
+  /** Chunks asked of AI Search for each query: 1 to 50. */
+  readonly chunks: number;
+  /**
+   * The vector similarity below which AI Search drops a chunk, 0 to 1. It
+   * applies to vector similarity alone, so a keyword match far from the
+   * question in meaning is dropped too when it is set high.
+   */
+  readonly vectorThreshold: number;
+  /** Whether a keyword match needs every word of the query, or any. */
+  readonly keywordMatch: 'and' | 'or';
+  /** Neighbouring chunks AI Search adds on each side of a match: 0 to 3. */
+  readonly contextChunks: number;
+  readonly reranking: {
+    readonly enabled: boolean;
+    /** An AI Search reranking model. */
+    readonly model: string;
+    /** The reranking score below which a chunk is dropped, 0 to 1. */
+    readonly threshold: number;
+  };
+  /** Documents a search returns at most; no more than `chunks`. */
+  readonly results: number;
+  /** Passages each document shows at most. */
+  readonly passagesPerResult: number;
+  /** Characters of passage text one search returns at most, in all. */
+  readonly passageCharacters: number;
+}
+
+/**
  * The MCP server through which AI assistants read the site as the person who
  * connected them (ADR-041). It needs the Worker's sign-in, so it is accepted
  * only on a deployment whose every environment is private.
  */
 export interface McpConfiguration {
   readonly enabled: boolean;
+  readonly search: McpSearchConfiguration;
+  /** Characters `fetch` returns at most; a longer document is cut there. */
+  readonly fetchCharacters: number;
 }
+
+/** What `mcp` holds when a project sets only `enabled` (ADR-042). */
+export const MCP_DEFAULTS: Omit<McpConfiguration, 'enabled'> = Object.freeze({
+  search: Object.freeze({
+    chunks: 50,
+    vectorThreshold: 0.2,
+    keywordMatch: 'or',
+    contextChunks: 1,
+    reranking: Object.freeze({
+      enabled: true,
+      model: '@cf/baai/bge-reranker-base',
+      threshold: 0,
+    }),
+    results: 10,
+    passagesPerResult: 3,
+    passageCharacters: 24_000,
+  }),
+  fetchCharacters: 100_000,
+});
+
+/** A passage of fewer characters than this says too little to judge by. */
+const SHORTEST_PASSAGE = 100;
 
 export interface SiteConfiguration {
   /** Required to serve a private environment through the platform's Worker. */
@@ -361,6 +419,138 @@ function optionalCount(
 }
 
 /** A size above zero, in megabytes; a fraction such as 1.5 is allowed. */
+/** A number between `min` and `max`, whole when `whole`, or the fallback. */
+function optionalNumber(
+  source: Record<string, unknown>,
+  key: string,
+  path: string,
+  fallback: number,
+  { min, max, whole }: { min: number; max?: number; whole: boolean },
+): number {
+  const value = source[key];
+  if (value === undefined) {
+    return fallback;
+  }
+  if (
+    typeof value !== 'number' ||
+    !Number.isFinite(value) ||
+    (whole && !Number.isInteger(value)) ||
+    value < min ||
+    (max !== undefined && value > max)
+  ) {
+    const kind = whole ? 'a whole number' : 'a number';
+    fail(
+      path,
+      max === undefined
+        ? `must be ${kind} of at least ${min}`
+        : `must be ${kind} from ${min} to ${max}`,
+    );
+  }
+  return value;
+}
+
+/** Fails on a key the section does not define. */
+function knownKeys(
+  source: Record<string, unknown>,
+  path: string,
+  keys: readonly string[],
+): void {
+  for (const key of Object.keys(source)) {
+    if (!keys.includes(key)) {
+      fail(`${path}.${key}`, 'is not a known setting');
+    }
+  }
+}
+
+function mcpSearch(value: unknown): McpSearchConfiguration {
+  const defaults = MCP_DEFAULTS.search;
+  if (value === undefined) {
+    return defaults;
+  }
+  const source = record(value, 'mcp.search');
+  knownKeys(source, 'mcp.search', Object.keys(defaults));
+  const chunks = optionalNumber(
+    source,
+    'chunks',
+    'mcp.search.chunks',
+    defaults.chunks,
+    {
+      min: 1,
+      max: 50,
+      whole: true,
+    },
+  );
+  const keywordMatch = source.keywordMatch ?? defaults.keywordMatch;
+  if (keywordMatch !== 'and' && keywordMatch !== 'or') {
+    fail('mcp.search.keywordMatch', 'must be "and" or "or"');
+  }
+  let reranking = defaults.reranking;
+  if (source.reranking !== undefined) {
+    const rerankingSource = record(source.reranking, 'mcp.search.reranking');
+    knownKeys(rerankingSource, 'mcp.search.reranking', Object.keys(reranking));
+    reranking = {
+      enabled: optionalFlag(
+        rerankingSource,
+        'enabled',
+        'mcp.search.reranking.enabled',
+        reranking.enabled,
+      ),
+      model:
+        rerankingSource.model === undefined
+          ? reranking.model
+          : text(rerankingSource, 'model', 'mcp.search.reranking.model'),
+      threshold: optionalNumber(
+        rerankingSource,
+        'threshold',
+        'mcp.search.reranking.threshold',
+        reranking.threshold,
+        { min: 0, max: 1, whole: false },
+      ),
+    };
+  }
+  const results = optionalNumber(
+    source,
+    'results',
+    'mcp.search.results',
+    defaults.results,
+    { min: 1, max: chunks, whole: true },
+  );
+  return {
+    chunks,
+    vectorThreshold: optionalNumber(
+      source,
+      'vectorThreshold',
+      'mcp.search.vectorThreshold',
+      defaults.vectorThreshold,
+      { min: 0, max: 1, whole: false },
+    ),
+    keywordMatch,
+    contextChunks: optionalNumber(
+      source,
+      'contextChunks',
+      'mcp.search.contextChunks',
+      defaults.contextChunks,
+      { min: 0, max: 3, whole: true },
+    ),
+    reranking,
+    results,
+    passagesPerResult: optionalNumber(
+      source,
+      'passagesPerResult',
+      'mcp.search.passagesPerResult',
+      defaults.passagesPerResult,
+      { min: 1, whole: true },
+    ),
+    passageCharacters: optionalNumber(
+      source,
+      'passageCharacters',
+      'mcp.search.passageCharacters',
+      defaults.passageCharacters,
+      { min: results * SHORTEST_PASSAGE, whole: true },
+    ),
+  };
+}
+
 function optionalMegabytes(
   source: Record<string, unknown>,
   key: string,
@@ -553,11 +743,7 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
   let mcp: McpConfiguration | undefined;
   if (root.mcp !== undefined) {
     const source = record(root.mcp, 'mcp');
-    for (const key of Object.keys(source)) {
-      if (key !== 'enabled') {
-        fail(`mcp.${key}`, 'is not a known setting');
-      }
-    }
+    knownKeys(source, 'mcp', ['enabled', 'search', 'fetchCharacters']);
     const enabled = flag(source, 'enabled', 'mcp.enabled');
     if (enabled) {
       if (!signIn) {
@@ -570,7 +756,17 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
         );
       }
     }
-    mcp = { enabled };
+    mcp = {
+      enabled,
+      search: mcpSearch(source.search),
+      fetchCharacters: optionalNumber(
+        source,
+        'fetchCharacters',
+        'mcp.fetchCharacters',
+        MCP_DEFAULTS.fetchCharacters,
+        { min: 1_000, whole: true },
+      ),
+    };
   }
 
   return {

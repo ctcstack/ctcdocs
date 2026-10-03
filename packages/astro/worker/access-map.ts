@@ -27,6 +27,25 @@ export interface AccessMapEnvironment {
   readonly visibility: 'private' | 'public';
 }
 
+/**
+ * How the MCP server searches and how much it returns (ADR-042): the
+ * project's `mcp.search`, with the core's defaults, as the build resolved it.
+ */
+export interface AgentSearchSettings {
+  readonly chunks: number;
+  readonly vectorThreshold: number;
+  readonly keywordMatch: 'and' | 'or';
+  readonly contextChunks: number;
+  readonly reranking: {
+    readonly enabled: boolean;
+    readonly model: string;
+    readonly threshold: number;
+  };
+  readonly results: number;
+  readonly passagesPerResult: number;
+  readonly passageCharacters: number;
+}
+
 /** A document the MCP server publishes to R2 (ADR-041). */
 export interface AgentDocument {
   readonly id: string;
@@ -60,6 +79,9 @@ export interface AccessMapFile {
   readonly agents?: {
     readonly digest: string;
     readonly documents: readonly AgentDocument[];
+    readonly search: AgentSearchSettings;
+    /** Characters `fetch` returns at most. */
+    readonly fetchCharacters: number;
   };
 }
 
