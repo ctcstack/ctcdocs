@@ -159,6 +159,27 @@ rollback is published the same way, because its digest differs, so the
 bucket always follows the version that serves. No credential leaves
 Cloudflare for this: the deploy job is unchanged.
 
+**A schedule, because a Worker is not told when one of its versions starts
+serving.** Publishing from the deploy job instead would hand R2 and AI Search
+credentials to CI, and a rollback, which restores a version without building
+it, would leave the bucket on the build it replaced. A run checks against
+the version actually serving, whichever way it got there.
+
+**Five minutes weighs what a run costs against how long a deploy is
+unpublished.** A run that finds the bucket's marker naming the build, written
+in full and indexed, reads that one object and stops, so a frequent schedule
+is cheap: 288 runs a day per environment. The interval is how long, after a
+deploy, `fetch` does not find the documents that deploy changed or added:
+their objects still hold the previous text, whose hash the build refuses.
+Search lags further, until AI Search has synced. A cron can run every minute,
+but publishing a large corpus for the first time, one read and one write per
+document, can take longer than that, and a run overlapping the next would
+write the same objects twice: harmless, since every write is idempotent, but
+wasted. Five minutes is short beside the deploy before it and leaves a run
+time to finish. It is a platform constant that validation requires, so every
+deployment has the same window; shortening it would change only that window
+and the runbooks that quote it.
+
 **AI Search indexes that bucket**: one instance per environment, hybrid
 search, `class`, `title` and `short_id` as its custom metadata fields, and a
 15-minute sync interval as a backstop for a sync the Worker could not start.
@@ -249,7 +270,8 @@ scoring at least 0.4, a first value to tune with the real corpus.
 - AI Search is in beta and its price is not announced. `search` keeps its own
   interface, so a plain keyword index over the same bucket can replace it.
 - The bucket follows a deploy within the five-minute schedule, and search
-  follows the bucket once AI Search has synced. `fetch` reads the bucket.
+  follows the bucket once AI Search has synced. `fetch` reads the bucket, so
+  until then it does not find a document the deploy changed or added.
 - People connect again every 30 days. Signing out of the site does not
   disconnect an assistant; a departure or a group change does.
 - What an assistant has read stays in that assistant's history.
