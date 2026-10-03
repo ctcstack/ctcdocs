@@ -695,6 +695,38 @@ describe('an assistant reading', () => {
     expect(read.body.result?.structuredContent).toMatchObject({ id: 'aaaaaa' });
   });
 
+  it('refuses a token without the read scope', async () => {
+    const { clientId, tokens } = await connect('user-member');
+    const response = await call(
+      new Request(`${ORIGIN}/auth/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: tokens.refresh_token,
+          client_id: clientId,
+          scope: 'offline_access',
+        }),
+      }),
+    );
+    const narrowed = (await response.json()) as { access_token: string };
+    const listed = await call(
+      new Request(`${ORIGIN}/mcp`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${narrowed.access_token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+      }),
+    );
+    expect(listed.status).toBe(403);
+    expect(listed.headers.get('WWW-Authenticate')).toContain(
+      'error="insufficient_scope"',
+    );
+  });
+
   it('accepts no other bearer: not a machine key, not a made-up token', async () => {
     for (const token of ['kbk_not-for-mcp', 'made-up']) {
       expect((await mcp(token, 'tools/list')).status).toBe(401);
