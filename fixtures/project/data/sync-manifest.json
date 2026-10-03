@@ -52,6 +52,30 @@
         "folder-root"
       ]
     },
+    "doc-decision-log": {
+      "googleFileId": "doc-decision-log",
+      "googleParentId": "folder-handbook",
+      "googleName": "Decision log",
+      "displayTitle": "Decision log",
+      "description": "Every decision the platform team made this year, one section each, the oldest first. None of them is real.",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "googleCreatedTime": "2026-01-05T09:00:00.000Z",
+      "sourceUrl": "https://docs.google.com/document/d/doc-decision-log/edit",
+      "stableSlug": "handbook/decision-log",
+      "generatedMarkdownPath": "src/content/docs/_generated/doc-decision-log.md",
+      "generatedAssetsDirectory": "src/assets/generated/doc-decision-log",
+      "contentHash": "sha256:c794f5c64db8586ed8c83a2f5ab301091f80992c93fe1f69a34bc42ed74f064c",
+      "outputHash": "sha256:42da7d936d37a06ccdd9dbaa58656f30996c0b8aba396745f938a4d4cdeae397",
+      "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
+      "exportMode": "markdown",
+      "warnings": [],
+      "shortId": "f3732d",
+      "publishedReaders": "*",
+      "publishedChain": [
+        "folder-handbook",
+        "folder-root"
+      ]
+    },
     "doc-diagrams": {
       "googleFileId": "doc-diagrams",
       "googleParentId": "folder-reference",
@@ -122,6 +146,30 @@
       "exportMode": "markdown",
       "warnings": [],
       "shortId": "76ff21",
+      "publishedReaders": "*",
+      "publishedChain": [
+        "folder-handbook",
+        "folder-root"
+      ]
+    },
+    "doc-release-process": {
+      "googleFileId": "doc-release-process",
+      "googleParentId": "folder-handbook",
+      "googleName": "Release process",
+      "displayTitle": "Release process",
+      "description": "A release moves what is merged on main to the production site. None of it is real: the steps are here so the handbook has a document long enough to be worth splitting.",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "googleCreatedTime": "2026-01-05T09:00:00.000Z",
+      "sourceUrl": "https://docs.google.com/document/d/doc-release-process/edit",
+      "stableSlug": "handbook/release-process",
+      "generatedMarkdownPath": "src/content/docs/_generated/doc-release-process.md",
+      "generatedAssetsDirectory": "src/assets/generated/doc-release-process",
+      "contentHash": "sha256:ff913681012057cbd7a73ed4a546e9bc53ef4d73b6ab52993ea3a9669b3dde03",
+      "outputHash": "sha256:23ec7dc8fca0fa3c8e80c2fb7b303c41cb47c104103a696e2d8a3139644782d5",
+      "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
+      "exportMode": "markdown",
+      "warnings": [],
+      "shortId": "7020ef",
       "publishedReaders": "*",
       "publishedChain": [
         "folder-handbook",

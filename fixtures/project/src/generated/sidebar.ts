@@ -31,6 +31,14 @@ export const generatedSidebar = [
         "slug": "handbook/contacts"
       },
       {
+        "label": "Decision log",
+        "slug": "handbook/decision-log"
+      },
+      {
+        "label": "Release process",
+        "slug": "handbook/release-process"
+      },
+      {
         "label": "Scanned form",
         "slug": "handbook/scanned-form",
         "badge": "PDF"

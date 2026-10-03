@@ -28,7 +28,8 @@
     "workspaceDomains": ["example.com"]
   },
   "mcp": {
-    "enabled": true
+    "enabled": true,
+    "fetchCharacters": 3000
   },
   "brand": {
     "name": "Example Corp",
@@ -56,6 +57,7 @@
   "sync": {
     "generatedBy": "CTCDOCS SYNC",
     "commitBotName": "ctcdocs-sync[bot]",
-    "defaultLocale": "en"
+    "defaultLocale": "en",
+    "largeDocumentCharacters": 1500
   }
 }

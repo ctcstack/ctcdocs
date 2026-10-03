@@ -114,6 +114,8 @@ const items: DriveItem[] = [
   document('doc-overview', 'Overview', 'folder-handbook'),
   document('doc-contacts', 'Contacts', 'folder-handbook'),
   document('doc-tables-and-code', '01 - Tables and code', 'folder-handbook'),
+  document('doc-release-process', 'Release process', 'folder-handbook'),
+  document('doc-decision-log', 'Decision log', 'folder-handbook'),
   document('doc-diagrams', 'Diagrams', 'folder-reference'),
   document('doc-screenshots', 'Screenshots', 'folder-reference'),
   folder('folder-reference-guides', 'Guides', 'folder-reference'),
@@ -206,6 +208,27 @@ items.push(
   pdf('pdf-style-guide', 'Style guide.pdf', 'folder-reference-guides'),
 );
 
+/*
+ * Decisions for a log long enough that AI agents read only its beginning.
+ * Its length is the point and its words are not, so it is generated.
+ */
+const DECISIONS = [
+  'publish from one Shared Drive',
+  'keep every address once it is given',
+  'convert each document to Markdown',
+  'sign readers in with Google',
+  'open each folder to the groups its rule names',
+  'search the site with Pagefind',
+  'let assistants read through one server',
+  'name every file left off the site',
+  'rank the content health page by priority',
+  'note documents too long to read whole',
+  'crop images the way Google Docs shows them',
+  'publish a PDF as it is in Drive',
+  'keep a permanent link for every document',
+  'hold back a document that cannot be exported',
+];
+
 /** Google's Markdown export, as the pipeline receives it. */
 const markdownExports = new Map<string, string>([
   [
@@ -217,6 +240,76 @@ const markdownExports = new Map<string, string>([
       '- Platform team: platform@example.com',
       '- Documentation desk: docs@example.com',
       '',
+    ].join('\n'),
+  ],
+  /*
+   * Longer than the lines the fixture project sets, which are low so the
+   * corpus stays small: one document worth splitting, and one AI agents read
+   * only the beginning of (ADR-043).
+   */
+  [
+    'doc-release-process',
+    [
+      '# Release process',
+      '',
+      'A release moves what is merged on main to the production site. None of',
+      'it is real: the steps are here so the handbook has a document long enough',
+      'to be worth splitting.',
+      '',
+      '## Who takes part',
+      '',
+      'One person leads the release and makes every call during the window.',
+      'A second reviews each step before it runs, and a third watches what',
+      'readers report. Nobody leads two releases in a row, so that every member',
+      'of the team knows the steps by having taken them.',
+      '',
+      '## Before the release',
+      '',
+      'Agree on a window with the platform team a day ahead, and announce it.',
+      'Check that every pull request meant for the release is merged and that',
+      'the verification gate passed on the last commit. Read the changes since',
+      'the previous release, and write a short summary of what readers will',
+      'notice.',
+      '',
+      '## During the release',
+      '',
+      'Freeze the branch, so that nothing else is merged while the release runs.',
+      'Deploy from the tagged commit, never from a local checkout. Watch the log',
+      'until every step reports success, then open the site and read three pages',
+      'from different sections, one of them a PDF.',
+      '',
+      '## After the release',
+      '',
+      'Watch the error rate for an hour before closing the window. If readers',
+      'report a problem, roll back first and investigate afterwards: a rollback',
+      'takes a minute, and an investigation under pressure takes longer than',
+      'anyone expects. Close the window with a message naming the version live.',
+      '',
+      '## When a release goes wrong',
+      '',
+      'Write down what happened while it is fresh: what was seen, when, and what',
+      'was done about it. Share the notes with the team within a week, and turn',
+      'each lesson into a change to this process, a check in the gate, or both.',
+      '',
+    ].join('\n'),
+  ],
+  [
+    'doc-decision-log',
+    [
+      '# Decision log',
+      '',
+      'Every decision the platform team made this year, one section each, the',
+      'oldest first. None of them is real.',
+      '',
+      ...DECISIONS.flatMap((decision) => [
+        `## ${decision.charAt(0).toUpperCase()}${decision.slice(1)}`,
+        '',
+        `The platform team decided to ${decision}. It weighed the alternatives,`,
+        'wrote down why this one won, and agreed to revisit it if those reasons',
+        'stop holding. A change is proposed as a new entry that replaces this',
+        'one, never as an edit to it.',
+        '',
+      ]),
     ].join('\n'),
   ],
   [

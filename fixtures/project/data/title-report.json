@@ -94,19 +94,19 @@
     }
   ],
   "summary": {
-    "documents": 8,
-    "inspected": 8,
+    "documents": 10,
+    "inspected": 10,
     "conforming": 0,
     "severity": {
       "fix": 0,
-      "convention": 8,
+      "convention": 10,
       "note": 1
     },
     "checks": {
       "heading-mixes-alphabets": 0,
       "heading-from-another-document": 0,
       "empty-document": 0,
-      "title-styled-as-heading-1": 7,
+      "title-styled-as-heading-1": 9,
       "title-missing": 1,
       "title-not-first": 0,
       "title-style-on-section": 0,
@@ -120,7 +120,7 @@
     "firstBlock": {
       "title": 0,
       "subtitle": 0,
-      "heading-1": 8,
+      "heading-1": 10,
       "heading-2": 0,
       "heading-3": 0,
       "heading-4": 0,
@@ -134,12 +134,12 @@
     },
     "candidate": {
       "title": 0,
-      "heading-1": 8,
+      "heading-1": 10,
       "none": 0
     },
-    "candidateOpensDocument": 8,
+    "candidateOpensDocument": 10,
     "match": {
-      "identical": 7,
+      "identical": 9,
       "normalized": 0,
       "reordered": 0,
       "contains": 0,
@@ -148,7 +148,7 @@
       "different": 1,
       "none": 0
     },
-    "removedTitleHeading": 7,
+    "removedTitleHeading": 9,
     "severalTitles": 0,
     "severalHeading1": 0
   },
@@ -201,6 +201,54 @@
       ]
     },
     {
+      "id": "doc-decision-log",
+      "slug": "handbook/decision-log",
+      "name": "Decision log",
+      "title": "Decision log",
+      "folderPath": [
+        "Handbook"
+      ],
+      "lastEditedBy": "Avery Example",
+      "source": {
+        "version": 4,
+        "firstBlocks": [
+          "heading-1",
+          "text",
+          "heading-2"
+        ],
+        "candidate": {
+          "style": "heading-1",
+          "text": "Decision log",
+          "headingId": "h.doc-decision-log-0",
+          "blockIndex": 0
+        },
+        "titleCount": 0,
+        "heading1Count": 1,
+        "titles": [],
+        "mixedScriptHeadings": [],
+        "skippedHeadings": [],
+        "repeatedHeadings": []
+      },
+      "removedTitleHeading": true,
+      "match": "identical",
+      "similarity": 1,
+      "nameFeatures": {
+        "orderPrefix": false,
+        "underscorePrefix": false,
+        "underscores": false,
+        "fileExtension": false,
+        "copyOf": false,
+        "extraSpaces": false
+      },
+      "issues": [
+        {
+          "check": "title-styled-as-heading-1",
+          "text": "Decision log",
+          "headingId": "h.doc-decision-log-0"
+        }
+      ]
+    },
+    {
       "id": "doc-overview",
       "slug": "handbook/overview",
       "name": "Overview",
@@ -243,6 +291,54 @@
       "issues": [
         {
           "check": "title-missing"
+        }
+      ]
+    },
+    {
+      "id": "doc-release-process",
+      "slug": "handbook/release-process",
+      "name": "Release process",
+      "title": "Release process",
+      "folderPath": [
+        "Handbook"
+      ],
+      "lastEditedBy": "Robin Sample",
+      "source": {
+        "version": 4,
+        "firstBlocks": [
+          "heading-1",
+          "text",
+          "heading-2"
+        ],
+        "candidate": {
+          "style": "heading-1",
+          "text": "Release process",
+          "headingId": "h.doc-release-process-0",
+          "blockIndex": 0
+        },
+        "titleCount": 0,
+        "heading1Count": 1,
+        "titles": [],
+        "mixedScriptHeadings": [],
+        "skippedHeadings": [],
+        "repeatedHeadings": []
+      },
+      "removedTitleHeading": true,
+      "match": "identical",
+      "similarity": 1,
+      "nameFeatures": {
+        "orderPrefix": false,
+        "underscorePrefix": false,
+        "underscores": false,
+        "fileExtension": false,
+        "copyOf": false,
+        "extraSpaces": false
+      },
+      "issues": [
+        {
+          "check": "title-styled-as-heading-1",
+          "text": "Release process",
+          "headingId": "h.doc-release-process-0"
         }
       ]
     },

@@ -8,6 +8,7 @@ export const generatedRedirects = {
   "/d/3865e9/": "/reference/",
   "/d/46b556/": "/handbook/contacts/",
   "/d/48b067/": "/reference/diagrams/",
+  "/d/7020ef/": "/handbook/release-process/",
   "/d/76ff21/": "/handbook/overview/",
   "/d/b970ca/": "/start-here/",
   "/d/bf7106/": "/reference/archive/",
@@ -16,5 +17,6 @@ export const generatedRedirects = {
   "/d/e0a0b3/": "/reference/guides/",
   "/d/eda7da/": "/reference/release-checklist/",
   "/d/f18785/": "/рабочие-заметки/",
+  "/d/f3732d/": "/handbook/decision-log/",
   "/getting-started/": "/start-here/"
 } satisfies Record<string, string>;
