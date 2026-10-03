@@ -34,6 +34,11 @@ on:
       smoke_environment:
         required: true
         type: string
+      restore_older_secrets:
+        description: Restore a version whose Worker secrets were rotated since, bringing the old secrets back
+        required: false
+        type: boolean
+        default: false
       branch:
         description: Branch holding the tooling the rollback runs from
         required: false
@@ -103,6 +108,7 @@ jobs:
           CTCDOCS_BASE_URL: ${{ vars.CTCDOCS_BASE_URL }}
           CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          CTCDOCS_MACHINE_KEY: ${{ secrets.CTCDOCS_MACHINE_KEY }}
         run: pnpm exec ctcdocs-access-smoke --preflight
 
   rollback:
@@ -195,12 +201,40 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$(jq -r --arg env "${WRANGLER_ENVIRONMENT}" '.deployment.environments[$env].visibility // "private"' site.config.json)" != "private" ]]; then
+          if [[ "$(jq -r '[.deployment.environments[] | .visibility // "private"] | any(. == "private")' site.config.json)" != "true" ]]; then
             exit 0
           fi
           tag="$(pnpm exec wrangler versions view "${VERSION_ID}" --env "${WRANGLER_ENVIRONMENT}" --json | jq -r '.annotations["workers/tag"] // ""')"
           if [[ "${tag}" != "ctcdocs-gate-v1" ]]; then
             echo "::error::Version ${VERSION_ID} does not carry the gate's mark (tag '${tag}'); restoring it could publish the site without sign-in."
+            exit 1
+          fi
+
+      # A version carries the secrets it was deployed with, and a rollback
+      # brings them back: a rotated session secret would revive the sessions
+      # its rotation ended. Unless the caller says so, a version older than a
+      # secret change is refused, and so is one older than the versions
+      # Wrangler lists, since nothing then shows what changed after it.
+      - name: Refuse to restore rotated secrets unless asked
+        if: ${{ !inputs.restore_older_secrets }}
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          VERSION_ID: ${{ inputs.version_id }}
+          WRANGLER_ENVIRONMENT: ${{ inputs.wrangler_environment }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          created="$(pnpm exec wrangler versions view "${VERSION_ID}" --env "${WRANGLER_ENVIRONMENT}" --json | jq -er '.metadata.created_on')"
+          listed="$(pnpm exec wrangler versions list --env "${WRANGLER_ENVIRONMENT}" --json)"
+          oldest="$(jq -er 'map(.metadata.created_on) | min' <<< "${listed}")"
+          changes="$(jq -er --arg since "${created}" '[.[] | select(.metadata.created_on > $since and .annotations["workers/triggered_by"] == "secret")] | length' <<< "${listed}")"
+          if [[ "${changes}" != "0" ]]; then
+            echo "::error::Worker secrets changed after version ${VERSION_ID}; restoring it brings the old ones back. Run again with restore_older_secrets if that is intended."
+            exit 1
+          fi
+          if [[ "${oldest}" > "${created}" ]]; then
+            echo "::error::Version ${VERSION_ID} is older than the versions Wrangler lists, so a secret change after it cannot be ruled out. Run again with restore_older_secrets if that is intended."
             exit 1
           fi
 

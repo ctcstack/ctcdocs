@@ -13,7 +13,7 @@ import {
 
 import { createSyncContext, type SyncContext } from '../project-context.js';
 
-const TEST_SITE_CONFIGURATION_INPUT = {
+export const TEST_SITE_CONFIGURATION_INPUT = {
   brand: {
     name: 'Example',
     siteTitle: 'Example [DOCS]',

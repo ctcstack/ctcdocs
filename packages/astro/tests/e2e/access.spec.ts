@@ -45,16 +45,18 @@ test('a machine key reads a private deployment', async ({ page }) => {
   const machineKey = process.env.CTCDOCS_MACHINE_KEY;
   const clientId = process.env.CF_ACCESS_CLIENT_ID;
   const clientSecret = process.env.CF_ACCESS_CLIENT_SECRET;
-  if (!machineKey) {
-    test.skip(true, 'A machine key (CTCDOCS_MACHINE_KEY) is required');
+  const accessToken = clientId && clientSecret;
+  if (!machineKey && !accessToken) {
+    test.skip(
+      true,
+      'A machine key (CTCDOCS_MACHINE_KEY) or, while Cloudflare Access still stands in front, its service token is required',
+    );
     return;
   }
 
-  // While Cloudflare Access still stands in front of the Worker, its service
-  // token is sent as well.
   await page.setExtraHTTPHeaders({
-    Authorization: `Bearer ${machineKey}`,
-    ...(clientId && clientSecret
+    ...(machineKey ? { Authorization: `Bearer ${machineKey}` } : {}),
+    ...(accessToken
       ? {
           'CF-Access-Client-Id': clientId,
           'CF-Access-Client-Secret': clientSecret,

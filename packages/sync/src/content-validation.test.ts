@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import {
   GENERATED_DIRECTORY_ALLOWLIST,
   GENERATED_FILE_ALLOWLIST,
+  parseSiteConfiguration,
   PLATFORM_WORKERS,
   PROJECT_LAYOUT,
 } from '@ctcstack/ctcdocs-core';
@@ -17,6 +18,7 @@ import { createSyncContext, type SyncContext } from './project-context.js';
 import {
   publicSiteConfiguration,
   TEST_MARKDOWN_HEADER,
+  TEST_SITE_CONFIGURATION_INPUT,
   testSiteConfiguration,
   testSyncContext,
 } from './test-support/project-fixture.js';
@@ -306,6 +308,7 @@ describe('repository content validation', () => {
   it('rejects a secret-scanner exemption that Git actually tracks', async () => {
     const root = await createProject();
     await runCommand('git', ['init', '--quiet'], { cwd: root });
+    await writeFile(join(root, '.gitignore'), '.ctcdocs/\n');
     await writeFile(join(root, '.env'), 'TOKEN=synthetic\n');
     await runCommand('git', ['add', '--force', '.env'], { cwd: root });
 
@@ -477,5 +480,74 @@ describe('a deployment anyone may read', () => {
         await validateRepositoryContent(createSyncContext(root, withoutSignIn))
       ).errors.join('\n'),
     ).toContain('signIn.workspaceDomains');
+  });
+
+  it('refuses redirects the asset store would apply before the Worker judged a file', async () => {
+    const root = await createProject();
+    await writeFile(join(root, 'public', '_redirects'), '/x/ /y/ 302\n');
+    expect(
+      (await validateRepositoryContent(testSyncContext(root))).errors.join(
+        '\n',
+      ),
+    ).toContain('public/_redirects is not allowed');
+  });
+
+  it('refuses a route the directory Worker would inherit', async () => {
+    const root = await createProject();
+    const path = join(root, PROJECT_LAYOUT.directoryWranglerConfigurationFile);
+    const directory = JSON.parse(await readFile(path, 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    await writeFile(
+      path,
+      JSON.stringify({
+        ...directory,
+        routes: [{ pattern: deployment.environments.production.hostname }],
+      }),
+    );
+    expect(
+      (await validateRepositoryContent(testSyncContext(root))).errors.join(
+        '\n',
+      ),
+    ).toContain(`${deployment.workerName}-directory`);
+  });
+
+  it('gates a deployment whose production is public but another environment is private', async () => {
+    const root = await createProject({ visibility: 'public' });
+    const mixed = parseSiteConfiguration({
+      ...TEST_SITE_CONFIGURATION_INPUT,
+      deployment: {
+        ...TEST_SITE_CONFIGURATION_INPUT.deployment,
+        environments: {
+          production: {
+            ...TEST_SITE_CONFIGURATION_INPUT.deployment.environments.production,
+            visibility: 'public',
+          },
+          staging: { url: 'https://docs-staging.example.com' },
+        },
+      },
+    });
+    expect(
+      (
+        await validateRepositoryContent(createSyncContext(root, mixed))
+      ).errors.join('\n'),
+    ).toContain(`with main ${PLATFORM_WORKERS.gate}`);
+  });
+
+  it('asks for the access map to be ignored by Git', async () => {
+    const root = await createProject();
+    await runCommand('git', ['init', '--quiet'], { cwd: root });
+    expect(
+      (await validateRepositoryContent(testSyncContext(root))).errors.join(
+        '\n',
+      ),
+    ).toContain(`${PROJECT_LAYOUT.accessMapFile} is not ignored by Git`);
+    await writeFile(join(root, '.gitignore'), '.ctcdocs/\n');
+    expect(
+      (await validateRepositoryContent(testSyncContext(root))).errors.join(
+        '\n',
+      ),
+    ).not.toContain('is not ignored by Git');
   });
 });

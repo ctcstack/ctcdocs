@@ -76,18 +76,20 @@ export async function verifyGate({ projectRoot, distRoot }) {
   }
   const now = Date.now();
   const secret = randomToken(48);
-  const restricted = Object.entries(map.classes).filter(
-    ([, cls]) => Array.isArray(cls.readers) && cls.readers.length > 0,
-  );
-
-  // A key that reads the members class only, and one per restricted class.
+  /*
+   * A key that reads the members class only, and one per restricted class,
+   * issued for a reader group of that class that is not an admin group: a
+   * machine key never reads as an admin, so a class only admins read has no
+   * key of its own.
+   */
   const keys = [{ name: 'members', groups: [], key: `kbk_${randomToken()}` }];
-  for (const [id, cls] of restricted) {
-    keys.push({
-      name: id,
-      groups: [cls.readers[0]],
-      key: `kbk_${randomToken()}`,
-    });
+  for (const [id, cls] of Object.entries(map.classes)) {
+    const group = Array.isArray(cls.readers)
+      ? cls.readers.find((reader) => !map.admins.includes(reader))
+      : undefined;
+    if (group) {
+      keys.push({ name: id, groups: [group], key: `kbk_${randomToken()}` });
+    }
   }
   const records = await Promise.all(
     keys.map(async ({ name, groups, key }) => ({
@@ -219,15 +221,27 @@ export async function verifyGate({ projectRoot, distRoot }) {
   const page = await ask('/', { 'Sec-Fetch-Mode': 'navigate' });
   assert.equal(page.status, 302);
   assert.match(page.headers.get('Location') ?? '', /^\/auth\/sign-in\?/u);
-  for (const { name, key } of keys.slice(1)) {
-    const classes = await ask('/_kb/classes', {
-      Authorization: `Bearer ${key}`,
-    });
-    const { bundles } = await classes.json();
-    assert.ok(
-      bundles.includes(map.bundles[name]),
-      `The classes route did not list ${name}'s search bundle.`,
+  for (const { name, key } of keys) {
+    const auth = { Authorization: `Bearer ${key}` };
+    // The route lists bundles beyond the members one; a class whose pages
+    // have no search region has no bundle to list.
+    if (name !== 'members' && map.bundles[name]) {
+      const { bundles } = await (await ask('/_kb/classes', auth)).json();
+      assert.ok(
+        bundles.includes(map.bundles[name]),
+        `The classes route did not list ${name}'s search bundle.`,
+      );
+    }
+    assert.equal(
+      (await ask('/_kb/status', auth)).status,
+      403,
+      `A key for ${name} read the directory status.`,
     );
+    assert.equal(
+      (await ask('/no-such-page-for-the-denial-suite/', auth)).status,
+      404,
+    );
+    requests += 3;
   }
   return { files: files.length, requests };
 }
