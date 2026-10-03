@@ -44,6 +44,35 @@ describe('corpus structure', () => {
     });
   });
 
+  it('reads the short ID, title and modified time an agent needs', () => {
+    const corpus = parseCorpusStructure({
+      folders: {},
+      documents: {
+        d: {
+          googleParentId: null,
+          stableSlug: 'd',
+          shortId: '1a2b3c',
+          displayTitle: 'Handbook',
+          googleModifiedTime: '2026-10-01T00:00:00.000Z',
+        },
+        e: { googleParentId: null, stableSlug: 'e', shortId: '' },
+      },
+    });
+    expect(corpus.documents.get('d')).toEqual({
+      id: 'd',
+      parentId: null,
+      slug: 'd',
+      shortId: '1a2b3c',
+      title: 'Handbook',
+      modified: '2026-10-01T00:00:00.000Z',
+    });
+    expect(corpus.documents.get('e')).toEqual({
+      id: 'e',
+      parentId: null,
+      slug: 'e',
+    });
+  });
+
   it('refuses a manifest it cannot read the chain from', () => {
     expect(() => parseCorpusStructure({ folders: [], documents: {} })).toThrow(
       CorpusStructureError,

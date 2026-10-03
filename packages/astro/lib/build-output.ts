@@ -29,6 +29,7 @@ import {
 import * as cheerio from 'cheerio';
 import { close, createIndex, type PagefindIndex } from 'pagefind';
 
+import { buildAgentCatalog } from './agent-catalog.js';
 import {
   buildAccessMap,
   canonicalSitePath,
@@ -448,6 +449,22 @@ export async function writeBuildOutput({
       );
     });
   }
+  /*
+   * The documents the MCP server publishes to R2 for assistants (ADR-041),
+   * with the class each projection was judged to have here.
+   */
+  const mcp = site.mcp?.enabled === true;
+  const agents = mcp
+    ? await buildAgentCatalog({
+        documents: [...corpus.documents.values()],
+        files,
+        readMarkdown: (slug) =>
+          readFile(resolve(distRoot, slug, 'index.md'), 'utf8').catch(
+            () => undefined,
+          ),
+      })
+    : undefined;
+
   const accessMap = {
     schemaVersion: ACCESS_MAP_VERSION,
     site: {
@@ -465,6 +482,8 @@ export async function writeBuildOutput({
       ),
       workspaceDomains: site.signIn?.workspaceDomains ?? [],
       title: site.brand.siteTitle,
+      description: site.brand.siteDescription,
+      mcp,
     },
     csp: { scriptHashes: [...scriptHashes].sort() },
     enabled: model.enabled,
@@ -474,6 +493,7 @@ export async function writeBuildOutput({
     files: Object.fromEntries(
       [...files].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
     ),
+    ...(agents ? { agents } : {}),
   };
   const target = accessMapPath(projectRoot);
   await mkdir(dirname(target), { recursive: true });

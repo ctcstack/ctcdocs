@@ -1,0 +1,78 @@
+/**
+ * The documents the MCP server publishes for assistants (ADR-041).
+ *
+ * The build lists every document that has a Markdown projection and one
+ * access class, with what the Worker writes to R2 beside it: its permanent
+ * short ID, title, Markdown address, modified time and a hash of everything
+ * that would change the stored object. The Worker compares those hashes with
+ * the bucket and rewrites only what changed; the digest tells it, cheaply,
+ * whether anything did.
+ */
+import { createHash } from 'node:crypto';
+
+import type { CorpusDocument } from '@ctcstack/ctcdocs-core';
+
+import type { FileClass } from './access-map.js';
+
+export interface AgentDocument {
+  /** The permanent short ID: the tool's `id` and the R2 object's name. */
+  readonly id: string;
+  readonly title: string;
+  /** The Markdown projection's address, as the access map lists it. */
+  readonly markdown: string;
+  readonly modified: string | null;
+  /** SHA-256 of the projection, its class and its title. */
+  readonly hash: string;
+}
+
+export interface AgentCatalog {
+  readonly digest: string;
+  readonly documents: readonly AgentDocument[];
+}
+
+function sha256(text: string): string {
+  return createHash('sha256').update(text).digest('hex');
+}
+
+export async function buildAgentCatalog({
+  documents,
+  files,
+  readMarkdown,
+}: {
+  readonly documents: Iterable<CorpusDocument>;
+  readonly files: ReadonlyMap<string, FileClass>;
+  /** The built projection of a slug; `undefined` when there is none. */
+  readonly readMarkdown: (slug: string) => Promise<string | undefined>;
+}): Promise<AgentCatalog> {
+  const listed: AgentDocument[] = [];
+  for (const document of documents) {
+    if (!document.shortId) {
+      continue;
+    }
+    const markdown = `/${document.slug}/index.md`;
+    const fileClass = files.get(markdown);
+    // A document held back before its first publication has no projection.
+    if (typeof fileClass !== 'string') {
+      continue;
+    }
+    const text = await readMarkdown(document.slug);
+    if (text === undefined) {
+      continue;
+    }
+    const title = document.title ?? document.slug;
+    listed.push({
+      id: document.shortId,
+      title,
+      markdown,
+      modified: document.modified ?? null,
+      hash: sha256(JSON.stringify([text, fileClass, title])),
+    });
+  }
+  listed.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return {
+    digest: sha256(
+      JSON.stringify(listed.map((document) => [document.id, document.hash])),
+    ),
+    documents: listed,
+  };
+}
