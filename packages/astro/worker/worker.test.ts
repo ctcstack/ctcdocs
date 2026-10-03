@@ -2,6 +2,7 @@ import {
   ACCESS_CLASSES_ROUTE,
   ADMINS_CLASS as CORE_ADMINS,
   MEMBERS_CLASS as CORE_MEMBERS,
+  permanentLinkPath,
 } from '@ctcstack/ctcdocs-core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -9,6 +10,7 @@ import {
   ADMINS_CLASS,
   CLASSES_ROUTE,
   MEMBERS_CLASS,
+  PERMANENT_LINK_PREFIX,
   type AccessMapFile,
 } from './access-map.js';
 import { handle, SESSION_COOKIE, type WorkerContext } from './handler.js';
@@ -199,6 +201,7 @@ describe('shared constants', () => {
     expect(CLASSES_ROUTE).toBe(ACCESS_CLASSES_ROUTE);
     expect(MEMBERS_CLASS).toBe(CORE_MEMBERS);
     expect(ADMINS_CLASS).toBe(CORE_ADMINS);
+    expect(`${PERMANENT_LINK_PREFIX}a1b2c3/`).toBe(permanentLinkPath('a1b2c3'));
   });
 });
 

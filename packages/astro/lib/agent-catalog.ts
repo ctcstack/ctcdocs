@@ -13,6 +13,7 @@ import { createHash } from 'node:crypto';
 import type { CorpusDocument } from '@ctcstack/ctcdocs-core';
 
 import type { FileClass } from './access-map.js';
+import { markdownProjectionPath } from './projection.js';
 
 interface AgentDocument {
   /** The permanent short ID: the tool's `id` and the R2 object's name. */
@@ -41,21 +42,21 @@ export async function buildAgentCatalog({
 }: {
   readonly documents: Iterable<CorpusDocument>;
   readonly files: ReadonlyMap<string, FileClass>;
-  /** The built projection of a slug; `undefined` when there is none. */
-  readonly readMarkdown: (slug: string) => Promise<string | undefined>;
+  /** The built projection at a site path; `undefined` when there is none. */
+  readonly readMarkdown: (path: string) => Promise<string | undefined>;
 }): Promise<AgentCatalog> {
   const listed: AgentDocument[] = [];
   for (const document of documents) {
     if (!document.shortId) {
       continue;
     }
-    const markdown = `/${document.slug}/index.md`;
+    const markdown = markdownProjectionPath(document.slug);
     const fileClass = files.get(markdown);
     // A document held back before its first publication has no projection.
     if (typeof fileClass !== 'string') {
       continue;
     }
-    const text = await readMarkdown(document.slug);
+    const text = await readMarkdown(markdown);
     if (text === undefined) {
       continue;
     }

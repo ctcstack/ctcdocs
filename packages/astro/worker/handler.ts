@@ -62,7 +62,7 @@ import {
   signInFailedPage,
   unavailablePage,
 } from './pages.js';
-import { canonicalPath, returnPath } from './paths.js';
+import { canonicalPath, returnPath, sitePath } from './paths.js';
 import { randomToken, seal, sealKeys, unseal, type SealKeys } from './seal.js';
 import {
   groupsOf,
@@ -157,10 +157,6 @@ function redirect(location: string, status = 302, setCookie?: string[]) {
     headers.append('Set-Cookie', value);
   }
   return new Response(null, { status, headers });
-}
-
-function sitePath(path: string): string {
-  return path.split('/').map(encodeURIComponent).join('/');
 }
 
 interface Gate {

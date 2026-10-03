@@ -15,6 +15,8 @@ export const PLATFORM_FILE = 'platform';
 export const CLASSES_ROUTE = '/_kb/classes';
 /** Where an admin reads the snapshot's age and counts. */
 export const STATUS_ROUTE = '/_kb/status';
+/** A document's permanent link is this, its short ID and a slash (ADR-022). */
+export const PERMANENT_LINK_PREFIX = '/d/';
 
 type Readers = '*' | readonly string[];
 export type FileClass = string | readonly string[];

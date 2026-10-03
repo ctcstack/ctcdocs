@@ -35,6 +35,11 @@ export function canonicalPath(url: URL): string | undefined {
   return path;
 }
 
+/** A canonical path as a URL's path again, each segment encoded. */
+export function sitePath(path: string): string {
+  return path.split('/').map(encodeURIComponent).join('/');
+}
+
 /** Longer return paths would push the sign-in cookie past what browsers keep. */
 const LONGEST_RETURN_PATH = 1024;
 
