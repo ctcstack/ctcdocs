@@ -2,6 +2,20 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Fixed
+
+- **Sign out** took about 25 seconds in Chrome: the `Clear-Site-Data: "cache"`
+  header it sent makes Chrome clear the whole cache before it moves on. The
+  header is gone; instead a page is served `private, no-cache`, so it is
+  checked with the Worker every time it is shown and none read before signing
+  out is shown from the cache afterwards. Markdown, images and search data keep
+  their minute.
+- The Content Security Policy blocked a font the build inlines as `data:`,
+  and a PDF's page, which shows the file in an `<object>`. It now allows
+  `font-src 'self' data:` and `object-src 'self'`.
+
 ## 0.16.1
 
 ### Fixed

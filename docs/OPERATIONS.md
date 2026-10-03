@@ -511,8 +511,9 @@ user loses every session at the same moment, because a session is honored only
 for a user the snapshot lists as active; they, and a new account the directory
 has not been read for yet, see a page saying their account is not in the
 directory. A session otherwise lasts twelve hours, and **Sign out**, in the
-header and the mobile menu, ends it on the site and clears the browser's cache
-of it, without signing the reader out of Google.
+header and the mobile menu, ends it on the site — pages are checked with the
+Worker each time they are shown, so none is served from the browser's cache
+afterwards — without signing the reader out of Google.
 
 ### The directory snapshot
 

@@ -578,11 +578,19 @@ describe('the gate', () => {
       context(),
     );
     expect(home.status).toBe(200);
-    expect(home.headers.get('Cache-Control')).toBe(
-      'private, max-age=60, must-revalidate',
+    // A page is revalidated on every view, so it is not shown after sign-out.
+    expect(home.headers.get('Cache-Control')).toBe('private, no-cache');
+    const csp = home.headers.get('Content-Security-Policy') ?? '';
+    expect(csp).toContain("'sha256-abc'");
+    // Inlined fonts and a PDF's <object> are the site's own.
+    expect(csp).toContain("font-src 'self' data:");
+    expect(csp).toContain("object-src 'self'");
+    const markdown = await handle(
+      get('/handbook/index.md', { Cookie: cookie }),
+      context(),
     );
-    expect(home.headers.get('Content-Security-Policy')).toContain(
-      "'sha256-abc'",
+    expect(markdown.headers.get('Cache-Control')).toBe(
+      'private, max-age=60, must-revalidate',
     );
     expect(home.headers.get('X-Robots-Tag')).toContain('noindex');
 
@@ -791,7 +799,9 @@ describe('the gate', () => {
     expect(signedOut.headers.get('Set-Cookie')).toMatch(
       /^__Host-kb-session=; .*Max-Age=0$/u,
     );
-    expect(signedOut.headers.get('Clear-Site-Data')).toBe('"cache"');
+    // Clear-Site-Data made Chrome hold the sign-out for seconds; pages are
+    // revalidated instead.
+    expect(signedOut.headers.get('Clear-Site-Data')).toBeNull();
     expect(
       (await handle(get('/auth/sign-out', { Cookie: cookie }), context()))
         .status,

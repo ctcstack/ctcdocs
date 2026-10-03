@@ -111,9 +111,11 @@ The previous secret is accepted during a rotation.
 snapshot exists (ADR-040) and lists its `sub` as an active user; with no
 snapshot, no session is admitted. There is no server-side session store.
 Sign-out is a `POST` with an `Origin` check, offered as a form in the header
-and the mobile menu; it clears the cookie and asks the browser to clear its
-cache of the site (`Clear-Site-Data`). It does not sign the reader out of
-Google.
+and the mobile menu; it clears the cookie. Pages are revalidated with the
+Worker on every view (`private, no-cache`), so none read before signing out is
+shown from the browser's cache after it; `Clear-Site-Data` would do the same
+but holds the sign-out in Chrome for many seconds. It does not sign the reader
+out of Google.
 
 ### Every request
 

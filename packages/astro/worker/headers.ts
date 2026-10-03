@@ -2,8 +2,9 @@
  * The response headers of a private deployment, set by the Worker (ADR-038).
  *
  * Cloudflare does not apply `_headers` to responses a Worker returns, so the
- * policy the project's `_headers` file held lives here: content is cached
- * privately and briefly and asks not to be indexed; fingerprinted scripts,
+ * policy the project's `_headers` file held lives here: pages are revalidated
+ * on every view, other content is cached privately and briefly, and nothing
+ * asks to be indexed; fingerprinted scripts,
  * styles and fonts are cached for a year; anything that depends on who is
  * asking is not cached at all. Every HTML page carries a Content Security
  * Policy that admits the site's own scripts and the inline ones the build
@@ -27,9 +28,11 @@ function contentSecurityPolicy(map: AccessMapFile): string {
     `script-src 'self' 'wasm-unsafe-eval'${scripts ? ` ${scripts}` : ''}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data:",
-    "font-src 'self'",
+    // The build inlines small font files into its stylesheets.
+    "font-src 'self' data:",
     "connect-src 'self'",
-    "object-src 'none'",
+    // A PDF's page shows the file in an <object> (ADR-027).
+    "object-src 'self'",
     "base-uri 'none'",
     "frame-ancestors 'none'",
     "form-action 'self'",
@@ -89,13 +92,18 @@ export function withPolicy(
   }: { path: string; policy: CachePolicy; map: AccessMapFile },
 ): Response {
   const headers = new Headers(response.headers);
+  const html = (headers.get('Content-Type') ?? '').startsWith('text/html');
   headers.set(
     'Cache-Control',
     policy === 'immutable'
       ? 'public, max-age=31556952, immutable'
       : policy === 'no-store'
         ? 'no-store'
-        : 'private, max-age=60, must-revalidate',
+        : // A page is checked with the Worker each time it is shown, so one
+          // read before signing out is not shown from the cache after it.
+          html
+          ? 'private, no-cache'
+          : 'private, max-age=60, must-revalidate',
   );
   headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
@@ -105,7 +113,7 @@ export function withPolicy(
       headers.set('Content-Type', type);
     }
   }
-  if ((headers.get('Content-Type') ?? '').startsWith('text/html')) {
+  if (html) {
     headers.set('Content-Security-Policy', contentSecurityPolicy(map));
   }
   return new Response(response.body, {
