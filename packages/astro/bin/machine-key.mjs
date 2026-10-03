@@ -2,10 +2,10 @@
  * Issues a machine key for a private deployment (ADR-038).
  *
  * Prints the key once, for whoever will use it, and the record to add to the
- * deployment's MACHINE_KEYS secret, which holds only the key's hash. Nothing is
- * written to disk and nothing is sent anywhere: the operator puts the record
- * into the secret with `wrangler secret put`, and the key into the place its
- * user reads it from.
+ * `machine-keys` list in the environment's KV namespace, which holds only the
+ * key's hash. Nothing is written to disk and nothing is sent anywhere: the
+ * operator adds the record with `wrangler kv key put`, and puts the key where
+ * its user reads it from.
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { realpathSync } from 'node:fs';
@@ -13,9 +13,10 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
 const USAGE =
-  'Usage: ctcdocs-machine-key --name <name> --owner <who answers for it> [--group <address>]... [--days <1-365>]';
+  'Usage: ctcdocs-machine-key --name <name> --owner <who answers for it> [--group <address>]... [--days <1-90>]';
 const GROUP = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/u;
-const LONGEST_DAYS = 365;
+// The Worker refuses a record whose expiry is further away (ADR-038).
+const LONGEST_DAYS = 90;
 const DEFAULT_DAYS = 90;
 
 export function parseMachineKeyArguments(argv) {
@@ -97,7 +98,7 @@ if (invokedDirectly()) {
         'Key, shown once — give it to whoever will use it:',
         key,
         '',
-        'Record — add it to the list in the MACHINE_KEYS secret:',
+        'Record — add it to the machine-keys list in the environment’s KV namespace:',
         JSON.stringify(record),
       ].join('\n'),
     );

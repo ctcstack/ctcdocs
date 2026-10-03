@@ -4,11 +4,20 @@
  *
  * A key is a random secret with a recognizable prefix, so a scanner can find
  * one that leaked. The deployment keeps only its SHA-256 hash, with a name, an
- * owner, the groups it reads as and an expiry, in a Worker secret: whoever can
- * merge a change to the project cannot mint one.
+ * owner, the groups it reads as and an expiry, in its KV namespace: the token
+ * that deploys cannot write there, so whoever can merge a change to the
+ * project cannot mint one, and a rollback, which restores a version's secrets,
+ * cannot bring back a key since revoked. A key lives at most 90 days.
  */
 
 export const MACHINE_KEY_PREFIX = 'kbk_';
+/** Where the KV namespace keeps the list of key records. */
+export const MACHINE_KEYS_KEY = 'machine-keys';
+/**
+ * A record whose expiry is further away than this admits nothing: 90 days,
+ * and a day more so a key issued on a clock slightly ahead still works.
+ */
+export const LONGEST_KEY_LIFETIME_MS = 91 * 24 * 60 * 60 * 1000;
 const KEY_SHAPE = /^kbk_[A-Za-z0-9_-]{43}$/u;
 
 export interface MachineKeyRecord {
@@ -21,19 +30,8 @@ export interface MachineKeyRecord {
   readonly expires: string;
 }
 
-/** Parses the secret that lists the keys; a malformed list admits no key. */
-export function parseMachineKeys(
-  secret: string | undefined,
-): MachineKeyRecord[] {
-  if (!secret) {
-    return [];
-  }
-  let value: unknown;
-  try {
-    value = JSON.parse(secret);
-  } catch {
-    return [];
-  }
+/** Reads the stored list of keys; a malformed list admits no key. */
+export function parseMachineKeys(value: unknown): MachineKeyRecord[] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -76,7 +74,12 @@ export async function findMachineKey(
   now: number,
 ): Promise<MachineKeyRecord | undefined> {
   const hash = await sha256Hex(key);
-  return records.find(
-    (record) => record.hash === hash && Date.parse(record.expires) > now,
-  );
+  return records.find((record) => {
+    const expires = Date.parse(record.expires);
+    return (
+      record.hash === hash &&
+      expires > now &&
+      expires - now <= LONGEST_KEY_LIFETIME_MS
+    );
+  });
 }

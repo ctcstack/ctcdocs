@@ -156,12 +156,12 @@ function context(
       },
     },
     snapshot: async () => snapshot(),
+    machineKeys: async () => null,
     secrets: {
       googleClientId: CLIENT_ID,
       googleClientSecret: 'client-secret',
       sessionSecret: SECRET,
       previousSessionSecret: undefined,
-      machineKeys: undefined,
     },
     fetch: fetcher,
     now: () => NOW,
@@ -225,6 +225,7 @@ describe('canonicalPath and returnPath', () => {
     ['//evil.example/x', '/'],
     ['https://evil.example/', '/'],
     ['/a%2f..%2fb', '/'],
+    [`/${'a'.repeat(1100)}`, '/'],
     [null, '/'],
   ])('return %s → %s', (value, expected) => {
     expect(returnPath(value)).toBe(expected);
@@ -350,10 +351,51 @@ describe('the gate', () => {
         .status,
     ).toBe(421);
     const open = await handle(
-      new Request('https://portal.example.com/team/plan/'),
+      new Request('https://portal.example.com/team/plan/index.md'),
       context(),
     );
     expect(open.status).toBe(200);
+    expect(open.headers.get('Content-Type')).toBe(
+      'text/markdown; charset=utf-8',
+    );
+    expect(open.headers.get('X-Robots-Tag')).toBeNull();
+    expect(open.headers.get('Strict-Transport-Security')).toBe(
+      'max-age=31536000',
+    );
+  });
+
+  it('sends a page read over HTTP to HTTPS, and keeps every answer on it', async () => {
+    const plain = await handle(
+      new Request('http://docs.example.com/team/plan/?q=1', { headers: page }),
+      context(),
+    );
+    expect(plain.status).toBe(308);
+    expect(plain.headers.get('Location')).toBe(`${ORIGIN}/team/plan/?q=1`);
+    const anonymous = await handle(get('/team/plan/'), context());
+    expect(anonymous.headers.get('Strict-Transport-Security')).toBe(
+      'max-age=31536000',
+    );
+  });
+
+  it('never follows a redirect from the asset store', async () => {
+    const cookie = await sessionCookie('user-member');
+    const redirecting = context({
+      assets: {
+        fetch: async (request: Request) => {
+          expect(request.redirect).toBe('manual');
+          return new Response(null, {
+            status: 302,
+            headers: { Location: '/team/plan/' },
+          });
+        },
+      },
+    });
+    const response = await handle(
+      get('/handbook/', { ...page, Cookie: cookie }),
+      redirecting,
+    );
+    expect(response.status).toBe(500);
+    expect(await response.text()).not.toContain('asset');
   });
 
   it('is unavailable until sign-in is configured', async () => {
@@ -440,10 +482,8 @@ describe('the gate', () => {
     expect(setCookies[0]).toMatch(
       /^__Host-kb-session=.+; Path=\/; Secure; HttpOnly; SameSite=Lax; Max-Age=43200$/u,
     );
-    expect(gate.events).toContainEqual({
-      event: 'signed-in',
-      sub: 'user-team',
-    });
+    expect(gate.events).toContainEqual({ event: 'signed-in' });
+    expect(JSON.stringify(gate.events)).not.toContain('user-team');
 
     const session = setCookies[0]?.split(';')[0] ?? '';
     const plan = await handle(
@@ -452,6 +492,46 @@ describe('the gate', () => {
     );
     expect(plan.status).toBe(200);
     expect(await plan.text()).toBe('asset /team/plan/');
+  });
+
+  it('issues no session to someone the directory does not list', async () => {
+    let nonce = '';
+    const fetcher = googleFetch(() =>
+      idToken({
+        iss: 'https://accounts.google.com',
+        aud: CLIENT_ID,
+        sub: 'user-new',
+        email: 'new-person@example.com',
+        email_verified: true,
+        hd: 'example.com',
+        nonce,
+        iat: Math.floor(NOW / 1000),
+        exp: Math.floor(NOW / 1000) + 3600,
+      }),
+    );
+    const gate = context({
+      fetch: fetcher,
+      googleKeys: new GoogleKeys(fetcher, () => NOW),
+    });
+    const start = await handle(get('/auth/sign-in?return=/handbook/'), gate);
+    const google = new URL(start.headers.get('Location') ?? '');
+    nonce = google.searchParams.get('nonce') ?? '';
+    const state = google.searchParams.get('state') ?? '';
+    const transaction =
+      (start.headers.get('Set-Cookie') ?? '').split(';')[0] ?? '';
+    const callback = await handle(
+      get(`/auth/callback?state=${state}&code=c1`, { Cookie: transaction }),
+      gate,
+    );
+    expect(callback.status).toBe(403);
+    expect(await callback.text()).toContain('not in the directory');
+    const setCookies = callback.headers.getSetCookie();
+    expect(setCookies.some((value) => value.startsWith(SESSION_COOKIE))).toBe(
+      false,
+    );
+    expect(setCookies).toEqual([
+      expect.stringMatching(/^__Host-kb-sign-in-.+=; .*Max-Age=0$/u),
+    ]);
   });
 
   it('refuses a callback whose state it did not start', async () => {
@@ -542,10 +622,16 @@ describe('the gate', () => {
     );
     expect(none.status).toBe(503);
     const gone = await sessionCookie('user-gone');
+    const left = await handle(
+      get('/handbook/', { ...page, Cookie: gone }),
+      context(),
+    );
+    expect(left.status).toBe(403);
+    expect(await left.text()).toContain('not in the directory');
     expect(
-      (await handle(get('/handbook/', { ...page, Cookie: gone }), context()))
+      (await handle(get('/handbook/index.md', { Cookie: gone }), context()))
         .status,
-    ).toBe(302);
+    ).toBe(403);
   });
 
   it('refuses a session from another environment', async () => {
@@ -618,18 +704,17 @@ describe('the gate', () => {
     const hash = [...new Uint8Array(digest)]
       .map((byte) => byte.toString(16).padStart(2, '0'))
       .join('');
-    const keys = JSON.stringify([
+    const record = (expires: number) => [
       {
         name: 'smoke',
         owner: 'ops@example.com',
         hash,
         groups: ['team@example.com', 'admins@example.com'],
-        expires: '2027-01-01',
+        expires: new Date(expires).toISOString(),
       },
-    ]);
-    const gate = context({
-      secrets: { ...context().secrets, machineKeys: keys },
-    });
+    ];
+    const day = 24 * 60 * 60 * 1000;
+    const gate = context({ machineKeys: async () => record(NOW + 30 * day) });
     const auth = { Authorization: `Bearer ${key}` };
     expect((await handle(get('/team/plan/index.md', auth), gate)).status).toBe(
       200,
@@ -637,15 +722,25 @@ describe('the gate', () => {
     expect((await handle(get('/content-health/', auth), gate)).status).toBe(
       403,
     );
-    const expired = context({
-      secrets: {
-        ...context().secrets,
-        machineKeys: keys.replace('2027-01-01', '2026-01-01'),
-      },
-    });
+    const expired = context({ machineKeys: async () => record(NOW - day) });
     expect(
       (await handle(get('/handbook/index.md', auth), expired)).status,
     ).toBe(401);
+    // A record that would outlive 90 days admits nothing.
+    const tooLong = context({
+      machineKeys: async () => record(NOW + 92 * day),
+    });
+    expect(
+      (await handle(get('/handbook/index.md', auth), tooLong)).status,
+    ).toBe(401);
+    // Not over plain HTTP: the key is never read there.
+    const plain = await handle(
+      new Request('http://docs.example.com/handbook/index.md', {
+        headers: auth,
+      }),
+      gate,
+    );
+    expect(plain.status).toBe(403);
   });
 
   it('signs out only from the site itself', async () => {
@@ -667,6 +762,7 @@ describe('the gate', () => {
     expect(signedOut.headers.get('Set-Cookie')).toMatch(
       /^__Host-kb-session=; .*Max-Age=0$/u,
     );
+    expect(signedOut.headers.get('Clear-Site-Data')).toBe('"cache"');
     expect(
       (await handle(get('/auth/sign-out', { Cookie: cookie }), context()))
         .status,

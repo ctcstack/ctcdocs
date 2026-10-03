@@ -111,12 +111,12 @@ export async function verifyGate({ projectRoot, distRoot }) {
     map,
     assets: assetsFrom(distRoot),
     snapshot: async () => snapshot,
+    machineKeys: async () => records,
     secrets: {
       googleClientId: 'verify-gate.apps.googleusercontent.com',
       googleClientSecret: 'unused',
       sessionSecret: secret,
       previousSessionSecret: undefined,
-      machineKeys: JSON.stringify(records),
     },
     fetch: async () => new Response('offline', { status: 503 }),
     now: () => now,

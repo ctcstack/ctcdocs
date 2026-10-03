@@ -26,7 +26,12 @@ import {
   readableBundles,
   type Reader,
 } from './decide.js';
-import { cachePolicyFor, withPolicy } from './headers.js';
+import {
+  cachePolicyFor,
+  withPolicy,
+  withPublicPolicy,
+  withTransportSecurity,
+} from './headers.js';
 import {
   findMachineKey,
   parseMachineKeys,
@@ -41,6 +46,7 @@ import {
   type GoogleKeys,
 } from './oidc.js';
 import {
+  notInDirectoryPage,
   refusalPage,
   signedOutPage,
   signInFailedPage,
@@ -65,13 +71,14 @@ interface WorkerSecrets {
   readonly googleClientSecret: string | undefined;
   readonly sessionSecret: string | undefined;
   readonly previousSessionSecret: string | undefined;
-  readonly machineKeys: string | undefined;
 }
 
 export interface WorkerContext {
   readonly map: AccessMapFile;
   readonly assets: { fetch(request: Request): Promise<Response> };
   readonly snapshot: () => Promise<DirectorySnapshot | undefined>;
+  /** The stored list of machine key records, as JSON parsed from KV. */
+  readonly machineKeys: () => Promise<unknown>;
   readonly secrets: WorkerSecrets;
   readonly fetch: typeof fetch;
   readonly now: () => number;
@@ -168,12 +175,17 @@ async function finishSignIn(
 ): Promise<Response> {
   const { map, log } = gate.context;
   const site = map.site.title;
-  if (url.searchParams.get('error')) {
-    return signInFailedPage(site, 'Google did not sign you in.');
-  }
   const state = url.searchParams.get('state') ?? '';
   const code = url.searchParams.get('code') ?? '';
   const name = `${TRANSACTION_COOKIE}${state.slice(0, 12)}`;
+  // A failed sign-in also clears its transaction, so none piles up.
+  const ending = (response: Response) => {
+    response.headers.append('Set-Cookie', cookie(name, '', 0));
+    return response;
+  };
+  if (url.searchParams.get('error')) {
+    return ending(signInFailedPage(site, 'Google did not sign you in.'));
+  }
   const transaction = await unseal(
     gate.transaction,
     cookies(request).get(name),
@@ -189,9 +201,11 @@ async function finishSignIn(
     typeof transaction.nonce !== 'string' ||
     typeof transaction.verifier !== 'string'
   ) {
-    return signInFailedPage(
-      site,
-      'This sign-in expired or was not started on this site.',
+    return ending(
+      signInFailedPage(
+        site,
+        'This sign-in expired or was not started on this site.',
+      ),
     );
   }
   try {
@@ -210,6 +224,20 @@ async function finishSignIn(
       domains: map.site.workspaceDomains,
       now: gate.now,
     });
+    // A session is only worth issuing to someone the directory admits.
+    const snapshot = await gate.context.snapshot();
+    if (!snapshot) {
+      return ending(
+        unavailablePage(
+          site,
+          'The directory of groups has not been read yet. Try again in a few minutes.',
+        ),
+      );
+    }
+    if (!isActive(snapshot, who.sub)) {
+      log({ event: 'sign-in-refused', reason: 'not in the directory' });
+      return ending(notInDirectoryPage(site));
+    }
     const seconds = Math.floor(gate.now / 1000);
     const session = await seal(gate.session, {
       aud: gate.origin,
@@ -218,7 +246,7 @@ async function finishSignIn(
       sub: who.sub,
       email: who.email,
     });
-    log({ event: 'signed-in', sub: who.sub });
+    log({ event: 'signed-in' });
     return redirect(returnPath(String(transaction.back ?? '/')), 302, [
       cookie(SESSION_COOKIE, session, SESSION_SECONDS),
       cookie(name, '', 0),
@@ -227,7 +255,7 @@ async function finishSignIn(
     const reason =
       error instanceof SignInError ? error.message : 'Sign-in failed.';
     log({ event: 'sign-in-failed', reason });
-    return signInFailedPage(site, reason);
+    return ending(signInFailedPage(site, reason));
   }
 }
 
@@ -238,22 +266,27 @@ function signOut(gate: Gate, request: Request): Response {
   if (!sameOrigin) {
     return new Response('Forbidden', { status: 403 });
   }
-  return redirect('/auth/signed-out', 303, [cookie(SESSION_COOKIE, '', 0)]);
+  const response = redirect('/auth/signed-out', 303, [
+    cookie(SESSION_COOKIE, '', 0),
+  ]);
+  // Pages read while signed in must not stay in this browser's cache.
+  response.headers.set('Clear-Site-Data', '"cache"');
+  return response;
 }
 
-type Identified = Reader | 'no-directory' | undefined;
+type Identified = Reader | 'no-directory' | 'not-in-directory' | undefined;
 
 async function identify(
   gate: Gate,
   request: Request,
   snapshot: DirectorySnapshot | undefined,
 ): Promise<Identified> {
-  const { map, secrets } = gate.context;
+  const { map } = gate.context;
   const key = presentedKey(request);
   if (key) {
     const record = await findMachineKey(
       key,
-      parseMachineKeys(secrets.machineKeys),
+      parseMachineKeys(await gate.context.machineKeys()),
       gate.now,
     );
     return record
@@ -279,7 +312,7 @@ async function identify(
     return 'no-directory';
   }
   if (!isActive(snapshot, claims.sub)) {
-    return undefined;
+    return 'not-in-directory';
   }
   return {
     kind: 'person',
@@ -313,14 +346,30 @@ export async function handle(
   request: Request,
   context: WorkerContext,
 ): Promise<Response> {
+  return withTransportSecurity(await route(request, context));
+}
+
+async function route(
+  request: Request,
+  context: WorkerContext,
+): Promise<Response> {
   const { map } = context;
   const url = new URL(request.url);
   const environment = environmentOf(map, url.hostname);
   if (!environment) {
     return new Response('Misdirected request', { status: 421 });
   }
+  // Nothing is read, a key included, before the connection is private.
+  if (url.protocol !== 'https:') {
+    return isNavigation(request)
+      ? redirect(`${environment.origin}${url.pathname}${url.search}`, 308)
+      : new Response('HTTPS required', { status: 403 });
+  }
   if (environment.visibility === 'public') {
-    return context.assets.fetch(request);
+    return withPublicPolicy(
+      await context.assets.fetch(new Request(request, { redirect: 'manual' })),
+      url.pathname,
+    );
   }
 
   const site = map.site.title;
@@ -394,6 +443,15 @@ export async function handle(
       ),
     );
   }
+  if (reader === 'not-in-directory') {
+    return noStore(
+      isNavigation(request)
+        ? notInDirectoryPage(site)
+        : new Response('Your account is not in the directory.', {
+            status: 403,
+          }),
+    );
+  }
   if (!reader) {
     if (isNavigation(request)) {
       const back = encodeURIComponent(`${url.pathname}${url.search}`);
@@ -434,10 +492,14 @@ export async function handle(
   }
   if (fileClass === undefined) {
     const missing = await context.assets.fetch(
-      new Request(new URL('/404.html', environment.origin)),
+      new Request(new URL('/404.html', environment.origin), {
+        redirect: 'manual',
+      }),
     );
     return withPolicy(
-      new Response(missing.body, { status: 404, headers: missing.headers }),
+      missing.ok
+        ? new Response(missing.body, { status: 404, headers: missing.headers })
+        : new Response('Not found', { status: 404 }),
       { path: '/404.html', policy: 'content', map },
     );
   }
@@ -457,11 +519,27 @@ export async function handle(
       headers.set(name, value);
     }
   }
+  /*
+   * The file judged is the file served: a redirect from the asset store —
+   * a `_redirects` rule, say — would hand over another file's bytes under
+   * this path's class, so it is never followed.
+   */
   const response = await context.assets.fetch(
     new Request(new URL(sitePath(path), environment.origin), {
       method: request.method === 'HEAD' ? 'HEAD' : 'GET',
       headers,
+      redirect: 'manual',
     }),
   );
+  if (
+    response.status >= 300 &&
+    response.status < 400 &&
+    response.status !== 304
+  ) {
+    context.log({ event: 'asset-redirect-refused' });
+    return noStore(
+      new Response('The file could not be served.', { status: 500 }),
+    );
+  }
   return withPolicy(response, { path, policy: cachePolicyFor(path), map });
 }
