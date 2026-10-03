@@ -109,10 +109,11 @@ export const PLATFORM_ROUTE_HREFS = {
 /**
  * Top-level addresses the platform serves beside the corpus: the Worker's
  * sign-in and OAuth routes (ADR-038, ADR-041), the search bundles,
- * `/pagefind/` and `/pagefind-<class>/` (ADR-039), the original files under
- * `/assets/`, and the MCP server at `/mcp` (ADR-041).
+ * `/pagefind/` and `/pagefind-<class>/` (ADR-039), and the original files
+ * under `/assets/`. The MCP server needs none: it answers `/mcp` exactly
+ * (ADR-041), and a page is always served under its trailing slash.
  */
-const SERVED_ADDRESSES = ['auth', 'pagefind', 'assets', 'mcp'] as const;
+const SERVED_ADDRESSES = ['auth', 'pagefind', 'assets'] as const;
 
 export const RESERVED_SLUGS: readonly string[] = Object.freeze([
   ...Object.values(PLATFORM_ROUTES),
