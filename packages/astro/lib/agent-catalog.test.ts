@@ -25,9 +25,9 @@ const document = (
 };
 
 const projections: Record<string, string> = {
-  handbook: '# Handbook\n',
-  'team/plan': '# Plan\n',
-  shared: '# Shared\n',
+  '/handbook/index.md': '# Handbook\n',
+  '/team/plan/index.md': '# Plan\n',
+  '/shared/index.md': '# Shared\n',
 };
 
 async function catalog(
@@ -37,7 +37,7 @@ async function catalog(
   return buildAgentCatalog({
     documents,
     files: new Map(Object.entries(files)),
-    readMarkdown: (slug) => Promise.resolve(projections[slug]),
+    readMarkdown: (path) => Promise.resolve(projections[path]),
   });
 }
 

@@ -13,7 +13,11 @@
  *
  * Web-standard code only: the bucket and the index are handed in.
  */
-import type { AccessMapFile, AgentDocument } from '../access-map.js';
+import {
+  PERMANENT_LINK_PREFIX,
+  type AccessMapFile,
+  type AgentDocument,
+} from '../access-map.js';
 import { mayRead, type Reader } from '../decide.js';
 
 /** The part of an R2 bucket the server uses. */
@@ -80,7 +84,7 @@ function catalogOf(map: AccessMapFile): ReadonlyMap<string, AgentDocument> {
 
 /** The permanent link a citation uses, which survives a rename (ADR-022). */
 function permanentLink(origin: string, id: string): string {
-  return `${origin}/d/${id}/`;
+  return `${origin}${PERMANENT_LINK_PREFIX}${id}/`;
 }
 
 /** The classes whose documents the reader may open. */

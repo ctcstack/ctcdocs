@@ -458,8 +458,8 @@ export async function writeBuildOutput({
     ? await buildAgentCatalog({
         documents: [...corpus.documents.values()],
         files,
-        readMarkdown: (slug) =>
-          readFile(resolve(distRoot, slug, 'index.md'), 'utf8').catch(
+        readMarkdown: (path) =>
+          readFile(resolve(distRoot, path.slice(1)), 'utf8').catch(
             () => undefined,
           ),
       })

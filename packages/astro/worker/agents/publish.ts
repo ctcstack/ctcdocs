@@ -16,6 +16,7 @@
  * handed in.
  */
 import type { AccessMapFile } from '../access-map.js';
+import { sitePath } from '../paths.js';
 import {
   DOCUMENT_PREFIX,
   documentKey,
@@ -57,10 +58,6 @@ function isMarker(value: unknown): value is PublishedMarker {
     typeof (value as PublishedMarker).complete === 'boolean' &&
     typeof (value as PublishedMarker).synced === 'boolean'
   );
-}
-
-function sitePath(path: string): string {
-  return path.split('/').map(encodeURIComponent).join('/');
 }
 
 async function storedHashes(

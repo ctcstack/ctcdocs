@@ -24,6 +24,7 @@ import {
 } from '../dist-node/worker/agents/documents.js';
 import { publishDocuments } from '../dist-node/worker/agents/publish.js';
 import { handle, SESSION_COOKIE } from '../dist-node/worker/handler.js';
+import { sitePath } from '../dist-node/worker/paths.js';
 import { GoogleKeys } from '../dist-node/worker/oidc.js';
 import { randomToken, seal, sealKeys } from '../dist-node/worker/seal.js';
 
@@ -162,13 +163,7 @@ export async function verifyGate({ projectRoot, distRoot }) {
 
   const ask = (path, headers = {}) =>
     handle(
-      new Request(
-        new URL(
-          path.split('/').map(encodeURIComponent).join('/'),
-          environment.origin,
-        ),
-        { headers },
-      ),
+      new Request(new URL(sitePath(path), environment.origin), { headers }),
       context,
     );
 
