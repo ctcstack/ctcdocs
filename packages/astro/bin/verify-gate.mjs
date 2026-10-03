@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { findProjectRoot, PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
 
 import {
+  DOCUMENT_PREFIX,
   fetchDocument,
   searchDocuments,
 } from '../dist-node/worker/agents/documents.js';
@@ -290,22 +291,18 @@ async function verifyAgents({ map, distRoot, environment, keys }) {
     search: async () => everything(),
     sync: async () => {},
   };
-  const state = new Map();
   const outcome = await publishDocuments({
     map,
     assets: assetsFrom(distRoot),
     store,
     index,
-    state: {
-      get: async (key) => state.get(key),
-      put: async (key, value) => state.set(key, JSON.parse(value)),
-    },
     origin: environment.origin,
     log: () => {},
   });
   assert.equal(outcome, 'published', 'The build could not be published.');
   assert.equal(
-    store.objects.size,
+    [...store.objects.keys()].filter((key) => key.startsWith(DOCUMENT_PREFIX))
+      .length,
     map.agents.documents.length,
     'Publishing left the bucket without some of the build’s documents.',
   );

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { AccessMapFile } from '../access-map.js';
-import { publishDocuments, PUBLISHED_KEY } from './publish.js';
+import { MARKER_KEY, publishDocuments } from './publish.js';
 import { MemoryStore } from './memory-store.js';
 import {
   agentMap,
@@ -10,15 +10,10 @@ import {
   publishedStore,
 } from './test-support.js';
 
-function state(initial: Record<string, unknown> = {}) {
-  const values = new Map<string, unknown>(Object.entries(initial));
-  return {
-    values,
-    get: async (key: string) => values.get(key),
-    put: async (key: string, value: string) => {
-      values.set(key, JSON.parse(value));
-    },
-  };
+/** The marker a run left in the bucket, if any. */
+function markerIn(store: MemoryStore): unknown {
+  const object = store.objects.get(MARKER_KEY);
+  return object ? JSON.parse(object.text) : undefined;
 }
 
 function setup({
@@ -34,12 +29,13 @@ function setup({
 } = {}) {
   const fetched: string[] = [];
   const index = new FixedIndex([]);
-  const kept = state(marker === undefined ? {} : { [PUBLISHED_KEY]: marker });
+  if (marker !== undefined) {
+    store.seed(MARKER_KEY, JSON.stringify(marker), {});
+  }
   const events: unknown[] = [];
   return {
     store,
     index,
-    state: kept,
     fetched,
     events,
     run: () =>
@@ -56,7 +52,6 @@ function setup({
         },
         store,
         index,
-        state: kept,
         origin: ORIGIN,
         log: (event) => events.push(event),
       }),
@@ -89,7 +84,7 @@ describe('publishing documents for the MCP server', () => {
       run.store.objects.get('docs/aaaaaa.md')?.customMetadata.modified,
     ).toBe('2026-10-01T00:00:00.000Z');
     expect(run.index.syncs).toBe(1);
-    expect(run.state.values.get(PUBLISHED_KEY)).toEqual({
+    expect(markerIn(run.store)).toEqual({
       digest: 'digest-1',
       complete: true,
       synced: true,
@@ -111,6 +106,7 @@ describe('publishing documents for the MCP server', () => {
     expect(run.fetched).toEqual(['/handbook/index.md']);
     expect(store.objects.has('docs/ffffff.md')).toBe(false);
     expect([...store.objects.keys()].sort()).toEqual([
+      MARKER_KEY,
       'docs/aaaaaa.md',
       'docs/bbbbbb.md',
       'docs/cccccc.md',
@@ -128,6 +124,19 @@ describe('publishing documents for the MCP server', () => {
     expect(run.fetched).toEqual([]);
   });
 
+  it('keeps its marker in the bucket it describes', async () => {
+    const first = setup();
+    expect(await first.run()).toBe('published');
+    expect(await first.run()).toBe('unchanged');
+    // A bucket without that marker, or with one it cannot read, is filled.
+    expect(await setup().run()).toBe('published');
+    const unreadable = new MemoryStore();
+    unreadable.seed(MARKER_KEY, 'not json', {});
+    const second = setup({ store: unreadable });
+    expect(await second.run()).toBe('published');
+    expect(second.fetched).toHaveLength(3);
+  });
+
   it('skips a build it already published and synced', async () => {
     const run = setup({
       marker: { digest: 'digest-1', complete: true, synced: true },
@@ -141,7 +150,7 @@ describe('publishing documents for the MCP server', () => {
     const run = setup();
     run.index.failSync = true;
     expect(await run.run()).toBe('published');
-    expect(run.state.values.get(PUBLISHED_KEY)).toEqual({
+    expect(markerIn(run.store)).toEqual({
       digest: 'digest-1',
       complete: true,
       synced: false,
@@ -159,12 +168,13 @@ describe('publishing documents for the MCP server', () => {
     const run = setup({ missing });
     expect(await run.run()).toBe('incomplete');
     expect([...run.store.objects.keys()].sort()).toEqual([
+      MARKER_KEY,
       'docs/aaaaaa.md',
       'docs/cccccc.md',
     ]);
     // What was written is indexed now, not when the last document is.
     expect(run.index.syncs).toBe(1);
-    expect(run.state.values.get(PUBLISHED_KEY)).toEqual({
+    expect(markerIn(run.store)).toEqual({
       digest: 'digest-1',
       complete: false,
       synced: true,
@@ -195,6 +205,7 @@ describe('publishing documents for the MCP server', () => {
     const run = setup({ store });
     expect(await run.run()).toBe('incomplete');
     expect([...store.objects.keys()].sort()).toEqual([
+      MARKER_KEY,
       'docs/bbbbbb.md',
       'docs/cccccc.md',
     ]);

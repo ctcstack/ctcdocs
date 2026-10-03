@@ -144,8 +144,9 @@ their keys.
 document with a Markdown projection and one class — short ID, title, Markdown
 address, modified time, and a hash of projection, class and title — in the
 access map, with a digest of the list. On a schedule, every five minutes, the
-Worker compares that digest with the one it last published, kept in the
-state namespace. When they differ, it writes each document whose hash the
+Worker compares that digest with the one it last published, kept in a
+marker object in the bucket itself, so that it describes that bucket and no
+other. When they differ, it writes each document whose hash the
 bucket does not hold, from the projection in its own assets, to the
 deployment's private bucket as `docs/<short ID>.md` with its class, title,
 short ID, Markdown address, modified time and hash as object metadata;
