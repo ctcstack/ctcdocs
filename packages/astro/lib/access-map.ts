@@ -115,13 +115,19 @@ export function buildAccessMap(input: AccessMapInput): AccessMap {
   const searchPages = new Map<string, string[]>();
   const imageClasses = new Map<string, Set<string>>();
   const imageListings = new Map<string, Set<string>>();
+  const imageDocuments = new Map<string, Set<string>>();
 
   for (const page of input.pages) {
     let cls: string | undefined;
     let documentPage = false;
     if (page.path === contentHealth) {
       cls = model.enabled ? ADMINS_CLASS : MEMBERS_CLASS;
-    } else if (membersPages.has(page.path) || page.redirect) {
+    } else if (
+      membersPages.has(page.path) ||
+      // A redirect page carries no source of its own; a page that names one is
+      // classed by it, whatever else its markup holds.
+      (page.redirect && page.source === undefined)
+    ) {
       cls = MEMBERS_CLASS;
     } else if (page.source && DOCUMENT_SOURCES.has(page.source)) {
       const id = documentsBySlug.get(slugOf(page.path));
@@ -143,7 +149,12 @@ export function buildAccessMap(input: AccessMapInput): AccessMap {
     }
     for (const image of page.images) {
       imageClasses.set(image, (imageClasses.get(image) ?? new Set()).add(cls));
-      if (!documentPage) {
+      if (documentPage) {
+        imageDocuments.set(
+          image,
+          (imageDocuments.get(image) ?? new Set()).add(cls),
+        );
+      } else {
         imageListings.set(
           image,
           (imageListings.get(image) ?? new Set()).add(cls),
@@ -205,17 +216,28 @@ export function buildAccessMap(input: AccessMapInput): AccessMap {
 
   /*
    * A listing — the home page, a folder page, a hand-written page — shows an
-   * image to its own readers. When a document of another restricted class
-   * shows the same image, the listing would hand it to readers that
-   * document does not have.
+   * image to its own readers. When a document shows the same image to fewer
+   * readers, admins-only documents included, the listing would hand it to
+   * readers that document does not have.
    */
+  const readersOf = (cls: string): '*' | readonly string[] =>
+    cls === MEMBERS_CLASS
+      ? '*'
+      : cls === ADMINS_CLASS
+        ? []
+        : (model.classes[cls]?.readers ?? []);
+  const within = (inner: string, outer: string) => {
+    const wider = readersOf(outer);
+    const narrower = readersOf(inner);
+    return (
+      wider === '*' ||
+      (narrower !== '*' && narrower.every((group) => wider.includes(group)))
+    );
+  };
   const sharedImages = [...imageListings]
     .filter(([image, listingClasses]) =>
-      [...(imageClasses.get(image) ?? [])].some(
-        (cls) =>
-          cls !== MEMBERS_CLASS &&
-          cls !== ADMINS_CLASS &&
-          ![...listingClasses].every((listing) => listing === cls),
+      [...(imageDocuments.get(image) ?? [])].some((cls) =>
+        [...listingClasses].some((listing) => !within(listing, cls)),
       ),
     )
     .map(([image]) => image)

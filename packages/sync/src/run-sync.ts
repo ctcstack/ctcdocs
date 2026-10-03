@@ -3,6 +3,9 @@ import { posix, resolve } from 'node:path';
 
 import {
   chainReaders,
+  chainRules,
+  folderChain,
+  nextPublishedReaders,
   parseCorpusStructure,
   PROJECT_LAYOUT,
   widensReaders,
@@ -307,50 +310,62 @@ const PDF_TEXT_WARNINGS: Readonly<Record<string, string | undefined>> = {
 
 /**
  * The readers each document is published with (ADR-039), written into the
- * candidate manifest. A move or a rule change that would widen them keeps the
- * earlier readers until a rule names the document's folder; those documents
- * are returned so the report can say so. Without access rules the field is
- * dropped.
+ * candidate manifest after every other field so a record's bytes never depend
+ * on the order it was assembled in. A move in Drive that would widen them
+ * keeps the readers both places allow until a rule on the new chain is added
+ * or changed; those documents are returned so the report can say so. Without
+ * access rules the fields are dropped.
  */
 export function recordPublishedReaders(
   candidate: SyncManifest,
   existing: SyncManifest,
   access: AccessConfiguration | undefined,
 ): Set<string> {
-  const widened = new Set<string>();
-  const ids = Object.keys(candidate.documents).sort(compareText);
-  if (!access) {
-    for (const id of ids) {
-      const record = { ...(candidate.documents[id] as SyncedDocumentRecord) };
-      delete record.publishedReaders;
-      candidate.documents[id] = record;
-    }
-    return widened;
-  }
-  const rules = new Map(access.rules.map((rule) => [rule.folder, rule]));
+  const held = new Set<string>();
+  const rules = new Map(
+    (access?.rules ?? []).map((rule) => [rule.folder, rule]),
+  );
   const corpus = parseCorpusStructure(candidate);
-  for (const id of ids) {
-    const record = candidate.documents[id] as SyncedDocumentRecord;
-    const chain = chainReaders(record.googleParentId, rules, corpus);
-    const current: Readers = chain.kind === 'readers' ? chain.readers : [];
-    const previous = existing.documents[id]?.publishedReaders;
-    const acknowledged =
-      record.googleParentId !== null && rules.has(record.googleParentId);
-    let published: Readers = current;
-    if (
-      previous !== undefined &&
-      !acknowledged &&
-      widensReaders(current, previous)
-    ) {
-      published = previous;
-      widened.add(id);
+  for (const id of Object.keys(candidate.documents).sort(compareText)) {
+    const record = { ...(candidate.documents[id] as SyncedDocumentRecord) };
+    delete record.publishedReaders;
+    delete record.publishedChain;
+    delete record.readersHeld;
+    if (!access) {
+      candidate.documents[id] = record;
+      continue;
     }
+    const resolved = chainReaders(record.googleParentId, rules, corpus);
+    const chain = folderChain(record.googleParentId, corpus);
+    const before = existing.documents[id];
+    const next = nextPublishedReaders(
+      {
+        readers: resolved.kind === 'readers' ? resolved.readers : [],
+        chain,
+        rules: chainRules(chain, rules),
+      },
+      before?.publishedReaders === undefined
+        ? undefined
+        : {
+            readers: before.publishedReaders,
+            ...(before.publishedChain ? { chain: before.publishedChain } : {}),
+            ...(before.readersHeld ? { held: before.readersHeld } : {}),
+          },
+    );
+    if (next.held) {
+      held.add(id);
+    }
+    const { readers, chain: publishedChain, held: waiting } = next.published;
     candidate.documents[id] = {
       ...record,
-      publishedReaders: published === '*' ? '*' : [...published].sort(),
+      publishedReaders: readers === '*' ? '*' : [...readers].sort(),
+      publishedChain: [...publishedChain],
+      ...(waiting
+        ? { readersHeld: { chain: [...waiting.chain], rules: waiting.rules } }
+        : {}),
     };
   }
-  return widened;
+  return held;
 }
 
 /** The parts of a PDF's page that are missing, from its record (ADR-027). */
@@ -561,6 +576,24 @@ async function buildSectionIndexPages(
     selection.folders.map((folder) => [folder.item.id, folder]),
   );
   /*
+   * A document whose move is waiting for a rule (ADR-039) has fewer readers
+   * than its folder's page, so that page lists it by title alone.
+   */
+  const access = site.access;
+  const rules = new Map(
+    (access?.rules ?? []).map((rule) => [rule.folder, rule]),
+  );
+  const corpus = access ? parseCorpusStructure(manifest) : undefined;
+  function describedOn(folderId: string, record: SyncedDocumentRecord) {
+    if (!corpus || record.publishedReaders === undefined) {
+      return true;
+    }
+    const resolved = chainReaders(folderId, rules, corpus);
+    const pageReaders: Readers =
+      resolved.kind === 'readers' ? resolved.readers : [];
+    return !widensReaders(pageReaders, record.publishedReaders);
+  }
+  /*
    * Published documents anywhere below a folder: the number a reader needs to
    * know whether opening it is worth the click. A document the manifest does
    * not record is not published, so it is not counted.
@@ -619,7 +652,8 @@ async function buildSectionIndexPages(
                     kind: 'document',
                     label,
                     slug,
-                    ...(childDocument?.description
+                    ...(childDocument?.description &&
+                    describedOn(folder.googleFolderId, childDocument)
                       ? { description: childDocument.description }
                       : {}),
                   }) satisfies SectionIndexEntry,

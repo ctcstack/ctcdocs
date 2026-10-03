@@ -23,7 +23,11 @@
       "exportMode": "markdown",
       "warnings": [],
       "shortId": "46b556",
-      "publishedReaders": "*"
+      "publishedReaders": "*",
+      "publishedChain": [
+        "folder-handbook",
+        "folder-root"
+      ]
     },
     "doc-cyrillic": {
       "googleFileId": "doc-cyrillic",
@@ -43,7 +47,10 @@
       "exportMode": "markdown",
       "warnings": [],
       "shortId": "f18785",
-      "publishedReaders": []
+      "publishedReaders": [],
+      "publishedChain": [
+        "folder-root"
+      ]
     },
     "doc-diagrams": {
       "googleFileId": "doc-diagrams",
@@ -66,6 +73,10 @@
       "publishedReaders": [
         "engineering@example.com",
         "writers@example.com"
+      ],
+      "publishedChain": [
+        "folder-reference",
+        "folder-root"
       ]
     },
     "doc-getting-started": {
@@ -88,7 +99,10 @@
         "link:outside_site"
       ],
       "shortId": "b970ca",
-      "publishedReaders": []
+      "publishedReaders": [],
+      "publishedChain": [
+        "folder-root"
+      ]
     },
     "doc-overview": {
       "googleFileId": "doc-overview",
@@ -108,7 +122,11 @@
       "exportMode": "markdown",
       "warnings": [],
       "shortId": "76ff21",
-      "publishedReaders": "*"
+      "publishedReaders": "*",
+      "publishedChain": [
+        "folder-handbook",
+        "folder-root"
+      ]
     },
     "doc-screenshots": {
       "googleFileId": "doc-screenshots",
@@ -138,6 +156,10 @@
       "publishedReaders": [
         "engineering@example.com",
         "writers@example.com"
+      ],
+      "publishedChain": [
+        "folder-reference",
+        "folder-root"
       ]
     },
     "doc-style-guide": {
@@ -160,6 +182,11 @@
       "shortId": "dbb1dc",
       "publishedReaders": [
         "writers@example.com"
+      ],
+      "publishedChain": [
+        "folder-reference-guides",
+        "folder-reference",
+        "folder-root"
       ]
     },
     "doc-tables-and-code": {
@@ -185,7 +212,11 @@
       "undescribedImages": 0,
       "croppedImages": 0,
       "imageVersion": 1,
-      "publishedReaders": "*"
+      "publishedReaders": "*",
+      "publishedChain": [
+        "folder-handbook",
+        "folder-root"
+      ]
     },
     "pdf-release-checklist": {
       "googleFileId": "pdf-release-checklist",
@@ -210,6 +241,10 @@
       "publishedReaders": [
         "engineering@example.com",
         "writers@example.com"
+      ],
+      "publishedChain": [
+        "folder-reference",
+        "folder-root"
       ]
     },
     "pdf-scanned-form": {
@@ -233,7 +268,11 @@
       "shortId": "2a3aab",
       "sourceChecksum": "sha256:aa89a8a4d9205ce24edfac2453add7dc86d1ba534bf224d42938ed2bc4f0743e",
       "pdfTextVersion": 2,
-      "publishedReaders": "*"
+      "publishedReaders": "*",
+      "publishedChain": [
+        "folder-handbook",
+        "folder-root"
+      ]
     },
     "pdf-style-guide": {
       "googleFileId": "pdf-style-guide",
@@ -257,6 +296,11 @@
       "pdfTextVersion": 2,
       "publishedReaders": [
         "writers@example.com"
+      ],
+      "publishedChain": [
+        "folder-reference-guides",
+        "folder-reference",
+        "folder-root"
       ]
     }
   },

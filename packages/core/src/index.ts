@@ -42,18 +42,22 @@ export type {
 export {
   ADMINS_CLASS,
   chainReaders,
+  chainRules,
   classIdentifiers,
   computeAccessModel,
   documentClass,
+  folderChain,
   folderClass,
   intersectReaders,
   MEMBERS_CLASS,
+  nextPublishedReaders,
   widensReaders,
 } from './access-classes.js';
 export type {
   AccessClass,
   AccessModel,
   ChainReaders,
+  PublishedReaders,
   Readers,
 } from './access-classes.js';
 export { accessFindings } from './access-findings.js';

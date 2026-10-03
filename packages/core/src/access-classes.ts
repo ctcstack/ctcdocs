@@ -125,6 +125,108 @@ export function chainReaders(
     : { kind: 'readers', readers };
 }
 
+/**
+ * The folders on a folder's chain, from the folder up to the root, as far as
+ * the corpus knows them. Two documents in the same place have the same chain;
+ * a move in Drive changes it, and a change to the rules does not.
+ */
+export function folderChain(
+  folderId: string | null,
+  corpus: CorpusStructure,
+): string[] {
+  const chain: string[] = [];
+  let current = folderId ?? corpus.rootFolderId;
+  while (current !== null && !chain.includes(current)) {
+    chain.push(current);
+    current = corpus.folders.get(current)?.parentId ?? null;
+  }
+  return chain;
+}
+
+/**
+ * The access rules on a chain as one comparable value: adding, removing or
+ * changing the readers of any of them changes it, and a label does not.
+ */
+export function chainRules(
+  chain: readonly string[],
+  rules: ReadonlyMap<string, AccessRule>,
+): string {
+  const named = chain.flatMap((folder) => {
+    const rule = rules.get(folder);
+    return rule ? [`${folder}=${[...rule.readers].sort().join(',')}`] : [];
+  });
+  return createHash('sha256')
+    .update(`ctcdocs-chain-rules/v1\n${named.join('\n')}`)
+    .digest('hex')
+    .slice(0, 16);
+}
+
+/** The readers a document was last published with, and from where. */
+export interface PublishedReaders {
+  readonly readers: Readers;
+  /** Its folder chain when it was published there. */
+  readonly chain: readonly string[];
+  /**
+   * Set while a move that would widen its readers waits: the chain it moved
+   * to, and the rules on that chain when it arrived.
+   */
+  readonly held?: { readonly chain: readonly string[]; readonly rules: string };
+}
+
+function sameChain(left: readonly string[], right: readonly string[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((folder, index) => folder === right[index])
+  );
+}
+
+/**
+ * The readers a document is published with this time (ADR-039).
+ *
+ * A change to the rules is reviewed where the configuration is, so it takes
+ * effect at once, wider or narrower. A move in Drive is not reviewed: one that
+ * would give the document readers it did not have keeps the readers both
+ * places allow, until a rule on the new chain is added or changed. A move that
+ * narrows, or a move back, takes effect at once.
+ */
+export function nextPublishedReaders(
+  current: {
+    readonly readers: Readers;
+    readonly chain: readonly string[];
+    readonly rules: string;
+  },
+  previous: Partial<PublishedReaders> | undefined,
+): { readonly published: PublishedReaders; readonly held: boolean } {
+  const settled = {
+    published: { readers: current.readers, chain: current.chain },
+    held: false,
+  };
+  if (previous?.readers === undefined || previous.chain === undefined) {
+    return settled;
+  }
+  if (
+    sameChain(current.chain, previous.chain) ||
+    !widensReaders(current.readers, previous.readers)
+  ) {
+    return settled;
+  }
+  const waiting =
+    previous.held !== undefined && sameChain(previous.held.chain, current.chain)
+      ? previous.held
+      : undefined;
+  if (waiting && waiting.rules !== current.rules) {
+    return settled;
+  }
+  return {
+    published: {
+      readers: intersect(current.readers, previous.readers),
+      chain: previous.chain,
+      held: waiting ?? { chain: current.chain, rules: current.rules },
+    },
+    held: true,
+  };
+}
+
 function readerKey(readers: readonly string[]): string {
   return readers.join('\n');
 }
