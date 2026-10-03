@@ -524,6 +524,24 @@ describe('connecting an assistant', () => {
     expect(location.searchParams.get('state')).toBe('client-state');
   });
 
+  it('answers a request it cannot read with a page, not an exception', async () => {
+    const response = await call(
+      new Request(`${ORIGIN}/auth/authorize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      }),
+    );
+    expect(response.status).toBe(400);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(response.headers.get('Strict-Transport-Security')).toBeTruthy();
+    expect(await response.text()).toContain('could not be completed');
+    expect(events).toContainEqual({
+      event: 'authorize-failed',
+      error: 'TypeError',
+    });
+  });
+
   it('refuses an answer posted without the browser that saw the page', async () => {
     const { handle } = await consent(new Jar(), await register());
     const response = await answer(new Jar(), handle);
