@@ -194,11 +194,13 @@ tool ever shows a document its reader cannot open. A document longer than
 about 100,000 characters is cut there, and `metadata` says so.
 
 The tools are served by the MCP TypeScript SDK's server package
-(`@modelcontextprotocol/server`), whose `createMcpHandler` answers each
+(`@modelcontextprotocol/server` 2.3), whose `createMcpHandler` answers each
 request statelessly on any web-standard runtime, rather than by the Agents
 SDK the spike used, so that no Cloudflare package sits between the gate and
-the tools. The SDK takes the tools' schemas in `zod`. With the OAuth library,
-these are the three production dependencies the server adds.
+the tools. It needs at least 2.1, which bounds the body of a request to
+`/mcp` at 4 MiB and a batch at 100 messages. The SDK takes the tools'
+schemas in `zod`. With the OAuth library, these are the three production
+dependencies the server adds.
 
 ### Configuration and checks
 
