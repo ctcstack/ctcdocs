@@ -96,6 +96,9 @@ importers:
       '@fontsource-variable/jetbrains-mono':
         specifier: 5.3.0
         version: 5.3.0
+      '@pagefind/default-ui':
+        specifier: 1.5.2
+        version: 1.5.2
       cheerio:
         specifier: 1.2.0
         version: 1.2.0

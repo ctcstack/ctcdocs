@@ -52,6 +52,14 @@ export function classOfFolderSlug(slug: string): string {
   return folderClass(accessModel, folderIdsBySlug.get(slug));
 }
 
+/**
+ * Whether any document is outside the members class, so the search interface
+ * has bundles of other classes to ask the Worker about.
+ */
+export const hasRestrictedClasses: boolean = Object.keys(
+  accessModel.classes,
+).some((id) => id !== MEMBERS_CLASS);
+
 /** Whether every signed-in member may read a document. */
 export function isOpenToMembers(fileId: string | undefined): boolean {
   return classOfDocument(fileId) === MEMBERS_CLASS;

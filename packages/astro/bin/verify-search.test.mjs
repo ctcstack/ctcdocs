@@ -4,6 +4,7 @@ import test from 'node:test';
 
 import {
   buildSearchCases,
+  casesByBundle,
   resultPath,
   sitePathOf,
   unindexedElements,
@@ -186,4 +187,42 @@ test('a built file maps to the path a Pagefind result reports', () => {
     '/notes/заметки/',
   );
   assert.equal(sitePathOf('404.html'), '/404.html');
+});
+
+test('a document is searched for in the bundle of its own class', () => {
+  const groups = casesByBundle(
+    [
+      ['Open guide', '/open/guide/'],
+      ['Team plan', '/team/plan/'],
+      ['Unmapped page', '/elsewhere/'],
+    ],
+    {
+      files: { '/open/guide/': 'members', '/team/plan/': '0a1b2c3d' },
+      bundles: { members: '/pagefind/', '0a1b2c3d': '/pagefind-0a1b2c3d/' },
+    },
+  );
+  assert.deepEqual(
+    [...groups],
+    [
+      [
+        '/pagefind/',
+        [
+          ['Open guide', '/open/guide/', 'members'],
+          ['Unmapped page', '/elsewhere/', 'members'],
+        ],
+      ],
+      ['/pagefind-0a1b2c3d/', [['Team plan', '/team/plan/', '0a1b2c3d']]],
+    ],
+  );
+});
+
+test('a class without a bundle fails the check', () => {
+  assert.throws(
+    () =>
+      casesByBundle([['Team plan', '/team/plan/']], {
+        files: { '/team/plan/': 'admins' },
+        bundles: { members: '/pagefind/' },
+      }),
+    /names no search bundle/u,
+  );
 });

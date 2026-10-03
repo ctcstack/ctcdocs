@@ -12,11 +12,15 @@ import { describe, expect, it } from 'vitest';
  * this test notices the coupling coming back.
  *
  * `config.ts` is outside the rule: it is Starlight's configuration, and its
- * Expressive Code overrides keep Starlight's names on purpose.
+ * Expressive Code overrides keep Starlight's names on purpose. So is
+ * `components/Search.astro`, Starlight's own search adapted to merge bundles
+ * by access class (ADR-039): its styles stay Starlight's, word for word, so it
+ * can be compared with Starlight's on every upgrade.
  */
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 const STARLIGHT_TOKEN = /--_*sl-[a-z0-9]/u;
 const STARLIGHT_TOKEN_READ = /var\(\s*--_*sl-[a-z0-9]/u;
+const ADAPTED_FROM_STARLIGHT = new Set(['components/Search.astro']);
 const ADAPTER_START =
   '/* --------------------------------------------------------------- adapter */';
 
@@ -26,7 +30,10 @@ function sources(directory: string, extensions: readonly string[]): string[] {
     .filter(
       (file) =>
         extensions.some((extension) => file.endsWith(extension)) &&
-        !file.endsWith('.test.ts'),
+        !file.endsWith('.test.ts') &&
+        !ADAPTED_FROM_STARLIGHT.has(
+          join(directory, file).split('\\').join('/'),
+        ),
     )
     .map((file) => join(packageRoot, directory, file));
 }

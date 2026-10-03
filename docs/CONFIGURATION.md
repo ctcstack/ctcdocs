@@ -141,6 +141,14 @@ deployment has one, rules already decide what the site's indexes say: the
 a home page folder card takes its description only from a document every
 member may read. See [ADR-039](ADR/039-open-a-folder-only-to-the-google-groups-its-rule-names.md).
 
+Every build writes `.ctcdocs/access-map.json`, outside `dist`, naming the
+access class of every file it built, and one search bundle per class:
+`/pagefind/` for every member and `/pagefind-<class>/` for each other class.
+The search box merges the bundles the Worker lists for the reader at
+`/_kb/classes`; without a Worker it searches `/pagefind/` alone. Once rules
+exist, a built file the map cannot place fails the build. Add `.ctcdocs/` to
+the project's `.gitignore`.
+
 ## Environments
 
 `deployment.environments` is an open set, not a fixed pair. Name the

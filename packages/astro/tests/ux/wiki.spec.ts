@@ -1,4 +1,5 @@
 import { AxeBuilder } from '@axe-core/playwright';
+import { ACCESS_CLASSES_ROUTE } from '@ctcstack/ctcdocs-core';
 import { expect, test, type Page } from '@playwright/test';
 import type { Root, RootContent } from 'mdast';
 import remarkParse from 'remark-parse';
@@ -15,6 +16,7 @@ import {
   contentHealthReport,
   deepestDocument,
   folderAccessFindingCount,
+  searchBundlesOfEveryClass,
   unpublishedReport,
   documentInFolder,
   documentLinkingAnother,
@@ -25,6 +27,19 @@ import {
   pdfDocument,
   sectionWithSubfolder,
 } from '../support/corpus-fixtures.js';
+
+/*
+ * The classes route belongs to the Worker (ADR-038, ADR-039), which the static
+ * server the suite runs against does not have. Answering it as the Worker
+ * would for an admin keeps every document searchable, as it was before
+ * search was split by class.
+ */
+test.beforeEach(async ({ page }) => {
+  const bundles = searchBundlesOfEveryClass();
+  await page.route(`**${ACCESS_CLASSES_ROUTE}`, (route) =>
+    route.fulfill({ json: { bundles } }),
+  );
+});
 
 /** Every link destination in a Markdown document, read by a real parser. */
 function markdownLinks(markdown: string): string[] {

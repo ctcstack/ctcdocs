@@ -44,6 +44,7 @@ import { PLATFORM_ROUTE_HREFS } from '@ctcstack/ctcdocs-core';
 
 <script>
   import { searchesFor } from '../scripts/missing-page-searches';
+  import { readableBundles } from '../scripts/search-bundles';
 
   interface PagefindResultData {
     url: string;
@@ -52,6 +53,7 @@ import { PLATFORM_ROUTE_HREFS } from '@ctcstack/ctcdocs-core';
   }
 
   interface Pagefind {
+    mergeIndex(bundlePath: string): Promise<void>;
     search(term: string): Promise<{
       results: Array<{ data(): Promise<PagefindResultData> }>;
     }>;
@@ -67,6 +69,10 @@ import { PLATFORM_ROUTE_HREFS } from '@ctcstack/ctcdocs-core';
       try {
         const bundle = '/pagefind/pagefind.js';
         const pagefind = (await import(/* @vite-ignore */ bundle)) as Pagefind;
+        // The bundles of the reader's other access classes (ADR-039).
+        for (const extra of await readableBundles()) {
+          await pagefind.mergeIndex(extra);
+        }
         let results: PagefindResultData[] = [];
         for (const terms of searches) {
           const search = await pagefind.search(terms);
