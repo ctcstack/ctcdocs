@@ -314,30 +314,9 @@ the gate, so the two cannot drift apart silently.
 
 A project installs the packages; it does not fork this repository. What it owns
 is its identity, its brand, its content and its workflows — the list in the
-[README](../README.md#what-a-project-looks-like).
-
-1. Write `site.config.json`.
-2. Write `wrangler.jsonc` with the same Worker name and hostnames, and on a
-   private deployment `wrangler.directory.jsonc`. `ctcdocs-sync validate` tells
-   you if you missed one.
-3. List every generated path in `.prettierignore`, following
-   [NEW_PROJECT.md](NEW_PROJECT.md#4-the-rest-of-the-files).
-   `ctcdocs-sync validate` names any the formatter would still check.
-4. Add `public/favicon.svg` and the accent triads in `src/styles/brand.css`.
-5. Point the sync at the Shared Drive with `GOOGLE_DRIVE_ID` and
-   `GOOGLE_ROOT_FOLDER_ID`, following
-   [GOOGLE_WORKSPACE_SETUP.md](GOOGLE_WORKSPACE_SETUP.md).
-6. For a private deployment, create the sign-in client and the directory
-   reader, following [GOOGLE_WORKSPACE_SETUP.md](GOOGLE_WORKSPACE_SETUP.md#sign-in),
-   then the KV namespace, the Workers' secrets and the custom domains,
-   following [CLOUDFLARE_SETUP.md](CLOUDFLARE_SETUP.md).
-7. Set the repository and environment secrets and variables listed in
-   [DEPLOYMENT.md](DEPLOYMENT.md).
-8. Run a first sync, then the project's own gate:
-
-```bash
-ctcdocs-sync sync --full
-```
+[README](../README.md#what-a-project-looks-like). The whole setup, step by
+step, with every value and where it goes, is
+[Setting up a CTCDocs site](NEW_PROJECT.md).
 
 ## Why the checks stay honest
 
