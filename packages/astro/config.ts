@@ -25,6 +25,7 @@ import { normalizeFolderName } from './lib/folder-anchor.js';
 import { remarkMermaid } from './lib/remark-mermaid.js';
 import { remarkPermanentLinks } from './lib/remark-permanent-links.js';
 import { remarkTableScroll } from './lib/remark-table-scroll.js';
+import { ctcdocsAccessOutput } from './access-output.js';
 import { ctcdocsRoutes } from './route-injection.js';
 
 type SidebarConfiguration = NonNullable<StarlightUserConfig['sidebar']>;
@@ -142,6 +143,8 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
       // A section page draws its listing with folders and documents apart.
       MarkdownContent: '@ctcstack/ctcdocs/components/MarkdownContent.astro',
       PageTitle: '@ctcstack/ctcdocs/components/DocumentHeader.astro',
+      // Search merges the bundles of the access classes a reader may open.
+      Search: '@ctcstack/ctcdocs/components/Search.astro',
       // Carets rather than arrows on the previous and next links.
       Pagination: '@ctcstack/ctcdocs/components/Pagination.astro',
       SiteTitle: '@ctcstack/ctcdocs/components/SiteTitle.astro',
@@ -152,6 +155,9 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
     // would repeat it from the sync commit, which is a different, less
     // meaningful date.
     lastUpdated: false,
+    // The platform indexes each access class into its own bundle after the
+    // build (ADR-039); Starlight's single bundle would mix them.
+    pagefind: false,
     // The platform serves its own 404, which searches for the missing address.
     disable404Route: true,
     pagination: true,
@@ -210,6 +216,9 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
     integrations: [
       ctcdocsRoutes({ navigation: generatedSidebar }),
       starlight(starlightConfiguration),
+      // After Starlight, which places its sitemap right after itself, so the
+      // map sees every file the build writes.
+      ctcdocsAccessOutput(),
     ],
     ...options.astro,
   };

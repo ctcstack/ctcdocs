@@ -21,6 +21,20 @@ All three packages share a version and are released together.
 - The `llms.txt` indexes describe a document only in an index of its own
   access class and list the rest by title and address, and a home page folder
   card takes its description only from a document every member may read.
+- Every build writes an access map, `.ctcdocs/access-map.json`, outside
+  `dist`: the access class of every built file, which the Worker will read.
+  Once rules exist, a file the map cannot place fails the build.
+- Search is split by access class: Starlight's own Pagefind run is off, and
+  the platform writes `/pagefind/` for every member and `/pagefind-<class>/`
+  for each other class. The search box and the 404 page merge the bundles the
+  Worker lists for the reader at `/_kb/classes`, and search `/pagefind/` alone
+  without one. `ctcdocs-verify-search` searches each document in its own
+  class's bundle and checks that no narrower document is found in
+  `/pagefind/`.
+
+### Upgrade note
+
+- Add `.ctcdocs/` to the project's `.gitignore`.
 
 ## 0.15.0
 

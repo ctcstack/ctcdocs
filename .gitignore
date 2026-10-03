@@ -12,6 +12,9 @@ dist/
 !.husky/
 !.husky/pre-commit
 
+# The access map a build writes for the Worker (ADR-039)
+.ctcdocs/
+
 # Environment
 .env
 .env.local

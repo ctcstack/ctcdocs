@@ -32,6 +32,11 @@ export const PROJECT_LAYOUT = {
   syncReportFile: 'data/latest-sync-report.json',
   /** What each document's opening says about its title (ADR-023). */
   titleReportFile: 'data/title-report.json',
+  /**
+   * Which access class every built file belongs to (ADR-039). Written by the
+   * build outside `dist`, so it is never published, and read by the Worker.
+   */
+  accessMapFile: '.ctcdocs/access-map.json',
 } as const;
 
 /**
@@ -60,6 +65,12 @@ export const PLATFORM_ROUTES = {
    */
   contentHealth: 'content-health',
 } as const;
+
+/**
+ * Where the Worker tells a signed-in reader which search bundles, beyond the
+ * members bundle, they may open (ADR-039). Answered `{ "bundles": [...] }`.
+ */
+export const ACCESS_CLASSES_ROUTE = '/_kb/classes';
 
 /** Each platform route as the href a link uses. */
 export const PLATFORM_ROUTE_HREFS = {

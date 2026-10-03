@@ -14,7 +14,11 @@ import { tmpdir } from 'node:os';
 import { dirname, extname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { findProjectRoot, PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
+import {
+  findProjectRoot,
+  MEMBERS_CLASS,
+  PROJECT_LAYOUT,
+} from '@ctcstack/ctcdocs-core';
 import * as cheerio from 'cheerio';
 import { close, createIndex } from 'pagefind';
 
@@ -236,13 +240,99 @@ async function searchCases() {
   return cases;
 }
 
+/**
+ * The access map the build writes (ADR-039): which class each page is in, and
+ * where each class's search bundle is.
+ */
+async function readAccessMap(projectRoot) {
+  const path = resolve(projectRoot, PROJECT_LAYOUT.accessMapFile);
+  const text = await readFile(path, 'utf8').catch(() => undefined);
+  assert(
+    text !== undefined,
+    `${PROJECT_LAYOUT.accessMapFile} is missing; build the site before verifying search.`,
+  );
+  return JSON.parse(text);
+}
+
+/**
+ * Search cases grouped by the bundle that must answer them: a document is
+ * found in the bundle of its own class, and only there.
+ */
+export function casesByBundle(cases, accessMap) {
+  const groups = new Map();
+  for (const [query, path] of cases) {
+    const cls = accessMap.files?.[path] ?? MEMBERS_CLASS;
+    const bundle = accessMap.bundles?.[cls];
+    assert(
+      typeof bundle === 'string',
+      `The access map names no search bundle for the class of ${path}.`,
+    );
+    groups.set(bundle, [...(groups.get(bundle) ?? []), [query, path, cls]]);
+  }
+  return groups;
+}
+
+async function expectNoResult(pagefind, query, path) {
+  const search = await pagefind.search(query);
+  const results = await Promise.all(
+    search.results.map((result) => result.data()),
+  );
+  assert(
+    !results.some((result) => resultPath(result.url) === path),
+    `The members search bundle returned ${path}, which is in a narrower class.`,
+  );
+}
+
+/** The members bundle with another class's bundle merged, as a reader sees it. */
+async function withMergedIndex(distRoot, bundle, run) {
+  const membersRoot = resolve(distRoot, 'pagefind');
+  await assertBundleIsComplete(membersRoot);
+  await assertBundleIsComplete(resolve(distRoot, bundle.slice(1, -1)));
+  const server = await startStaticServer(distRoot);
+  const moduleUrl = pathToFileURL(resolve(membersRoot, 'pagefind.js'));
+  moduleUrl.searchParams.set('test-run', crypto.randomUUID());
+  const pagefind = await import(moduleUrl.href);
+  try {
+    await pagefind.options({
+      basePath: new URL('pagefind/', server.baseUrl).href,
+    });
+    await pagefind.mergeIndex(new URL(bundle.slice(1), server.baseUrl).href);
+    await run(pagefind);
+  } finally {
+    await pagefind.destroy();
+    await server.close();
+  }
+}
+
 async function verifyBuiltIndex(distRoot) {
   const cases = await searchCases();
-  await withSearchIndex(resolve(distRoot, 'pagefind'), async (pagefind) => {
-    for (const [query, expectedPath] of cases) {
-      await expectResult(pagefind, query, expectedPath);
-    }
-  });
+  const groups = casesByBundle(cases, await readAccessMap(findProjectRoot()));
+  for (const [bundle, bundleCases] of groups) {
+    await withSearchIndex(
+      resolve(distRoot, bundle.slice(1, -1)),
+      async (pagefind) => {
+        for (const [query, expectedPath] of bundleCases) {
+          await expectResult(pagefind, query, expectedPath);
+        }
+      },
+    );
+  }
+  const restricted = [...groups]
+    .filter(([bundle]) => bundle !== '/pagefind/')
+    .flatMap(([bundle, bundleCases]) =>
+      bundleCases.map(([query, path]) => [bundle, query, path]),
+    );
+  if (restricted.length > 0) {
+    await withSearchIndex(resolve(distRoot, 'pagefind'), async (pagefind) => {
+      for (const [, query, path] of restricted) {
+        await expectNoResult(pagefind, query, path);
+      }
+    });
+    const [bundle, query, path] = restricted[0];
+    await withMergedIndex(distRoot, bundle, (pagefind) =>
+      expectResult(pagefind, query, path),
+    );
+  }
   return cases.length;
 }
 

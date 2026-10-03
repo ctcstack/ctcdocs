@@ -71,6 +71,13 @@ const jsonLd =
 <Default />
 <style is:inline set:html={STARLIGHT_LAYER_ORDER}></style>
 {
+  /*
+   * What the page was made from, read back by the build to give every file
+   * an access class (ADR-039).
+   */
+}
+<meta name="ctcdocs:source" content={data.sourceType} />
+{
   markdownPath && (
     <link rel="alternate" type="text/markdown" href={markdownPath} />
   )

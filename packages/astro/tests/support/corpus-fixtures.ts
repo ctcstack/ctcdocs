@@ -385,6 +385,29 @@ export function contentHealthReport():
 }
 
 /**
+ * Every search bundle beyond the members bundle, as the Worker would list them
+ * for a reader in an admin group (ADR-039). The browser suite runs against a
+ * static server with no Worker, so it answers the classes route itself and
+ * searches what an admin may.
+ */
+export function searchBundlesOfEveryClass(): string[] {
+  let map: { bundles?: Record<string, string> };
+  try {
+    map = JSON.parse(
+      readFileSync(
+        resolve(repositoryRoot, PROJECT_LAYOUT.accessMapFile),
+        'utf8',
+      ),
+    ) as { bundles?: Record<string, string> };
+  } catch {
+    return [];
+  }
+  return Object.values(map.bundles ?? {})
+    .filter((bundle) => bundle !== '/pagefind/')
+    .sort();
+}
+
+/**
  * How many folder access findings (ADR-039) the content health page lists:
  * none for a project without an `access` section.
  */
