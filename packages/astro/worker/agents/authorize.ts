@@ -42,8 +42,10 @@ type AuthorizationApi = Pick<
 >;
 
 /**
- * The OAuth library as the gate uses it, so that only the Worker's entry
- * imports the library itself.
+ * The OAuth library as the gate uses it. This module is written against the
+ * library's helpers and imports their types only; the adapter, `oauth.ts`, is
+ * the one module that imports its code, and only the Worker's entry imports
+ * the adapter.
  */
 export interface AgentOAuth {
   readonly api: AuthorizationApi;

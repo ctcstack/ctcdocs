@@ -43,7 +43,10 @@ way Starlight does, because the consuming project's Astro build compiles them;
 its `worker/` is bundled by the project's Wrangler. The Worker code uses
 web-standard APIs only, with Cloudflare confined to its two entry files and
 the MCP server's OAuth adapter (`worker/agents/oauth.ts`), so a deployment can
-move to another host without rewriting its gate.
+move to another host without rewriting its gate. The authorization step
+(`worker/agents/authorize.ts`) is written against that OAuth library's
+helpers and imports its types, never its code: moving host replaces the
+library, the adapter and that step, and nothing else.
 
 ## Product invariants
 
