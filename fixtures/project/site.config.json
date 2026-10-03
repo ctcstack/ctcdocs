@@ -27,6 +27,9 @@
   "signIn": {
     "workspaceDomains": ["example.com"]
   },
+  "mcp": {
+    "enabled": true
+  },
   "brand": {
     "name": "Example Corp",
     "siteTitle": "Example [DOCS]",

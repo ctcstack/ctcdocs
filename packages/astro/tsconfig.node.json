@@ -20,7 +20,17 @@
     "lib/folder-anchor.ts",
     "lib/project.ts",
     "tests/**/*.ts",
-    "worker/*.ts"
+    "worker/*.ts",
+    "worker/agents/*.ts"
   ],
-  "exclude": ["node_modules", "dist-node", "**/*.test.ts", "worker/index.ts"]
+  "exclude": [
+    "node_modules",
+    "dist-node",
+    "**/*.test.ts",
+    "worker/index.ts",
+    // The OAuth library imports Cloudflare's runtime, which Node cannot load.
+    "worker/agents/oauth.ts",
+    "worker/agents/cloudflare-workers.stub.ts",
+    "worker/agents/test-support.ts"
+  ]
 }

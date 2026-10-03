@@ -18,6 +18,11 @@ import { fileURLToPath } from 'node:url';
 
 import { findProjectRoot, PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
 
+import {
+  fetchDocument,
+  searchDocuments,
+} from '../dist-node/worker/agents/documents.js';
+import { publishDocuments } from '../dist-node/worker/agents/publish.js';
 import { handle, SESSION_COOKIE } from '../dist-node/worker/handler.js';
 import { GoogleKeys } from '../dist-node/worker/oidc.js';
 import { randomToken, seal, sealKeys } from '../dist-node/worker/seal.js';
@@ -262,7 +267,136 @@ export async function verifyGate({ projectRoot, distRoot }) {
     );
     requests += 3;
   }
+  requests += await verifyAgents({ map, distRoot, environment, keys });
   return { files: files.length, requests };
+}
+
+/** A bucket in memory, as far as publishing and the tools use one. */
+function memoryStore() {
+  const objects = new Map();
+  return {
+    objects,
+    async get(key) {
+      const object = objects.get(key);
+      return object
+        ? { text: async () => object.text, customMetadata: object.metadata }
+        : null;
+    },
+    async head(key) {
+      const object = objects.get(key);
+      return object ? { customMetadata: object.metadata } : null;
+    },
+    async put(key, text, options) {
+      objects.set(key, { text, metadata: options.customMetadata });
+    },
+    async list({ prefix }) {
+      return {
+        objects: [...objects]
+          .filter(([key]) => key.startsWith(prefix))
+          .map(([key, object]) => ({ key, customMetadata: object.metadata })),
+        truncated: false,
+      };
+    },
+    async delete(keys) {
+      for (const key of keys) {
+        objects.delete(key);
+      }
+    },
+  };
+}
+
+/**
+ * The MCP server's tools (ADR-041), against the same build: the documents
+ * are published from `dist` as the Worker's schedule would, then every reader
+ * asks for every document. An index that returns everything stands in for AI
+ * Search, so only the gate's own judgment stands between a reader and a
+ * document.
+ */
+async function verifyAgents({ map, distRoot, environment, keys }) {
+  if (map.site.mcp !== true || !map.agents) {
+    return 0;
+  }
+  const store = memoryStore();
+  const everything = () =>
+    [...store.objects.keys()].map((key) => ({ key, score: 1 }));
+  const index = {
+    search: async () => everything(),
+    sync: async () => {},
+  };
+  const state = new Map();
+  const outcome = await publishDocuments({
+    map,
+    assets: assetsFrom(distRoot),
+    store,
+    index,
+    state: {
+      get: async (key) => state.get(key),
+      put: async (key, value) => state.set(key, JSON.parse(value)),
+    },
+    origin: environment.origin,
+    log: () => {},
+  });
+  assert.equal(outcome, 'published', 'The build could not be published.');
+  assert.equal(
+    store.objects.size,
+    map.agents.documents.length,
+    'Publishing left the bucket without some of the build’s documents.',
+  );
+
+  const people = keys.map(({ name, groups }) => ({
+    name,
+    reader: { kind: 'person', sub: name, email: '', groups },
+  }));
+  if (map.admins[0]) {
+    people.push({
+      name: 'admin',
+      reader: {
+        kind: 'person',
+        sub: 'admin',
+        email: '',
+        groups: [map.admins[0]],
+      },
+    });
+  }
+  let requests = 0;
+  for (const { name, reader } of people) {
+    const access = {
+      map,
+      reader,
+      stale: false,
+      origin: environment.origin,
+      store,
+      index,
+    };
+    const found = new Set(
+      (await searchDocuments(access, 'anything')).map((result) => result.id),
+    );
+    requests += 1;
+    for (const document of map.agents.documents) {
+      const fileClass = map.files[document.markdown];
+      const readers = map.classes[fileClass]?.readers;
+      // Independent of the gate's code, as for files above.
+      const allowed =
+        name === 'admin' ||
+        fileClass === 'members' ||
+        (Array.isArray(readers) &&
+          reader.groups.some((group) => readers.includes(group)));
+      const fetched = await fetchDocument(access, document.id);
+      requests += 1;
+      assert.equal(
+        fetched !== undefined,
+        allowed,
+        `MCP fetch ${allowed ? 'refused' : 'gave'} ${name} ${document.markdown} (${fileClass}).`,
+      );
+      if (found.has(document.id)) {
+        assert.ok(
+          allowed,
+          `MCP search showed ${name} ${document.markdown} (${fileClass}).`,
+        );
+      }
+    }
+  }
+  return requests;
 }
 
 function invokedDirectly() {

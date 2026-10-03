@@ -342,6 +342,55 @@ export async function verifyAnonymousDenial({
     }
     console.log(`Anonymous boundary holds: ${path} (${response.status}).`);
   }
+  await verifyMcpChallenge({ baseUrl, site, fetchImplementation });
+}
+
+/**
+ * The MCP server's boundary (ADR-041): an assistant without a token is told
+ * where to sign in, and nothing more. The metadata both OAuth documents name
+ * is public by design; it says how to connect, not what the site holds.
+ */
+export async function verifyMcpChallenge({
+  baseUrl,
+  site,
+  fetchImplementation = fetch,
+}) {
+  if (site.mcp?.enabled !== true) {
+    return;
+  }
+  const origin = parseWikiBaseUrl(baseUrl).origin;
+  const anonymous = await fetchImplementation(new URL('/mcp', origin), {
+    method: 'POST',
+    redirect: 'manual',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json, text/event-stream',
+    },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+  });
+  const challenge = anonymous.headers.get('www-authenticate') ?? '';
+  const metadata = `${origin}/.well-known/oauth-protected-resource/mcp`;
+  if (
+    anonymous.status !== 401 ||
+    !challenge.includes(`resource_metadata="${metadata}"`)
+  ) {
+    throw new AccessSmokeError(
+      `An anonymous MCP request was not challenged (${anonymous.status}).`,
+    );
+  }
+  for (const [path, field, expected] of [
+    ['/.well-known/oauth-protected-resource/mcp', 'resource', `${origin}/mcp`],
+    ['/.well-known/oauth-authorization-server', 'issuer', origin],
+  ]) {
+    const response = await request(fetchImplementation, new URL(path, origin));
+    const body = await response.json().catch(() => ({}));
+    if (response.status !== 200 || body[field] !== expected) {
+      throw new AccessSmokeError(
+        `${path} did not name ${expected} (${response.status}).`,
+      );
+    }
+  }
+  console.log('MCP boundary holds: /mcp asks for a token.');
 }
 
 function isPropagationFailure(error) {
@@ -503,6 +552,7 @@ export async function verifyPostDeploy({
     site,
     fetchImplementation,
   });
+  await verifyMcpChallenge({ baseUrl, site, fetchImplementation });
 }
 
 /**
