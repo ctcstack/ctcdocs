@@ -11,6 +11,13 @@
  * build's text. A store or an index that lags a deploy, or runs ahead of a
  * rollback, can hide a document for a while, never open one.
  *
+ * Search returns the passages that matched (ADR-042). A passage is shown only
+ * when its document is one the reader may open and the class its chunk carries
+ * in the index is one the reader may read: neither the index's filter nor its
+ * cache is trusted with that. A passage may come from an earlier version of a
+ * document the reader may still open, until the index syncs; it never reaches
+ * a reader outside the class of the text it was taken from.
+ *
  * Web-standard code only: the bucket and the index are handed in.
  */
 import {
@@ -46,18 +53,37 @@ export interface DocumentStore {
   delete(keys: string[]): Promise<void>;
 }
 
+/** A chunk the index found: its object's key, its text and its class. */
+export interface IndexedChunk {
+  readonly key: string;
+  readonly text: string;
+  /** The class the chunk's object carried when it was indexed. */
+  readonly class: string | undefined;
+}
+
 /** The part of an AI Search instance the server uses. */
 export interface DocumentIndex {
-  /** Keys of the objects whose chunks match `query`, best first. */
-  search(query: string, classes: readonly string[]): Promise<readonly string[]>;
+  /** Chunks matching `query` among documents of these classes, best first. */
+  search(
+    query: string,
+    classes: readonly string[],
+  ): Promise<readonly IndexedChunk[]>;
   /** Starts a sync of the bucket; throws when one cannot start now. */
   sync(): Promise<void>;
 }
 
 export const DOCUMENT_PREFIX = 'docs/';
 const DOCUMENT_SUFFIX = '.md';
-/** Results a search returns at most. */
+/** Documents a search returns at most. */
 const MAX_RESULTS = 10;
+/** Passages each document shows at most. */
+const PASSAGES_PER_RESULT = 3;
+/** Characters of passage text a search returns at most: about 6,000 tokens. */
+const PASSAGE_BUDGET = 24_000;
+/** Characters one passage shows at most, so that all ten fit the budget. */
+const PASSAGE_LIMIT = PASSAGE_BUDGET / MAX_RESULTS;
+/** Between two passages of one document. */
+const PASSAGE_SEPARATOR = '\n\n…\n\n';
 /** Text `fetch` returns at most: about 25,000 tokens. */
 export const FETCH_LIMIT = 100_000;
 
@@ -123,6 +149,48 @@ export interface SearchResult {
   readonly id: string;
   readonly title: string;
   readonly url: string;
+  /** The passages that matched, best first. */
+  readonly text: string;
+  /** The folders from the corpus root to the document. */
+  readonly path: readonly string[];
+  /** When the document last changed in Drive, when known. */
+  readonly modified?: string;
+}
+
+const sentences = new Intl.Segmenter('en', { granularity: 'sentence' });
+
+/**
+ * A passage cut to `limit` characters around its middle, where the chunk that
+ * matched sits between the neighbours the index adds, at sentence boundaries
+ * when a whole sentence fits.
+ */
+export function excerpt(text: string, limit: number): string {
+  const passage = text.trim();
+  if (passage.length <= limit) {
+    return passage;
+  }
+  const start = Math.floor((passage.length - limit) / 2);
+  const end = start + limit;
+  let from: number | undefined;
+  let to: number | undefined;
+  for (const { index, segment } of sentences.segment(passage)) {
+    if (index >= start && from === undefined) {
+      from = index;
+    }
+    if (index + segment.length <= end) {
+      to = index + segment.length;
+    }
+  }
+  return from !== undefined && to !== undefined && to > from
+    ? passage.slice(from, to).trim()
+    : passage.slice(start, end).trim();
+}
+
+/** The short ID an index key names, if it names a document object. */
+function idOf(key: string): string | undefined {
+  return key.startsWith(DOCUMENT_PREFIX) && key.endsWith(DOCUMENT_SUFFIX)
+    ? key.slice(DOCUMENT_PREFIX.length, -DOCUMENT_SUFFIX.length)
+    : undefined;
 }
 
 export async function searchDocuments(
@@ -134,31 +202,57 @@ export async function searchDocuments(
   if (classes.length === 0 || query.trim().length === 0) {
     return [];
   }
-  const results: SearchResult[] = [];
-  const seen = new Set<string>();
-  for (const key of await index.search(query, classes)) {
-    if (!key.startsWith(DOCUMENT_PREFIX) || !key.endsWith(DOCUMENT_SUFFIX)) {
-      continue;
+  const readable = new Set(classes);
+
+  // The documents the reader may open, in rank order, with their passages.
+  const found = new Map<
+    string,
+    { readonly document: AgentDocument; readonly passages: string[] }
+  >();
+  for (const chunk of await index.search(query, classes)) {
+    const id = idOf(chunk.key);
+    let entry = id === undefined ? undefined : found.get(id);
+    if (id !== undefined && !entry && found.size < MAX_RESULTS) {
+      const document = readableDocument(access, id);
+      if (document) {
+        entry = { document, passages: [] };
+        found.set(id, entry);
+      }
     }
-    const id = key.slice(DOCUMENT_PREFIX.length, -DOCUMENT_SUFFIX.length);
-    if (seen.has(id)) {
-      continue;
-    }
-    seen.add(id);
-    const document = readableDocument(access, id);
-    if (!document) {
-      continue;
-    }
-    results.push({
-      id,
-      title: document.title,
-      url: permanentLink(origin, id),
-    });
-    if (results.length === MAX_RESULTS) {
-      break;
+    if (
+      entry &&
+      entry.passages.length < PASSAGES_PER_RESULT &&
+      chunk.class !== undefined &&
+      readable.has(chunk.class) &&
+      chunk.text.trim().length > 0
+    ) {
+      entry.passages.push(excerpt(chunk.text, PASSAGE_LIMIT));
     }
   }
-  return results;
+
+  // Breadth first: every document's best passage before any second one.
+  const shown = new Map<string, string[]>(
+    [...found.keys()].map((id) => [id, []]),
+  );
+  let budget = PASSAGE_BUDGET;
+  for (let rank = 0; rank < PASSAGES_PER_RESULT; rank += 1) {
+    for (const [id, { passages }] of found) {
+      const passage = passages[rank];
+      if (passage !== undefined && passage.length <= budget) {
+        shown.get(id)?.push(passage);
+        budget -= passage.length;
+      }
+    }
+  }
+
+  return [...found].map(([id, { document }]) => ({
+    id,
+    title: document.title,
+    url: permanentLink(origin, id),
+    text: (shown.get(id) ?? []).join(PASSAGE_SEPARATOR),
+    path: document.path,
+    ...(document.modified ? { modified: document.modified } : {}),
+  }));
 }
 
 export interface FetchedDocument {

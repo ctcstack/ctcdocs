@@ -277,16 +277,22 @@ export async function verifyGate({ projectRoot, distRoot }) {
 /**
  * The MCP server's tools (ADR-041), against the same build: the documents
  * are published from `dist` as the Worker's schedule would, then every reader
- * asks for every document. An index that returns everything stands in for AI
- * Search, so only the gate's own judgment stands between a reader and a
- * document.
+ * asks for every document. An index that returns every object, whole, as a
+ * chunk with the class it was published with, stands in for AI Search, so
+ * only the gate's own judgment stands between a reader and a document or a
+ * passage of it.
  */
 async function verifyAgents({ map, distRoot, environment, keys }) {
   if (map.site.mcp !== true || !map.agents) {
     return 0;
   }
   const store = new MemoryStore();
-  const everything = () => [...store.objects.keys()];
+  const everything = () =>
+    [...store.objects].map(([key, object]) => ({
+      key,
+      text: object.text,
+      class: object.customMetadata.class,
+    }));
   const index = {
     search: async () => everything(),
     sync: async () => {},
@@ -331,10 +337,15 @@ async function verifyAgents({ map, distRoot, environment, keys }) {
       store,
       index,
     };
-    const found = new Set(
-      (await searchDocuments(access, 'anything')).map((result) => result.id),
-    );
+    const results = await searchDocuments(access, 'anything');
+    const found = new Set(results.map((result) => result.id));
     requests += 1;
+    for (const result of results) {
+      assert.ok(
+        result.text.length > 0,
+        `MCP search showed ${name} ${result.id} without a passage.`,
+      );
+    }
     for (const document of map.agents.documents) {
       const fileClass = map.files[document.markdown];
       const allowed =

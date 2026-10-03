@@ -101,8 +101,9 @@ second call; most also filter by folder or date.
 text, its object's key and custom metadata, and its scores; it can add up to
 three neighbouring chunks to each, switch keyword matching to `or`, boost by
 a metadata field, and rerank with `@cf/baai/bge-reranker-base`, an English
-cross-encoder, which has its own threshold
+cross-encoder, which has its own threshold, 0.4 unless a request sets another
 (<https://developers.cloudflare.com/ai-search/api/search/workers-binding/>).
+How the neighbouring chunks appear in a response is not documented.
 Query rewriting applies only to follow-up turns of a conversation, and
 `chatCompletions` writes an answer, which the assistant does itself. An
 instance's similarity cache is on unless it is turned off, for 48 hours, and
@@ -122,19 +123,23 @@ starting point.
 **The index is asked broadly, and the answer is kept short.** The Worker asks
 AI Search for 50 chunks in hybrid mode, with keyword matching set to `or`, a
 vector `match_threshold` of 0.2, so that exact terms reach the ranking,
-reranking by `bge-reranker-base` with its own threshold, which now decides
-what is not a match, and `context_expansion` of 1, so that each passage reads
-as a paragraph rather than a fragment. All of it is set in the request, so
-every deployment searches the same way without a setup step.
+reranking by `bge-reranker-base`, and `context_expansion` of 1, so that each
+passage reads as a paragraph rather than a fragment. The reranker orders the
+chunks and, for now, drops none: its threshold is set to 0. A weak match
+costs less than it did, since the assistant now reads why it matched; the
+first evaluation decides whether the reranker's score should cut. All of it
+is set in the request, so every deployment searches the same way without a
+setup step.
 
 **One result per document, with its best passages.** Chunks are grouped by
 document in reranked order: at most ten documents, each with up to three
 passages, and at most 24,000 characters of passage text in all, about 6,000
 tokens. The budget goes breadth first: every document gets its best passage
 before any gets a second, so the agent always sees the whole ten. A passage
-is at most about 2,400 characters, trimmed at a sentence boundary around the
-chunk that matched, since the chunk size is AI Search's and not the
-platform's. Each result keeps OpenAI's `id`, `title` and `url`, and adds:
+is at most about 2,400 characters, since the chunk size is AI Search's and
+not the platform's: a longer one keeps its middle, where the chunk that
+matched sits between its neighbours, cut at sentence boundaries. Each result
+keeps OpenAI's `id`, `title` and `url`, and adds:
 
 - `text` — its passages, in rank order;
 - `path` — the folders from the corpus root to the document, from the build;

@@ -1,4 +1,4 @@
-import type { CorpusDocument } from '@ctcstack/ctcdocs-core';
+import type { CorpusDocument, CorpusFolder } from '@ctcstack/ctcdocs-core';
 import { describe, expect, it } from 'vitest';
 
 import { buildAgentCatalog } from './agent-catalog.js';
@@ -30,12 +30,29 @@ const projections: Record<string, string> = {
   '/shared/index.md': '# Shared\n',
 };
 
+const folder = (
+  id: string,
+  parentId: string | null,
+  label: string,
+): [string, CorpusFolder] => [
+  id,
+  { id, parentId, name: `01 ${label}`, label, slug: undefined },
+];
+
+/** The root, a team folder, and a folder of plans inside it. */
+const FOLDERS = new Map([
+  folder('root', null, 'Root'),
+  folder('team', 'root', 'Team'),
+  folder('plans', 'team', 'Plans'),
+]);
+
 async function catalog(
   documents: CorpusDocument[],
   files: Record<string, string | string[]>,
 ) {
   return buildAgentCatalog({
     documents,
+    folders: FOLDERS,
     files: new Map(Object.entries(files)),
     readMarkdown: (path) => Promise.resolve(projections[path]),
   });
@@ -95,6 +112,26 @@ describe('agent catalog', () => {
     expect(moved.documents[0]?.hash).not.toBe(base.documents[0]?.hash);
     expect(moved.digest).not.toBe(base.digest);
     expect(renamed.documents[0]?.hash).not.toBe(base.documents[0]?.hash);
+  });
+
+  it('names the folders a document sits in, without the root', async () => {
+    const result = await catalog(
+      [
+        document('handbook', { shortId: 'aaaaaa', parentId: 'root' }),
+        document('team/plan', { shortId: 'bbbbbb', parentId: 'plans' }),
+        document('shared', { shortId: 'cccccc', parentId: 'gone' }),
+      ],
+      {
+        '/handbook/index.md': 'members',
+        '/team/plan/index.md': 'team0001',
+        '/shared/index.md': 'members',
+      },
+    );
+    expect(result.documents.map((entry) => entry.path)).toEqual([
+      [],
+      ['Team', 'Plans'],
+      [],
+    ]);
   });
 
   it('falls back to the slug for a title and to null for a time', async () => {

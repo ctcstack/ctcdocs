@@ -639,6 +639,15 @@ AI Search's own jobs show whether the index has caught up:
 pnpm exec wrangler ai-search jobs list <instance name>
 ```
 
+`search` asks AI Search for up to 50 chunks, matching any word of the query
+and with a low vector threshold, reranks them with `bge-reranker-base` without
+dropping any, and returns up to ten documents with their best passages, their
+folders and their date
+([ADR-042](ADR/042-an-assistants-search-returns-the-passages-that-match.md)).
+All of it is set in each request, so the instance needs no setting of its own.
+The Worker checks every passage against the person asking, so the instance's
+similarity cache, on by default, cannot show one person another's results.
+
 The Worker logs each tool call by tool and outcome only, never the query, the
 person or the document. A `tool-failed` event names a tool whose bucket or
 index failed, by the error's name; the assistant is told only to try again.
