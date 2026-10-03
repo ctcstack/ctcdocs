@@ -160,3 +160,59 @@ describe('sign-in configuration', () => {
     expect(() => parseSiteConfiguration(withSignIn(signIn))).toThrow(message);
   });
 });
+
+describe('MCP configuration', () => {
+  const withMcp = (
+    mcp: unknown,
+    {
+      signIn = true,
+      visibility,
+    }: { signIn?: boolean; visibility?: string } = {},
+  ) => ({
+    ...configuration(undefined, visibility),
+    ...(signIn ? { signIn: { workspaceDomains: ['example.com'] } } : {}),
+    mcp,
+  });
+
+  it('is absent unless the project sets it', () => {
+    expect(
+      parseSiteConfiguration(configuration(undefined)).mcp,
+    ).toBeUndefined();
+  });
+
+  it('turns the server on for a private deployment that signs readers in', () => {
+    expect(parseSiteConfiguration(withMcp({ enabled: true })).mcp).toEqual({
+      enabled: true,
+    });
+  });
+
+  it('may be switched off without sign-in', () => {
+    expect(
+      parseSiteConfiguration(withMcp({ enabled: false }, { signIn: false }))
+        .mcp,
+    ).toEqual({ enabled: false });
+  });
+
+  it.each([
+    [{}, /mcp\.enabled must be true or false/u],
+    [{ enabled: 'yes' }, /mcp\.enabled must be true or false/u],
+    [{ enabled: true, extra: 1 }, /mcp\.extra is not a known/u],
+    ['on', /mcp must be an object/u],
+  ])('rejects %j', (mcp, message) => {
+    expect(() => parseSiteConfiguration(withMcp(mcp))).toThrow(message);
+  });
+
+  it('needs sign-in', () => {
+    expect(() =>
+      parseSiteConfiguration(withMcp({ enabled: true }, { signIn: false })),
+    ).toThrow(/mcp needs signIn/u);
+  });
+
+  it('is refused while an environment is public', () => {
+    expect(() =>
+      parseSiteConfiguration(
+        withMcp({ enabled: true }, { visibility: 'public' }),
+      ),
+    ).toThrow(/mcp must not be enabled while the production environment/u);
+  });
+});

@@ -75,6 +75,7 @@ export type {
   DeploymentEnvironmentConfigurations,
   DeploymentVisibility,
   HomeConfiguration,
+  McpConfiguration,
   NavigationConfiguration,
   SignInConfiguration,
   SiteConfiguration,
