@@ -82,6 +82,16 @@ export const PLATFORM_WORKERS = {
   accessMapAlias: 'ctcdocs-access-map',
   stateBinding: 'KB_STATE',
   directorySchedule: '*/10 * * * *',
+  /** The MCP server's OAuth state; the library requires this name (ADR-041). */
+  oauthBinding: 'OAUTH_KV',
+  /** The R2 bucket the Worker publishes each document's Markdown to. */
+  documentsBinding: 'KB_DOCUMENTS',
+  /** The AI Search instance that indexes that bucket. */
+  searchBinding: 'KB_SEARCH',
+  /** How often the site's Worker checks that the bucket matches its build. */
+  publishSchedule: '*/5 * * * *',
+  /** Lets the OAuth library fetch a client's metadata document safely. */
+  oauthCompatibilityFlag: 'global_fetch_strictly_public',
 } as const;
 
 /**
@@ -98,10 +108,11 @@ export const PLATFORM_ROUTE_HREFS = {
 
 /**
  * Top-level addresses the platform serves beside the corpus: the Worker's
- * sign-in routes (ADR-038), the search bundles, `/pagefind/` and
- * `/pagefind-<class>/` (ADR-039), and the original files under `/assets/`.
+ * sign-in and OAuth routes (ADR-038, ADR-041), the search bundles,
+ * `/pagefind/` and `/pagefind-<class>/` (ADR-039), the original files under
+ * `/assets/`, and the MCP server at `/mcp` (ADR-041).
  */
-const SERVED_ADDRESSES = ['auth', 'pagefind', 'assets'] as const;
+const SERVED_ADDRESSES = ['auth', 'pagefind', 'assets', 'mcp'] as const;
 
 export const RESERVED_SLUGS: readonly string[] = Object.freeze([
   ...Object.values(PLATFORM_ROUTES),
