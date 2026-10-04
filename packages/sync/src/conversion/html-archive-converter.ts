@@ -231,12 +231,21 @@ interface DomNodeLike {
 
 const WHITESPACE = /\s/u;
 const PUNCTUATION = /[\p{P}\p{S}]/u;
+/** The character each mark's Markdown delimiters are made of. */
+const DELIMITER_CHARACTERS: Readonly<Record<string, string>> = {
+  B: '*',
+  DEL: '~',
+  EM: '*',
+  I: '*',
+  STRONG: '*',
+};
 
 /**
  * The character Markdown sees beside a mark, approximately: the edge of the
  * text next to it, a space when the mark's own text ends in one (the
- * conversion moves that space outside the delimiters), the punctuation an
- * element's Markdown opens or closes with, or none at the edge of a block.
+ * conversion moves that space outside the delimiters), the delimiter of a
+ * mark next to it, the punctuation another element's Markdown opens or
+ * closes with, or none at the edge of a block.
  */
 function besideMark(
   node: DomNodeLike,
@@ -254,14 +263,19 @@ function besideMark(
     const text = sibling.textContent ?? '';
     return side === 'before' ? text.at(-1) : text.at(0);
   }
-  return sibling.nodeName === 'BR' ? '\n' : '*';
+  if (sibling.nodeName === 'BR') {
+    return '\n';
+  }
+  return DELIMITER_CHARACTERS[sibling.nodeName] ?? '.';
 }
 
 /**
  * A mark written with its delimiters where Markdown reads them as one, and
  * as its HTML element where it would not: punctuation at the edge of the
  * mark with a letter beyond it, as in `<strong>Note:</strong>text`, would
- * leave the delimiters as literal characters.
+ * leave the delimiters as literal characters. So would the same delimiter
+ * beyond it, the next mark's: `**Note:***text*` runs the asterisks of both
+ * together, so the bold is written `<strong>Note:</strong>*text*`.
  */
 function markReplacement(delimiter: string, element: string) {
   return (content: string, node: unknown): string => {
@@ -269,10 +283,11 @@ function markReplacement(delimiter: string, element: string) {
       return content;
     }
     const mark = node as DomNodeLike;
+    const own = delimiter.at(0);
     const loose = (character: string | undefined) =>
       character === undefined ||
       WHITESPACE.test(character) ||
-      PUNCTUATION.test(character);
+      (PUNCTUATION.test(character) && character !== own);
     const first = content.at(0) ?? '';
     const last = content.at(-1) ?? '';
     const opens = !PUNCTUATION.test(first) || loose(besideMark(mark, 'before'));
