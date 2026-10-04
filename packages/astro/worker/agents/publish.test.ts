@@ -21,11 +21,14 @@ function setup({
   store = new MemoryStore(),
   marker,
   missing = [] as string[],
+  bare = [] as string[],
 }: {
   map?: AccessMapFile;
   store?: MemoryStore;
   marker?: unknown;
   missing?: string[];
+  /** Projections served without the front matter the site writes. */
+  bare?: string[];
 } = {}) {
   const fetched: string[] = [];
   const index = new FixedIndex([]);
@@ -45,9 +48,15 @@ function setup({
           fetch: async (request: Request) => {
             const path = decodeURIComponent(new URL(request.url).pathname);
             fetched.push(path);
-            return missing.includes(path)
-              ? new Response('missing', { status: 404 })
-              : new Response(`projection of ${path}`);
+            if (missing.includes(path)) {
+              return new Response('missing', { status: 404 });
+            }
+            const body = `# Projection of ${path}\n`;
+            return new Response(
+              bare.includes(path)
+                ? body
+                : `---\ntitle: "x"\nsynced_at: "2026-10-02T00:00:00.000Z"\n---\n\n${body}`,
+            );
           },
         },
         store,
@@ -71,7 +80,8 @@ describe('publishing documents for the MCP server', () => {
     const run = setup();
     expect(await run.run()).toBe('published');
     expect(run.store.objects.get('docs/bbbbbb.md')).toEqual({
-      text: 'projection of /team/plan/index.md',
+      // Without the front matter, which the index would hold as text.
+      text: '# Projection of /team/plan/index.md\n',
       customMetadata: {
         class: 'team0001',
         title: 'Team plan',
@@ -191,6 +201,13 @@ describe('publishing documents for the MCP server', () => {
     expect(run.store.objects.has('docs/bbbbbb.md')).toBe(true);
     expect(run.index.syncs).toBe(2);
     expect(await run.run()).toBe('unchanged');
+  });
+
+  it('stores no projection without its front matter, and says so', async () => {
+    const run = setup({ bare: ['/team/plan/index.md'] });
+    expect(await run.run()).toBe('incomplete');
+    expect(run.store.objects.has('docs/bbbbbb.md')).toBe(false);
+    expect(run.store.objects.has('docs/aaaaaa.md')).toBe(true);
   });
 
   it('keeps going past a document the bucket refuses', async () => {

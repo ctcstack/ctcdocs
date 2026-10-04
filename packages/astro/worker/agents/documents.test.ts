@@ -162,6 +162,7 @@ describe('search', () => {
       markdown: '/handbook/index.md',
       modified: null,
       path: [],
+      source: null,
       hash: `h-${n}`,
     }));
     const map: AccessMapFile = {
@@ -224,6 +225,7 @@ describe('passages', () => {
       markdown: '/handbook/index.md',
       modified: null,
       path: [],
+      source: null,
       hash: `h-${n}`,
     }));
     const map: AccessMapFile = {
@@ -263,6 +265,7 @@ describe('passages', () => {
       markdown: '/handbook/index.md',
       modified: null,
       path: [],
+      source: null,
       hash: `h-${n}`,
     }));
     const map: AccessMapFile = {
@@ -355,7 +358,9 @@ describe('settings', () => {
       access(readers.member, { map }),
       'aaaaaa',
     );
-    expect(document?.text).toBe('# Han');
+    expect(document?.text).toBe(
+      `# Han\n\n…\n\nThe document continues: this is its first 5 characters. The whole of it is on its page, ${ORIGIN}/d/aaaaaa/\n`,
+    );
     expect(document?.metadata.truncated).toBe(true);
   });
 });
@@ -367,8 +372,18 @@ describe('fetch', () => {
       title: 'Handbook',
       text: '# Handbook\n',
       url: `${ORIGIN}/d/aaaaaa/`,
-      metadata: { modified: '2026-10-01T00:00:00.000Z' },
+      metadata: {
+        modified: '2026-10-01T00:00:00.000Z',
+        path: [],
+        source: 'https://docs.google.com/document/d/handbook/edit',
+      },
     });
+  });
+
+  it('names the folders of a document, and no time or source it lacks', async () => {
+    expect(
+      (await fetchDocument(access(readers.team), 'bbbbbb'))?.metadata,
+    ).toEqual({ path: ['Team'] });
   });
 
   it.each([
@@ -445,7 +460,41 @@ describe('fetch', () => {
       access(readers.admin, { store }),
       'cccccc',
     );
-    expect(document?.text).toHaveLength(agentSettings.fetchCharacters);
-    expect(document?.metadata).toEqual({ truncated: true });
+    const { fetchCharacters } = agentSettings;
+    expect(document?.text.startsWith('x'.repeat(fetchCharacters))).toBe(true);
+    expect(document?.text.slice(fetchCharacters)).toBe(
+      `\n\n…\n\nThe document continues: this is its first ${fetchCharacters} characters. The whole of it is on its page, ${ORIGIN}/d/cccccc/\n`,
+    );
+    expect(document?.metadata).toEqual({ path: ['Unruled'], truncated: true });
+  });
+
+  it('cuts a document whole characters at a time', async () => {
+    const cutAt = (fetchCharacters: number): AccessMapFile => ({
+      ...agentMap,
+      agents: {
+        ...(agentMap.agents as NonNullable<AccessMapFile['agents']>),
+        fetchCharacters,
+      },
+    });
+    const store = publishedStore();
+    store.seed('docs/aaaaaa.md', 'Café 🙂 and more', {
+      class: 'members',
+      title: 'Handbook',
+      markdown: '/handbook/index.md',
+      hash: 'h-handbook',
+    });
+    const document = await fetchDocument(
+      access(readers.member, { map: cutAt(5), store }),
+      'aaaaaa',
+    );
+    expect(document?.text.startsWith('Café \n')).toBe(true);
+    expect(document?.text).toContain('its first 5 characters');
+    const smiley = await fetchDocument(
+      access(readers.member, { map: cutAt(6), store }),
+      'aaaaaa',
+    );
+    // The emoji's two halves stay together, outside the cut.
+    expect(smiley?.text.startsWith('Café \n')).toBe(true);
+    expect(smiley?.text).toContain('its first 5 characters');
   });
 });

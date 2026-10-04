@@ -315,8 +315,8 @@ editing generated files.
 
 ## Documents too long to read whole
 
-The content health page measures each document by its Markdown version, the
-text `fetch` returns, and names those over two lines
+The content health page measures each document by the text `fetch` returns,
+its Markdown version without the front matter, and names those over two lines
 ([ADR-043](ADR/043-content-health-names-documents-too-long-to-read-whole.md)):
 `sync.largeDocumentCharacters`, worth splitting, and `mcp.fetchCharacters`,
 which assistants read only the beginning of (100,000 with the MCP server

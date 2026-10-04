@@ -991,8 +991,9 @@ describe('basic Markdown sync', () => {
     temporaryDirectories.push(repository);
     /*
      * Five paragraphs of 901 characters: a body of 4,513 with the blank lines
-     * between them. The page's Markdown version adds its front matter and its
-     * title, 4,789 characters in all, and that is what `fetch` returns and cuts.
+     * between them. What `fetch` returns and cuts adds the title, 4,530
+     * characters in all, and not the front matter of the page's Markdown
+     * version, which the MCP server does not keep.
      * A document this short is converted fast; the default line is the
      * configuration's to test.
      */
@@ -1034,7 +1035,7 @@ describe('basic Markdown sync', () => {
       {
         id: 'doc-one',
         note: 'document-long',
-        detail: '4,789 characters, over 4,000',
+        detail: '4,530 characters, over 4,000',
       },
     ]);
     expect(first.report.documentLengths).toEqual({
@@ -1047,16 +1048,20 @@ describe('basic Markdown sync', () => {
     expect(raised.report.summary.exported).toBe(0);
     expect(long(raised)).toEqual([]);
 
-    // A body within the cut whose Markdown version is past it is cut too.
+    // A body within the cut that its title takes past it is cut too.
     expect(
-      long(await run({}, { enabled: true, fetchCharacters: 4_600 })),
+      long(await run({}, { enabled: true, fetchCharacters: 4_520 })),
     ).toEqual([
       {
         id: 'doc-one',
         note: 'document-over-agent-limit',
-        detail: '4,789 characters; AI agents read the first 4,600',
+        detail: '4,530 characters; AI agents read the first 4,520',
       },
     ]);
+    // The front matter is not counted.
+    expect(
+      long(await run({}, { enabled: true, fetchCharacters: 4_600 })),
+    ).toEqual([]);
   });
 
   it('crops, once, an image an earlier version published whole', async () => {

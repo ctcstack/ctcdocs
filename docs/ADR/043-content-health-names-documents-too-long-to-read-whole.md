@@ -34,12 +34,12 @@ was not settled, which ADR-037 ranks under Improve.
 ## Decision
 
 **The sync measures every published document.** Its length is the number of
-characters of its Markdown version: the text the site's projection serves and
-`fetch` returns and cuts, front matter and title included, with its links as
-the site writes them. The sync serializes that text with the function the
-projection route uses, which the core holds for both, from the same generated
-file, and counts it as `fetch` counts it, the same way on every run, so the
-notes are deterministic. It is measured from the output the run writes, as
+characters of the text `fetch` returns and cuts: its Markdown version without
+the front matter, which the MCP server does not keep (ADR-042), its title
+included, with its links as the site writes them. The sync serializes that
+text with the function the projection route uses, which the core holds for
+both, from the same generated file, and counts it as `fetch` counts it, the
+same way on every run, so the notes are deterministic. It is measured from the output the run writes, as
 image sizes are, so a changed line applies on the next run without exporting
 anything again.
 

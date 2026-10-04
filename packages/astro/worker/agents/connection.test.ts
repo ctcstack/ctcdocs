@@ -689,6 +689,17 @@ describe('an assistant reading', () => {
       title: 'Team plan',
       url: `${ORIGIN}/d/bbbbbb/`,
     });
+    // The folders, as a list, pass the tool's declared output schema.
+    expect(
+      (await tool(token, 'fetch', { id: 'aaaaaa' })).body.result
+        ?.structuredContent,
+    ).toMatchObject({
+      metadata: {
+        modified: '2026-10-01T00:00:00.000Z',
+        path: [],
+        source: 'https://docs.google.com/document/d/handbook/edit',
+      },
+    });
 
     // Leaving the directory ends it.
     snapshot = snapshotWith([]);

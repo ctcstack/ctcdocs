@@ -153,14 +153,37 @@ export function inlineMarkdown(value: string): string {
     .replace(/([\\`*_[\]<>#])/gu, '\\$1');
 }
 
-export function serializePublishedMarkdown(
-  input: PublishedMarkdownInput,
+/**
+ * The page's Markdown without its front matter: its title as a heading and
+ * its body. It is what the MCP server stores, indexes and returns from
+ * `fetch` (ADR-042), so it is also what the sync measures (ADR-043).
+ */
+export function publishedMarkdownBody(
+  input: Pick<
+    PublishedMarkdownInput,
+    'title' | 'ownershipHeader' | 'body' | 'stableSlugs' | 'permanentLinks'
+  >,
 ): string {
   const body = rewriteInternalLinks(
     cleanBody(input.body, input.ownershipHeader),
     input.stableSlugs,
     input.permanentLinks,
   );
+  return [
+    `# ${inlineMarkdown(input.title)}`,
+    '',
+    ...(body ? [body, ''] : []),
+  ].join('\n');
+}
+
+/**
+ * The page's Markdown version (ADR-010): front matter, then
+ * `publishedMarkdownBody`. Each front matter value is one JSON string, so no
+ * value spans a line and the first `---` line after the opening one closes it.
+ */
+export function serializePublishedMarkdown(
+  input: PublishedMarkdownInput,
+): string {
   return [
     '---',
     `title: ${yamlString(input.title)}`,
@@ -171,8 +194,6 @@ export function serializePublishedMarkdown(
     `content_hash: ${yamlString(input.contentHash)}`,
     '---',
     '',
-    `# ${inlineMarkdown(input.title)}`,
-    '',
-    ...(body ? [body, ''] : []),
+    publishedMarkdownBody(input),
   ].join('\n');
 }

@@ -56,6 +56,7 @@ export const agentMap: AccessMapFile = {
         markdown: '/handbook/index.md',
         modified: '2026-10-01T00:00:00.000Z',
         path: [],
+        source: 'https://docs.google.com/document/d/handbook/edit',
         hash: 'h-handbook',
       },
       {
@@ -64,6 +65,7 @@ export const agentMap: AccessMapFile = {
         markdown: '/team/plan/index.md',
         modified: null,
         path: ['Team'],
+        source: null,
         hash: 'h-plan',
       },
       {
@@ -72,6 +74,7 @@ export const agentMap: AccessMapFile = {
         markdown: '/unruled/notes/index.md',
         modified: null,
         path: ['Unruled'],
+        source: null,
         hash: 'h-notes',
       },
     ],

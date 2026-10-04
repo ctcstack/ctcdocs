@@ -271,7 +271,24 @@ export interface FetchedDocument {
   readonly title: string;
   readonly text: string;
   readonly url: string;
-  readonly metadata: Readonly<Record<string, string | boolean>>;
+  /**
+   * When it last changed, the folders it sits in, the source it is
+   * published from, and whether its text was cut (ADR-042).
+   */
+  readonly metadata: Readonly<
+    Record<string, string | boolean | readonly string[]>
+  >;
+}
+
+/**
+ * The first `limit` characters of a document too long to read whole, and a
+ * line that says it continues and where the whole of it is (ADR-042).
+ */
+function cut(text: string, limit: number, url: string): string {
+  // Never half of a character outside the Basic Multilingual Plane.
+  const last = text.charCodeAt(limit - 1);
+  const end = last >= 0xd800 && last <= 0xdbff ? limit - 1 : limit;
+  return `${text.slice(0, end)}\n\n…\n\nThe document continues: this is its first ${end} characters. The whole of it is on its page, ${url}\n`;
 }
 
 /** The document, or `undefined` when it does not exist for this reader. */
@@ -290,14 +307,17 @@ export async function fetchDocument(
     return undefined;
   }
   const text = await object.text();
+  const url = permanentLink(access.origin, id);
   const truncated = text.length > limit;
   return {
     id,
     title: document.title,
-    text: truncated ? text.slice(0, limit) : text,
-    url: permanentLink(access.origin, id),
+    text: truncated ? cut(text, limit, url) : text,
+    url,
     metadata: {
       ...(document.modified ? { modified: document.modified } : {}),
+      path: document.path,
+      ...(document.source ? { source: document.source } : {}),
       ...(truncated ? { truncated: true } : {}),
     },
   };
