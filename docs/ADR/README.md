@@ -78,5 +78,7 @@ Rejected
 - ADR-043: content health names documents too long to read whole. Proposed.
 - ADR-044: assistants list a folder and recent changes, and narrow a search.
   Proposed; supersedes ADR-042 in part once accepted.
+- ADR-045: an access review page shows admins who may read each folder.
+  Proposed; supersedes ADR-037 and ADR-011 in part once accepted.
 
 Create a new ADR by copying `000-template.md`.
