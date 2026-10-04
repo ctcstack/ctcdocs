@@ -3,7 +3,7 @@
 "slug": "reference"
 "shortId": "3865e9"
 "sourceType": "section-index"
-"contentHash": "sha256:4effb2e1ca940d21bec71db481f7942a4eafbc5bd9fb830479e8328620b39ce0"
+"contentHash": "sha256:0401e8731aec364851fe9633e6c132014c6f0eb67b8dd539bbc55a0e32f30f01"
 "folderPath": []
 "entries":
   - "kind": "folder"
@@ -13,9 +13,13 @@
     "slug": "reference/guides"
     "documentCount": 2
   - "kind": "document"
+    "slug": "reference/decision-log"
+  - "kind": "document"
     "slug": "reference/diagrams"
   - "kind": "document"
     "slug": "reference/release-checklist"
+  - "kind": "document"
+    "slug": "reference/release-process"
   - "kind": "document"
     "slug": "reference/screenshots"
 "pagefind": false
@@ -24,6 +28,8 @@
 
 - [Archive](/reference/archive/)
 - [Guides](/reference/guides/)
+- [Decision log](/reference/decision-log/) — Every decision the platform team made this year, one section each, the oldest first. None of them is real.
 - [Diagrams](/reference/diagrams/) — A mermaid fence has to be claimed before the code-frame renderer sees it, or the diagram publishes as a listing of its own source.
 - [Release checklist](/reference/release-checklist/) — Every release follows the same steps, in this order.
+- [Release process](/reference/release-process/) — A release moves what is merged on main to the production site. None of it is real: the steps are here so the reference has a document long enough to be worth splitting.
 - [Screenshots](/reference/screenshots/) — A document whose media forces the HTML archive path, so the asset route and the image pipeline are exercised by the corpus.
