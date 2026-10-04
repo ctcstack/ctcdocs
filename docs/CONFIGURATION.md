@@ -31,7 +31,8 @@ name of its own; they read this file. The rationale is recorded in
   "home": {
     "lede": "Every document here is published from Google Docs in the Example Shared Drive and is read-only. Each entry shows when its source was last edited.",
     "recentLimit": 6,
-    "corpusIndex": true
+    "corpusIndex": true,
+    "start": "about"
   },
   "navigation": {
     "landingDocumentTitles": ["Overview", "README", "About"],
@@ -59,6 +60,7 @@ name of its own; they read this file. The rationale is recorded in
 | `home.lede`                            | The paragraph under the home page heading, in full: where documents come from and what a reader may do with them.                        |
 | `home.recentLimit`                     | How many documents the "recently updated" band lists. A whole number of at least 1; defaults to 6.                                       |
 | `home.corpusIndex`                     | Whether the home page carries the full index, which is published at `/documents/` either way. Defaults to `true`.                        |
+| `home.start`                           | Optional. The address of a hand-authored page, such as `about`; the opening links newcomers to it by its title.                          |
 | `navigation.landingDocumentTitles`     | Titles that open the folder they sit in, most preferred first. Also picks the description the home page shows for a folder.              |
 | `navigation.sectionIndexPages`         | Whether each folder gets a generated page listing its subfolders, then its documents, at `/<folder-slug>/`.                              |
 | `navigation.nameScripts`               | Optional. The Unicode scripts a letter in a Drive name may belong to, such as `["Latin"]`. See below.                                    |
@@ -339,6 +341,12 @@ a slow corpus and an afternoon on a busy one, so the number belongs to the
 deployment rather than to the platform. Documents with no recorded source
 modification time are not in the band at all; they are still listed everywhere
 else.
+
+`home.start` names the page a newcomer reads first: the address of a page the
+project writes by hand under `src/content/docs`, such as `about`. The opening
+links to it with that page's own title, so renaming the page renames the link,
+and an address with no page behind it fails the build. Without the setting the
+opening carries no such link.
 
 `home.corpusIndex` decides whether the home page ends with every document,
 grouped by folder. Keeping it is right for a corpus a reader can take in at a

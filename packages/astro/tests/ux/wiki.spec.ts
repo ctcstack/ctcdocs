@@ -127,9 +127,14 @@ test('home page is accessible and search is keyboard operable', async ({
       '/documents/',
     );
   }
-  await expect(
-    page.getByRole('link', { name: 'About this wiki' }).first(),
-  ).toBeVisible();
+  const { start } = siteConfiguration.home;
+  if (start === undefined) {
+    await expect(page.locator('.hero-onboarding')).toHaveCount(0);
+  } else {
+    await expect(
+      page.locator('.hero-onboarding').getByRole('link'),
+    ).toHaveAttribute('href', `/${start}/`);
+  }
 
   // Agents are an equal audience, so the machine-readable surface is named on
   // the page and the address it advertises has to resolve.

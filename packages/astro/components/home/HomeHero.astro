@@ -1,6 +1,6 @@
 ---
 /**
- * The home page's opening: what this wiki is, and the fastest way in.
+ * The home page's opening: what this site is, and the fastest way in.
  *
  * The dominant use is an employee arriving with a specific question, so search
  * is given the width rather than being left as an icon in the header. The
@@ -11,6 +11,8 @@
  * whole from the project configuration rather than assembled here around a
  * configured name. See docs/ADR/012-project-configuration-layer.md.
  */
+import { getEntry } from 'astro:content';
+
 import { siteConfiguration } from '../../lib/project';
 
 import { formatDate, type Corpus } from '../../lib/corpus';
@@ -18,6 +20,20 @@ import { formatDate, type Corpus } from '../../lib/corpus';
 type Props = { corpus: Corpus };
 
 const { corpus } = Astro.props;
+
+/*
+ * The page a newcomer starts from is the project's own, so the link is named by
+ * that page's title rather than by words chosen here. A configured address
+ * with no page behind it fails the build instead of linking to a 404.
+ */
+const { start } = siteConfiguration.home;
+const startPage =
+  start === undefined ? undefined : await getEntry('docs', start);
+if (start !== undefined && startPage === undefined) {
+  throw new Error(
+    `home.start names /${start}/, but src/content/docs has no page at that address.`,
+  );
+}
 ---
 
 <div class="hero">
@@ -55,9 +71,14 @@ const { corpus } = Astro.props;
         )
       }
     </p>
-    <p class="hero-onboarding">
-      New here? Start with <a href="/about-wiki/">About this wiki</a>.
-    </p>
+    {
+      startPage && (
+        <p class="hero-onboarding">
+          New here? Start with <a href={`/${start}/`}>{startPage.data.title}</a>
+          .
+        </p>
+      )
+    }
   </div>
 </div>
 
