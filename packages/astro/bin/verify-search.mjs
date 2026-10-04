@@ -185,15 +185,27 @@ async function expectResult(pagefind, query, expectedPath) {
  * A document whose slug leaves ASCII is searched for first. Its address is the
  * one a URL percent-encodes, so it is the case most likely to go wrong, and at
  * five cases it would otherwise only be reached when the corpus happened to
- * list it early.
+ * list it early. Then the first document of each format, so that a PDF's page
+ * is searched for however many Google Docs the corpus lists before it.
  */
 export function buildSearchCases(documents) {
   const encodesSlug = (document) =>
     typeof document.slug === 'string' &&
     encodeURI(document.slug) !== document.slug;
+  const formats = new Set();
+  const firstOfEachFormat = [];
+  for (const document of documents) {
+    if (!formats.has(document.format)) {
+      formats.add(document.format);
+      firstOfEachFormat.push(document);
+    }
+  }
   const ordered = [
-    ...documents.filter(encodesSlug),
-    ...documents.filter((document) => !encodesSlug(document)),
+    ...new Set([
+      ...documents.filter(encodesSlug),
+      ...firstOfEachFormat,
+      ...documents,
+    ]),
   ];
   const cases = [];
   for (const document of ordered) {

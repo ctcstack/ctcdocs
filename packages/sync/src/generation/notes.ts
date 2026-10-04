@@ -133,14 +133,14 @@ export const NOTE_KINDS: readonly NoteKind[] = [
     title: 'AI agents read only the beginning of a document',
     action: 'Split it into shorter documents',
     instruction:
-      'The document is longer than an AI agent is given when it reads one, so an agent reads only its beginning and does not know what the rest says. Split it into a folder of shorter documents, one subject each: each part then has its own page, title and search results, and is read whole. Keep the document itself for one of the parts, so its address and permanent link still lead to it.',
+      'The document is longer than an AI agent is given when it reads one, so an agent reads only its beginning and does not know what the rest says. Split it into a folder of shorter documents, one subject each: each part then has its own page, title and search results, and is read whole. Keep the document itself for one of the parts, so that its permanent link, and every link to it from another document, still leads to it.',
   },
   {
     code: 'document-long',
     title: 'A document is long enough to split',
     action: 'Split it into shorter documents',
     instruction:
-      'The document is longer than the length this site notes. People scroll past most of it to find their part, and an AI agent reads all of it to answer about one, which costs it and makes its answers worse. Split it into a folder of shorter documents, one subject each: each part then has its own page, title and search results. Keep the document itself for one of the parts, so its address and permanent link still lead to it.',
+      'The document is longer than the length this site notes. People scroll past most of it to find their part, and an AI agent reads all of it to answer about one, which costs it and makes its answers worse. Split it into a folder of shorter documents, one subject each: each part then has its own page, title and search results. Keep the document itself for one of the parts, so that its permanent link, and every link to it from another document, still leads to it.',
   },
   {
     code: 'pdf-long',
@@ -309,32 +309,29 @@ function largeImages(
 }
 
 /**
- * A page longer than the line, or than an AI agent reads, gets one note: the
- * one that matters more. A PDF's editor usually cannot split it, so its note
+ * A page longer than an AI agent reads, or than the line, gets one note: the
+ * first that applies. A PDF's editor usually cannot split it, so its note
  * says how long it is and whether agents read it whole, and asks nothing.
  */
 function longDocument(
   record: SyncedDocumentRecord,
   lengths: PublishedDocumentLengths,
 ): { code: NoteCode; detail: string } | undefined {
-  const characters = lengths.characters.get(record.googleFileId);
-  if (characters === undefined) {
-    return undefined;
+  const characters = lengths.characters.get(record.googleFileId) ?? 0;
+  const pdf = record.exportMode === 'pdf';
+  if (characters > lengths.fetchCharacters) {
+    return {
+      code: pdf ? 'pdf-long' : 'document-over-agent-limit',
+      detail: `${grouped(characters)} characters; AI agents read the first ${grouped(lengths.fetchCharacters)}`,
+    };
   }
-  const cut = characters > lengths.fetchCharacters;
-  if (!cut && characters <= lengths.largeDocumentCharacters) {
-    return undefined;
+  if (characters > lengths.largeDocumentCharacters) {
+    return {
+      code: pdf ? 'pdf-long' : 'document-long',
+      detail: `${grouped(characters)} characters, over ${grouped(lengths.largeDocumentCharacters)}`,
+    };
   }
-  const detail = cut
-    ? `${grouped(characters)} characters; AI agents read the first ${grouped(lengths.fetchCharacters)}`
-    : `${grouped(characters)} characters, over ${grouped(lengths.largeDocumentCharacters)}`;
-  const code: NoteCode =
-    record.exportMode === 'pdf'
-      ? 'pdf-long'
-      : cut
-        ? 'document-over-agent-limit'
-        : 'document-long';
-  return { code, detail };
+  return undefined;
 }
 
 /**

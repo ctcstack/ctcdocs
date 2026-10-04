@@ -986,12 +986,14 @@ describe('basic Markdown sync', () => {
     expect(large(raised)).toEqual([]);
   });
 
-  it('notes a document by the length of the body it publishes', async () => {
+  it('notes a document by the length of the Markdown fetch returns', async () => {
     const repository = await mkdtemp(resolve(tmpdir(), 'kb-sync-long-'));
     temporaryDirectories.push(repository);
     /*
-     * Under the title, which the page shows as its heading, fifty paragraphs
-     * of 901 characters: 45,148 with the blank lines between them.
+     * Fifty paragraphs of 901 characters: a body of 45,148 with the blank
+     * lines between them. The page's Markdown version adds its front matter
+     * and its title, 45,424 characters in all, and that is what `fetch`
+     * returns and cuts.
      */
     const paragraph = `${'Plain words. '.repeat(69)}End.`;
     const markdown = `# Architecture\n\n${Array.from({ length: 50 }, () => paragraph).join('\n\n')}\n`;
@@ -1016,17 +1018,6 @@ describe('basic Markdown sync', () => {
           markdownExporter: {
             exportMarkdown: () =>
               Promise.resolve(new TextEncoder().encode(markdown)),
-            exportHtmlZip: () => Promise.reject(new Error('No archive.')),
-          },
-          documentInspector: {
-            inspectDocument: () =>
-              Promise.resolve({
-                hasEmbeddedDrawings: false,
-                hasImages: false,
-                inlineObjectCount: 0,
-                positionedObjectCount: 0,
-                tabCount: 1,
-              }),
           },
           now: () => new Date(firstTimestamp),
         },
@@ -1037,27 +1028,32 @@ describe('basic Markdown sync', () => {
         .map(({ id, note, detail }) => ({ id, note, detail }));
 
     // Over the 40,000 characters a project gets unless it sets its own line.
-    expect(long(await run({}))).toEqual([
+    const first = await run({});
+    expect(long(first)).toEqual([
       {
         id: 'doc-one',
         note: 'document-long',
-        detail: '45,148 characters, over 40,000',
+        detail: '45,424 characters, over 40,000',
       },
     ]);
+    expect(first.report.documentLengths).toEqual({
+      largeDocumentCharacters: 40_000,
+      fetchCharacters: 100_000,
+    });
 
     // A higher line reads on the next run, without exporting anything again.
     const raised = await run({ largeDocumentCharacters: 50_000 });
     expect(raised.report.summary.exported).toBe(0);
     expect(long(raised)).toEqual([]);
 
-    // Past what `fetch` returns, the line is the cut, and the note says so.
+    // A body within the cut whose Markdown version is past it is cut too.
     expect(
-      long(await run({}, { enabled: true, fetchCharacters: 30_000 })),
+      long(await run({}, { enabled: true, fetchCharacters: 45_200 })),
     ).toEqual([
       {
         id: 'doc-one',
         note: 'document-over-agent-limit',
-        detail: '45,148 characters; AI agents read the first 30,000',
+        detail: '45,424 characters; AI agents read the first 45,200',
       },
     ]);
   });

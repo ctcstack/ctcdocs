@@ -378,6 +378,15 @@ describe('parseSiteConfiguration', () => {
     );
   });
 
+  it('refuses a sync setting it does not know, such as a misspelled line', () => {
+    const raw = validConfiguration();
+    (raw.sync as Record<string, unknown>).largeDocumentCharacter = 500;
+
+    expect(() => parseSiteConfiguration(raw)).toThrow(
+      /sync\.largeDocumentCharacter is not a known setting/u,
+    );
+  });
+
   it('keeps the large document line within the cut fetch makes', () => {
     const raw: Record<string, unknown> = {
       ...validConfiguration(),

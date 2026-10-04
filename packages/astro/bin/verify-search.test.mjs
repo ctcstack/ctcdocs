@@ -64,6 +64,19 @@ test('a document the check cannot search for is skipped, not failed', () => {
   );
 });
 
+test('the first document of each format is searched for', () => {
+  const documents = [
+    ...Array.from({ length: 6 }, (_, index) => ({
+      ...documentOf(`Document number ${index}`, `document-${index}`),
+      format: 'google-doc',
+    })),
+    { ...documentOf('Release checklist', 'checklist'), format: 'pdf' },
+  ];
+  const cases = buildSearchCases(documents);
+  assert.equal(cases.length, 5);
+  assert.deepEqual(cases[1], ['Release checklist', '/checklist/']);
+});
+
 test('at most five documents are searched for', () => {
   const documents = Array.from({ length: 8 }, (_, index) =>
     documentOf(`Document number ${index}`, `document-${index}`),

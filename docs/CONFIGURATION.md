@@ -303,6 +303,7 @@ than reaching a deployment:
   or `Cyrillic`;
 - `sync.largeDocumentCharacters`, where present, must be a whole number from 1
   to the characters an assistant reads of a document (see below);
+- `sync` and `mcp` accept only the settings this page lists;
 - no required value may be empty.
 
 ### Changing `sync.generatedBy`
@@ -314,26 +315,15 @@ editing generated files.
 
 ## Documents too long to read whole
 
-The content health page names a document too long for people and assistants
-to read whole, by the length of its text: the characters of the Markdown body
-the sync writes, which the page's Markdown version serves and `fetch` returns
-([ADR-043](ADR/043-content-health-names-documents-too-long-to-read-whole.md)).
-Two lines decide the note:
-
-- over `sync.largeDocumentCharacters`, a Google Doc is noted under Improve, as
-  worth splitting into a folder of shorter documents;
-- over the characters an assistant reads of a document, `mcp.fetchCharacters`,
-  it is noted under Fix next, because assistants read only its beginning.
-  With the MCP server off, the line is that setting's default, 100,000.
-
-A document over both gets the one note, under Fix next. A PDF, whose editor
-usually cannot split it, is noted under Improve over either line, with its
-length and whether assistants read it whole.
-
-`sync.largeDocumentCharacters` is 40,000 unless the project sets it, about
-10,000 tokens of English, and never more than the second line: unset, it is
-that line where that line is lower; set above it, the configuration fails.
-Both take effect on the next sync, without exporting anything again.
+The content health page measures each document by its Markdown version, the
+text `fetch` returns, and names those over two lines
+([ADR-043](ADR/043-content-health-names-documents-too-long-to-read-whole.md)):
+`sync.largeDocumentCharacters`, worth splitting, and `mcp.fetchCharacters`,
+which assistants read only the beginning of (100,000 with the MCP server
+off). The first is 40,000 unless the project sets it, and never more than
+the second: unset, it is the second where the second is lower; set above
+it, the configuration fails. The sync reads both, so a change shows on the
+page after the next sync, without exporting anything again.
 
 ## What the home page shows
 

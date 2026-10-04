@@ -21,6 +21,7 @@ import { dirname, relative, resolve, sep } from 'node:path';
 
 import {
   computeAccessModel,
+  fetchCharacterLimit,
   loadSiteConfiguration,
   MEMBERS_CLASS,
   PROJECT_LAYOUT,
@@ -499,7 +500,8 @@ export async function writeBuildOutput({
           agents: {
             ...agents,
             search: site.mcp.search,
-            fetchCharacters: site.mcp.fetchCharacters,
+            // The one value the content health note reads too (ADR-043).
+            fetchCharacters: fetchCharacterLimit(site.mcp),
           },
         }
       : {}),

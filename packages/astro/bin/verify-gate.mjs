@@ -16,7 +16,11 @@ import { readFile } from 'node:fs/promises';
 import { extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { findProjectRoot, PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
+import {
+  findProjectRoot,
+  markdownProjectionPath,
+  PROJECT_LAYOUT,
+} from '@ctcstack/ctcdocs-core';
 
 import {
   DOCUMENT_PREFIX,
@@ -270,7 +274,13 @@ export async function verifyGate({ projectRoot, distRoot }) {
     );
     requests += 3;
   }
-  requests += await verifyAgents({ map, distRoot, environment, keys });
+  requests += await verifyAgents({
+    map,
+    projectRoot,
+    distRoot,
+    environment,
+    keys,
+  });
   return { files: files.length, requests };
 }
 
@@ -282,7 +292,7 @@ export async function verifyGate({ projectRoot, distRoot }) {
  * only the gate's own judgment stands between a reader and a document or a
  * passage of it.
  */
-async function verifyAgents({ map, distRoot, environment, keys }) {
+async function verifyAgents({ map, projectRoot, distRoot, environment, keys }) {
   if (map.site.mcp !== true || !map.agents) {
     return 0;
   }
@@ -327,6 +337,10 @@ async function verifyAgents({ map, distRoot, environment, keys }) {
       },
     });
   }
+  const cutNotes = await lengthNotesAgainst(
+    projectRoot,
+    map.agents.fetchCharacters,
+  );
   let requests = 0;
   for (const { name, reader } of people) {
     const access = {
@@ -363,9 +377,54 @@ async function verifyAgents({ map, distRoot, environment, keys }) {
           `MCP search showed ${name} ${document.markdown} (${fileClass}).`,
         );
       }
+      if (fetched && cutNotes) {
+        const note = cutNotes.get(document.markdown);
+        const truncated = fetched.metadata.truncated === true;
+        assert.ok(
+          truncated
+            ? note === 'document-over-agent-limit' || note === 'pdf-long'
+            : note !== 'document-over-agent-limit',
+          truncated
+            ? `MCP fetch cut ${document.markdown}, which the content health page does not name.`
+            : `The content health page says MCP fetch cuts ${document.markdown}, which it returned whole.`,
+        );
+      }
     }
   }
   return requests;
+}
+
+/**
+ * The length notes of the sync report (ADR-043), by Markdown address, when
+ * the report measured documents against the cut this build makes; otherwise
+ * `undefined`, since a report written before the cut changed, or before
+ * documents were measured, describes another cut until the next sync.
+ */
+async function lengthNotesAgainst(projectRoot, fetchCharacters) {
+  let report;
+  try {
+    report = JSON.parse(
+      await readFile(
+        resolve(projectRoot, PROJECT_LAYOUT.syncReportFile),
+        'utf8',
+      ),
+    );
+  } catch {
+    return undefined;
+  }
+  if (report?.documentLengths?.fetchCharacters !== fetchCharacters) {
+    return undefined;
+  }
+  return new Map(
+    report.notes
+      .filter(
+        (note) =>
+          note.slug &&
+          (note.note === 'document-over-agent-limit' ||
+            note.note === 'pdf-long'),
+      )
+      .map((note) => [markdownProjectionPath(note.slug), note.note]),
+  );
 }
 
 function invokedDirectly() {
