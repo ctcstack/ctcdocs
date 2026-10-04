@@ -70,6 +70,7 @@ import {
   isStale,
   type DirectorySnapshot,
 } from './snapshot.js';
+import { directoryStatus } from './status.js';
 
 export const SESSION_COOKIE = '__Host-kb-session';
 const TRANSACTION_COOKIE = '__Host-kb-sign-in-';
@@ -448,26 +449,6 @@ async function identify(
   return personFrom(snapshot, claims.sub);
 }
 
-function statusOf(snapshot: DirectorySnapshot | undefined, now: number) {
-  return {
-    takenAt: snapshot?.takenAt ?? null,
-    ageSeconds: snapshot
-      ? Math.round((now - Date.parse(snapshot.takenAt)) / 1000)
-      : null,
-    stale: snapshot ? isStale(snapshot, now) : true,
-    activeUsers: snapshot ? Object.keys(snapshot.users).length : 0,
-    groups: Object.fromEntries(
-      Object.entries(snapshot?.groups ?? {}).map(([address, group]) => [
-        address,
-        {
-          members: group.members.length,
-          ...(group.admitsNoOne ? { admitsNoOne: group.admitsNoOne } : {}),
-        },
-      ]),
-    ),
-  };
-}
-
 export async function handle(
   request: Request,
   context: WorkerContext,
@@ -614,10 +595,18 @@ async function route(
     );
   }
   if (url.pathname === STATUS_ROUTE) {
+    if (!isAdmin(map, reader)) {
+      return noStore(new Response('Forbidden', { status: 403 }));
+    }
     return noStore(
-      isAdmin(map, reader)
-        ? Response.json(statusOf(snapshot, now))
-        : new Response('Forbidden', { status: 403 }),
+      Response.json(
+        directoryStatus(
+          map,
+          snapshot,
+          parseMachineKeys(await context.machineKeys()),
+          now,
+        ),
+      ),
     );
   }
 

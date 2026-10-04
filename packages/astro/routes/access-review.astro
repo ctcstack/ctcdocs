@@ -185,7 +185,11 @@ const warnings = (review?.attention ?? []).filter(
     next: false,
   }}
 >
-  <access-review class="not-content" data-pagefind-ignore>
+  <access-review
+    class="not-content"
+    data-pagefind-ignore
+    data-admins={review?.admins.join(' ')}
+  >
     {
       !review ? (
         <p class="review-intro">
@@ -249,10 +253,28 @@ const warnings = (review?.attention ?? []).filter(
               {review.admins.length === 1
                 ? `The admin group, ${review.admins[0]}, reads`
                 : `The admin groups, ${list(review.admins)}, read`}{' '}
-              everything, whatever the rules say. This page shows the rules this
-              build was made with; who is in each group is managed in Google
-              Admin.
+              everything, whatever the rules say.{' '}
+              <span data-live>
+                This page shows the rules this build was made with; who is in
+                each group could not be read here. It is managed in Google
+                Admin.
+              </span>
             </p>
+          </section>
+
+          <section
+            class="review-attention"
+            aria-labelledby="review-now-title"
+            data-tone="danger"
+            data-now
+            hidden
+          >
+            <h2 id="review-now-title">
+              <Icon name="error" size="1.25rem" />
+              <span>Right now</span>
+              <span class="review-count" data-now-count />
+            </h2>
+            <ul class="review-attention-list" data-now-list />
           </section>
 
           <section
@@ -339,6 +361,10 @@ const warnings = (review?.attention ?? []).filter(
                 </div>
               </fieldset>
             )}
+            <fieldset class="review-as" data-key-chips hidden>
+              <legend>Or as a machine key</legend>
+              <div class="review-chips" />
+            </fieldset>
             <div class="review-tools">
               <div class="review-find">
                 <label for="review-find">Find a document or folder</label>
@@ -392,6 +418,7 @@ const warnings = (review?.attention ?? []).filter(
                       <span class="review-col-domain">
                         {parts(group).domain}
                       </span>
+                      <span class="review-col-count" data-group-count hidden />
                     </th>
                   ))}
                 </tr>
@@ -410,6 +437,7 @@ const warnings = (review?.attention ?? []).filter(
                       data-ancestors={above.join(' ')}
                       data-readers={readersData(row.readers)}
                       data-reach={row.reach}
+                      data-class={row.classId}
                       data-name={nameOf(row)}
                       style={`--depth: ${row.depth}`}
                       data-default-folded={
@@ -443,12 +471,22 @@ const warnings = (review?.attention ?? []).filter(
                           {plural(row.documents, 'document')}
                           {row.root && ' in all'}
                         </span>
+                        <span class="review-cannot" data-cannot hidden>
+                          Cannot open
+                        </span>
                       </th>
                       <td class="review-readers">
                         <p class="review-readers-line" data-reach={row.reach}>
                           <span class="review-dot" />
-                          <strong>{readersText(row.readers)}</strong>
+                          <strong>{readersText(row.readers)}</strong>{' '}
+                          <span class="review-people" data-people hidden />
                         </p>
+                        <p
+                          class="review-narrower"
+                          data-tone="danger"
+                          data-live-note
+                          hidden
+                        />
                         <p class="review-origin">
                           {origin(row)}
                           {row.drive && (
@@ -493,6 +531,13 @@ const warnings = (review?.attention ?? []).filter(
                                       {readersText(document.readers)}
                                     </span>
                                   )}
+                                  <span
+                                    class="review-cannot"
+                                    data-cannot
+                                    hidden
+                                  >
+                                    Cannot open
+                                  </span>
                                 </li>
                               ))}
                             </ul>
@@ -570,6 +615,21 @@ const warnings = (review?.attention ?? []).filter(
             </li>
           </ul>
 
+          <section
+            class="review-keys"
+            aria-labelledby="review-keys-title"
+            data-keys
+            hidden
+          >
+            <h2 id="review-keys-title">Machine keys</h2>
+            <p class="review-keys-lede">
+              A key reads as the groups it was issued, never as an admin, and
+              lasts 90 days at most. Choose one under "Read as" to see what it
+              opens.
+            </p>
+            <ul data-key-list />
+          </section>
+
           <section class="review-how" id="how-access-works">
             <h2>How access works</h2>
             <ul>
@@ -618,16 +678,65 @@ const warnings = (review?.attention ?? []).filter(
 
 <script>
   /**
-   * Folds the tree, reads it as a set of groups and finds a document, in the
-   * browser over the rendered page: nothing is fetched. The fragment keeps the
-   * view, `#as=a@x,b@x&q=text&hide=1`, and never reaches the server; a
-   * fragment without `=` is a folder's anchor, which unfolds its row.
+   * Folds the tree, reads it as a set of groups or a machine key, and finds a
+   * document, in the browser over the rendered page. The fragment keeps the
+   * view, `#as=a@x,b@x&q=text&hide=1` or `#machine=name`, and never reaches the
+   * server; a fragment without `=` is a folder's anchor, which unfolds its row.
+   *
+   * The one request asks the Worker what holds now (ADR-045): when the
+   * directory was read, each group's size and whether it admits anyone, how
+   * many people may read each class, and the machine keys. It is laid over
+   * the rules as built; without an answer the page is the rules alone.
    */
+  import {
+    readDirectoryStatus,
+    type DirectoryStatus,
+    type MachineKey,
+  } from '../scripts/directory-status';
+
   const fold = (text: string) => text.normalize('NFKC').toLocaleLowerCase();
+  const plural = (count: number, one: string, many = `${one}s`) =>
+    `${count} ${count === 1 ? one : many}`;
+  const list = (items: readonly string[]) =>
+    items.length <= 2
+      ? items.join(' and ')
+      : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
+  const people = (count: number) => plural(count, 'person', 'people');
+
+  /** `3 minutes ago`, or nothing for a time in the future or unreadable. */
+  function ago(time: string): string {
+    const minutes = Math.round((Date.now() - Date.parse(time)) / 60_000);
+    if (!(minutes >= 0)) return '';
+    const format = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+    if (minutes < 60) return format.format(-minutes, 'minute');
+    if (minutes < 48 * 60)
+      return format.format(-Math.round(minutes / 60), 'hour');
+    return format.format(-Math.round(minutes / 1440), 'day');
+  }
+
+  /** An element with text, built without parsing markup. */
+  function element(
+    tag: string,
+    text?: string,
+    attributes: Record<string, string> = {},
+  ): HTMLElement {
+    const node = document.createElement(tag);
+    if (text !== undefined) node.textContent = text;
+    for (const [name, value] of Object.entries(attributes)) {
+      node.setAttribute(name, value);
+    }
+    return node;
+  }
 
   class AccessReview extends HTMLElement {
     private rows: HTMLTableRowElement[] = [];
     private summary = '';
+    /** What the Worker said holds now, once it has answered. */
+    private live: DirectoryStatus | undefined;
+    /** Named groups that admit no one now, with the reason. */
+    private shut = new Map<string, string>();
+    /** The machine key the page reads as, if one. */
+    private key: MachineKey | undefined;
 
     connectedCallback() {
       this.rows = [
@@ -671,7 +780,8 @@ const warnings = (review?.attention ?? []).filter(
         'button[data-as]',
       )) {
         button.addEventListener('click', () => {
-          const chosen = this.chosen();
+          const chosen = this.key ? [] : this.chosen();
+          this.key = undefined;
           const group = button.dataset.as ?? '';
           this.apply(
             form,
@@ -688,6 +798,7 @@ const warnings = (review?.attention ?? []).filter(
       );
       form.querySelector('[data-clear]')?.addEventListener('click', () => {
         form.reset();
+        this.key = undefined;
         this.apply(form, status, []);
       });
       const expand = this.querySelector<HTMLButtonElement>('[data-expand]');
@@ -735,7 +846,14 @@ const warnings = (review?.attention ?? []).filter(
         if (find instanceof HTMLInputElement) find.value = state.q;
         const hide = form.elements.namedItem('hide');
         if (hide instanceof HTMLInputElement) hide.checked = state.hide;
-        this.apply(form, status, state.as, false);
+        // A key is known once the Worker has answered.
+        this.key = this.live?.machineKeys.find((key) => key.name === state.key);
+        this.apply(
+          form,
+          status,
+          this.key ? this.keyGroups(this.key) : state.as,
+          false,
+        );
       };
       restore();
       this.goTo(location.hash);
@@ -745,12 +863,215 @@ const warnings = (review?.attention ?? []).filter(
         else this.goTo(location.hash);
       });
       this.labelExpand();
+      void this.showLive(form, status, restore);
+    }
+
+    /** The groups a key reads as that the rules name. */
+    keyGroups(key: MachineKey): string[] {
+      const named = new Set(this.knownGroups());
+      return key.groups.filter((group) => named.has(group));
+    }
+
+    knownGroups(): string[] {
+      return [...this.querySelectorAll<HTMLElement>('.review-chip')].map(
+        (chip) => chip.dataset.as ?? '',
+      );
+    }
+
+    /** Lays what holds now over the rules, when the Worker answers. */
+    async showLive(
+      form: HTMLFormElement,
+      status: HTMLElement,
+      restore: () => void,
+    ) {
+      const live = await readDirectoryStatus();
+      if (!live) return;
+      this.live = live;
+      const known = new Set(this.knownGroups());
+      const admins = (this.dataset.admins ?? '').split(' ').filter(Boolean);
+      this.shut = new Map(
+        [...known, ...admins].flatMap((group) => {
+          const entry = live.groups.get(group);
+          const reason = !entry
+            ? 'the directory has not read it yet'
+            : entry.admitsNoOne;
+          return reason ? [[group, reason] as const] : [];
+        }),
+      );
+
+      const line = this.querySelector<HTMLElement>('[data-live]');
+      if (line) {
+        line.textContent = live.takenAt
+          ? `Group membership was read ${ago(live.takenAt)}: ${plural(live.activeUsers, 'active person', 'active people')}. A folder's count includes the admins. Who is in a group is managed in Google Admin.`
+          : 'The directory has not been read yet, so no one is admitted. Who is in a group is managed in Google Admin.';
+      }
+
+      // Each group's size, or that it admits no one.
+      for (const count of this.querySelectorAll<HTMLElement>(
+        '[data-group-count]',
+      )) {
+        const group =
+          count.closest<HTMLElement>('[data-col]')?.dataset.col ?? '';
+        const entry = live.groups.get(group);
+        count.hidden = false;
+        count.textContent = this.shut.has(group)
+          ? 'admits no one'
+          : people(entry?.members ?? 0);
+        count.toggleAttribute('data-shut', this.shut.has(group));
+      }
+      for (const cell of this.querySelectorAll<HTMLElement>('td[data-col]')) {
+        cell.toggleAttribute(
+          'data-shut',
+          this.shut.has(cell.dataset.col ?? ''),
+        );
+      }
+
+      // How many may read each folder now, and what a shut group takes away.
+      for (const row of this.rows) {
+        const count = live.classes.get(row.dataset.class ?? '');
+        const span = row.querySelector<HTMLElement>('[data-people]');
+        if (span && count !== undefined) {
+          span.hidden = false;
+          span.textContent = people(count);
+        }
+        const readers = row.dataset.readers ?? '';
+        const groups =
+          readers === '*' ? [] : readers.split(' ').filter(Boolean);
+        const gone = groups.filter((group) => this.shut.has(group));
+        const note = row.querySelector<HTMLElement>('[data-live-note]');
+        if (note && gone.length > 0) {
+          note.hidden = false;
+          note.textContent =
+            gone.length === groups.length
+              ? `Admins only right now: ${list(gone)} ${gone.length === 1 ? 'admits' : 'admit'} no one.`
+              : `Fewer readers right now: ${list(gone)} ${gone.length === 1 ? 'admits' : 'admit'} no one.`;
+        }
+      }
+
+      this.showNow(live);
+      this.showKeys(live, form, status);
+      restore();
+    }
+
+    /** "Right now": a stale directory, and each group that admits no one. */
+    showNow(live: DirectoryStatus) {
+      const section = this.querySelector<HTMLElement>('[data-now]');
+      const items = this.querySelector<HTMLElement>('[data-now-list]');
+      if (!section || !items) return;
+      items.replaceChildren();
+      if (live.stale) {
+        const item = element('li', undefined, { 'data-tone': 'danger' });
+        item.append(
+          element(
+            'span',
+            'The directory has not been read for over two hours. Until it is, only what every member reads is served, to everyone, admins included.',
+          ),
+        );
+        items.append(item);
+      }
+      const admins = new Set(
+        (this.dataset.admins ?? '').split(' ').filter(Boolean),
+      );
+      for (const [group, reason] of this.shut) {
+        const item = element('li', undefined, { 'data-tone': 'danger' });
+        const text = element('span');
+        text.append(element('strong', group), ` admits no one: ${reason}.`);
+        if (admins.has(group)) {
+          text.append(' Its members are not admins until it is fixed.');
+        } else {
+          const rows = this.rows.filter((row) =>
+            (row.dataset.readers ?? '').split(' ').includes(group),
+          );
+          const closed = rows.filter((row) =>
+            (row.dataset.readers ?? '')
+              .split(' ')
+              .every((reader) => this.shut.has(reader)),
+          );
+          if (rows.length > 0) {
+            text.append(
+              ` Its members do not read ${rows.length === 1 ? 'the folder' : `the ${rows.length} folders`} it is named for: `,
+            );
+            rows.slice(0, 3).forEach((row, index) => {
+              if (index > 0) text.append(', ');
+              text.append(
+                element('a', row.dataset.name ?? '', { href: `#${row.id}` }),
+              );
+            });
+            text.append(
+              rows.length > 3 ? ` and ${rows.length - 3} more.` : '.',
+            );
+            if (closed.length > 0) {
+              text.append(
+                ` ${plural(closed.length, 'folder')} ${closed.length === 1 ? 'is' : 'are'} left to admins alone.`,
+              );
+            }
+          }
+        }
+        item.append(text);
+        items.append(item);
+      }
+      section.hidden = items.childElementCount === 0;
+      const count = section.querySelector<HTMLElement>('[data-now-count]');
+      if (count) count.textContent = String(items.childElementCount);
+    }
+
+    /** The machine keys, and a way to read as each. */
+    showKeys(
+      live: DirectoryStatus,
+      form: HTMLFormElement,
+      status: HTMLElement,
+    ) {
+      const section = this.querySelector<HTMLElement>('[data-keys]');
+      const items = this.querySelector<HTMLElement>('[data-key-list]');
+      const chips = this.querySelector<HTMLElement>('[data-key-chips]');
+      if (!section || !items || !chips) return;
+      const holder = chips.querySelector<HTMLElement>('.review-chips');
+      items.replaceChildren();
+      holder?.replaceChildren();
+      const soon = 14 * 24 * 60 * 60 * 1000;
+      for (const key of live.machineKeys) {
+        const groups = this.keyGroups(key);
+        const item = element('li', undefined, {
+          'data-tone':
+            Date.parse(key.expires) - Date.now() < soon ? 'warning' : 'note',
+        });
+        item.append(
+          element('strong', key.name),
+          element(
+            'span',
+            groups.length > 0
+              ? `Reads as ${list(groups)}`
+              : 'Reads what every member reads',
+          ),
+          element('span', `Answered for by ${key.owner}`),
+          element(
+            'span',
+            `Expires on ${key.expires.slice(0, 10)}, in ${plural(Math.max(1, Math.ceil((Date.parse(key.expires) - Date.now()) / 86_400_000)), 'day')}`,
+          ),
+        );
+        items.append(item);
+
+        const chip = element('button', key.name, {
+          type: 'button',
+          class: 'review-chip',
+          'aria-pressed': 'false',
+          'data-key': key.name,
+        });
+        chip.addEventListener('click', () => {
+          const same = this.key?.name === key.name;
+          this.key = same ? undefined : key;
+          this.apply(form, status, same ? [] : groups);
+        });
+        holder?.append(chip);
+      }
+      section.hidden = live.machineKeys.length === 0;
+      chips.hidden = live.machineKeys.length === 0;
     }
 
     /** The view the fragment names; an anchor names none. */
-    readFragment(): { as: string[]; q: string; hide: boolean } {
+    readFragment(): { as: string[]; key: string; q: string; hide: boolean } {
       const hash = location.hash.slice(1);
-      if (!hash.includes('=')) return { as: [], q: '', hide: false };
+      if (!hash.includes('=')) return { as: [], key: '', q: '', hide: false };
       const params = new URLSearchParams(hash);
       const known = new Set(
         [...this.querySelectorAll<HTMLElement>('.review-chip')].map(
@@ -761,6 +1082,8 @@ const warnings = (review?.attention ?? []).filter(
         as: (params.get('as') ?? '')
           .split(',')
           .filter((group) => known.has(group)),
+        // Not `key`, which reads as a secret to people and scanners alike.
+        key: params.get('machine') ?? '',
         q: params.get('q') ?? '',
         hide: params.get('hide') === '1',
       };
@@ -854,12 +1177,21 @@ const warnings = (review?.attention ?? []).filter(
       write = true,
     ) {
       const chosen = new Set(groups);
+      const key = this.key;
       for (const button of this.querySelectorAll<HTMLButtonElement>(
         'button[data-as]',
       )) {
         button.setAttribute(
           'aria-pressed',
-          String(chosen.has(button.dataset.as ?? '')),
+          String(!key && chosen.has(button.dataset.as ?? '')),
+        );
+      }
+      for (const button of this.querySelectorAll<HTMLButtonElement>(
+        'button[data-key]',
+      )) {
+        button.setAttribute(
+          'aria-pressed',
+          String(button.dataset.key === key?.name),
         );
       }
       for (const cell of this.querySelectorAll<HTMLElement>('[data-col]')) {
@@ -867,11 +1199,22 @@ const warnings = (review?.attention ?? []).filter(
       }
       const data = new FormData(form);
       const query = fold(String(data.get('q') ?? '').trim());
-      const hide = data.get('hide') === 'on' && chosen.size > 0;
-      const reading = chosen.size > 0;
+      const reading = chosen.size > 0 || !!key;
+      const hide = data.get('hide') === 'on' && reading;
+      /*
+       * As the gate decides: a person is in no group that admits no one, a
+       * key reads as its groups whatever the directory says, and a stale
+       * directory serves what every member reads, to anyone.
+       */
+      const stale = this.live?.stale === true;
       const reads = (readers: string) =>
         readers === '*' ||
-        readers.split(' ').some((group) => chosen.has(group));
+        (!stale &&
+          readers
+            .split(' ')
+            .some(
+              (group) => chosen.has(group) && (!!key || !this.shut.has(group)),
+            ));
 
       // Which rows the search or "Read as" keeps, and the rows above them.
       const kept = new Set<HTMLTableRowElement>();
@@ -891,6 +1234,8 @@ const warnings = (review?.attention ?? []).filter(
           const hit = !!query && fold(item.dataset.title ?? '').includes(query);
           item.toggleAttribute('data-hit', hit);
           item.toggleAttribute('data-closed', reading && !open);
+          const cannot = item.querySelector<HTMLElement>('[data-cannot]');
+          if (cannot) cannot.hidden = !reading || open;
           if (hit && (!hide || open)) {
             matched = true;
             found += 1;
@@ -900,6 +1245,10 @@ const warnings = (review?.attention ?? []).filter(
         if (named) foldersFound += 1;
         const open = !reading || reads(row.dataset.readers ?? '');
         row.toggleAttribute('data-closed', reading && !open);
+        const cannot = row.querySelector<HTMLElement>(
+          ':scope > th [data-cannot]',
+        );
+        if (cannot) cannot.hidden = !reading || open;
         const details =
           row.querySelector<HTMLDetailsElement>('[data-documents]');
         if (details && query) details.open = matched;
@@ -932,9 +1281,25 @@ const warnings = (review?.attention ?? []).filter(
 
       const parts: string[] = [];
       if (reading) {
+        const who = key
+          ? `The key ${key.name}`
+          : `A reader in ${[...chosen].join(' and ')}`;
         parts.push(
-          `A reader in ${[...chosen].join(' and ')} may open ${readable} of ${documents} ${documents === 1 ? 'document' : 'documents'}.`,
+          `${who} may open ${readable} of ${documents} ${documents === 1 ? 'document' : 'documents'}.`,
         );
+        const gone = key
+          ? []
+          : [...chosen].filter((group) => this.shut.has(group));
+        if (gone.length > 0) {
+          parts.push(
+            `${list(gone)} ${gone.length === 1 ? 'admits' : 'admit'} no one right now.`,
+          );
+        }
+        if (stale) {
+          parts.push(
+            'The directory is stale: only what every member reads is served.',
+          );
+        }
       }
       if (query) {
         const matches = [
@@ -963,7 +1328,8 @@ const warnings = (review?.attention ?? []).filter(
 
       if (!write) return;
       const params = new URLSearchParams();
-      if (reading) params.set('as', [...chosen].join(','));
+      if (key) params.set('machine', key.name);
+      else if (reading) params.set('as', [...chosen].join(','));
       if (query) params.set('q', String(data.get('q') ?? '').trim());
       if (hide) params.set('hide', '1');
       // An address is easier to read, and to send, with its @ and commas.
@@ -1048,6 +1414,11 @@ const warnings = (review?.attention ?? []).filter(
     access-review [data-tone='note'] {
       --tone: var(--review-note);
       --tone-low: var(--kb-gray-6);
+    }
+
+    access-review [data-tone='danger'] {
+      --tone: var(--kb-red);
+      --tone-low: var(--kb-red-low);
     }
 
     access-review [data-tone='good'] {
@@ -1142,8 +1513,7 @@ const warnings = (review?.attention ?? []).filter(
       padding: 0;
     }
 
-    access-review .review-legend li,
-    access-review .review-readers-line {
+    access-review .review-legend li {
       align-items: center;
       display: flex;
       gap: 0.5rem;
@@ -1297,11 +1667,15 @@ const warnings = (review?.attention ?? []).filter(
       cursor: pointer;
     }
 
-    access-review .review-chip[aria-pressed='true'],
-    access-review .review-col-button[aria-pressed='true'] {
+    access-review .review-chip[aria-pressed='true'] {
       background: var(--kb-ink);
       border-color: var(--kb-ink);
       color: var(--kb-ground);
+    }
+
+    /* A chosen column is outlined; its words keep their colors. */
+    access-review .review-col-button[aria-pressed='true'] {
+      border-color: var(--kb-ink);
     }
 
     access-review .review-tools {
@@ -1435,10 +1809,25 @@ const warnings = (review?.attention ?? []).filter(
       min-width: 13rem;
     }
 
+    /*
+     * The readers line is one run of text: the dot, the addresses, the count.
+     * It wraps between words, and breaks an address only when it is wider
+     * than the column.
+     */
+    access-review .review-readers-line .review-dot {
+      display: inline-block;
+      margin-inline-end: 0.5rem;
+      vertical-align: 0.05em;
+    }
+
     access-review .review-readers-line strong {
       color: var(--kb-ink);
       font-weight: 600;
-      overflow-wrap: anywhere;
+      overflow-wrap: break-word;
+    }
+
+    access-review .review-origin a {
+      white-space: nowrap;
     }
 
     access-review .review-origin {
@@ -1555,10 +1944,6 @@ const warnings = (review?.attention ?? []).filter(
       border-color: var(--kb-border-strong);
     }
 
-    access-review .review-col-button[aria-pressed='true'] .review-col-name {
-      color: inherit;
-    }
-
     /* A mark is a shape first, so it reads without its hue. */
     access-review .review-mark {
       border-radius: 50%;
@@ -1589,10 +1974,39 @@ const warnings = (review?.attention ?? []).filter(
       border: 2px solid var(--review-warning);
     }
 
-    /* "Read as": what the reader cannot open recedes, or goes. */
-    access-review tr[data-closed] > :is(th, td) > *,
-    access-review li[data-closed] {
-      opacity: 0.45;
+    /*
+     * "Read as": what the reader cannot open says so, and recedes to the
+     * secondary ink, which keeps its contrast; its dots and marks fade.
+     */
+    access-review tr[data-closed] > :is(th, td),
+    access-review tr[data-closed] :is(a, strong, .review-folder),
+    access-review li[data-closed],
+    access-review li[data-closed] a {
+      color: var(--kb-gray-3);
+    }
+
+    access-review tr[data-closed] :is(.review-dot, .review-mark) {
+      opacity: 0.35;
+    }
+
+    access-review .review-cannot {
+      background: var(--kb-gray-6);
+      border-radius: 999px;
+      color: var(--kb-ink);
+      display: inline-block;
+      font-size: var(--kb-text-xs);
+      font-weight: 500;
+      margin-top: 0.25rem;
+      padding: 0 0.5rem;
+    }
+
+    access-review th .review-cannot {
+      margin-inline-start: 1.5rem;
+    }
+
+    access-review li .review-cannot {
+      margin-inline-start: 0.375rem;
+      margin-top: 0;
     }
 
     access-review tr[data-folded],
@@ -1644,6 +2058,110 @@ const warnings = (review?.attention ?? []).filter(
       access-review .review-key {
         display: none;
       }
+    }
+
+    /* ------------------------------------------------------- what holds now */
+
+    access-review .review-attention[data-tone='danger'] {
+      border-color: var(--tone);
+    }
+
+    access-review .review-people::before {
+      content: '·';
+      margin-inline-end: 0.375rem;
+    }
+
+    access-review .review-people {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-sm);
+      font-weight: 400;
+      white-space: nowrap;
+    }
+
+    access-review .review-col-count {
+      display: block;
+      font-size: var(--kb-text-xs);
+      font-weight: 400;
+      white-space: nowrap;
+    }
+
+    /* A group that admits no one says so in words, beside a red dot. */
+    access-review .review-col-count[data-shut] {
+      color: var(--kb-ink);
+    }
+
+    access-review .review-col-count[data-shut]::before {
+      background: var(--kb-red);
+      border-radius: 50%;
+      content: '';
+      display: inline-block;
+      height: 0.5rem;
+      margin-inline-end: 0.25rem;
+      vertical-align: 0.05em;
+      width: 0.5rem;
+    }
+
+    access-review td[data-shut] .review-mark {
+      opacity: 0.35;
+    }
+
+    access-review .review-keys {
+      margin-top: 2.5rem;
+    }
+
+    access-review .review-keys > h2 {
+      color: var(--kb-ink);
+      font-size: var(--kb-text-h3);
+    }
+
+    access-review .review-keys-lede {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-sm);
+      margin-top: 0.25rem;
+      max-width: 44rem;
+    }
+
+    access-review .review-keys ul {
+      list-style: none;
+      margin-top: 0.75rem;
+      padding: 0;
+    }
+
+    access-review .review-keys li {
+      border-top: 1px solid var(--kb-hairline);
+      display: flex;
+      flex-wrap: wrap;
+      font-size: var(--kb-text-sm);
+      gap: 0.25rem 1rem;
+      padding-block: 0.5rem;
+    }
+
+    access-review .review-keys li strong {
+      color: var(--kb-ink);
+      flex: 0 0 10rem;
+    }
+
+    /* On a wide screen the keys line up: name, groups, owner, expiry. */
+    @media (min-width: 50rem) {
+      access-review .review-keys li {
+        display: grid;
+        grid-template-columns: 9rem minmax(0, 1.2fr) minmax(0, 1fr) 13rem;
+      }
+    }
+
+    access-review .review-keys li span {
+      color: var(--kb-gray-3);
+    }
+
+    /* A key that expires within two weeks is marked, in words and a dot. */
+    access-review .review-keys li[data-tone='warning'] span:last-child::before {
+      background: var(--tone);
+      border-radius: 50%;
+      content: '';
+      display: inline-block;
+      height: 0.5rem;
+      margin-inline-end: 0.375rem;
+      width: 0.5rem;
     }
 
     /* --------------------------------------------------------------- end */

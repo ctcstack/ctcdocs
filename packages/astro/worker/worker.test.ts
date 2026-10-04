@@ -659,7 +659,54 @@ describe('the gate', () => {
       get('/_kb/status', { Cookie: admin }),
       context(),
     );
-    expect(await status.json()).toMatchObject({ stale: false, activeUsers: 3 });
+    expect(await status.json()).toMatchObject({
+      stale: false,
+      activeUsers: 3,
+      classes: { admins: 1, members: 3, team0001: 2 },
+      machineKeys: [],
+    });
+    expect(status.headers.get('Cache-Control')).toBe('no-store');
+  });
+
+  it('gives the status to no machine key, whatever groups it holds', async () => {
+    const key = `${MACHINE_KEY_PREFIX}${'B'.repeat(43)}`;
+    const digest = await crypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(key),
+    );
+    const hash = [...new Uint8Array(digest)]
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('');
+    const records = [
+      {
+        name: 'agent',
+        owner: 'ops@example.com',
+        hash,
+        groups: ['admins@example.com', 'team@example.com'],
+        expires: new Date(NOW + 24 * 60 * 60 * 1000).toISOString(),
+      },
+    ];
+    const gate = context({ machineKeys: async () => records });
+    const refused = await handle(
+      get('/_kb/status', { Authorization: `Bearer ${key}` }),
+      gate,
+    );
+    expect(refused.status).toBe(403);
+
+    // An admin sees the key as the groups it reads as, without its hash.
+    const admin = await sessionCookie('user-admin');
+    const status = await handle(get('/_kb/status', { Cookie: admin }), gate);
+    const body = await status.text();
+    expect(JSON.parse(body).machineKeys).toEqual([
+      {
+        name: 'agent',
+        owner: 'ops@example.com',
+        groups: ['team@example.com'],
+        expires: records[0]?.expires,
+      },
+    ]);
+    expect(body).not.toContain(hash);
+    expect(body).not.toMatch(/user-/u);
   });
 
   it('refuses spellings that could slip past the map', async () => {

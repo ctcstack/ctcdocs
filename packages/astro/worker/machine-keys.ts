@@ -68,18 +68,19 @@ export function presentedKey(request: Request): string | undefined {
   return key && KEY_SHAPE.test(key) ? key : undefined;
 }
 
+/** Whether a record admits its key now: not expired, and not too long-lived. */
+export function admitsNow(record: MachineKeyRecord, now: number): boolean {
+  const expires = Date.parse(record.expires);
+  return expires > now && expires - now <= LONGEST_KEY_LIFETIME_MS;
+}
+
 export async function findMachineKey(
   key: string,
   records: readonly MachineKeyRecord[],
   now: number,
 ): Promise<MachineKeyRecord | undefined> {
   const hash = await sha256Hex(key);
-  return records.find((record) => {
-    const expires = Date.parse(record.expires);
-    return (
-      record.hash === hash &&
-      expires > now &&
-      expires - now <= LONGEST_KEY_LIFETIME_MS
-    );
-  });
+  return records.find(
+    (record) => record.hash === hash && admitsNow(record, now),
+  );
 }
