@@ -572,9 +572,13 @@ const htmlArchives = new Map<string, Uint8Array>([
              * A merged cell keeps a table as HTML. Google writes each cell as
              * a paragraph of styled spans spaced with no-break spaces, and
              * every other cell with a span of one; the page keeps the cells'
-             * text and nothing of that.
+             * text and nothing of that. Bold and italic are classes of its
+             * stylesheet, which the page keeps as marks.
              */
-            '<p class="c2"><span class="c1">Who answers for each part:</span></p>',
+            '<style type="text/css">.c1{font-weight:400}.c9{font-weight:700}',
+            '.c10{font-style:italic}</style>',
+            '<p class="c2"><span class="c9">Who answers</span>',
+            '<span class="c1"> for each part:</span></p>',
             '<table class="c8"><tr class="c4">',
             '<td class="c3" colspan="1" rowspan="1"><p class="c2"><span class="c1">Area</span></p></td>',
             '<td class="c3" colspan="2" rowspan="1"><p class="c2"><span class="c1">Owner&nbsp; &nbsp;and backup</span></p></td>',
@@ -583,7 +587,7 @@ const htmlArchives = new Map<string, Uint8Array>([
             '<td class="c3" colspan="1" rowspan="1"><p class="c2"><span class="c1">Release lead</span></p></td>',
             '<td class="c3" colspan="1" rowspan="1"><p class="c2"><span class="c1">Platform</span></p></td>',
             '</tr><tr class="c4">',
-            '<td class="c3" colspan="1" rowspan="1"><p class="c2"><span class="c1">Deputy</span></p><p class="c2"><span class="c1">On call in&nbsp;turn</span></p></td>',
+            '<td class="c3" colspan="1" rowspan="1"><p class="c2"><span class="c1">Deputy</span></p><p class="c2"><span class="c10">On call in&nbsp;turn</span></p></td>',
             '<td class="c3" colspan="1" rowspan="1"><p class="c2"><span class="c1"></span></p></td>',
             '</tr></table>',
             '<p>The pipeline is invoked the same way in every project:</p>',

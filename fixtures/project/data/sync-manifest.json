@@ -255,13 +255,14 @@
       "stableSlug": "handbook/tables-and-code",
       "generatedMarkdownPath": "src/content/docs/_generated/doc-tables-and-code.md",
       "generatedAssetsDirectory": "src/assets/generated/doc-tables-and-code",
-      "contentHash": "sha256:202a3f3c93118f730a5fe48531633375bd8d62827730bbbcb62e119b35afab50",
-      "outputHash": "sha256:80b7e32c88d76a20a4619116f08077864fa467366682beade451315a8d588ebd",
+      "contentHash": "sha256:ea7d2f49c70af507813d5abb3f90942e422a127d2b6da391ad8ab1cf5444ec77",
+      "outputHash": "sha256:2c2dcae21067017df7ba0c6c3a651bfca98c6c5606ca7e494da2649da65564d0",
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "hybrid",
       "warnings": [
         "fallback:table",
-        "removed_unsafe_html_attribute"
+        "removed_unsafe_html_attribute",
+        "removed_unsupported_html"
       ],
       "shortId": "14062a",
       "undescribedImages": 0,
