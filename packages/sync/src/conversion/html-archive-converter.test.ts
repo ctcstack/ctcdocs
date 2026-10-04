@@ -261,6 +261,42 @@ describe('HTML archive conversion', () => {
     );
   });
 
+  it('keeps a mark whose delimiters would run into the next mark', () => {
+    const body = (html: string) =>
+      convertHtmlArchive(
+        [
+          {
+            path: 'document.html',
+            bytes: new TextEncoder().encode(
+              `<html><head><style>.b{font-weight:700}.i{font-style:italic}.s{text-decoration:line-through}</style></head><body><p>${html}</p></body></html>`,
+            ),
+          },
+        ],
+        options,
+      ).body;
+
+    // Punctuation at the edge, and the next mark's asterisks against it:
+    // `**Note:***text*` would leave the bold's asterisks as text.
+    expect(
+      body('<span class="b">Note:</span><span class="i">text</span>'),
+    ).toBe('<strong>Note:</strong>*text*\n');
+    expect(body('<span class="i">text</span><span class="b">(x)</span>')).toBe(
+      '*text*<strong>(x)</strong>\n',
+    );
+    // Without punctuation at the edge, or beside other delimiters, it reads.
+    expect(
+      body('<span class="b">bold</span><span class="i">italic</span>'),
+    ).toBe('**bold***italic*\n');
+    expect(body('<span class="b">a.</span><span class="s">b</span>')).toBe(
+      '**a.**~~b~~\n',
+    );
+    expect(
+      body(
+        '<span class="b">Note:</span><a href="https://example.com/">link</a>',
+      ),
+    ).toBe('**Note:**[link](https://example.com/)\n');
+  });
+
   it('preserves a merged table as sanitized HTML', async () => {
     const result = convertHtmlArchive(
       await fixtureEntries('merged-table.html'),
