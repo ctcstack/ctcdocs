@@ -76,5 +76,7 @@ Rejected
 - ADR-042: an assistant's search returns the passages that match. Proposed;
   supersedes ADR-041 in part once accepted.
 - ADR-043: content health names documents too long to read whole. Proposed.
+- ADR-044: assistants list a folder and recent changes, and narrow a search.
+  Proposed; supersedes ADR-042 in part once accepted.
 
 Create a new ADR by copying `000-template.md`.
