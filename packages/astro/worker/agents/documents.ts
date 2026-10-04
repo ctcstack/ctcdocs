@@ -21,6 +21,10 @@
  * syncs; it never reaches a reader outside the class of the text it was taken
  * from.
  *
+ * A search may ask for fewer documents, or for none of their passages; the
+ * passages of fewer documents may each be longer, within the same budget
+ * (ADR-044).
+ *
  * A search may be kept to a folder or to documents changed since a date, and
  * `browse` and `recent` list documents without searching (ADR-044). All three
  * start from the documents the build lists and the reader may open, so a
@@ -424,8 +428,8 @@ export interface SearchResult {
   readonly id: string;
   readonly title: string;
   readonly url: string;
-  /** The passages that matched, best first. */
-  readonly text: string;
+  /** The passages that matched, best first; none in a compact search. */
+  readonly text?: string;
   /** The folders from the corpus root to the document. */
   readonly path: readonly string[];
   /** When the document last changed in Drive, when known. */
@@ -477,10 +481,19 @@ function idOf(key: string): string | undefined {
     : undefined;
 }
 
+/** How much a search returns: fewer documents, or no passages. */
+export interface SearchShape {
+  /** Documents at most, up to the project's `results`. */
+  readonly limit?: number | undefined;
+  /** Titles, links, folders and times only, without passages. */
+  readonly compact?: boolean | undefined;
+}
+
 export async function searchDocuments(
   access: DocumentAccess,
   query: string,
   narrowing: Narrowing = {},
+  shape: SearchShape = {},
 ): Promise<SearchResult[]> {
   const { map, reader, stale, origin, index } = access;
   // Read first, so a date the server cannot read is refused before searching.
@@ -511,19 +524,19 @@ export async function searchDocuments(
           ? { notIn: outside }
           : undefined;
   }
-  const {
-    results: maxResults,
-    passagesPerResult,
-    passageCharacters,
-  } = settings;
-  // Each passage short enough that every result's best one fits the budget.
-  const passageLimit = Math.floor(passageCharacters / maxResults);
+  const { passagesPerResult, passageCharacters } = settings;
+  const maxResults = Math.min(
+    Math.max(Math.trunc(shape.limit ?? settings.results), 1),
+    settings.results,
+  );
+  const compact = shape.compact === true;
   const readable = new Set(classes);
 
-  // The documents found through chunks that count, in rank order.
+  // The documents found through chunks that count, in rank order, each with
+  // the text of its best chunks.
   const found = new Map<
     string,
-    { readonly document: AgentDocument; readonly passages: string[] }
+    { readonly document: AgentDocument; readonly chunks: string[] }
   >();
   for (const chunk of await index.search(
     query,
@@ -549,22 +562,38 @@ export async function searchDocuments(
       if (!document) {
         continue;
       }
-      entry = { document, passages: [] };
+      entry = { document, chunks: [] };
       found.set(id, entry);
     }
-    if (entry.passages.length < passagesPerResult) {
-      entry.passages.push(excerpt(chunk.text, passageLimit));
+    if (!compact && entry.chunks.length < passagesPerResult) {
+      entry.chunks.push(chunk.text);
     }
   }
 
+  const listedResult = (id: string, document: AgentDocument) => ({
+    id,
+    title: document.title,
+    url: permanentLink(origin, id),
+    path: document.path,
+    ...(document.modified ? { modified: document.modified } : {}),
+  });
+  if (compact) {
+    return [...found].map(([id, { document }]) => listedResult(id, document));
+  }
+
+  // Each passage short enough that every document found has room for its
+  // best one: the fewer found, the longer each may be.
+  const passageLimit = Math.floor(passageCharacters / Math.max(found.size, 1));
   // Breadth first: every document's best passage before any second one.
   const shown = new Map<string, string[]>(
     [...found.keys()].map((id) => [id, []]),
   );
   let budget = passageCharacters;
   for (let rank = 0; rank < passagesPerResult; rank += 1) {
-    for (const [id, { passages }] of found) {
-      const passage = passages[rank];
+    for (const [id, { chunks }] of found) {
+      const text = chunks[rank];
+      const passage =
+        text === undefined ? undefined : excerpt(text, passageLimit);
       if (passage !== undefined && passage.length <= budget) {
         shown.get(id)?.push(passage);
         budget -= passage.length;
@@ -573,12 +602,8 @@ export async function searchDocuments(
   }
 
   return [...found].map(([id, { document }]) => ({
-    id,
-    title: document.title,
-    url: permanentLink(origin, id),
+    ...listedResult(id, document),
     text: (shown.get(id) ?? []).join(PASSAGE_SEPARATOR),
-    path: document.path,
-    ...(document.modified ? { modified: document.modified } : {}),
   }));
 }
 

@@ -183,7 +183,7 @@ describe('search', () => {
 });
 
 describe('passages', () => {
-  const text = (results: readonly { id: string; text: string }[]) =>
+  const text = (results: readonly { id: string; text?: string }[]) =>
     Object.fromEntries(results.map((result) => [result.id, result.text]));
 
   it('shows up to three passages a document, best first', async () => {
@@ -287,12 +287,12 @@ describe('passages', () => {
       'x',
     );
     expect(results).toHaveLength(10);
-    const lengths = results.map((result) => result.text.length);
+    const lengths = results.map((result) => result.text?.length ?? 0);
     expect(lengths.every((length) => length > 0 && length <= 2_400)).toBe(true);
     expect(
       lengths.reduce((sum, length) => sum + length, 0),
     ).toBeLessThanOrEqual(24_000);
-    expect(results.every((result) => !result.text.includes('…'))).toBe(true);
+    expect(results.every((result) => !result.text?.includes('…'))).toBe(true);
   });
 
   it('cuts a long passage around its middle, at sentence boundaries', () => {
@@ -323,6 +323,107 @@ describe('passages', () => {
     expect(cut.length).toBeGreaterThan(250);
     // It starts and ends with whole words, never inside one.
     expect(passage).toContain(` ${cut} `);
+  });
+});
+
+describe('a shaped search', () => {
+  it('returns no more documents than asked, nor than the project allows', async () => {
+    const index = new FixedIndex(ALL_KEYS);
+    expect(
+      ids(
+        await searchDocuments(
+          access(readers.admin, { index }),
+          'x',
+          {},
+          { limit: 2 },
+        ),
+      ),
+    ).toEqual(['aaaaaa', 'bbbbbb']);
+    expect(
+      await searchDocuments(
+        access(readers.admin, { index }),
+        'x',
+        {},
+        { limit: 50 },
+      ),
+    ).toHaveLength(3);
+  });
+
+  it('counts toward the limit only documents the reader may open', async () => {
+    const index = new FixedIndex([
+      'docs/cccccc.md',
+      'docs/bbbbbb.md',
+      'docs/aaaaaa.md',
+    ]);
+    expect(
+      ids(
+        await searchDocuments(
+          access(readers.member, { index }),
+          'x',
+          {},
+          { limit: 1 },
+        ),
+      ),
+    ).toEqual(['aaaaaa']);
+  });
+
+  it('gives fewer documents longer passages, within the same budget', async () => {
+    const long = 'A sentence of the passage. '.repeat(200);
+    const index = new FixedIndex([
+      chunkOf('docs/aaaaaa.md', { text: long }),
+      chunkOf('docs/bbbbbb.md', { text: long }),
+    ]);
+    const results = await searchDocuments(access(readers.team, { index }), 'x');
+    expect(ids(results)).toEqual(['aaaaaa', 'bbbbbb']);
+    // Two documents share the budget ten would: each passage whole here.
+    expect(results.map((result) => result.text)).toEqual([
+      long.trim(),
+      long.trim(),
+    ]);
+    const one = await searchDocuments(
+      access(readers.team, {
+        index: new FixedIndex([
+          chunkOf('docs/aaaaaa.md', { text: long.repeat(10) }),
+        ]),
+      }),
+      'x',
+    );
+    expect(one[0]?.text?.length).toBeGreaterThan(2_400);
+    expect(one[0]?.text?.length).toBeLessThanOrEqual(24_000);
+  });
+
+  it('leaves the passages out of a compact search, and finds the same documents', async () => {
+    const index = new FixedIndex(ALL_KEYS);
+    const full = await searchDocuments(access(readers.team, { index }), 'x');
+    const compact = await searchDocuments(
+      access(readers.team, { index }),
+      'x',
+      {},
+      { compact: true },
+    );
+    expect(compact).toEqual(
+      full.map((result) => {
+        const { text, ...rest } = result;
+        expect(text).toBeTruthy();
+        return rest;
+      }),
+    );
+    expect(compact.every((result) => !('text' in result))).toBe(true);
+  });
+
+  it('finds a document compactly only through text the reader may read', async () => {
+    const index = new FixedIndex([
+      chunkOf('docs/aaaaaa.md', { text: 'Team text.', class: 'team0001' }),
+      chunkOf('docs/bbbbbb.md', { text: 'Plan.', class: 'members' }),
+    ]);
+    expect(
+      await searchDocuments(
+        access(readers.member, { index }),
+        'x',
+        {},
+        { compact: true },
+      ),
+    ).toEqual([]);
   });
 });
 
@@ -359,7 +460,7 @@ describe('settings', () => {
     // The index is asked with the project's settings.
     expect(index.queries[0]?.settings).toEqual(search);
     expect(ids(results)).toEqual(['aaaaaa']);
-    expect(results[0]?.text.length).toBeLessThanOrEqual(120);
+    expect(results[0]?.text?.length).toBeLessThanOrEqual(120);
     expect(results[0]?.text).not.toContain('Second passage.');
   });
 

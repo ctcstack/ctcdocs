@@ -763,6 +763,32 @@ describe('an assistant reading', () => {
     expect((await mcp(token, 'tools/list')).status).toBe(403);
   });
 
+  it('shapes a search as asked, within the project’s limit', async () => {
+    const { tokens } = await connect('user-member');
+    const token = tokens.access_token;
+    // Compact, the results pass the tool's declared output schema.
+    const compact = await tool(token, 'search', {
+      query: 'plan',
+      limit: 1,
+      compact: true,
+    });
+    expect(compact.body.result?.structuredContent).toEqual({
+      results: [
+        {
+          id: 'aaaaaa',
+          title: 'Handbook',
+          url: `${ORIGIN}/d/aaaaaa/`,
+          path: [],
+          modified: '2026-10-01T00:00:00.000Z',
+        },
+      ],
+    });
+    expect(
+      (await tool(token, 'search', { query: 'plan', limit: 11 })).body.result
+        ?.isError,
+    ).toBe(true);
+  });
+
   it('reads only what every member reads while the directory is stale', async () => {
     snapshot = snapshotWith(['user-member'], ['user-member']);
     const { tokens } = await connect('user-member');
