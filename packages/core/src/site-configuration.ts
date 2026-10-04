@@ -55,6 +55,14 @@ export interface HomeConfiguration {
    * outgrown one page may prefer the home page to stay an entrance.
    */
   readonly corpusIndex: boolean;
+  /**
+   * The address of the hand-authored page the home page sends a newcomer to,
+   * as a slug: `about` for `src/content/docs/about.md`. The link reads that
+   * page's own title, so renaming the page renames the link. Without it the
+   * home page offers no such link: the platform does not know what a
+   * deployment calls its introduction, or whether it has one.
+   */
+  readonly start?: string;
 }
 
 /**
@@ -378,6 +386,29 @@ function optionalFlag(
   fallback: boolean,
 ): boolean {
   return source[key] === undefined ? fallback : flag(source, key, path);
+}
+
+/**
+ * A page's address as Starlight derives it from a file under
+ * `src/content/docs`: lowercase segments joined by `/`, with no leading or
+ * trailing slash, so it is the same string the content collection knows.
+ */
+function optionalPageSlug(
+  source: Record<string, unknown>,
+  key: string,
+  path: string,
+): Record<string, string> {
+  if (source[key] === undefined) {
+    return {};
+  }
+  const value = text(source, key, path);
+  if (!/^[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)*$/u.test(value)) {
+    fail(
+      path,
+      'must be a page address such as "about", without slashes at either end',
+    );
+  }
+  return { [key]: value };
 }
 
 /**
@@ -822,6 +853,7 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
         'home.recentLimit',
         6,
       ),
+      ...optionalPageSlug(homeSource, 'start', 'home.start'),
     },
     navigation: {
       landingDocumentTitles: titleList(

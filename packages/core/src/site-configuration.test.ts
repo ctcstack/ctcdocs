@@ -307,6 +307,25 @@ describe('parseSiteConfiguration', () => {
     });
   });
 
+  it('sends a newcomer to the page the project names', () => {
+    const raw = validConfiguration();
+    (raw.home as Record<string, unknown>).start = 'about';
+
+    expect(parseSiteConfiguration(raw).home.start).toBe('about');
+  });
+
+  it.each<[unknown, string]>([
+    ['/about/', 'slashes at either end'],
+    ['About', 'capitals Starlight would not keep'],
+    ['about page', 'a space'],
+    [3, 'a number'],
+  ])('rejects %s as the newcomer page (%s)', (value) => {
+    const raw = validConfiguration();
+    (raw.home as Record<string, unknown>).start = value;
+
+    expect(() => parseSiteConfiguration(raw)).toThrow(/home\.start must/u);
+  });
+
   it('lets a project decide how far the recent band reaches', () => {
     const raw = validConfiguration();
     (raw.home as Record<string, unknown>).recentLimit = 10;
