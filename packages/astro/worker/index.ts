@@ -13,6 +13,7 @@ import builtMap from 'ctcdocs-access-map';
 import type { AccessMapFile } from './access-map.js';
 import { agentOAuth, type ExecutionContextLike } from './agents/oauth.js';
 import type { DocumentIndex, DocumentStore } from './agents/documents.js';
+import { searchFilter, type SearchFilter } from './agents/search-filter.js';
 import { publishDocuments } from './agents/publish.js';
 import { handle, type AgentContext } from './handler.js';
 import { MACHINE_KEYS_KEY } from './machine-keys.js';
@@ -33,10 +34,7 @@ interface AiSearch {
         match_threshold: number;
         keyword_match_mode: 'and' | 'or';
         context_expansion: number;
-        filters: {
-          class: { $in: string[] };
-          short_id?: { $in: string[] } | { $nin: string[] };
-        };
+        filters?: SearchFilter;
       };
       reranking: { enabled: boolean; model: string; match_threshold: number };
     };
@@ -76,6 +74,10 @@ const googleKeys = new GoogleKeys(
 const log = (event: Readonly<Record<string, unknown>>) =>
   console.log(JSON.stringify(event));
 
+/** A filter AI Search accepts: none rather than an empty one. */
+const withFilter = (filters: SearchFilter) =>
+  Object.keys(filters).length > 0 ? { filters } : {};
+
 function documentIndex(search: AiSearch): DocumentIndex {
   return {
     // As the project's `mcp.search` says (ADR-042).
@@ -88,15 +90,14 @@ function documentIndex(search: AiSearch): DocumentIndex {
             match_threshold: settings.vectorThreshold,
             keyword_match_mode: settings.keywordMatch,
             context_expansion: settings.contextChunks,
-            filters: {
-              class: { $in: [...classes] },
-              // A narrowed search (ADR-044), by the short IDs the build lists.
-              ...(restriction && 'in' in restriction
-                ? { short_id: { $in: [...restriction.in] } }
-                : restriction
-                  ? { short_id: { $nin: [...restriction.notIn] } }
-                  : {}),
-            },
+            // Within AI Search's limits; the Worker judges every chunk anyway.
+            ...withFilter(
+              searchFilter(
+                Object.keys(accessMap.classes),
+                classes,
+                restriction,
+              ),
+            ),
           },
           reranking: {
             enabled: settings.reranking.enabled,
