@@ -307,8 +307,22 @@ describe('passages', () => {
     expect(cut.endsWith('passage.')).toBe(true);
     expect(cut).toContain('Sentence 20 of the passage.');
     expect(excerpt('  Short.  ', 300)).toBe('Short.');
-    // One sentence longer than the limit is cut as it is.
+    // One word longer than the limit is cut as it is.
     expect(excerpt('x'.repeat(500), 300)).toHaveLength(300);
+  });
+
+  it('cuts a passage without a sentence end between words', () => {
+    // A table kept as HTML: one line, and no full stop to end a sentence.
+    const cells = Array.from(
+      { length: 60 },
+      (_, n) => `<td><p>cell number ${n}</p></td>`,
+    );
+    const passage = `<table><tr>${cells.join('')}</tr></table>`;
+    const cut = excerpt(passage, 300);
+    expect(cut.length).toBeLessThanOrEqual(300);
+    expect(cut.length).toBeGreaterThan(250);
+    // It starts and ends with whole words, never inside one.
+    expect(passage).toContain(` ${cut} `);
   });
 });
 
