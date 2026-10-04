@@ -114,10 +114,15 @@ const items: DriveItem[] = [
   document('doc-overview', 'Overview', 'folder-handbook'),
   document('doc-contacts', 'Contacts', 'folder-handbook'),
   document('doc-tables-and-code', '01 - Tables and code', 'folder-handbook'),
-  document('doc-release-process', 'Release process', 'folder-handbook'),
-  document('doc-decision-log', 'Decision log', 'folder-handbook'),
   document('doc-diagrams', 'Diagrams', 'folder-reference'),
   document('doc-screenshots', 'Screenshots', 'folder-reference'),
+  /*
+   * In a folder whose addresses sort after the handbook's, so that the
+   * search check's first cases, a PDF and a hybrid export among them, stay
+   * the ones they were.
+   */
+  document('doc-release-process', 'Release process', 'folder-reference'),
+  document('doc-decision-log', 'Decision log', 'folder-reference'),
   folder('folder-reference-guides', 'Guides', 'folder-reference'),
   folder('folder-reference-archive', 'Archive', 'folder-reference'),
   document('doc-style-guide', 'Style guide', 'folder-reference-guides'),
@@ -253,8 +258,8 @@ const markdownExports = new Map<string, string>([
       '# Release process',
       '',
       'A release moves what is merged on main to the production site. None of',
-      'it is real: the steps are here so the handbook has a document long enough',
-      'to be worth splitting.',
+      'it is real: the steps are here so the reference has a document long',
+      'enough to be worth splitting.',
       '',
       '## Who takes part',
       '',

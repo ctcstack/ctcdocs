@@ -31,14 +31,6 @@ export const generatedSidebar = [
         "slug": "handbook/contacts"
       },
       {
-        "label": "Decision log",
-        "slug": "handbook/decision-log"
-      },
-      {
-        "label": "Release process",
-        "slug": "handbook/release-process"
-      },
-      {
         "label": "Scanned form",
         "slug": "handbook/scanned-form",
         "badge": "PDF"
@@ -77,6 +69,10 @@ export const generatedSidebar = [
         ]
       },
       {
+        "label": "Decision log",
+        "slug": "reference/decision-log"
+      },
+      {
         "label": "Diagrams",
         "slug": "reference/diagrams"
       },
@@ -84,6 +80,10 @@ export const generatedSidebar = [
         "label": "Release checklist",
         "slug": "reference/release-checklist",
         "badge": "PDF"
+      },
+      {
+        "label": "Release process",
+        "slug": "reference/release-process"
       },
       {
         "label": "Screenshots",

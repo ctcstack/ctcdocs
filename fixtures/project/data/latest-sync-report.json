@@ -219,6 +219,10 @@
       "items": 1
     }
   ],
+  "documentLengths": {
+    "largeDocumentCharacters": 1500,
+    "fetchCharacters": 3000
+  },
   "noteKinds": [
     {
       "code": "image-crop-not-applied",
@@ -284,13 +288,13 @@
       "code": "document-over-agent-limit",
       "title": "AI agents read only the beginning of a document",
       "action": "Split it into shorter documents",
-      "instruction": "The document is longer than an AI agent is given when it reads one, so an agent reads only its beginning and does not know what the rest says. Split it into a folder of shorter documents, one subject each: each part then has its own page, title and search results, and is read whole. Keep the document itself for one of the parts, so its address and permanent link still lead to it."
+      "instruction": "The document is longer than an AI agent is given when it reads one, so an agent reads only its beginning and does not know what the rest says. Split it into a folder of shorter documents, one subject each: each part then has its own page, title and search results, and is read whole. Keep the document itself for one of the parts, so that its permanent link, and every link to it from another document, still leads to it."
     },
     {
       "code": "document-long",
       "title": "A document is long enough to split",
       "action": "Split it into shorter documents",
-      "instruction": "The document is longer than the length this site notes. People scroll past most of it to find their part, and an AI agent reads all of it to answer about one, which costs it and makes its answers worse. Split it into a folder of shorter documents, one subject each: each part then has its own page, title and search results. Keep the document itself for one of the parts, so its address and permanent link still lead to it."
+      "instruction": "The document is longer than the length this site notes. People scroll past most of it to find their part, and an AI agent reads all of it to answer about one, which costs it and makes its answers worse. Split it into a folder of shorter documents, one subject each: each part then has its own page, title and search results. Keep the document itself for one of the parts, so that its permanent link, and every link to it from another document, still leads to it."
     },
     {
       "code": "pdf-long",
@@ -346,27 +350,27 @@
       "id": "doc-release-process",
       "name": "Release process",
       "folderPath": [
-        "Handbook"
+        "Reference"
       ],
       "type": "Google Docs",
       "sourceUrl": "https://drive.google.com/open?id=doc-release-process",
       "lastEditedBy": "Robin Sample",
-      "slug": "handbook/release-process",
+      "slug": "reference/release-process",
       "note": "document-long",
-      "detail": "1,613 characters, over 1,500"
+      "detail": "1,908 characters, over 1,500"
     },
     {
       "id": "doc-decision-log",
       "name": "Decision log",
       "folderPath": [
-        "Handbook"
+        "Reference"
       ],
       "type": "Google Docs",
       "sourceUrl": "https://drive.google.com/open?id=doc-decision-log",
       "lastEditedBy": "Avery Example",
-      "slug": "handbook/decision-log",
+      "slug": "reference/decision-log",
       "note": "document-over-agent-limit",
-      "detail": "4,402 characters; AI agents read the first 3,000"
+      "detail": "4,687 characters; AI agents read the first 3,000"
     },
     {
       "id": "doc-style-guide",
