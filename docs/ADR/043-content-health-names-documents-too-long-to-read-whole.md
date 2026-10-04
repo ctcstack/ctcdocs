@@ -39,9 +39,9 @@ the front matter, which the MCP server does not keep (ADR-042), its title
 included, with its links as the site writes them. The sync serializes that
 text with the function the projection route uses, which the core holds for
 both, from the same generated file, and counts it as `fetch` counts it, the
-same way on every run, so the notes are deterministic. It is measured from the output the run writes, as
-image sizes are, so a changed line applies on the next run without exporting
-anything again.
+same way on every run, so the notes are deterministic. It is measured from the
+output the run writes, as image sizes are, so a changed line applies on the
+next run without exporting anything again.
 
 **Two steps, two priorities.**
 
