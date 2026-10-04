@@ -8,7 +8,7 @@
 "googleFileId": "doc-tables-and-code"
 "googleModifiedTime": "2026-02-06T16:45:00.000Z"
 "syncedAt": "2026-02-10T06:00:00.000Z"
-"contentHash": "sha256:251d5df897f505b46fab76b8a2b7c53b2d0631e7950bbe99c003748f8c8419d0"
+"contentHash": "sha256:202a3f3c93118f730a5fe48531633375bd8d62827730bbbcb62e119b35afab50"
 "folderPath":
   - "Handbook"
 "pagefind": true
@@ -21,6 +21,10 @@ Two things a documentation platform gets wrong quietly: wide tables that push a 
 | ----------- | ---------------- | --------- | ------------- | --------- | ---------- |
 | Production  | docs.example.com | Yes       | main          | Platform  | Indefinite |
 | Preview     | not deployed     | —         | pull requests | Authors   | Seven days |
+
+Who answers for each part:
+
+<table><tbody><tr><td>Area</td><td colspan="2">Owner and backup</td></tr><tr><td rowspan="2">Releases</td><td>Release lead</td><td>Platform</td></tr><tr><td><p>Deputy</p><p>On call in turn</p></td><td></td></tr></tbody></table>
 
 The pipeline is invoked the same way in every project:
 
