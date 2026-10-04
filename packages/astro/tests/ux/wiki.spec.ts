@@ -12,6 +12,7 @@ import {
 } from '../../lib/folder-anchor.js';
 import { siteConfiguration } from '../../lib/project.js';
 import {
+  accessReviewShape,
   anyDocument,
   contentHealthReport,
   deepestDocument,
@@ -781,6 +782,76 @@ test('the content health page names what is not on the site, and every note', as
         .first(),
     ).toContainText(note.name);
   }
+});
+
+test('the access review shows who may read each folder, and reads as a group', async ({
+  page,
+}) => {
+  const shape = accessReviewShape();
+  if (!shape) {
+    // Without access rules there is nothing to review, and no page.
+    const response = await page.goto('/access-review/');
+    expect(response?.status()).toBe(404);
+    return;
+  }
+
+  await page.goto('/access-review/');
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Access review' }),
+  ).toBeVisible();
+  const rows = page.locator('access-review tr[data-row]');
+  await expect(rows).toHaveCount(shape.rows);
+  for (const group of shape.groups) {
+    await expect(
+      page.locator(`access-review thead th[data-col="${group}"]`),
+    ).toHaveCount(1);
+  }
+  expect(
+    await page.locator('access-review .review-attention-list li').count(),
+  ).toBeGreaterThanOrEqual(shape.findings);
+
+  const theme = page.getByRole('combobox', { name: 'Select theme' });
+  await theme.selectOption({ label: 'Light' });
+  await expectNoAccessibilityViolations(page);
+  await theme.selectOption({ label: 'Dark' });
+  await expectNoAccessibilityViolations(page);
+
+  // Reading as a group marks every folder it cannot open, and the address
+  // keeps the choice.
+  const [group] = shape.groups;
+  if (group) {
+    const readAs = page.getByRole('group', { name: 'Read as' });
+    await readAs.getByRole('button', { name: group, exact: true }).click();
+    await expect(page).toHaveURL(
+      new RegExp(`#as=${escapeRegExp(group)}$`, 'u'),
+    );
+    await expect(page.getByRole('status')).toContainText('may open');
+    for (const row of await rows.all()) {
+      const readers = (await row.getAttribute('data-readers')) ?? '';
+      const reads = readers === '*' || readers.split(' ').includes(group);
+      if (reads) {
+        await expect(row).not.toHaveAttribute('data-closed');
+      } else {
+        await expect(row).toHaveAttribute('data-closed');
+      }
+    }
+    await page.reload();
+    await expect(
+      readAs.getByRole('button', { name: group, exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: 'Clear' }).click();
+    await expect(page).toHaveURL(/\/access-review\/$/u);
+  }
+
+  // Finding a document by its title shows it in its folder's row.
+  const sample = anyDocument();
+  await page.getByLabel('Find a document or folder').fill(sample.title);
+  await expect(
+    page
+      .locator('access-review li[data-hit]')
+      .filter({ hasText: sample.title })
+      .first(),
+  ).toBeVisible();
 });
 
 test('a PDF has a page with the file and its text', async ({

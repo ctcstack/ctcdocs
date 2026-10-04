@@ -104,6 +104,8 @@ export function buildAccessMap(input: AccessMapInput): AccessMap {
   );
   const slugOf = (path: string) => path.replace(/^\/|\/$/gu, '');
   const contentHealth = pagePath(PLATFORM_ROUTES.contentHealth);
+  // Built only when rules exist (ADR-045); closed whatever the model says.
+  const accessReview = pagePath(PLATFORM_ROUTES.accessReview);
   const membersPages = new Set([
     '/',
     pagePath(PLATFORM_ROUTES.fullIndex),
@@ -122,6 +124,8 @@ export function buildAccessMap(input: AccessMapInput): AccessMap {
     let documentPage = false;
     if (page.path === contentHealth) {
       cls = model.enabled ? ADMINS_CLASS : MEMBERS_CLASS;
+    } else if (page.path === accessReview) {
+      cls = ADMINS_CLASS;
     } else if (
       membersPages.has(page.path) ||
       // A redirect page carries no source of its own; a page that names one is

@@ -225,7 +225,10 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
       }),
     },
     integrations: [
-      ctcdocsRoutes({ navigation: generatedSidebar }),
+      ctcdocsRoutes({
+        navigation: generatedSidebar,
+        accessRules: site.access !== undefined,
+      }),
       starlight(starlightConfiguration),
       // After Starlight, which places its sitemap right after itself, so the
       // map sees every file the build writes.

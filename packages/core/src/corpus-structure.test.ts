@@ -75,6 +75,40 @@ describe('corpus structure', () => {
     });
   });
 
+  it('reads the readers a document was published with, and a waiting move', () => {
+    const corpus = parseCorpusStructure({
+      folders: {},
+      documents: {
+        held: {
+          googleParentId: null,
+          stableSlug: 'held',
+          publishedReaders: ['team@example.com'],
+          publishedChain: ['team'],
+          readersHeld: { chain: ['open'], rules: '0123456789abcdef' },
+        },
+        settled: {
+          googleParentId: null,
+          stableSlug: 'settled',
+          publishedReaders: '*',
+          publishedChain: ['open'],
+        },
+      },
+    });
+    expect(corpus.documents.get('held')).toEqual({
+      id: 'held',
+      parentId: null,
+      slug: 'held',
+      publishedReaders: ['team@example.com'],
+      readersHeld: true,
+    });
+    expect(corpus.documents.get('settled')).toEqual({
+      id: 'settled',
+      parentId: null,
+      slug: 'settled',
+      publishedReaders: '*',
+    });
+  });
+
   it('refuses a manifest it cannot read the chain from', () => {
     expect(() => parseCorpusStructure({ folders: [], documents: {} })).toThrow(
       CorpusStructureError,

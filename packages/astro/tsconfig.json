@@ -22,6 +22,7 @@
     "node_modules",
     "config.ts",
     "content.ts",
+    "lib/access-review-source.ts",
     "lib/agent-index-source.ts",
     "lib/corpus.ts",
     "lib/sections.ts",

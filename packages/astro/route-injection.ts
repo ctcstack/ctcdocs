@@ -46,13 +46,25 @@ const ROUTES = [
 const NAVIGATION_MODULE = 'virtual:ctcdocs/navigation';
 const RESOLVED_NAVIGATION_MODULE = `\0${NAVIGATION_MODULE}`;
 
+/**
+ * Who may read each folder (ADR-045). Without access rules there is nothing to
+ * review, and the address is not served.
+ */
+const ACCESS_REVIEW = {
+  entrypoint: '@ctcstack/ctcdocs/routes/access-review.astro',
+  pattern: `/${PLATFORM_ROUTES.accessReview}`,
+} as const;
+
 export interface CtcdocsRoutesOptions {
   /** The generated sidebar, without the project's prefix. */
   navigation: readonly unknown[];
+  /** Whether the project has access rules, so an access review to build. */
+  accessRules: boolean;
 }
 
 export function ctcdocsRoutes({
   navigation,
+  accessRules,
 }: CtcdocsRoutesOptions): AstroIntegration {
   return {
     name: '@ctcstack/ctcdocs/routes',
@@ -75,7 +87,7 @@ export function ctcdocsRoutes({
             ],
           },
         });
-        for (const route of ROUTES) {
+        for (const route of accessRules ? [...ROUTES, ACCESS_REVIEW] : ROUTES) {
           injectRoute({
             entrypoint: route.entrypoint,
             pattern: route.pattern,

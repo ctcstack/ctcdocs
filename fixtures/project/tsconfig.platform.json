@@ -10,6 +10,7 @@
     ".astro/types.d.ts",
     "../../packages/astro/lib/virtual-modules.d.ts",
     "../../packages/astro/content.ts",
+    "../../packages/astro/lib/access-review-source.ts",
     "../../packages/astro/lib/agent-index-source.ts",
     "../../packages/astro/lib/corpus.ts",
     "../../packages/astro/lib/sections.ts",

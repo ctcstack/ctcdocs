@@ -33,6 +33,8 @@ export interface CorpusDocument {
    * on its new chain to be confirmed.
    */
   readonly publishedReaders?: '*' | readonly string[];
+  /** Set while such a move waits, as the manifest's `readersHeld` says. */
+  readonly readersHeld?: true;
   /** The permanent short ID (ADR-022), the title and Drive's modified time. */
   readonly shortId?: string;
   readonly title?: string;
@@ -125,6 +127,9 @@ export function parseCorpusStructure(manifest: unknown): CorpusStructure {
       ...(title ? { title } : {}),
       ...(modified ? { modified } : {}),
       ...(source ? { source } : {}),
+      ...(typeof record.readersHeld === 'object' && record.readersHeld !== null
+        ? { readersHeld: true as const }
+        : {}),
       ...(published === '*' ||
       (Array.isArray(published) &&
         published.every((group) => typeof group === 'string'))

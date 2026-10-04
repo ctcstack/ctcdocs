@@ -71,6 +71,11 @@ export const PLATFORM_ROUTES = {
    * docs/ADR/024-content-health-page.md.
    */
   contentHealth: 'content-health',
+  /**
+   * Who may read each folder, for admins. See
+   * docs/ADR/045-an-access-review-page-shows-admins-who-may-read-each-folder.md.
+   */
+  accessReview: 'access-review',
 } as const;
 
 /**
@@ -106,6 +111,7 @@ export const ACCESS_CLASSES_ROUTE = '/_kb/classes';
 export const PLATFORM_ROUTE_HREFS = {
   fullIndex: `/${PLATFORM_ROUTES.fullIndex}/`,
   contentHealth: `/${PLATFORM_ROUTES.contentHealth}/`,
+  accessReview: `/${PLATFORM_ROUTES.accessReview}/`,
 } as const;
 
 /**

@@ -20,9 +20,11 @@ import {
 
 import { siteConfiguration } from './project.js';
 
-const corpus = readCorpusStructure(findProjectRoot());
+/** The folder chain of every document, from the sync manifest. */
+export const corpus = readCorpusStructure(findProjectRoot());
 
-const accessModel: AccessModel = computeAccessModel(
+/** The model the access map is built from, for pages that report on it. */
+export const accessModel: AccessModel = computeAccessModel(
   siteConfiguration.access,
   corpus,
 );

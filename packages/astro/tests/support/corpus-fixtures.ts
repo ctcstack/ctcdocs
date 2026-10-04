@@ -419,6 +419,34 @@ export function folderAccessFindingCount(): number {
 }
 
 /**
+ * What the access review (ADR-045) should show: a row per folder, the root
+ * included, a column per group the rules name, and every folder access
+ * finding. None for a project without an `access` section, which has no
+ * review.
+ */
+export function accessReviewShape():
+  { rows: number; groups: string[]; findings: number } | undefined {
+  const { access } = loadSiteConfiguration(repositoryRoot);
+  if (!access) {
+    return undefined;
+  }
+  const corpus = readCorpusStructure(repositoryRoot);
+  const root = corpus.rootFolderId;
+  return {
+    rows:
+      corpus.folders.size + (root !== null && corpus.folders.has(root) ? 0 : 1),
+    groups: [
+      ...new Set(
+        access.rules.flatMap((rule) =>
+          rule.readers.filter((reader) => reader !== '*'),
+        ),
+      ),
+    ].sort(),
+    findings: accessFindings(access, corpus).length,
+  };
+}
+
+/**
  * What the last sync left off the site (ADR-025), when the corpus has a sync
  * report in the shape the content health page reads.
  */

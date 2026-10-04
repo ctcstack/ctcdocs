@@ -488,7 +488,17 @@ const blocks = (groups: Group[]) => {
                       }
                       data-editor=""
                     >
-                      <span class="health-folder-name">{line.name}</span>
+                      <span class="health-folder-name">
+                        {finding.code === 'rule-folder-missing' ? (
+                          line.name
+                        ) : (
+                          <a
+                            href={`${PLATFORM_ROUTE_HREFS.accessReview}#folder-${finding.folder}`}
+                          >
+                            {line.name}
+                          </a>
+                        )}
+                      </span>
                       <span class="health-folder-meta">
                         {line.where} · {line.what}
                       </span>
@@ -496,6 +506,11 @@ const blocks = (groups: Group[]) => {
                   );
                 })}
               </ul>
+              <p class="health-footer">
+                The{' '}
+                <a href={PLATFORM_ROUTE_HREFS.accessReview}>access review</a>{' '}
+                shows who may read every folder.
+              </p>
             </section>
           )}
 
