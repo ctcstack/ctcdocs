@@ -197,6 +197,70 @@ describe('HTML archive conversion', () => {
     );
   });
 
+  it('keeps the bold, italic and struck text Google marks with classes', async () => {
+    const result = convertHtmlArchive(
+      await fixtureEntries('google-emphasis.html'),
+      options,
+    );
+
+    expect(result.body).toBe(
+      [
+        'Plain, **bold by class**, *italic by class*, ***both***, ~~struck~~, and **bold inline**.',
+        '',
+        // Spans of one style are one mark, a link included.
+        'A **bold phrase in two spans** and a **[bold link](https://example.com/)**.',
+        '',
+        // The later rule wins; a mark on a space marks nothing; an underline
+        // has no Markdown.
+        'Overridden weight, **trailing** space, and an underline that is not kept.',
+        '',
+        // A heading is bold already; its italic is its own.
+        '## Heading in bold',
+        '',
+        '### Heading with *italic*',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('writes a mark as HTML where Markdown would not read its delimiters', () => {
+    const body = (html: string) =>
+      convertHtmlArchive(
+        [
+          {
+            path: 'document.html',
+            bytes: new TextEncoder().encode(
+              `<html><head><style>.b{font-weight:700}.i{font-style:italic}</style></head><body>${html}</body></html>`,
+            ),
+          },
+        ],
+        options,
+      ).body;
+
+    // Punctuation at the edge of a mark, a letter beyond it.
+    expect(body('<p><span class="b">Note:</span><span>text</span></p>')).toBe(
+      '<strong>Note:</strong>text\n',
+    );
+    expect(
+      body('<p><span>a</span><span class="b">(x)</span><span>b</span></p>'),
+    ).toBe('a<strong>(x)</strong>b\n');
+    expect(
+      body(
+        '<p><span class="i"><a href="https://example.com/">link</a></span><span>s</span></p>',
+      ),
+    ).toBe('<em>[link](https://example.com/)</em>s\n');
+    // A space or punctuation beyond the mark, or a letter inside it, reads.
+    expect(
+      body('<p><span class="b">Owner: </span><span>Name.</span></p>'),
+    ).toBe('**Owner:** Name.\n');
+    expect(body('<p><span class="b">Done</span><span>.</span></p>')).toBe(
+      '**Done**.\n',
+    );
+    expect(body('<p><span class="i">word</span><span>s</span></p>')).toBe(
+      '*word*s\n',
+    );
+  });
+
   it('preserves a merged table as sanitized HTML', async () => {
     const result = convertHtmlArchive(
       await fixtureEntries('merged-table.html'),
