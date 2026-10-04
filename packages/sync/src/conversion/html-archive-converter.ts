@@ -206,6 +206,67 @@ function simpleTableMarkdown(node: DomTableLike): string {
   ].join('\n');
 }
 
+interface DomNodeLike {
+  nodeName: string;
+  textContent: string | null;
+  previousSibling: DomNodeLike | null;
+  nextSibling: DomNodeLike | null;
+}
+
+const WHITESPACE = /\s/u;
+const PUNCTUATION = /[\p{P}\p{S}]/u;
+
+/**
+ * The character Markdown sees beside a mark, approximately: the edge of the
+ * text next to it, a space when the mark's own text ends in one (the
+ * conversion moves that space outside the delimiters), the punctuation an
+ * element's Markdown opens or closes with, or none at the edge of a block.
+ */
+function besideMark(
+  node: DomNodeLike,
+  side: 'before' | 'after',
+): string | undefined {
+  const own = node.textContent ?? '';
+  if (WHITESPACE.test((side === 'before' ? own.at(0) : own.at(-1)) ?? '')) {
+    return ' ';
+  }
+  const sibling = side === 'before' ? node.previousSibling : node.nextSibling;
+  if (!sibling) {
+    return undefined;
+  }
+  if (sibling.nodeName === '#text' || sibling.nodeName === 'SPAN') {
+    const text = sibling.textContent ?? '';
+    return side === 'before' ? text.at(-1) : text.at(0);
+  }
+  return sibling.nodeName === 'BR' ? '\n' : '*';
+}
+
+/**
+ * A mark written with its delimiters where Markdown reads them as one, and
+ * as its HTML element where it would not: punctuation at the edge of the
+ * mark with a letter beyond it, as in `<strong>Note:</strong>text`, would
+ * leave the delimiters as literal characters.
+ */
+function markReplacement(delimiter: string, element: string) {
+  return (content: string, node: unknown): string => {
+    if (content.trim() === '') {
+      return content;
+    }
+    const mark = node as DomNodeLike;
+    const loose = (character: string | undefined) =>
+      character === undefined ||
+      WHITESPACE.test(character) ||
+      PUNCTUATION.test(character);
+    const first = content.at(0) ?? '';
+    const last = content.at(-1) ?? '';
+    const opens = !PUNCTUATION.test(first) || loose(besideMark(mark, 'before'));
+    const closes = !PUNCTUATION.test(last) || loose(besideMark(mark, 'after'));
+    return opens && closes
+      ? `${delimiter}${content}${delimiter}`
+      : `<${element}>${content}</${element}>`;
+  };
+}
+
 function createTurndownService(): TurndownService {
   const service = new TurndownService({
     bulletListMarker: '-',
@@ -214,9 +275,17 @@ function createTurndownService(): TurndownService {
     headingStyle: 'atx',
     strongDelimiter: '**',
   });
+  service.addRule('strong', {
+    filter: ['strong', 'b'],
+    replacement: markReplacement('**', 'strong'),
+  });
+  service.addRule('emphasis', {
+    filter: ['em', 'i'],
+    replacement: markReplacement('*', 'em'),
+  });
   service.addRule('strikethrough', {
     filter: 'del',
-    replacement: (content) => `~~${content}~~`,
+    replacement: markReplacement('~~', 'del'),
   });
   service.addRule('tables', {
     filter: 'table',
@@ -364,6 +433,125 @@ function readCrop(
     : { frameWidth, frameHeight, imageWidth, imageHeight, left, top };
 }
 
+interface ClassRule {
+  readonly className: string;
+  readonly declarations: ReadonlyMap<string, string>;
+}
+
+/**
+ * The rules of Google's stylesheet that name one class, in source order.
+ * The export writes a flat list of rules, `.c1{font-weight:700}`, after an
+ * optional `@import`; a rule for anything other than one class, such as the
+ * markers of a list, styles no text and is skipped.
+ */
+function classRules(stylesheet: string): ClassRule[] {
+  const rules: ClassRule[] = [];
+  for (const block of stylesheet.split('}')) {
+    const open = block.indexOf('{');
+    if (open < 0) {
+      continue;
+    }
+    // An at-rule before the first rule ends at its semicolon.
+    const selectors = block.slice(0, open).split(';').at(-1) ?? '';
+    const declarations = styleDeclarations(block.slice(open + 1));
+    for (const selector of selectors.split(',')) {
+      const name = selector.trim();
+      if (/^\.[\w-]+$/u.test(name)) {
+        rules.push({ className: name.slice(1), declarations });
+      }
+    }
+  }
+  return rules;
+}
+
+type Mark = 'strong' | 'em' | 'del';
+
+/** The marks a span's style draws, in the order they nest. */
+function marksOf(declarations: ReadonlyMap<string, string>): Mark[] {
+  const marks: Mark[] = [];
+  const weight = declarations.get('font-weight')?.toLocaleLowerCase('en');
+  if (weight === 'bold' || weight === 'bolder' || Number(weight) >= 600) {
+    marks.push('strong');
+  }
+  const style = declarations.get('font-style')?.toLocaleLowerCase('en');
+  if (style === 'italic' || style === 'oblique') {
+    marks.push('em');
+  }
+  const decoration =
+    declarations.get('text-decoration-line') ??
+    declarations.get('text-decoration');
+  if (
+    decoration?.toLocaleLowerCase('en').split(/\s+/u).includes('line-through')
+  ) {
+    marks.push('del');
+  }
+  return marks;
+}
+
+/**
+ * Google marks bold, italic and struck text with classes its stylesheet
+ * defines, or now and then with a style of the span's own, and both are
+ * removed with the rest of the export's styling. Read first, they become
+ * the elements the Markdown conversion writes as marks. A heading is bold
+ * already, so its bold is not repeated; a span of spaces or around an image
+ * marks nothing. Google splits a run of one style over several spans, so
+ * marks that touch are joined into one.
+ */
+function markEmphasis(
+  $: ReturnType<typeof cheerio.load>,
+  rules: readonly ClassRule[],
+): void {
+  $('body span')
+    .toArray()
+    .reverse()
+    .forEach((span) => {
+      if (!(span instanceof Element)) {
+        return;
+      }
+      const classes = new Set((span.attribs.class ?? '').split(/\s+/u));
+      const declarations = new Map<string, string>();
+      for (const rule of rules) {
+        if (classes.has(rule.className)) {
+          for (const [property, value] of rule.declarations) {
+            declarations.set(property, value);
+          }
+        }
+      }
+      for (const [property, value] of styleDeclarations(span.attribs.style)) {
+        declarations.set(property, value);
+      }
+      const inHeading = $(span).closest('h1, h2, h3, h4, h5, h6').length > 0;
+      const marks = marksOf(declarations).filter(
+        (mark) => !(inHeading && mark === 'strong'),
+      );
+      if (
+        marks.length === 0 ||
+        $(span).text().trim() === '' ||
+        $(span).find('img').length > 0
+      ) {
+        return;
+      }
+      const outer = $(`<${marks[0]}></${marks[0]}>`);
+      let inner = outer;
+      for (const mark of marks.slice(1)) {
+        const next = $(`<${mark}></${mark}>`);
+        inner.append(next);
+        inner = next;
+      }
+      inner.append($(span).contents());
+      $(span).replaceWith(outer);
+    });
+  for (const mark of ['strong', 'em', 'del']) {
+    $(`body ${mark}`).each((_, element) => {
+      const previous = element.prev;
+      if (previous instanceof Element && previous.name === mark) {
+        $(previous).append($(element).contents());
+        $(element).remove();
+      }
+    });
+  }
+}
+
 /** What a table cell may hold besides text that a paragraph break sits beside. */
 const CELL_BLOCKS = 'p, ul, ol, pre, blockquote, table, div';
 
@@ -468,6 +656,17 @@ export function convertHtmlArchive(
         const crop = image instanceof Element ? readCrop(image) : undefined;
         return crop ? [[image, crop] as const] : [];
       }),
+  );
+
+  // Read before the classes and styles that draw them are removed.
+  markEmphasis(
+    $,
+    classRules(
+      $('style')
+        .toArray()
+        .map((style) => $(style).text())
+        .join('\n'),
+    ),
   );
 
   $('body *')
