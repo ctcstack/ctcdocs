@@ -26,6 +26,8 @@ export const PROJECT_LAYOUT = {
   publicDirectory: 'public',
   robotsFile: 'public/robots.txt',
   headersFile: 'public/_headers',
+  /** The pages a project writes by hand; generated ones sit beneath, apart. */
+  documentsDirectory: 'src/content/docs',
   /** Generated Markdown, one directory per Drive folder. */
   generatedDocumentsDirectory: 'src/content/docs/_generated',
   /** Original images, one directory per Google file identifier. */
