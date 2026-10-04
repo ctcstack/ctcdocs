@@ -113,6 +113,7 @@ interface DomElementLike {
   getAttribute(name: string): string | null;
   tagName: string;
   textContent: string | null;
+  innerHTML: string;
 }
 
 interface DomRowLike {
@@ -183,18 +184,33 @@ function isComplexCheerioTable(
   return complex || rowCount === 0 || columnCounts.size > 1;
 }
 
-function tableCellText(cell: DomElementLike): string {
-  return (cell.textContent ?? '')
-    .replace(/\s+/gu, ' ')
-    .trim()
+/**
+ * A cell as one line of Markdown: its marks, links and code as the rest of
+ * the page writes them, and its paragraphs and line breaks, which the
+ * conversion writes as a blank line and as two spaces before a newline, as
+ * `<br>`, the one break a table cell can hold. A pipe is escaped, in code
+ * too, so the row keeps its cells.
+ */
+function tableCellMarkdown(
+  cell: DomElementLike,
+  convert: (html: string) => string,
+): string {
+  return convert(cell.innerHTML)
+    .split(/\n[^\S\n]*\n| {2}\n/u)
+    .map((line) => line.replace(/\s+/gu, ' ').trim())
+    .filter((line) => line !== '')
+    .join('<br>')
     .replaceAll('|', '\\|');
 }
 
-function simpleTableMarkdown(node: DomTableLike): string {
+function simpleTableMarkdown(
+  node: DomTableLike,
+  convert: (html: string) => string,
+): string {
   const rows = Array.from(node.querySelectorAll('tr')).map((row) =>
     Array.from(row.children)
       .filter((child) => ['TD', 'TH'].includes(child.tagName))
-      .map((cell) => tableCellText(cell)),
+      .map((cell) => tableCellMarkdown(cell, convert)),
   );
   const firstRow = rows[0] ?? [];
   return [
@@ -293,7 +309,7 @@ function createTurndownService(): TurndownService {
       const table = node as unknown as DomTableLike;
       return isComplexDomTable(table)
         ? `\n\n${table.outerHTML}\n\n`
-        : simpleTableMarkdown(table);
+        : simpleTableMarkdown(table, (html) => service.turndown(html));
     },
   });
   return service;

@@ -321,6 +321,41 @@ describe('HTML archive conversion', () => {
     expect(result.body).toMatch(/<td><code>x\s+y<\/code><\/td>/u);
   });
 
+  it('keeps the marks, links and paragraphs of simple table cells', () => {
+    const cell = (html: string) => `<td><p class="c0">${html}</p></td>`;
+    const result = convertHtmlArchive(
+      [
+        {
+          path: 'document.html',
+          bytes: new TextEncoder().encode(
+            '<html><head><style>.c1{font-weight:700}.c2{font-style:italic}</style></head><body><table>' +
+              `<tr>${cell('<span class="c1">Step</span>')}${cell('<span class="c1">Detail</span>')}</tr>` +
+              `<tr>${cell('<span>One</span>')}${cell('<span>Run </span><span class="c2">once</span><span>, see </span><a href="https://example.com/">the guide</a>')}</tr>` +
+              `<tr>${cell('<span>Two</span>')}<td><p><span>First line</span></p><p><span>second line</span></p></td></tr>` +
+              `<tr>${cell('<span>a | b</span>')}${cell('<span>0 2 * * *</span>')}</tr>` +
+              '</table></body></html>',
+          ),
+        },
+      ],
+      options,
+    );
+
+    expect(result.hasComplexTables).toBe(false);
+    const rows = result.body
+      .trim()
+      .split('\n')
+      .map((row) => row.split(/(?<!\\)\|/u).map((part) => part.trim()));
+    expect(rows.map((row) => row.slice(1, -1))).toEqual([
+      ['**Step**', '**Detail**'],
+      [expect.stringMatching(/^-+$/u), expect.stringMatching(/^-+$/u)],
+      ['One', 'Run *once*, see [the guide](https://example.com/)'],
+      // Two paragraphs of a cell stay two lines.
+      ['Two', 'First line<br>second line'],
+      // A pipe is escaped so the row keeps its cells; an asterisk is text.
+      ['a \\| b', '0 2 \\* \\* \\*'],
+    ]);
+  });
+
   it('converts a simple table to GitHub-flavored Markdown', () => {
     const result = convertHtmlArchive(
       [
