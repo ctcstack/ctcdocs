@@ -2,6 +2,62 @@
 
 All three packages share a version and are released together.
 
+## 0.18.0
+
+Every document converted from Google's HTML export, which is every document
+with an image, keeps its bold, italic and struck text, its tables' marks and
+links, and loses Google's wrappers in a merged table. The MCP server stores and
+returns a document without its front matter, `fetch` names its folders and its
+source, and the first measurement of search sets its defaults; see
+[ADR-042](docs/ADR/042-an-assistants-search-returns-the-passages-that-match.md),
+still proposed.
+
+### Changed
+
+- **Bold, italic and struck text from Google's HTML export.** Google draws
+  them with classes of its stylesheet, which the converter removed without
+  reading, so every document with an image lost every mark. The rules that
+  name one class are read first, and a span that draws a mark becomes
+  `**`, `*` or `~~`. A heading's bold is not repeated, marks Google splits
+  over several spans are joined, and where Markdown would not read the
+  delimiters (punctuation inside the mark and a letter or another mark beyond
+  it) the mark is written as its HTML element.
+- **Markdown tables keep their cells' marks, links and paragraphs.** A cell
+  was its plain text: marks and links were lost, and paragraphs ran together.
+  A cell's paragraphs and line breaks are now `<br>`, and a pipe is escaped.
+- **Tables with merged cells** keep their cells without Google's paragraph
+  and span wrappers, its no-break spaces and its default `colspan="1"
+rowspan="1"`.
+- The converter version is `hybrid-v4`, so the next sync exports every
+  document again, once.
+- **The MCP server keeps each document without its front matter.** The copy
+  in R2, and so the index, no longer holds the sync's bookkeeping; the
+  catalog hashes that text, so a sync that changes only the front matter
+  rewrites nothing. The content health page measures the same text.
+- **`fetch`** adds `path`, the folders as a list, and `source`, the Google Doc
+  or PDF in Drive, to its `metadata`. A document cut at `mcp.fetchCharacters`
+  ends with a line saying it continues and where the whole of it is, and is
+  never cut inside a character.
+- **`search`** cuts a passage with no sentence end between words, not inside
+  a word or a tag.
+- **`mcp.search.contextChunks` defaults to 0.** With AI Search's default
+  1,024-token chunks, neighbouring chunks changed no ranking and only added
+  text the Worker cut away.
+- `mcp.search.vectorThreshold` is described as it behaves: AI Search ignores
+  it while reranking is on.
+- ADR-042 records the first measurement of search: 34 questions in English
+  and Russian, one setting varied at a time, and 512-token chunks on a second
+  instance. ADR-043 measures the text `fetch` returns. The runbook says how
+  to see documents an index left in error or running.
+
+### Upgrade note
+
+Bump the packages and the workflow pins. The next sync is a full export
+(`hybrid-v4`), and a targeted sync is refused until it has run. After the
+deploy that follows, the MCP server rewrites every document in its bucket
+once and AI Search reindexes them. A project that set
+`mcp.search.contextChunks` to 0 may drop the line.
+
 ## 0.17.0
 
 AI assistants can read a private deployment as the person who connected
