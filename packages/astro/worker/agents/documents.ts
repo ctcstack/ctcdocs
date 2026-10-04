@@ -160,7 +160,10 @@ const sentences = new Intl.Segmenter('en', { granularity: 'sentence' });
 /**
  * A passage cut to `limit` characters around its middle, where the chunk that
  * matched sits between the neighbours the index adds, at sentence boundaries
- * when a whole sentence fits.
+ * when a whole sentence fits. A line break ends a sentence too, so a list or
+ * a table is cut between its lines. Text with no sentence end inside the
+ * window, such as a table kept as HTML on one line, is cut between words,
+ * and only text without a space is cut where the window falls.
  */
 export function excerpt(text: string, limit: number): string {
   const passage = text.trim();
@@ -179,9 +182,15 @@ export function excerpt(text: string, limit: number): string {
       to = index + segment.length;
     }
   }
-  return from !== undefined && to !== undefined && to > from
-    ? passage.slice(from, to).trim()
-    : passage.slice(start, end).trim();
+  if (from !== undefined && to !== undefined && to > from) {
+    return passage.slice(from, to).trim();
+  }
+  const window = passage.slice(start, end);
+  const first = window.search(/\s/u);
+  const last = window.search(/\s\S*$/u);
+  return first >= 0 && last > first
+    ? window.slice(first, last).trim()
+    : window.trim();
 }
 
 /** The short ID an index key names, if it names a document object. */
