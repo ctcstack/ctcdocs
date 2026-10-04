@@ -21,12 +21,10 @@ documentation of the clients and of AI Search shows where this falls short:
   matched, is thrown away.
 - **Exact terms are lost before they are ranked.** AI Search's
   `match_threshold` filters on vector similarity, not on the fused score it
-  returns (<https://developers.cloudflare.com/ai-search/configuration/retrieval/result-controls/>).
-  A chunk that matches a code name, an acronym or a product name word for
-  word, but whose meaning is far from the question, never reaches the fusion
-  that would rank it. Keyword matching also defaults to `and`: a chunk must
-  contain every word of the query, so a question asked in a sentence gets
-  little from BM25.
+  returns (<https://developers.cloudflare.com/ai-search/configuration/retrieval/result-controls/>),
+  so a threshold set high leaves little for the fusion to rank. Keyword
+  matching also defaults to `and`: a chunk must contain every word of the
+  query, so a question asked in a sentence gets little from BM25.
 - **The front matter is noise.** `synced_at` and `content_hash` are sync
   bookkeeping. They open every text `fetch` returns and are indexed with each
   document's first chunk.
@@ -100,35 +98,106 @@ second call; most also filter by folder or date.
 **What AI Search offers.** A search returns up to 50 chunks, each with its
 text, its object's key and custom metadata, and its scores; it can add up to
 three neighbouring chunks to each, switch keyword matching to `or`, boost by
-a metadata field, and rerank with `@cf/baai/bge-reranker-base`, an English
-cross-encoder, which has its own threshold, 0.4 unless a request sets another
-(<https://developers.cloudflare.com/ai-search/api/search/workers-binding/>).
-How the neighbouring chunks appear in a response is not documented.
+a metadata field, and rerank with `@cf/baai/bge-reranker-base`, the one
+reranking model it supports, a cross-encoder trained on English and Chinese
+that reads 512 tokens of each chunk and has its own threshold, 0.4 unless a
+request sets another
+(<https://developers.cloudflare.com/ai-search/api/search/workers-binding/>,
+<https://developers.cloudflare.com/ai-search/configuration/models/supported-models/>).
 Query rewriting applies only to follow-up turns of a conversation, and
 `chatCompletions` writes an answer, which the assistant does itself. An
 instance's similarity cache is on unless it is turned off, for 48 hours, and
-its documentation does not say whether a request's filters are part of the
-cache key. The platform's setup leaves an instance's chunk size at AI
-Search's default, which is not documented. The corpora the platform serves
-today are mostly in English.
+a request can turn it off for itself with `ai_search_options.cache`. The
+platform's setup leaves an instance's models and chunking at AI Search's
+defaults: an instance it created indexes with
+`@cf/qwen/qwen3-embedding-0.6b`, a multilingual model, in chunks of 1,024
+tokens overlapping by 10%, with the `porter` keyword tokenizer, which stems
+English. The corpora the platform serves are mostly in English, some in
+other languages or mixed.
 
-There is no measurement of the platform's own search yet: no set of
-questions, no recall, no answers graded. Every number in this record is a
-starting point.
+**What AI Search does, measured.** Where its documentation is silent or
+says otherwise, the first measurement (below) found:
+
+- `retrieval.match_threshold` is ignored while reranking is on: a request
+  at 0 and at 0.6 returns the same chunks. With reranking off it drops only
+  the chunks vector search found below it; a chunk keyword search found stays
+  whatever its vector score, and keyword matches fill the places the
+  threshold frees. It never cut an exact term.
+- `context_expansion` joins the neighbouring chunks into the matched chunk's
+  text and changes no ranking. With the default chunk size a chunk's text was
+  2,600 characters at the median, 3,800 at the 90th percentile; with one
+  neighbour on each side, 7,800 and 11,400.
+- The search endpoint reported no cache status, and the same query under two
+  class filters returned each filter's own chunks.
+
+**What the first measurement showed.** A set of 34 questions was run against
+one deployment's corpus, about 140 documents in English and Russian, as a
+reader of its widest class: 15 questions in Russian and 19 in English;
+lookups, questions across languages, acronyms and code names, questions that
+need several documents, two that ask for every document of a kind, and two
+nothing answers. The documents each answer needs were assigned by hand. Each
+setting was varied alone from this record's defaults:
+
+| Setting                     | Answer first | In top 3 | In top 10 | MRR   | Recall at 10 | Documents a search returns |
+| --------------------------- | ------------ | -------- | --------- | ----- | ------------ | -------------------------- |
+| The defaults                | 20 of 32     | 26       | 30        | 0.734 | 0.856        | 10                         |
+| No reranking                | 16           | 22       | 28        | 0.616 | 0.848        | 10                         |
+| Keyword matching `and`      | 20           | 25       | 29        | 0.724 | 0.822        | 10                         |
+| Vector threshold 0.3 to 0.6 | 20           | 26       | 30        | 0.734 | 0.856        | 10                         |
+| No neighbouring chunks      | 20           | 26       | 30        | 0.734 | 0.856        | 10                         |
+| Reranking threshold 0.005   | 20           | 26       | 30        | 0.734 | 0.825        | 7.4                        |
+| Reranking threshold 0.01    | 20           | 26       | 30        | 0.734 | 0.803        | 6.8                        |
+| Reranking threshold 0.05    | 19           | 25       | 29        | 0.703 | 0.760        | 5                          |
+| Reranking threshold 0.4     | 17           | 20       | 22        | 0.591 | 0.589        | 3.2                        |
+
+- **The reranker earns its place, most of all across languages.** Without
+  it, the mean reciprocal rank of the answer fell from 0.70 to 0.42 for the
+  Russian questions, and stayed within noise for the English ones (0.76 and
+  0.77).
+- **Its score does not separate the relevant from the rest.** The best chunk
+  of a needed document scored under 0.08 for one in five of them and under
+  0.01 for one in ten, while one in ten unrelated documents scored over 0.88;
+  a question nothing answers scored 0.054 at most. Any threshold that cuts
+  noise also cuts needed documents, the second and third ones first, and
+  cross-language ones most. At 0.005 it kept every answer and returned 7.4
+  documents instead of 10.
+- **Keyword matching `or` reaches more.** `and` lost one answer from the
+  first ten and some of the other needed documents.
+- **A search's noise is documents that suit every question.** Pages that
+  describe the knowledge base itself were among the first ten of every search
+  in an assistant's replayed session; where an access rule kept them to a few
+  readers, the others never saw them. In a language the keyword tokenizer
+  does not stem, short common words matched many documents in that language,
+  which the reranker mostly ranked down.
+- **The failures were of vocabulary.** A question in a reader's own words
+  ("may I use a chatbot with client data") missed the policy that answers it
+  in both languages, because the policy uses neither word; the policy's own
+  terms found it first in both. Searching again in other words, which the
+  server's instructions ask of the assistant, is the remedy, not a setting.
+- **Passages reach their cap.** In an assistant's replayed session every
+  result's passage was cut to its share of the budget, so a second passage
+  fitted once in fifty results.
+
+The numbers come from one corpus and one person's judgment of the answers:
+a difference of one or two questions is noise. The effects above are larger.
 
 ## Decision
 
 ### What `search` returns
 
 **The index is asked broadly, and the answer is kept short.** The Worker asks
-AI Search for 50 chunks in hybrid mode, with keyword matching set to `or`, a
-vector `match_threshold` of 0.2, so that exact terms reach the ranking,
-reranking by `bge-reranker-base`, and `context_expansion` of 1, so that each
-passage reads as a paragraph rather than a fragment. The reranker orders the
-chunks and, for now, drops none: its threshold is set to 0. A weak match
-costs less than it did, since the assistant now reads why it matched; the
-first evaluation decides whether the reranker's score should cut. All of it
-is set in the request, so the instance needs no setting of its own.
+AI Search for 50 chunks in hybrid mode, with keyword matching set to `or`,
+reranking by `bge-reranker-base`, and no neighbouring chunks
+(`context_expansion` of 0). It sends a vector `match_threshold` of 0.2 as
+well, which AI Search applies only with reranking off, and then only to
+chunks vector search alone found. The reranker orders the chunks and drops
+none: its threshold is 0, since the first measurement found no score that
+cuts noise without cutting needed documents. A weak match costs less than it
+did, since the assistant now reads why it matched. A chunk of AI Search's
+default size is already longer than the passage a result shows, so
+neighbouring chunks would add only text the Worker cuts away; a project that
+indexes smaller chunks may ask for them. All of it is set in the request, so
+the instance needs no setting of its own.
 
 **The numbers are the project's to tune.** Every value in this record, from
 the chunks asked for to the characters `fetch` returns, is a default of the
@@ -243,9 +312,18 @@ cache is not relied on for anything.
 - A search costs about 6,000 tokens where titles cost a few hundred.
 - A passage may show text a document has since dropped, until AI Search
   syncs.
-- The thresholds, the budget and the number of passages are unmeasured.
-- The reranker is trained on English. A question in another language still
-  finds an English document by meaning, but is ranked less well.
+- The defaults were measured once, on one corpus, against answers one person
+  chose; the passage budget and the number of passages were not varied.
+- `mcp.search.vectorThreshold` does nothing while reranking is on, which is
+  the default. It is kept for a project that turns reranking off.
+- The reranker is trained on English and Chinese. It still improved the
+  ranking of Russian questions the most, but scores needed documents in
+  another language than the question's low, so a reranking threshold costs
+  those first.
+- With reranking threshold 0, a search returns ten documents even when
+  nothing answers the question.
+- A chunk of the default size is longer than a passage, so a passage is the
+  middle of a chunk and a document rarely shows a second one.
 - Reranking adds latency to every search.
 - ChatGPT may ignore the extra fields, or refuse them.
 - Changing the copy in R2 republishes and reindexes every document once.
@@ -259,7 +337,16 @@ cache is not relied on for anything.
   several runs. Synthetic questions over the fixture run in CI; 50 to 100 real
   questions — lookups, questions across documents, "list them all",
   unanswerable ones, acronyms — live in each project's repository, never in
-  this one. The first run sets this record's numbers.
+  this one. The first measurement above was a project's own script, which
+  calls AI Search as the Worker does and ranks documents as the Worker does;
+  the platform's tool can start from it.
+- Measure smaller chunks: 512 tokens, the most the reranker reads, would let
+  it judge a whole chunk and let a document show two or three passages. It
+  takes a second instance, indexed from the same bucket, to compare.
+- Revisit the passage budget once chunks and passages are measured together.
+- Turn the cache off in each request if AI Search starts to cache searches:
+  a response cached for one reader's classes could hide documents from
+  another, though never open one.
 - Verify the extra `search` fields in ChatGPT, and the 100,000-character
   `fetch` in Claude Code, before release.
 - Optional `search` parameters for a folder and a modified-after date, for

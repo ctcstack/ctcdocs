@@ -175,7 +175,7 @@ Every setting is optional, and the defaults are the values shown:
     "chunks": 50,
     "vectorThreshold": 0.2,
     "keywordMatch": "or",
-    "contextChunks": 1,
+    "contextChunks": 0,
     "reranking": {
       "enabled": true,
       "model": "@cf/baai/bge-reranker-base",
@@ -189,22 +189,25 @@ Every setting is optional, and the defaults are the values shown:
 }
 ```
 
-| Setting                          | Meaning                                                                                                                        |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `mcp.search.chunks`              | Chunks asked of AI Search for each query, 1 to 50.                                                                             |
-| `mcp.search.vectorThreshold`     | Vector similarity, 0 to 1, below which AI Search drops a chunk. It ignores keyword matches, so a high value loses exact terms. |
-| `mcp.search.keywordMatch`        | `or`: a keyword match needs any word of the query; `and`: every word.                                                          |
-| `mcp.search.contextChunks`       | Neighbouring chunks added on each side of a match, 0 to 3, so that a passage reads as a paragraph.                             |
-| `mcp.search.reranking.enabled`   | Whether AI Search reranks the chunks before the Worker groups them.                                                            |
-| `mcp.search.reranking.model`     | The reranking model.                                                                                                           |
-| `mcp.search.reranking.threshold` | Reranking score, 0 to 1, below which a chunk is dropped; 0 keeps every chunk.                                                  |
-| `mcp.search.results`             | Documents a search returns at most: no more than `chunks`, which is also the default when it is under 10.                      |
-| `mcp.search.passagesPerResult`   | Passages each document shows at most.                                                                                          |
-| `mcp.search.passageCharacters`   | Characters of passage text a search returns in all; at least 100 for each result.                                              |
-| `mcp.fetchCharacters`            | Characters `fetch` returns at most, 1,000 or more; a longer document is cut there, and the content health page names it.       |
+| Setting                          | Meaning                                                                                                                                                                                                                          |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mcp.search.chunks`              | Chunks asked of AI Search for each query, 1 to 50.                                                                                                                                                                               |
+| `mcp.search.vectorThreshold`     | Vector similarity, 0 to 1, below which AI Search drops a chunk vector search alone found; a keyword match stays. AI Search ignores it while reranking is on, so it acts only with `reranking.enabled` false.                     |
+| `mcp.search.keywordMatch`        | `or`: a keyword match needs any word of the query; `and`: every word.                                                                                                                                                            |
+| `mcp.search.contextChunks`       | Neighbouring chunks joined to each side of a match, 0 to 3. A chunk of AI Search's default size is already longer than a passage, so they add only text the Worker cuts away; they help when an instance indexes smaller chunks. |
+| `mcp.search.reranking.enabled`   | Whether AI Search reranks the chunks before the Worker groups them.                                                                                                                                                              |
+| `mcp.search.reranking.model`     | The reranking model.                                                                                                                                                                                                             |
+| `mcp.search.reranking.threshold` | Reranking score, 0 to 1, below which a chunk is dropped; 0 keeps every chunk. Needed documents can score near 0, those in another language than the question first, so a threshold cuts them with the noise.                     |
+| `mcp.search.results`             | Documents a search returns at most: no more than `chunks`, which is also the default when it is under 10.                                                                                                                        |
+| `mcp.search.passagesPerResult`   | Passages each document shows at most.                                                                                                                                                                                            |
+| `mcp.search.passageCharacters`   | Characters of passage text a search returns in all; at least 100 for each result.                                                                                                                                                |
+| `mcp.fetchCharacters`            | Characters `fetch` returns at most, 1,000 or more; a longer document is cut there, and the content health page names it.                                                                                                         |
 
 The build writes the resolved values into the access map, so a change takes
-effect with the project's next deploy.
+effect with the project's next deploy. ADR-042 records what each setting did
+when the defaults were first measured, and what AI Search does with the
+settings its documentation leaves unsaid; measure a change against the
+project's own questions before keeping it.
 
 ## Who may read which folder
 

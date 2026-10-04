@@ -183,13 +183,16 @@ export interface McpSearchConfiguration {
   readonly chunks: number;
   /**
    * The vector similarity below which AI Search drops a chunk, 0 to 1. It
-   * applies to vector similarity alone, so a keyword match far from the
-   * question in meaning is dropped too when it is set high.
+   * drops only chunks vector search alone found, and AI Search ignores it
+   * while reranking is on (ADR-042), so it acts only with reranking off.
    */
   readonly vectorThreshold: number;
   /** Whether a keyword match needs every word of the query, or any. */
   readonly keywordMatch: 'and' | 'or';
-  /** Neighbouring chunks AI Search adds on each side of a match: 0 to 3. */
+  /**
+   * Neighbouring chunks AI Search joins to each side of a match: 0 to 3. A
+   * chunk of AI Search's default size is already longer than a passage.
+   */
   readonly contextChunks: number;
   readonly reranking: {
     readonly enabled: boolean;
@@ -224,7 +227,7 @@ export const MCP_DEFAULTS: Omit<McpConfiguration, 'enabled'> = Object.freeze({
     chunks: 50,
     vectorThreshold: 0.2,
     keywordMatch: 'or',
-    contextChunks: 1,
+    contextChunks: 0,
     reranking: Object.freeze({
       enabled: true,
       model: '@cf/baai/bge-reranker-base',

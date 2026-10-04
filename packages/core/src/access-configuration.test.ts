@@ -242,7 +242,7 @@ describe('MCP configuration', () => {
         chunks: 50,
         vectorThreshold: 0.2,
         keywordMatch: 'or',
-        contextChunks: 1,
+        contextChunks: 0,
         reranking: {
           enabled: true,
           model: '@cf/baai/bge-reranker-base',
