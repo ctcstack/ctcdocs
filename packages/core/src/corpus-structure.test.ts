@@ -44,7 +44,7 @@ describe('corpus structure', () => {
     });
   });
 
-  it('reads the short ID, title and modified time an agent needs', () => {
+  it('reads the short ID, title, modified time and source an agent needs', () => {
     const corpus = parseCorpusStructure({
       folders: {},
       documents: {
@@ -54,6 +54,7 @@ describe('corpus structure', () => {
           shortId: '1a2b3c',
           displayTitle: 'Handbook',
           googleModifiedTime: '2026-10-01T00:00:00.000Z',
+          sourceUrl: 'https://docs.google.com/document/d/handbook/edit',
         },
         e: { googleParentId: null, stableSlug: 'e', shortId: '' },
       },
@@ -65,6 +66,7 @@ describe('corpus structure', () => {
       shortId: '1a2b3c',
       title: 'Handbook',
       modified: '2026-10-01T00:00:00.000Z',
+      source: 'https://docs.google.com/document/d/handbook/edit',
     });
     expect(corpus.documents.get('e')).toEqual({
       id: 'e',

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { buildAgentCatalog } from './agent-catalog.js';
 
-type Field = 'shortId' | 'title' | 'modified';
+type Field = 'shortId' | 'title' | 'modified' | 'source';
 
 const document = (
   slug: string,
@@ -17,6 +17,7 @@ const document = (
     shortId: `${slug.length}a${slug.length}b`,
     title: `Title of ${slug}`,
     modified: '2026-10-01T00:00:00.000Z',
+    source: `https://docs.google.com/document/d/${slug}/edit`,
     ...extra,
   };
   return Object.fromEntries(
@@ -24,10 +25,14 @@ const document = (
   ) as unknown as CorpusDocument;
 };
 
-const projections: Record<string, string> = {
-  '/handbook/index.md': '# Handbook\n',
-  '/team/plan/index.md': '# Plan\n',
-  '/shared/index.md': '# Shared\n',
+/** A Markdown version as the site serves it, front matter first. */
+const projection = (body: string, syncedAt = '2026-10-02T00:00:00.000Z') =>
+  `---\ntitle: "x"\nsynced_at: "${syncedAt}"\n---\n\n${body}`;
+
+const PROJECTIONS: Record<string, string> = {
+  '/handbook/index.md': projection('# Handbook\n'),
+  '/team/plan/index.md': projection('# Plan\n'),
+  '/shared/index.md': projection('# Shared\n'),
 };
 
 const folder = (
@@ -49,6 +54,7 @@ const FOLDERS = new Map([
 async function catalog(
   documents: CorpusDocument[],
   files: Record<string, string | string[]>,
+  projections: Record<string, string> = PROJECTIONS,
 ) {
   return buildAgentCatalog({
     documents,
@@ -79,6 +85,7 @@ describe('agent catalog', () => {
       title: 'Title of handbook',
       markdown: '/handbook/index.md',
       modified: '2026-10-01T00:00:00.000Z',
+      source: 'https://docs.google.com/document/d/handbook/edit',
     });
   });
 
@@ -112,6 +119,29 @@ describe('agent catalog', () => {
     expect(moved.documents[0]?.hash).not.toBe(base.documents[0]?.hash);
     expect(moved.digest).not.toBe(base.digest);
     expect(renamed.documents[0]?.hash).not.toBe(base.documents[0]?.hash);
+
+    const edited = await catalog([document('handbook')], files, {
+      '/handbook/index.md': projection('# Handbook\n\nEdited.\n'),
+    });
+    expect(edited.documents[0]?.hash).not.toBe(base.documents[0]?.hash);
+  });
+
+  it('hashes the text the Worker stores, not the front matter', async () => {
+    const files = { '/handbook/index.md': 'members' };
+    const base = await catalog([document('handbook')], files);
+    const resynced = await catalog([document('handbook')], files, {
+      '/handbook/index.md': projection(
+        '# Handbook\n',
+        '2026-10-03T00:00:00.000Z',
+      ),
+    });
+    expect(resynced).toEqual(base);
+
+    // A file the site would not have written has no text to store.
+    const bare = await catalog([document('handbook')], files, {
+      '/handbook/index.md': '# Handbook\n',
+    });
+    expect(bare.documents).toEqual([]);
   });
 
   it('names the folders a document sits in, without the root', async () => {
@@ -134,14 +164,15 @@ describe('agent catalog', () => {
     ]);
   });
 
-  it('falls back to the slug for a title and to null for a time', async () => {
+  it('falls back to the slug for a title and to null for a time or a source', async () => {
     const result = await catalog(
-      [document('handbook', {}, ['title', 'modified'])],
+      [document('handbook', {}, ['title', 'modified', 'source'])],
       { '/handbook/index.md': 'members' },
     );
     expect(result.documents[0]).toMatchObject({
       title: 'handbook',
       modified: null,
+      source: null,
     });
   });
 });

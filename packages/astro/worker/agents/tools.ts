@@ -42,7 +42,10 @@ const FETCH_OUTPUT = z.object({
   title: z.string(),
   text: z.string(),
   url: z.string(),
-  metadata: z.record(z.string(), z.union([z.string(), z.boolean()])),
+  metadata: z.record(
+    z.string(),
+    z.union([z.string(), z.boolean(), z.array(z.string())]),
+  ),
 });
 
 /**
@@ -121,7 +124,7 @@ function server(context: ToolContext): McpServer {
     'fetch',
     {
       title: `Read a document from ${site}`,
-      description: `Read one ${site} document by the id search returned: its whole Markdown text, its link to cite, and when it was last changed.`,
+      description: `Read one ${site} document by the id search returned: its whole Markdown text, its link to cite, and in its metadata when it last changed, the folders it sits in and the Google Doc or PDF it is published from.`,
       inputSchema: z.object({
         id: z.string().describe('A document id from search'),
       }),

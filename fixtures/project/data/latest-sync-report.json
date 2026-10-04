@@ -357,7 +357,7 @@
       "lastEditedBy": "Robin Sample",
       "slug": "reference/release-process",
       "note": "document-long",
-      "detail": "1,908 characters, over 1,500"
+      "detail": "1,634 characters, over 1,500"
     },
     {
       "id": "doc-decision-log",
@@ -370,7 +370,7 @@
       "lastEditedBy": "Avery Example",
       "slug": "reference/decision-log",
       "note": "document-over-agent-limit",
-      "detail": "4,687 characters; AI agents read the first 3,000"
+      "detail": "4,419 characters; AI agents read the first 3,000"
     },
     {
       "id": "doc-style-guide",

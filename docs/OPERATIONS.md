@@ -625,7 +625,9 @@ assistant.
 
 Every five minutes the site Worker checks whether the documents in its
 `KB_DOCUMENTS` bucket match its build, and when they do not, rewrites what
-changed and starts an AI Search sync. Its log shows `agents-published` with
+changed and starts an AI Search sync. The bucket holds each document's
+Markdown version without its front matter, the text `fetch` returns; a
+release that changes that text rewrites and reindexes every document once. Its log shows `agents-published` with
 the counts written and deleted, and `agents-publish-incomplete` when a
 document could not be written: the others are published and indexed all the
 same, and the next run tries the missing ones again. The last published

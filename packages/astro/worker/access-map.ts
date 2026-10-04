@@ -54,6 +54,8 @@ export interface AgentDocument {
   readonly modified: string | null;
   /** The folders from the corpus root to the document (ADR-042). */
   readonly path: readonly string[];
+  /** The Google Doc or PDF in Drive it is published from (ADR-042). */
+  readonly source: string | null;
   readonly hash: string;
 }
 

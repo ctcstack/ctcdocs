@@ -2,21 +2,19 @@
  * How long each page's Markdown version is: the text the MCP server's `fetch`
  * returns and cuts (ADR-043).
  *
- * The site serializes that text from the generated file, with the function
- * the core shares, and the Worker stores and cuts it as it is. Serializing it
- * here the same way, from the same file, counts exactly what an assistant is
- * given: its front matter, its title and its links as the site writes them,
- * not only the body the sync wrote.
+ * The Worker stores the site's Markdown version without its front matter
+ * (ADR-042) and cuts that. Serializing it here with the function the core
+ * shares, from the same file, counts exactly what an assistant is given: its
+ * title and its links as the site writes them, not only the body the sync
+ * wrote.
  */
 import { permanentLinkPath } from '@ctcstack/ctcdocs-core';
-import {
-  publishedFileUrl,
-  serializePublishedMarkdown,
-} from '@ctcstack/ctcdocs-core/published-markdown';
+import { publishedMarkdownBody } from '@ctcstack/ctcdocs-core/published-markdown';
 
 import type { SyncManifest } from '../manifest.js';
 import { extractGeneratedFrontmatter } from '../markdown/generated-document.js';
 
+/** The fields without which the site serves no Markdown version of a page. */
 interface ProjectionFacts {
   title: string;
   editUrl: string;
@@ -24,7 +22,6 @@ interface ProjectionFacts {
   googleModifiedTime: string;
   syncedAt: string;
   contentHash: string;
-  pdf?: { file?: string };
 }
 
 function isProjectionFacts(value: unknown): value is ProjectionFacts {
@@ -85,15 +82,8 @@ export function publishedLengths(
     if (!isProjectionFacts(facts) || body === undefined) {
       continue;
     }
-    const text = serializePublishedMarkdown({
+    const text = publishedMarkdownBody({
       title: facts.title,
-      sourceUrl: facts.editUrl,
-      ...(facts.pdf?.file
-        ? { fileUrl: publishedFileUrl(facts.googleFileId, facts.pdf.file) }
-        : {}),
-      googleModifiedTime: facts.googleModifiedTime,
-      syncedAt: facts.syncedAt,
-      contentHash: facts.contentHash,
       body,
       ownershipHeader: markdownHeader,
       stableSlugs,

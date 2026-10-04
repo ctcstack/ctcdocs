@@ -6,9 +6,11 @@
  * short ID, title, Markdown address, modified time and a hash of everything
  * that would change the stored object. The Worker compares those hashes with
  * the bucket and rewrites only what changed; the digest tells it, cheaply,
- * whether anything did. Each entry also names the folders the document sits
- * in, which search returns with it (ADR-042) and which the bucket does not
- * hold.
+ * whether anything did. The object holds the projection without its front
+ * matter (ADR-042), so the hash is of that text, and a sync that touches only
+ * the front matter rewrites nothing. Each entry also names the folders the
+ * document sits in and the source it is published from, which the tools
+ * return with it and the bucket does not hold.
  */
 import { createHash } from 'node:crypto';
 
@@ -18,6 +20,7 @@ import {
   type CorpusFolder,
 } from '@ctcstack/ctcdocs-core';
 
+import { documentText } from '../worker/agents/document-text.js';
 import type { FileClass } from './access-map.js';
 
 interface AgentDocument {
@@ -29,7 +32,9 @@ interface AgentDocument {
   readonly modified: string | null;
   /** The folders from the corpus root to the document, as the site names them. */
   readonly path: readonly string[];
-  /** SHA-256 of the projection, its class and its title. */
+  /** The Google Doc or PDF in Drive, as the page links it. */
+  readonly source: string | null;
+  /** SHA-256 of the stored text, its class and its title. */
   readonly hash: string;
 }
 
@@ -81,7 +86,9 @@ export async function buildAgentCatalog({
     if (typeof fileClass !== 'string') {
       continue;
     }
-    const text = await readMarkdown(markdown);
+    const projection = await readMarkdown(markdown);
+    const text =
+      projection === undefined ? undefined : documentText(projection);
     if (text === undefined) {
       continue;
     }
@@ -92,6 +99,7 @@ export async function buildAgentCatalog({
       markdown,
       modified: document.modified ?? null,
       path: folderPath(document, folders),
+      source: document.source ?? null,
       hash: sha256(JSON.stringify([text, fileClass, title])),
     });
   }

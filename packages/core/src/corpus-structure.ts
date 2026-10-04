@@ -37,6 +37,8 @@ export interface CorpusDocument {
   readonly shortId?: string;
   readonly title?: string;
   readonly modified?: string;
+  /** The Google Doc or PDF in Drive, as the page links it. */
+  readonly source?: string;
 }
 
 export interface CorpusStructure {
@@ -114,6 +116,7 @@ export function parseCorpusStructure(manifest: unknown): CorpusStructure {
     const shortId = optional('shortId');
     const title = optional('displayTitle');
     const modified = optional('googleModifiedTime');
+    const source = optional('sourceUrl');
     documents.set(id, {
       id,
       parentId: field(raw, 'googleParentId', path, true),
@@ -121,6 +124,7 @@ export function parseCorpusStructure(manifest: unknown): CorpusStructure {
       ...(shortId ? { shortId } : {}),
       ...(title ? { title } : {}),
       ...(modified ? { modified } : {}),
+      ...(source ? { source } : {}),
       ...(published === '*' ||
       (Array.isArray(published) &&
         published.every((group) => typeof group === 'string'))

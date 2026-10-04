@@ -4,7 +4,8 @@
  * The build lists every document the MCP server offers, with a hash of what
  * its stored object would hold. On a schedule the Worker compares that list
  * with the bucket: it writes each document whose hash differs, from the
- * Markdown projection in its own assets, deletes the ones the build no longer
+ * Markdown projection in its own assets without its front matter (ADR-042),
+ * so the index holds no bookkeeping, deletes the ones the build no longer
  * has, and asks AI Search to sync what changed. A document that cannot be
  * written now is tried again on the next run, without holding back the
  * others. A marker kept in the bucket itself — the build's digest, whether
@@ -19,6 +20,7 @@
  */
 import type { AccessMapFile } from '../access-map.js';
 import { sitePath } from '../paths.js';
+import { documentText } from './document-text.js';
 import {
   DOCUMENT_PREFIX,
   documentKey,
@@ -129,11 +131,15 @@ export async function publishDocuments(
             redirect: 'manual',
           }),
         );
-        if (!response.ok || typeof fileClass !== 'string') {
+        // A projection without the front matter the build read is not stored.
+        const text = response.ok
+          ? documentText(await response.text())
+          : undefined;
+        if (text === undefined || typeof fileClass !== 'string') {
           complete = false;
           continue;
         }
-        await store.put(key, await response.text(), {
+        await store.put(key, text, {
           httpMetadata: { contentType: 'text/markdown; charset=utf-8' },
           customMetadata: {
             class: fileClass,

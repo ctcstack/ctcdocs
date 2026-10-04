@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { serializePublishedMarkdown } from './published-markdown.js';
+import {
+  publishedMarkdownBody,
+  serializePublishedMarkdown,
+} from './published-markdown.js';
 
 /*
  * A synthetic marker: the real one names a deployment, and this package has no
@@ -92,5 +95,21 @@ describe('published Markdown', () => {
 
     expect(result).toContain('# Guide \\[safe\\]');
     expect(result.endsWith('\n')).toBe(true);
+  });
+
+  it('ends with the body the MCP server keeps, after the front matter', () => {
+    for (const body of ['Document body.\n\n---\n\nAfter a rule.', '']) {
+      const value = input(body);
+      const whole = serializePublishedMarkdown(value);
+      const kept = publishedMarkdownBody(value);
+
+      expect(kept).toBe(
+        body
+          ? `# Guide \\[safe\\]\n\n${body.replace('---', '***')}\n`
+          : '# Guide \\[safe\\]\n',
+      );
+      expect(whole.endsWith(`---\n\n${kept}`)).toBe(true);
+      expect(kept).not.toContain('source_url');
+    }
   });
 });
