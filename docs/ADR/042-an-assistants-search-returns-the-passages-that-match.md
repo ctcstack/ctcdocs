@@ -4,7 +4,8 @@
 - Date: 2026-10-04
 - Owners: CTCDocs maintainers
 - Supersedes: ADR-041 in part, once accepted: what `search` and `fetch`
-  return, and the minimum relevance score
+  return, the minimum relevance score, and what its follow-up on moving
+  generated content from Git to R2 must keep apart
 
 ## Context
 
@@ -263,6 +264,16 @@ link to the Google Doc or PDF that the page on the site already shows its
 reader. The catalog in the access map carries the path and the source
 alongside the title, from the build.
 
+**The bucket is a copy, not a store.** What the bucket holds is derived from
+each build, and the Worker rewrites or deletes it to match the build it
+serves. The source of truth stays the content the sync generates: each
+document with its whole front matter, its images and files, the manifest and
+the reports, none of which the bucket ever held. ADR-041 leaves moving that
+content from Git to R2 to a record of its own. When it moves, it is stored
+apart from this copy, in another bucket or under a prefix AI Search does not
+index, and this copy is still derived from it: the index never holds the
+sync's records, and the Worker never deletes them.
+
 **A document is read whole.** The knowledge base keeps documents short
 enough for that, and the content health page names those that are not
 (ADR-043), rather than the server reading long ones in parts. `fetch` still
@@ -341,6 +352,8 @@ cache is not relied on for anything.
 ### Follow-up
 
 - When ADR-042 is accepted, mark ADR-041 as superseded in part.
+- The record that moves generated content from Git to R2 keeps it apart from
+  the bucket of documents assistants read, as decided above.
 - An evaluation: the platform runs a set of questions against a deployment
   and reports document recall at ten, answers graded by a model calibrated
   against about fifty human grades, citation support, calls and tokens, over
