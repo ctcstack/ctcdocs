@@ -22,6 +22,7 @@ import {
 import type { AstroUserConfig } from 'astro';
 
 import { normalizeFolderName } from './lib/folder-anchor.js';
+import { remarkExternalLinks } from './lib/remark-external-links.js';
 import { remarkMermaid } from './lib/remark-mermaid.js';
 import { remarkPermanentLinks } from './lib/remark-permanent-links.js';
 import { remarkTableScroll } from './lib/remark-table-scroll.js';
@@ -195,9 +196,10 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
     redirects: options.redirects,
     markdown: {
       /*
-       * Two transforms the reader interface needs and Markdown has no node
-       * for: mermaid fences are claimed before Expressive Code turns them into
-       * a code frame, and every table gains its own scroll container.
+       * Transforms the reader interface needs and Markdown has no node for:
+       * mermaid fences are claimed before Expressive Code turns them into a
+       * code frame, every table gains its own scroll container, and a link
+       * that leaves the site opens in a new tab.
        *
        * The processor is named explicitly because Astro 7 deprecates the bare
        * `markdown.remarkPlugins` array. `unified()` keeps the defaults this
@@ -212,6 +214,13 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
           // A link between documents is stored as a permanent link and drawn
           // as the address it leads to today (ADR-022).
           remarkPermanentLinks(options.redirects),
+          // Every environment's hostname is the site's own; any other host
+          // opens in a new tab, so the reader keeps the page they came from.
+          remarkExternalLinks(
+            Object.values(deployment.environments).map(
+              (environment) => environment.hostname,
+            ),
+          ),
         ],
       }),
     },
