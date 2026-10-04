@@ -209,6 +209,54 @@ describe('HTML archive conversion', () => {
     expect(result.body).not.toContain('<!doctype');
   });
 
+  it('keeps a merged table from Google as its cells, without their wrappers', async () => {
+    const result = convertHtmlArchive(
+      await fixtureEntries('google-merged-table.html'),
+      options,
+    );
+
+    expect(result.hasComplexTables).toBe(true);
+    // Each cell's paragraph of styled spans is its text; no-break spaces and
+    // the default spans of one cell are gone; two paragraphs stay two.
+    expect(result.body).toContain(
+      [
+        '<table><tbody>',
+        '<tr><td>Area</td><td colspan="2">Owner and backup</td></tr>',
+        '<tr><td rowspan="2">Releases</td><td>Release lead</td>',
+        '<td>See the <a href="https://example.com/runbook">runbook</a></td></tr>',
+        '<tr><td><p>Deputy</p><p>On call in turn</p></td><td></td></tr>',
+        '</tbody></table>',
+      ].join(''),
+    );
+    expect(result.body).not.toMatch(/<span|<p><\/p>|&nbsp;|colspan="1"/u);
+    // The same input gives the same bytes.
+    expect(
+      convertHtmlArchive(
+        await fixtureEntries('google-merged-table.html'),
+        options,
+      ).body,
+    ).toBe(result.body);
+  });
+
+  it('keeps the spacing of code in a merged table', () => {
+    const result = convertHtmlArchive(
+      [
+        {
+          path: 'document.html',
+          bytes: new TextEncoder().encode(
+            '<table><tr><td colspan="2"><p><span>Run</span></p></td></tr>' +
+              '<tr><td><pre>a  b\n  c</pre></td><td><p><code>x  y</code></p></td></tr></table>',
+          ),
+        },
+      ],
+      options,
+    );
+
+    expect(result.body).toContain('<pre>a  b\n  c</pre>');
+    // Inline code keeps its element; HTML collapses its spaces anyway.
+    expect(result.body).toMatch(/<td><code>x\s+y<\/code><\/td>/u);
+  });
+
   it('converts a simple table to GitHub-flavored Markdown', () => {
     const result = convertHtmlArchive(
       [
