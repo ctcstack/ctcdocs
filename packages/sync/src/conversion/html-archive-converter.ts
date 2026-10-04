@@ -364,6 +364,72 @@ function readCrop(
     : { frameWidth, frameHeight, imageWidth, imageHeight, left, top };
 }
 
+/** What a table cell may hold besides text that a paragraph break sits beside. */
+const CELL_BLOCKS = 'p, ul, ol, pre, blockquote, table, div';
+
+/**
+ * Google writes every table cell's text as a paragraph of styled spans,
+ * spaced with no-break spaces. Once the styles are gone the spans say
+ * nothing, and a table kept as HTML (one with merged cells, a list or an
+ * image) would carry them into the page, the search index and the text an
+ * assistant reads. Each cell keeps its text, links, marks, images and lists,
+ * and its paragraphs only when it has more than one. A span or a merge of one
+ * cell is the default and is dropped.
+ */
+function simplifyTables($: ReturnType<typeof cheerio.load>): void {
+  const tables = $('body table');
+  tables
+    .find('span')
+    .toArray()
+    .reverse()
+    .forEach((span) => {
+      $(span).replaceWith($(span).contents());
+    });
+  tables.find('*').each((_, element) => {
+    if (
+      !(element instanceof Element) ||
+      $(element).closest('pre, code').length > 0
+    ) {
+      return;
+    }
+    for (const node of element.children) {
+      if (node.type === 'text') {
+        // `\s` includes the no-break space.
+        node.data = node.data.replace(/\s+/gu, ' ');
+      }
+    }
+  });
+  tables.find('p').each((_, paragraph) => {
+    if (
+      $(paragraph).text().trim() === '' &&
+      $(paragraph).find('img, br').length === 0
+    ) {
+      $(paragraph).remove();
+    }
+  });
+  tables.find('td, th, li').each((_, cell) => {
+    const blocks = $(cell).children(CELL_BLOCKS);
+    const loose = $(cell)
+      .contents()
+      .toArray()
+      .some(
+        (node) =>
+          (node.type === 'text' && node.data.trim() !== '') ||
+          (node instanceof Element && !$(node).is(CELL_BLOCKS)),
+      );
+    if (blocks.length === 1 && blocks.is('p') && !loose) {
+      blocks.replaceWith(blocks.contents());
+    }
+  });
+  tables.find('td, th').each((_, cell) => {
+    for (const name of ['colspan', 'rowspan']) {
+      if ($(cell).attr(name) === '1') {
+        $(cell).removeAttr(name);
+      }
+    }
+  });
+}
+
 function sortAttributes($: ReturnType<typeof cheerio.load>): void {
   $('body *').each((_, element) => {
     if (!(element instanceof Element)) {
@@ -563,6 +629,7 @@ export function convertHtmlArchive(
       }
     });
 
+  simplifyTables($);
   sortAttributes($);
   const sanitizedHtml = $('body').html()?.trim() ?? '';
   const hasComplexTables = $('body table')
