@@ -852,6 +852,47 @@ test('the access review shows who may read each folder, and reads as a group', a
       .filter({ hasText: sample.title })
       .first(),
   ).toBeVisible();
+
+  // A link to a folder the search has filtered out lifts the search.
+  const find = page.getByLabel('Find a document or folder');
+  await find.fill('no folder or document is called this');
+  await expect(rows.filter({ visible: true })).toHaveCount(0);
+  const link = page.locator('access-review a[data-goto]').first();
+  if ((await link.count()) > 0) {
+    const target = ((await link.getAttribute('href')) ?? '').slice(1);
+    await link.click();
+    await expect(find).toHaveValue('');
+    await expect(
+      page.locator(`access-review tr[id="${target}"]`),
+    ).toBeVisible();
+  }
+  await find.fill('');
+
+  // The admin groups read everything, so the page never reads as one.
+  for (const admin of shape.admins) {
+    await expect(
+      page.locator(`access-review button[data-as="${admin}"]`),
+    ).toHaveCount(0);
+  }
+
+  // "Hide" leaves no document the reader cannot open, folder or not.
+  if (group) {
+    await page
+      .getByRole('group', { name: 'Read as' })
+      .getByRole('button', { name: group, exact: true })
+      .click();
+    await page.getByLabel('Hide what they cannot read').check();
+    for (const details of await page
+      .locator('access-review tr[data-row]:visible [data-documents]')
+      .all()) {
+      await details.evaluate((element) => {
+        (element as HTMLDetailsElement).open = true;
+      });
+    }
+    await expect(
+      page.locator('access-review li[data-closed]:visible'),
+    ).toHaveCount(0);
+  }
 });
 
 test('the access review lays what holds now over the rules', async ({

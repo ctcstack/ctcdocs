@@ -107,7 +107,10 @@ export type Attention =
 
 export interface AccessReview {
   readonly admins: readonly string[];
-  /** Every group a rule names, sorted. */
+  /**
+   * Every group a rule names, sorted, but the admin groups: they read
+   * everything, so a column or a "read as" for one would say less than it reads.
+   */
   readonly groups: readonly string[];
   readonly documents: Readonly<Record<Reach, number>> & {
     readonly total: number;
@@ -166,10 +169,13 @@ export function buildAccessReview(input: AccessReviewInput): AccessReview {
   const { access, model, corpus } = input;
   const rules = new Map(access.rules.map((rule) => [rule.folder, rule]));
   const rootId = corpus.rootFolderId;
+  const admins = new Set(access.admins);
   const groups = [
     ...new Set(
       access.rules.flatMap((rule) =>
-        rule.readers.filter((reader) => reader !== EVERY_MEMBER),
+        rule.readers.filter(
+          (reader) => reader !== EVERY_MEMBER && !admins.has(reader),
+        ),
       ),
     ),
   ].sort();

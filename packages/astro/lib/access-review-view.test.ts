@@ -160,6 +160,25 @@ describe('buildAccessReview', () => {
     ]);
   });
 
+  it('leaves out an admin group a rule also names, which reads everything', () => {
+    const view = review(
+      withRule('team', {
+        folder: 'team',
+        label: 'Team',
+        readers: ['admins@example.com', 'team@example.com'],
+      }),
+    );
+    expect(view.groups).not.toContain('admins@example.com');
+    expect(Object.keys(row(view, 'team').groups)).not.toContain(
+      'admins@example.com',
+    );
+    // Its readers in words still name it.
+    expect(row(view, 'team').readers).toEqual([
+      'admins@example.com',
+      'team@example.com',
+    ]);
+  });
+
   it('names every group a rule names, and the admin groups apart', () => {
     const view = review();
     expect(view.groups).toEqual([

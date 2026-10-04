@@ -447,7 +447,9 @@ export function accessReviewShape():
     groups: [
       ...new Set(
         access.rules.flatMap((rule) =>
-          rule.readers.filter((reader) => reader !== '*'),
+          rule.readers.filter(
+            (reader) => reader !== '*' && !access.admins.includes(reader),
+          ),
         ),
       ),
     ].sort(),

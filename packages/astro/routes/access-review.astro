@@ -727,6 +727,8 @@ const warnings = (review?.attention ?? []).filter(
     private shut = new Map<string, string>();
     /** The machine key the page reads as, if one. */
     private key: MachineKey | undefined;
+    private form: HTMLFormElement | undefined;
+    private status: HTMLElement | undefined;
 
     connectedCallback() {
       this.rows = [
@@ -736,6 +738,8 @@ const warnings = (review?.attention ?? []).filter(
       const status = this.querySelector<HTMLElement>('[data-status]');
       if (!form || !status) return;
       form.hidden = false;
+      this.form = form;
+      this.status = status;
 
       // A long tree opens on its top level and on the rows it points at.
       for (const row of this.rows) {
@@ -1090,7 +1094,21 @@ const warnings = (review?.attention ?? []).filter(
       if (!id || id.includes('=')) return;
       const target = document.getElementById(id);
       if (!(target instanceof HTMLTableRowElement)) return;
-      const folded = target.hasAttribute('data-folded');
+      // A link to a folder the search or "hide" has filtered out lifts both.
+      const filtered = target.hasAttribute('data-filtered');
+      if (filtered && this.form && this.status) {
+        const find = this.form.elements.namedItem('q');
+        if (find instanceof HTMLInputElement) find.value = '';
+        const hide = this.form.elements.namedItem('hide');
+        if (hide instanceof HTMLInputElement) hide.checked = false;
+        this.apply(
+          this.form,
+          this.status,
+          this.key ? this.keyGroups(this.key) : this.chosen(),
+          false,
+        );
+      }
+      const folded = filtered || target.hasAttribute('data-folded');
       for (const anchor of (target.dataset.ancestors ?? '').split(' ')) {
         const row = anchor ? document.getElementById(anchor) : null;
         if (row instanceof HTMLTableRowElement) this.setFolded(row, false);
@@ -1229,6 +1247,8 @@ const warnings = (review?.attention ?? []).filter(
           const hit = !!query && fold(item.dataset.title ?? '').includes(query);
           item.toggleAttribute('data-hit', hit);
           item.toggleAttribute('data-closed', reading && !open);
+          // "Hide" goes down to a document narrower than its folder.
+          item.hidden = hide && !open;
           const cannot = item.querySelector<HTMLElement>('[data-cannot]');
           if (cannot) cannot.hidden = !reading || open;
           if (hit && (!hide || open)) {
