@@ -12,10 +12,13 @@
  */
 import { createHash } from 'node:crypto';
 
-import type { CorpusDocument, CorpusFolder } from '@ctcstack/ctcdocs-core';
+import {
+  markdownProjectionPath,
+  type CorpusDocument,
+  type CorpusFolder,
+} from '@ctcstack/ctcdocs-core';
 
 import type { FileClass } from './access-map.js';
-import { markdownProjectionPath } from './projection.js';
 
 interface AgentDocument {
   /** The permanent short ID: the tool's `id` and the R2 object's name. */

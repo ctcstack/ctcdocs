@@ -1,7 +1,7 @@
 {
   "name": "@ctcstack/ctcdocs-core",
   "version": "0.16.2",
-  "description": "Configuration schema, project layout, and generated-path allowlist shared by the CTCDocs platform packages.",
+  "description": "Configuration schema, project layout, generated-path allowlist and the published Markdown form shared by the CTCDocs platform packages.",
   "keywords": [
     "ctcdocs",
     "configuration",
@@ -27,6 +27,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./published-markdown": {
+      "types": "./dist/published-markdown.d.ts",
+      "default": "./dist/published-markdown.js"
     }
   },
   "files": [
@@ -43,7 +47,15 @@
     "typecheck": "tsc --project tsconfig.json",
     "test": "vitest run --root ../.."
   },
+  "dependencies": {
+    "cheerio": "1.2.0",
+    "remark-gfm": "4.0.1",
+    "remark-parse": "11.0.0",
+    "remark-stringify": "11.0.0",
+    "unified": "11.0.5"
+  },
   "devDependencies": {
+    "@types/mdast": "4.0.4",
     "@types/node": "22.20.1",
     "fast-check": "4.10.2",
     "typescript": "6.0.3",

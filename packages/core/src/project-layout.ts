@@ -132,6 +132,43 @@ export function permanentLinkPath(shortId: string): string {
   return `/${PLATFORM_ROUTES.permanentLinks}/${shortId}/`;
 }
 
+/**
+ * Renders a permanent link as the address it currently leads to.
+ *
+ * The sync writes a link between two documents as the target's permanent
+ * link, `/d/<short ID>/`, so the document holding it never changes when the
+ * target is renamed or moved (ADR-022). The redirect map says where each one
+ * leads today. Resolving it while the site builds sends a reader straight to
+ * the page instead of through a redirect page on every click.
+ *
+ * A permanent link the map does not know is left as it is: it is either a
+ * hand-written link to nothing, which the sync already refuses for generated
+ * pages, or one a later build will know.
+ */
+export function resolvePermanentLink(
+  value: string,
+  redirects: Readonly<Record<string, string>>,
+): string | undefined {
+  const prefix = `/${PLATFORM_ROUTES.permanentLinks}/`;
+  if (!value.startsWith(prefix)) {
+    return undefined;
+  }
+  const suffixStart = value.search(/[?#]/u);
+  const path = suffixStart < 0 ? value : value.slice(0, suffixStart);
+  const suffix = suffixStart < 0 ? '' : value.slice(suffixStart);
+  const target = redirects[path.endsWith('/') ? path : `${path}/`];
+  return target === undefined ? undefined : `${target}${suffix}`;
+}
+
+/**
+ * The site path of a page's Markdown version, from its route ID (ADR-010):
+ * the one definition, shared by the route that serves it, the pages that link
+ * it and the sync that measures it.
+ */
+export function markdownProjectionPath(slug: string): string {
+  return `/${slug}/index.md`;
+}
+
 export const GENERATED_DIRECTORY_ALLOWLIST = [
   PROJECT_LAYOUT.generatedDocumentsDirectory,
   PROJECT_LAYOUT.generatedAssetsDirectory,

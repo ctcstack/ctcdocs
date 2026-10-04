@@ -15,11 +15,10 @@
  *
  * See docs/ADR/033-publish-llms-txt-indexes.md.
  */
-import { MEMBERS_CLASS } from '@ctcstack/ctcdocs-core';
+import { markdownProjectionPath, MEMBERS_CLASS } from '@ctcstack/ctcdocs-core';
+import { inlineMarkdown } from '@ctcstack/ctcdocs-core/published-markdown';
 
 import { normalizeFolderName } from './folder-anchor.js';
-import { markdownProjectionPath } from './projection.js';
-import { inlineMarkdown } from './published-markdown.js';
 import { oneLine } from './text.js';
 
 /**

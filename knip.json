@@ -11,7 +11,9 @@
     "packages/astro": {
       "entry": ["worker/index.ts", "worker/directory/index.ts"]
     },
-    "packages/core": {},
+    "packages/core": {
+      "entry": ["src/index.ts", "src/published-markdown.ts"]
+    },
     "packages/sync": {},
     "fixtures/project": {}
   }

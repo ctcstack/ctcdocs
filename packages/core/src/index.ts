@@ -2,12 +2,14 @@ export {
   ACCESS_CLASSES_ROUTE,
   GENERATED_DIRECTORY_ALLOWLIST,
   GENERATED_FILE_ALLOWLIST,
+  markdownProjectionPath,
   PLATFORM_ROUTE_HREFS,
   PLATFORM_ROUTES,
   PLATFORM_WORKERS,
   permanentLinkPath,
   PROJECT_LAYOUT,
   RESERVED_SLUGS,
+  resolvePermanentLink,
   SHORT_ID_PATTERN,
 } from './project-layout.js';
 export {

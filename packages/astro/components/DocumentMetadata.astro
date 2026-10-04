@@ -14,9 +14,10 @@
  * browser follows the document's name, and this one does not. A section page
  * has no provenance to report, so the permanent link is all its row holds.
  */
-import { permanentLinkPath } from '@ctcstack/ctcdocs-core';
-
-import { markdownProjectionPath } from '../lib/projection';
+import {
+  markdownProjectionPath,
+  permanentLinkPath,
+} from '@ctcstack/ctcdocs-core';
 
 const { entry } = Astro.locals.starlightRoute;
 const { editUrl, googleModifiedTime, shortId, sourceType, syncedAt } =

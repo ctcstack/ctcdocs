@@ -3,10 +3,7 @@ import remarkStringify from 'remark-stringify';
 import { unified } from 'unified';
 import { describe, expect, it } from 'vitest';
 
-import {
-  remarkPermanentLinks,
-  resolvePermanentLink,
-} from './remark-permanent-links.js';
+import { remarkPermanentLinks } from './remark-permanent-links.js';
 
 const redirects = {
   '/d/a1b2c3/': '/sales/pricing/',
@@ -24,29 +21,6 @@ function render(markdown: string): string {
 }
 
 describe('permanent links in rendered pages', () => {
-  it('resolves a permanent link to the address it leads to', () => {
-    expect(resolvePermanentLink('/d/a1b2c3/', redirects)).toBe(
-      '/sales/pricing/',
-    );
-    expect(resolvePermanentLink('/d/a1b2c3', redirects)).toBe(
-      '/sales/pricing/',
-    );
-    expect(resolvePermanentLink('/d/a1b2c3/#rates', redirects)).toBe(
-      '/sales/pricing/#rates',
-    );
-    expect(resolvePermanentLink('/d/a1b2c3/?tab=1#rates', redirects)).toBe(
-      '/sales/pricing/?tab=1#rates',
-    );
-  });
-
-  it('leaves every other link alone', () => {
-    expect(resolvePermanentLink('/d/ffffff/', redirects)).toBeUndefined();
-    expect(resolvePermanentLink('/old-pricing/', redirects)).toBeUndefined();
-    expect(
-      resolvePermanentLink('https://example.com/d/a1b2c3/', redirects),
-    ).toBeUndefined();
-  });
-
   it('rewrites Markdown links, references and inline HTML', () => {
     const result = render(
       [
