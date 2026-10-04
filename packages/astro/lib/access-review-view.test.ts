@@ -291,8 +291,8 @@ describe('buildAccessReview', () => {
       'warning:folder-without-rule:loose',
       'warning:folder-without-rule:root',
       'warning:narrower:tone',
-      'warning:narrower:roster',
       'warning:rule-group-not-admitted-above:guides',
+      'note:narrower:roster',
       'note:rule-folder-missing:gone',
       'note:rule-label-outdated:guides',
     ]);

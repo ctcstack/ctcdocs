@@ -920,6 +920,13 @@ test('the access review lays what holds now over the rules', async ({
     'The key smoke may open',
   );
   await expect(page).toHaveURL(/#machine=smoke$/u);
+  // A search keeps reading as the key.
+  const readable = await page.getByRole('status').textContent();
+  await page.getByLabel('Find a document or folder').fill(anyDocument().title);
+  await expect(page.getByRole('status')).toContainText(
+    readable?.split('.')[0] ?? 'The key smoke may open',
+  );
+  await page.getByLabel('Find a document or folder').fill('');
 
   const theme = page.getByRole('combobox', { name: 'Select theme' });
   await theme.selectOption({ label: 'Light' });

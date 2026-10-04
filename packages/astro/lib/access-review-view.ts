@@ -101,7 +101,8 @@ export type Attention =
       readonly document: ReviewDocument;
       /** The folder it is in. */
       readonly folder: ReviewFolder;
-      readonly tone: 'warning';
+      /** A move waits for an admin; readers the next sync brings do not. */
+      readonly tone: 'warning' | 'note';
     };
 
 export interface AccessReview {
@@ -224,18 +225,24 @@ export function buildAccessReview(input: AccessReviewInput): AccessReview {
     firstPosition.set(id, place);
     return place;
   };
+  const counted = new Map<string | null, number>();
   const countUnder = (id: string | null, seen: Set<string | null>): number => {
+    const known = counted.get(id);
+    if (known !== undefined) {
+      return known;
+    }
     if (seen.has(id)) {
       return 0;
     }
     seen.add(id);
-    return (
+    const count =
       (directDocuments.get(id) ?? []).length +
       (childFolders.get(id) ?? []).reduce(
         (sum, child) => sum + countUnder(child.id, seen),
         0,
-      )
-    );
+      );
+    counted.set(id, count);
+    return count;
   };
 
   const reportedWithoutRule = new Set(
@@ -384,6 +391,12 @@ export function buildAccessReview(input: AccessReviewInput): AccessReview {
     (item) =>
       item.kind === 'finding' && item.finding.code === 'folder-without-rule',
   );
+  const narrowerItems = narrower.map(({ document, folder }): Attention => ({
+    kind: 'narrower',
+    document,
+    folder,
+    tone: document.narrower === 'move' ? 'warning' : 'note',
+  }));
   return {
     admins: [...access.admins].sort(),
     groups,
@@ -395,13 +408,12 @@ export function buildAccessReview(input: AccessReviewInput): AccessReview {
     folders,
     attention: [
       ...closed,
-      ...narrower.map(({ document, folder }): Attention => ({
-        kind: 'narrower',
-        document,
-        folder,
-        tone: 'warning',
-      })),
-      ...findings.filter((item) => !closed.includes(item)),
+      ...narrowerItems.filter((item) => item.tone === 'warning'),
+      ...findings.filter(
+        (item) => !closed.includes(item) && item.tone === 'warning',
+      ),
+      ...narrowerItems.filter((item) => item.tone === 'note'),
+      ...findings.filter((item) => item.tone === 'note'),
     ],
   };
 }
