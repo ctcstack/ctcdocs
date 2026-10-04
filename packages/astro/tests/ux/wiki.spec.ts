@@ -854,6 +854,80 @@ test('the access review shows who may read each folder, and reads as a group', a
   ).toBeVisible();
 });
 
+test('the access review lays what holds now over the rules', async ({
+  page,
+}) => {
+  const shape = accessReviewShape();
+  test.skip(!shape?.groups.length, 'The project names no group in a rule.');
+  const { groups, admins, classes } = shape as NonNullable<typeof shape>;
+  const [shut = '', other = shut] = groups;
+  const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+  // The Worker answers the status route; the static server the suite runs
+  // against does not, so it answers here as the Worker would for an admin.
+  await page.route('**/_kb/status', (route) =>
+    route.fulfill({
+      json: {
+        takenAt: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
+        ageSeconds: 240,
+        stale: false,
+        activeUsers: 12,
+        groups: Object.fromEntries(
+          [...groups, ...admins].map((group) => [
+            group,
+            group === shut
+              ? { members: 3, admitsNoOne: 'it lets people join themselves' }
+              : { members: 3 },
+          ]),
+        ),
+        classes: Object.fromEntries(classes.map((id) => [id, 4])),
+        machineKeys: [
+          {
+            name: 'smoke',
+            owner: 'ops@example.com',
+            groups: [other],
+            expires: expires.toISOString(),
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto('/access-review/');
+
+  await expect(page.locator('access-review [data-live]')).toContainText(
+    'Group membership was read',
+  );
+  // A group that admits no one says so in its column and right now.
+  await expect(
+    page.locator(`access-review thead th[data-col="${shut}"]`),
+  ).toContainText('admits no one');
+  const now = page.getByRole('region', { name: /Right now/u });
+  await expect(now).toBeVisible();
+  await expect(now).toContainText(shut);
+  // Every folder says how many people may read it.
+  for (const row of await page.locator('access-review tr[data-row]').all()) {
+    await expect(row.locator('[data-people]')).toHaveText('4 people');
+  }
+  // The keys are listed, and the page reads as one.
+  await expect(
+    page.getByRole('region', { name: 'Machine keys' }),
+  ).toContainText('smoke');
+  await page
+    .getByRole('group', { name: 'Or as a machine key' })
+    .getByRole('button', { name: 'smoke' })
+    .click();
+  await expect(page.getByRole('status')).toContainText(
+    'The key smoke may open',
+  );
+  await expect(page).toHaveURL(/#machine=smoke$/u);
+
+  const theme = page.getByRole('combobox', { name: 'Select theme' });
+  await theme.selectOption({ label: 'Light' });
+  await expectNoAccessibilityViolations(page);
+  await theme.selectOption({ label: 'Dark' });
+  await expectNoAccessibilityViolations(page);
+});
+
 test('a PDF has a page with the file and its text', async ({
   page,
   request,

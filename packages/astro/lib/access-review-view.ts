@@ -43,6 +43,8 @@ export interface ReviewDocument {
   readonly id: string;
   readonly title: string;
   readonly href: string;
+  /** Its access class, which the status route counts readers of. */
+  readonly classId: string;
   readonly readers: Readers;
   readonly reach: Reach;
   /**
@@ -71,6 +73,8 @@ export interface ReviewFolder {
   readonly documents: number;
   /** Documents directly in it, in the reader's order. */
   readonly direct: readonly ReviewDocument[];
+  /** Its access class, which the status route counts readers of. */
+  readonly classId: string;
   readonly readers: Readers;
   readonly reach: Reach;
   /** Why only admins may read it, when they alone may. */
@@ -291,6 +295,7 @@ export function buildAccessReview(input: AccessReviewInput): AccessReview {
           id: document.id,
           title: titleOf(document),
           href: `/${document.slug}/`,
+          classId: own,
           readers: documentReaders,
           reach: reachOf(documentReaders),
           ...(own !== cls
@@ -319,6 +324,7 @@ export function buildAccessReview(input: AccessReviewInput): AccessReview {
       drive: id === null ? '' : `${DRIVE_FOLDER}${encodeURIComponent(id)}`,
       documents: countUnder(id, new Set()),
       direct,
+      classId: cls,
       readers,
       reach,
       ...(reach === 'admins'

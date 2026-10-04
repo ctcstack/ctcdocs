@@ -532,10 +532,21 @@ rule offers the rule to paste into the configuration.
 - **Send a view.** The address keeps it after `#`, which never reaches the
   server, and "Copy link" copies it.
 
-The page shows the rules this build was made with and names groups, never
-people: who is in a group is managed in Google Admin, and the snapshot's
-counts are at `/_kb/status`, below. It does not cover Drive's own sharing, and
-everyone who can read the project repository reads every folder.
+The page also asks the Worker what holds now, at `/_kb/status`, and lays it
+over the rules: when the directory was read, each group's active members in
+its column, how many people may read each folder, admins included, and the
+machine keys, each with the groups it reads as and when it expires. "Right
+now", above what needs attention, names a group that admits no one and the
+folders it leaves with fewer readers or to admins alone, and says when the
+directory is stale. "Read as" follows the gate: a group that admits no one
+reads only what every member reads, a machine key reads as its groups, and a
+stale directory serves what every member reads to anyone. Without an answer —
+a local preview, or a Worker that cannot read the directory — the page shows
+the rules alone and says so.
+
+The page names groups, never people: who is in a group is managed in Google
+Admin. It does not cover Drive's own sharing, and everyone who can read the
+project repository reads every folder.
 
 ### When a reader leaves or changes groups
 
@@ -551,10 +562,13 @@ afterwards — without signing the reader out of Google.
 
 ### The directory snapshot
 
-An admin reads its state at `/_kb/status`: when it was taken, its age, whether
-it is stale, the number of active users, and each named group, by address,
-with its member count and the reason, if any, it admits no one. It names no
-person.
+An admin reads its state at `/_kb/status`, and the access review shows it:
+when it was taken, its age, whether it is stale, the number of active users,
+each named group, by address, with its active members and the reason, if any,
+it admits no one, the people who may read each access class now (`classes`,
+by class identifier, admins included), and the machine keys that admit
+something, with their owner, the groups they read as and their expiry
+(`machineKeys`). It names no person, and no key's hash.
 
 | What you see                                               | What it means                                                                                                                  | What to do                                                                                                                                                       |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |

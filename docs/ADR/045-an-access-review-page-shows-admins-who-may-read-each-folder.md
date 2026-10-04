@@ -163,7 +163,8 @@ reads it, as today.
   until a refresh succeeds;
 - each group's active members in its column header, and a group that admits
   no one, with the reason, across its column; the folders it leaves to fewer
-  readers, or to admins only, move to the top of what needs attention;
+  readers, or to admins only, are named under "Right now", above what needs
+  attention, and on their rows;
 - how many people may read each folder, admins included;
 - the machine keys, each with what it reads and how soon it expires;
 - in "Read as", that a group which admits no one reads only what every member

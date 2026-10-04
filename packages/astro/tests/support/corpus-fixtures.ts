@@ -15,6 +15,7 @@ import { resolve } from 'node:path';
 import { parseFrontmatter } from '@astrojs/markdown-remark';
 import {
   accessFindings,
+  computeAccessModel,
   findProjectRoot,
   loadSiteConfiguration,
   PROJECT_LAYOUT,
@@ -421,11 +422,19 @@ export function folderAccessFindingCount(): number {
 /**
  * What the access review (ADR-045) should show: a row per folder, the root
  * included, a column per group the rules name, and every folder access
- * finding. None for a project without an `access` section, which has no
- * review.
+ * finding; and, for a status answer made up to match, the admin groups and
+ * the access classes. None for a project without an `access` section, which
+ * has no review.
  */
 export function accessReviewShape():
-  { rows: number; groups: string[]; findings: number } | undefined {
+  | {
+      rows: number;
+      groups: string[];
+      admins: string[];
+      classes: string[];
+      findings: number;
+    }
+  | undefined {
   const { access } = loadSiteConfiguration(repositoryRoot);
   if (!access) {
     return undefined;
@@ -442,6 +451,8 @@ export function accessReviewShape():
         ),
       ),
     ].sort(),
+    admins: [...access.admins],
+    classes: Object.keys(computeAccessModel(access, corpus).classes),
     findings: accessFindings(access, corpus).length,
   };
 }

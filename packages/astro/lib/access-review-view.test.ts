@@ -197,6 +197,7 @@ describe('buildAccessReview', () => {
     });
     // Every member reads it; no group needs a mark of its own.
     expect(row(view, 'open')).toMatchObject({
+      classId: 'members',
       readers: '*',
       reach: 'members',
       everyMember: 'here',
@@ -213,6 +214,7 @@ describe('buildAccessReview', () => {
   it('says why a folder is open to admins only, and offers the rule to add', () => {
     const view = review();
     expect(row(view, 'loose')).toMatchObject({
+      classId: 'admins',
       reach: 'admins',
       closed: 'no-rule',
       ruleToAdd: { folder: 'loose', label: 'Loose', readers: [] },
@@ -256,6 +258,10 @@ describe('buildAccessReview', () => {
       readers: ['team@example.com'],
       narrower: 'sync',
     });
+    // A document narrower than its folder is in a class of its own, which
+    // the status route counts apart.
+    expect(roster?.classId).toBe(row(view, 'team').classId);
+    expect(roster?.classId).not.toBe(row(view, 'open').classId);
     const api = row(view, 'reference').direct.find(
       (entry) => entry.id === 'api',
     );
