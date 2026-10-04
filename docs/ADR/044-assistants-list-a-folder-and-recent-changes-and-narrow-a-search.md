@@ -4,7 +4,8 @@
 - Date: 2026-10-04
 - Owners: CTCDocs maintainers
 - Supersedes: ADR-042 in part, once accepted: the MCP server serves four
-  tools, not two
+  tools, not two, and a passage's share of the budget follows the documents
+  a search finds
 
 ## Context
 
@@ -20,6 +21,12 @@ for everything of a kind, or for what is new, is not a question of meaning:
   documents that talk about change.
 - **Nothing narrows a search to where the answer is.** A reader who knows the
   answer sits under a folder, or is recent, cannot say so.
+- **Every search costs the whole budget, and still cuts.** An assistant's
+  review of a session found ten results with their passages too much context
+  for a question that needed only which documents exist, with no way to ask
+  for fewer or for titles alone. And a passage was cut at a tenth of the
+  budget however few documents a search found, so a list in a matching chunk
+  ended mid-item and the assistant read the whole document for one line.
 
 ADR-041 notes a `browse` tool for when people ask for it, and ADR-042's
 follow-ups name the rest: tools to list a folder and recent changes, and
@@ -124,12 +131,30 @@ In every case the Worker keeps, as before, only chunks of documents the reader
 may open, and now only those that match. A narrowed search finds no document a
 plain one would not show the same reader.
 
+### `search` may return less
+
+`search` takes two more optional parameters: `limit`, the most documents it
+returns, from one to the project's `results`, and `compact`, which returns
+each document's `id`, `title`, `url`, `path` and `modified` without `text`,
+as `browse` and `recent` list documents. A document counts toward the limit
+only once a chunk of it has passed the same judgment as before, and a compact
+search finds a document only through such a chunk, so neither shows anything
+a full search would not show the same reader. ChatGPT's shape for a search
+result needs only `id`, `title` and `url`, so `text` becomes optional.
+
+A passage's share of the budget is the budget divided by the documents a
+search found, not by the most it may return: two documents found share the
+24,000 characters ten would, and a passage is cut only where a chunk is longer
+than its share. The budget, the passages per document and the breadth-first
+order stay as ADR-042 set them.
+
 ### Descriptions and instructions
 
-Each tool's description says what it returns. The server's instructions add
-that a question asking for every document of a kind, or for what is new, is
-answered by `browse` and `recent`, and that a search can be kept to a folder
-or a date.
+Each tool's description says what it returns; `search` names the project's
+`results` rather than ten. The server's instructions add that a question
+asking for every document of a kind, or for what is new, is answered by
+`browse` and `recent`, that a search can be kept to a folder or a date, and
+that a compact search shows which documents match without their passages.
 
 ## Consequences
 
@@ -142,6 +167,10 @@ or a date.
 - Nothing is reindexed and no AI Search setting changes: the folder and date
   come from the build, as access does.
 - No tool names a folder or a document the reader may not open.
+- A question about which documents exist costs a compact search, a few
+  hundred characters a document, instead of the whole passage budget.
+- A search that finds few documents shows their passages whole, up to the
+  chunk, instead of cutting each at a tenth of the budget.
 
 ### Negative
 
@@ -154,6 +183,8 @@ or a date.
 - `changedSince` and `recent` know Drive's time, which a typo fix moves as
   much as a rewrite.
 - ChatGPT has not been seen calling the new tools or the optional parameters.
+- A search that finds few documents returns more characters than before,
+  still within the budget.
 
 ### Follow-up
 
