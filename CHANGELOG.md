@@ -2,6 +2,63 @@
 
 All three packages share a version and are released together.
 
+## 0.19.0
+
+Assistants can list a folder and the latest changes, and keep a search to a
+folder or a date
+([ADR-044](docs/ADR/044-assistants-list-a-folder-and-recent-changes-and-narrow-a-search.md)).
+Admins get an access review page that shows who may read each folder
+([ADR-045](docs/ADR/045-an-access-review-page-shows-admins-who-may-read-each-folder.md)).
+Both records are proposed.
+
+### Added
+
+- **`browse` and `recent`**, two more read-only MCP tools. `browse` lists a
+  folder by its path, as results return it: its folders, each with how many
+  documents under it the reader may open, and its documents. `recent` lists
+  the documents changed last in Drive, newest first. Both read the build's
+  catalog, judged per reader as `fetch` is, and name no folder the reader may
+  open nothing in.
+- **`search` takes `folder` and `changedSince`.** The Worker asks AI Search
+  only for the matching documents, or excludes the rest, by short ID, and
+  keeps only matching documents in any case. Nothing is reindexed.
+- **An access review page for admins**, at `/access-review/`, built for a
+  project with access rules. Folders are rows and the groups the rules name
+  are columns; it lists what needs attention (folders without a rule,
+  documents with fewer readers than their folder, drifted rules), reads the
+  site as a set of groups or a machine key, and lays over the rules what holds
+  now: each group's size, a group that admits no one, a stale directory. It
+  names no person. The admin-only status route also answers how many people
+  read each class, and the machine keys, as counts.
+- **`home.start`** names the hand-authored page a newcomer reads first; the
+  home page links to it by its title.
+
+### Changed
+
+- **Every search's filter stays within AI Search's limits**, which it does
+  not document: keyword search takes at most 40 values in one list, and a
+  hybrid search with more silently ranks by meaning alone; past 100 the
+  search fails; and a filter's JSON is under 2,048 bytes. A reader of more
+  than 40 classes lost keyword search on every search; their classes now go
+  as `$nin` of the others when those fit.
+- **Links that leave the site open in a new tab**, with
+  `rel="noopener noreferrer"`; links to any of the site's own hostnames stay.
+- The home page no longer links every deployment to `/about-wiki/`: it links
+  to `home.start`, or to nothing.
+- The sync accepts links to any hand-authored page, not only the home page
+  and `/about-wiki/`.
+- The search check accepts the full stop Pagefind ends a home page title
+  with.
+- On the access review page, what a reader cannot open is labelled and set
+  in the secondary ink rather than faded.
+
+### Upgrade note
+
+Bump the packages and the workflow pins. A project whose home page linked to
+`/about-wiki/` sets `"home": { "start": "about-wiki" }`, or the address of its
+own page, to keep the link. Assistants see the new tools after their next
+connection or tool listing; nothing else changes for them.
+
 ## 0.18.0
 
 Every document converted from Google's HTML export, which is every document
