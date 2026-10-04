@@ -5,8 +5,10 @@ import remarkParse from 'remark-parse';
 import remarkStringify from 'remark-stringify';
 import { unified } from 'unified';
 
-import { markdownProjectionPath } from './projection.js';
-import { resolvePermanentLink } from './remark-permanent-links.js';
+import {
+  markdownProjectionPath,
+  resolvePermanentLink,
+} from './project-layout.js';
 
 const processor = unified()
   .use(remarkParse)
@@ -127,6 +129,11 @@ function cleanBody(body: string, ownershipHeader: string): string {
     );
   }
   return normalized.slice(ownershipHeader.length).trim();
+}
+
+/** Where the site serves a published PDF, as its Markdown version names it. */
+export function publishedFileUrl(googleFileId: string, file: string): string {
+  return `/assets/generated/${googleFileId}/${file}`;
 }
 
 function yamlString(value: string): string {

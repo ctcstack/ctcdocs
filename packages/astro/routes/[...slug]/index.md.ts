@@ -1,10 +1,13 @@
 import { permanentLinkPath } from '@ctcstack/ctcdocs-core';
+import {
+  publishedFileUrl,
+  serializePublishedMarkdown,
+} from '@ctcstack/ctcdocs-core/published-markdown';
 import type { APIRoute, GetStaticPaths } from 'astro';
 import { getCollection } from 'astro:content';
 
 import { markdownOwnershipHeader } from '../../lib/project.js';
 import { hasMarkdownProjection } from '../../lib/projection.js';
-import { serializePublishedMarkdown } from '../../lib/published-markdown.js';
 
 interface MarkdownPageProps {
   content: string;
@@ -42,9 +45,7 @@ export const getStaticPaths = (async () => {
           title: data.title,
           sourceUrl: required(data.editUrl?.toString(), 'editUrl'),
           ...(data.pdf?.file && data.googleFileId
-            ? {
-                fileUrl: `/assets/generated/${data.googleFileId}/${data.pdf.file}`,
-              }
+            ? { fileUrl: publishedFileUrl(data.googleFileId, data.pdf.file) }
             : {}),
           googleModifiedTime: required(
             data.googleModifiedTime,

@@ -29,7 +29,7 @@ be public while the deployments stay private.
 ## Layout
 
 ```text
-packages/core/     @ctcstack/ctcdocs-core   configuration, layout, allowlist
+packages/core/     @ctcstack/ctcdocs-core   configuration, layout, allowlist, Markdown version
 packages/sync/     @ctcstack/ctcdocs-sync   Google Drive → Markdown, CLI
 packages/astro/    @ctcstack/ctcdocs        preset, components, routes, styles, browser suite, Workers
 fixtures/project/  a complete synthetic project, built and tested by CI

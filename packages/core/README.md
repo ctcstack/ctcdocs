@@ -3,6 +3,8 @@
 The configuration layer shared by the [CTCDocs](https://github.com/ctcstack/ctcdocs)
 packages: the schema of a project's `site.config.json`, the fixed project
 layout, and the allowlist of paths the synchronization pipeline may write.
+Its `published-markdown` entry serializes a page's Markdown version, which
+the site serves and the sync measures.
 
 A project does not install this package directly — `@ctcstack/ctcdocs` and
 `@ctcstack/ctcdocs-sync` depend on it. It is documented because what it

@@ -12,6 +12,7 @@ import '@fontsource-variable/inter/wght.css';
 import '@fontsource-variable/jetbrains-mono/wght.css';
 
 import Default from '@astrojs/starlight/components/Head.astro';
+import { markdownProjectionPath } from '@ctcstack/ctcdocs-core';
 
 /*
  * Starlight's layer order, inline so that no bundler can place a layered rule
@@ -19,10 +20,7 @@ import Default from '@astrojs/starlight/components/Head.astro';
  */
 import { STARLIGHT_LAYER_ORDER } from '../lib/layer-order';
 import { siteConfiguration } from '../lib/project';
-import {
-  hasMarkdownProjection,
-  markdownProjectionPath,
-} from '../lib/projection';
+import { hasMarkdownProjection } from '../lib/projection';
 import { structuredData, type StructuredPage } from '../lib/structured-data';
 
 /*
