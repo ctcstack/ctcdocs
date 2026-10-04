@@ -552,6 +552,12 @@ const htmlArchives = new Map<string, Uint8Array>([
         path: 'Tables and code.html',
         bytes: Buffer.from(
           [
+            /*
+             * Bold and italic are classes of Google's stylesheet, which the
+             * page keeps as marks, in a Markdown table's cells too.
+             */
+            '<style type="text/css">.c1{font-weight:400}.c9{font-weight:700}',
+            '.c10{font-style:italic}</style>',
             '<h1>Tables and code</h1>',
             '<p>Two things a documentation platform gets wrong quietly: wide',
             ' tables that push a phone layout sideways, and code blocks that',
@@ -561,8 +567,12 @@ const htmlArchives = new Map<string, Uint8Array>([
              * nothing about the horizontal scroller the wrapper exists for.
              */
             '<table>',
-            '<tr><td>Environment</td><td>Address</td><td>Protected</td>',
-            '<td>Deployed from</td><td>Reviewers</td><td>Retention</td></tr>',
+            '<tr><td><span class="c9">Environment</span></td>',
+            '<td><span class="c9">Address</span></td>',
+            '<td><span class="c9">Protected</span></td>',
+            '<td><span class="c9">Deployed from</span></td>',
+            '<td><span class="c9">Reviewers</span></td>',
+            '<td><span class="c9">Retention</span></td></tr>',
             '<tr><td>Production</td><td>docs.example.com</td><td>Yes</td>',
             '<td>main</td><td>Platform</td><td>Indefinite</td></tr>',
             '<tr><td>Preview</td><td>not deployed</td><td>&#8212;</td>',
@@ -572,11 +582,8 @@ const htmlArchives = new Map<string, Uint8Array>([
              * A merged cell keeps a table as HTML. Google writes each cell as
              * a paragraph of styled spans spaced with no-break spaces, and
              * every other cell with a span of one; the page keeps the cells'
-             * text and nothing of that. Bold and italic are classes of its
-             * stylesheet, which the page keeps as marks.
+             * text and its marks, and nothing of that.
              */
-            '<style type="text/css">.c1{font-weight:400}.c9{font-weight:700}',
-            '.c10{font-style:italic}</style>',
             '<p class="c2"><span class="c9">Who answers</span>',
             '<span class="c1"> for each part:</span></p>',
             '<table class="c8"><tr class="c4">',

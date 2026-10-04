@@ -8,7 +8,7 @@
 "googleFileId": "doc-tables-and-code"
 "googleModifiedTime": "2026-02-06T16:45:00.000Z"
 "syncedAt": "2026-02-10T06:00:00.000Z"
-"contentHash": "sha256:ea7d2f49c70af507813d5abb3f90942e422a127d2b6da391ad8ab1cf5444ec77"
+"contentHash": "sha256:d2e435c7347fabb0a218a3d930f286b40f917f7575701444228504cc75a4c724"
 "folderPath":
   - "Handbook"
 "pagefind": true
@@ -17,10 +17,10 @@
 
 Two things a documentation platform gets wrong quietly: wide tables that push a phone layout sideways, and code blocks that lose their language.
 
-| Environment | Address          | Protected | Deployed from | Reviewers | Retention  |
-| ----------- | ---------------- | --------- | ------------- | --------- | ---------- |
-| Production  | docs.example.com | Yes       | main          | Platform  | Indefinite |
-| Preview     | not deployed     | —         | pull requests | Authors   | Seven days |
+| **Environment** | **Address**      | **Protected** | **Deployed from** | **Reviewers** | **Retention** |
+| --------------- | ---------------- | ------------- | ----------------- | ------------- | ------------- |
+| Production      | docs.example.com | Yes           | main              | Platform      | Indefinite    |
+| Preview         | not deployed     | —             | pull requests     | Authors       | Seven days    |
 
 **Who answers** for each part:
 
