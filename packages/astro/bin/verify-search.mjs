@@ -432,6 +432,15 @@ export function withoutUnindexed(html) {
 }
 
 /**
+ * Whether a page's indexed text is its title and nothing else. Pagefind ends a
+ * heading that has no closing punctuation with a full stop, so a title such as
+ * "Example Docs" is indexed as "Example Docs." while "Example [DOCS]" is not.
+ */
+export function isTitleAlone(content, title) {
+  return content === title || content === `${title}.`;
+}
+
+/**
  * What Pagefind itself indexes for each of `pages`, keyed by site path.
  *
  * The question of what reaches the index is put to Pagefind rather than to a
@@ -509,10 +518,9 @@ async function verifyExclusions(distRoot) {
   );
   const home = content.get('/home/');
   assert(home, 'Pagefind indexes nothing for the home page.');
-  assert.equal(
-    home.content,
-    home.meta.title,
-    'The home page must be indexed by its title alone.',
+  assert(
+    isTitleAlone(home.content, home.meta.title),
+    `The home page must be indexed by its title alone, not ${JSON.stringify(home.content)}.`,
   );
   return { checked, pages: 2 };
 }
