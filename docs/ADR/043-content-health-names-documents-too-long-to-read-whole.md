@@ -34,11 +34,14 @@ was not settled, which ADR-037 ranks under Improve.
 ## Decision
 
 **The sync measures every published document.** Its length is the number of
-characters of the Markdown body the sync writes for it, without the front
-matter: the text the site's projection serves and `fetch` returns. It is
-counted as `fetch` counts it, and the same way on every run, so the notes are
-deterministic. It is read from the output the run writes, as image sizes are,
-so a changed line applies on the next run without exporting anything again.
+characters of its Markdown version: the text the site's projection serves and
+`fetch` returns and cuts, front matter and title included, with its links as
+the site writes them. The sync serializes that text with the function the
+projection route uses, which the core holds for both, from the same generated
+file, and counts it as `fetch` counts it, the same way on every run, so the
+notes are deterministic. It is measured from the output the run writes, as
+image sizes are, so a changed line applies on the next run without exporting
+anything again.
 
 **Two steps, two priorities.**
 
@@ -63,10 +66,14 @@ hard to read on the site.
 **Both lines are the project's.** `sync.largeDocumentCharacters` is
 optional, a whole number above 0 and no greater than the limit; anything else
 is a configuration error. Unset, it is 40,000, or the limit where the limit is
-lower, so that a project that lowers only the limit is still valid. The limit is `mcp.fetchCharacters`, the cut `fetch`
-makes (ADR-042), 100,000 unless the project sets another; with MCP off, its
-default. The note and the cut read the same setting, so they cannot drift
-apart.
+lower, so that a project that lowers only the limit is still valid. The
+limit is `mcp.fetchCharacters`, the cut `fetch` makes (ADR-042), 100,000
+unless the project sets another; with MCP off, its default. The note and the
+cut read the same setting, the note when the sync runs and the cut when the
+site is built, so a changed cut reaches the notes with the next sync. The
+report records the lines it measured against, and the gate checks, whenever
+the report measured against the cut the build makes, that the documents
+`fetch` cuts are the ones the report names.
 
 **Each new note code is ranked** on the content health page, as ADR-037
 requires of every code, and the unit test that reads the fixture reports
@@ -93,6 +100,11 @@ those documents stay short.
 - Characters are not tokens: the same length costs more tokens in some
   languages than in English, so the first line is looser for them.
 - A long PDF stays long; the note only says so.
+- The sync serializes every page's Markdown version, as the build does. The
+  core carries the Markdown pipeline that takes, in an entry of its own that
+  the Worker does not import.
+- A changed `mcp.fetchCharacters` shows on the content health page only after
+  the next sync.
 
 ### Follow-up
 

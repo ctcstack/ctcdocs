@@ -43,6 +43,7 @@ import {
   type SyncReport,
 } from './generation/sync-report.js';
 import { createNotes, NOTE_KINDS } from './generation/notes.js';
+import { publishedLengths } from './generation/published-length.js';
 import {
   createIgnoredFolders,
   createUnpublishedItems,
@@ -1775,31 +1776,19 @@ async function synchronize(
       ]);
     }
   }
-  /*
-   * The length of each page's text, from the output too: its Markdown body,
-   * which the projection serves and `fetch` cuts, counted as `fetch` counts
-   * it (ADR-043).
-   */
-  const documentCharacters = new Map<string, number>();
-  for (const record of Object.values(candidateManifest.documents)) {
-    const content = output.get(record.generatedMarkdownPath);
-    const body =
-      typeof content === 'string'
-        ? extractGeneratedDocumentBody(content, markdownHeader)
-        : undefined;
-    if (body !== undefined) {
-      documentCharacters.set(record.googleFileId, body.trim().length);
-    }
-  }
+  const documentLengths = {
+    largeDocumentCharacters: site.sync.largeDocumentCharacters,
+    fetchCharacters: fetchCharacterLimit(site.mcp),
+  };
   const notes = createNotes(selection, candidateManifest, {
     images: {
       largeImageMegabytes: site.sync.largeImageMegabytes,
       imageBytes,
     },
     documents: {
-      largeDocumentCharacters: site.sync.largeDocumentCharacters,
-      fetchCharacters: fetchCharacterLimit(site.mcp),
-      characters: documentCharacters,
+      ...documentLengths,
+      // From the output too: each page's Markdown version, as `fetch` cuts it.
+      characters: publishedLengths(output, candidateManifest, markdownHeader),
     },
   });
   const pdfs = publishedRecords.filter(
@@ -1839,6 +1828,7 @@ async function synchronize(
     reasons: [...UNPUBLISHED_REASONS],
     unpublished,
     ignoredFolders: createIgnoredFolders(selection),
+    documentLengths,
     noteKinds: [...NOTE_KINDS],
     notes,
   };

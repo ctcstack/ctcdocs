@@ -86,6 +86,17 @@ export const syncReportSchema = z.object({
       items: z.number().int().nonnegative(),
     }),
   ),
+  /**
+   * The lines a document's length was measured against (ADR-043), so that a
+   * check of the build can tell a report measured against another cut.
+   * Absent from a report written before documents were measured.
+   */
+  documentLengths: z
+    .object({
+      largeDocumentCharacters: z.number().int().positive(),
+      fetchCharacters: z.number().int().positive(),
+    })
+    .optional(),
   /** The kinds behind `notes`, in the order the page shows them (ADR-028). */
   noteKinds: z.array(catalogEntry(noteCodes)),
   notes: z.array(
@@ -138,6 +149,7 @@ export function reportsListTheSameItems(
       previous.reasons,
       previous.unpublished,
       previous.ignoredFolders,
+      previous.documentLengths,
       previous.noteKinds,
       previous.notes,
     ]) ===
@@ -145,6 +157,7 @@ export function reportsListTheSameItems(
       report.reasons,
       report.unpublished,
       report.ignoredFolders,
+      report.documentLengths,
       report.noteKinds,
       report.notes,
     ])

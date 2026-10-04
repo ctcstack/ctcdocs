@@ -239,8 +239,9 @@ export const MCP_DEFAULTS: Omit<McpConfiguration, 'enabled'> = Object.freeze({
 
 /**
  * The characters an assistant reads of a document: the cut `fetch` makes
- * (ADR-042), or its default while the MCP server is off. The content health
- * note reads this one value, so it cannot drift from the cut (ADR-043).
+ * (ADR-042), or its default while the MCP server is off. The build writes
+ * this value into the access map and the sync measures documents against it
+ * (ADR-043), so the two never derive it apart.
  */
 export function fetchCharacterLimit(mcp: McpConfiguration | undefined): number {
   return mcp?.enabled ? mcp.fetchCharacters : MCP_DEFAULTS.fetchCharacters;
@@ -688,6 +689,14 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
   }
 
   const syncSource = record(root.sync, 'sync');
+  // A misspelled optional line would otherwise fall back to its default.
+  knownKeys(syncSource, 'sync', [
+    'generatedBy',
+    'commitBotName',
+    'defaultLocale',
+    'largeImageMegabytes',
+    'largeDocumentCharacters',
+  ]);
   const generatedBy = text(syncSource, 'generatedBy', 'sync.generatedBy');
   // The marker is embedded in an HTML comment in every generated Markdown
   // file. A comment delimiter inside it would terminate that comment early and
