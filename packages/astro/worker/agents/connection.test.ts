@@ -646,12 +646,14 @@ describe('connecting an assistant', () => {
 });
 
 describe('an assistant reading', () => {
-  it('lists two read-only tools', async () => {
+  it('lists four read-only tools', async () => {
     const { tokens } = await connect('user-member');
     const listed = await mcp(tokens.access_token, 'tools/list');
     expect(listed.body.result?.tools?.map((entry) => entry.name)).toEqual([
       'search',
       'fetch',
+      'browse',
+      'recent',
     ]);
     expect(
       listed.body.result?.tools?.every(
@@ -681,8 +683,50 @@ describe('an assistant reading', () => {
       (await tool(token, 'fetch', { id: 'bbbbbb' })).body.result?.isError,
     ).toBe(true);
 
+    // A folder holding nothing the person may open is not named, and an
+    // explicit request for it reads as one that does not exist.
+    const top = await tool(token, 'browse', {});
+    expect(top.body.result?.structuredContent).toMatchObject({
+      folder: [],
+      folders: [],
+      documents: [{ id: 'aaaaaa', title: 'Handbook' }],
+    });
+    const team = await tool(token, 'browse', { folder: 'Team' });
+    const missing = await tool(token, 'browse', { folder: 'No such folder' });
+    expect(team.body.result).toEqual(missing.body.result);
+    expect(
+      (await tool(token, 'recent', {})).body.result?.structuredContent,
+    ).toEqual({
+      results: [
+        {
+          id: 'aaaaaa',
+          title: 'Handbook',
+          url: `${ORIGIN}/d/aaaaaa/`,
+          path: [],
+          modified: '2026-10-01T00:00:00.000Z',
+        },
+      ],
+    });
+    // A search kept to that folder finds nothing either.
+    expect(
+      (await tool(token, 'search', { query: 'plan', folder: 'Team' })).body
+        .result?.structuredContent,
+    ).toEqual({ results: [] });
+
     // Joining the team opens its document to the same connection.
     snapshot = snapshotWith(['user-member'], ['user-member']);
+    expect(
+      (await tool(token, 'browse', {})).body.result?.structuredContent,
+    ).toMatchObject({
+      folders: [{ name: 'Team', path: ['Team'], documents: 1 }],
+    });
+    expect(
+      (await tool(token, 'browse', { folder: ' team ' })).body.result
+        ?.structuredContent,
+    ).toMatchObject({
+      folder: ['Team'],
+      documents: [{ id: 'bbbbbb', title: 'Team plan' }],
+    });
     const read = await tool(token, 'fetch', { id: 'bbbbbb' });
     expect(read.body.result?.structuredContent).toMatchObject({
       id: 'bbbbbb',

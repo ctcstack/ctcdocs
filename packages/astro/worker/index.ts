@@ -33,7 +33,10 @@ interface AiSearch {
         match_threshold: number;
         keyword_match_mode: 'and' | 'or';
         context_expansion: number;
-        filters: { class: { $in: string[] } };
+        filters: {
+          class: { $in: string[] };
+          short_id?: { $in: string[] } | { $nin: string[] };
+        };
       };
       reranking: { enabled: boolean; model: string; match_threshold: number };
     };
@@ -76,7 +79,7 @@ const log = (event: Readonly<Record<string, unknown>>) =>
 function documentIndex(search: AiSearch): DocumentIndex {
   return {
     // As the project's `mcp.search` says (ADR-042).
-    search: async (query, classes, settings) => {
+    search: async (query, classes, settings, restriction) => {
       const response = await search.search({
         query,
         ai_search_options: {
@@ -85,7 +88,15 @@ function documentIndex(search: AiSearch): DocumentIndex {
             match_threshold: settings.vectorThreshold,
             keyword_match_mode: settings.keywordMatch,
             context_expansion: settings.contextChunks,
-            filters: { class: { $in: [...classes] } },
+            filters: {
+              class: { $in: [...classes] },
+              // A narrowed search (ADR-044), by the short IDs the build lists.
+              ...(restriction && 'in' in restriction
+                ? { short_id: { $in: [...restriction.in] } }
+                : restriction
+                  ? { short_id: { $nin: [...restriction.notIn] } }
+                  : {}),
+            },
           },
           reranking: {
             enabled: settings.reranking.enabled,

@@ -21,6 +21,11 @@
  * syncs; it never reaches a reader outside the class of the text it was taken
  * from.
  *
+ * A search may be kept to a folder or to documents changed since a date, and
+ * `browse` and `recent` list documents without searching (ADR-044). All three
+ * start from the documents the build lists and the reader may open, so a
+ * folder no document the reader may open sits under is never named.
+ *
  * Web-standard code only: the bucket and the index are handed in.
  */
 import {
@@ -65,16 +70,25 @@ export interface IndexedChunk {
   readonly class: string | undefined;
 }
 
+/**
+ * The documents a narrowed search asks the index for, by short ID: only
+ * these, or all but these (ADR-044).
+ */
+export type DocumentRestriction =
+  { readonly in: readonly string[] } | { readonly notIn: readonly string[] };
+
 /** The part of an AI Search instance the server uses. */
 export interface DocumentIndex {
   /**
-   * Chunks matching `query` among documents of these classes, best first,
-   * asked for as the project's settings say.
+   * Chunks matching `query` among documents of these classes, and of the
+   * restriction when there is one, best first, asked for as the project's
+   * settings say.
    */
   search(
     query: string,
     classes: readonly string[],
     settings: AgentSearchSettings,
+    restriction?: DocumentRestriction,
   ): Promise<readonly IndexedChunk[]>;
   /** Starts a sync of the bucket; throws when one cannot start now. */
   sync(): Promise<void>;
@@ -143,6 +157,262 @@ function readableDocument(
     : undefined;
 }
 
+/** Every document the build lists that the reader may open, by short ID. */
+function readableDocuments(access: DocumentAccess): AgentDocument[] {
+  return [...catalogOf(access.map).values()]
+    .filter((document) => readableDocument(access, document.id))
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
+/**
+ * Short IDs a narrowed search asks the index to include or exclude at most.
+ * AI Search's keyword search takes 40 values in a filter; with more, a
+ * hybrid search silently drops it and ranks by meaning alone, and past 100
+ * it fails (ADR-044).
+ */
+export const RESTRICTION_LIMIT = 40;
+/** Documents `browse` lists in one folder at most. */
+const BROWSE_LIMIT = 100;
+/** Documents `recent` lists unless asked for more, and at most. */
+export const RECENT_DEFAULT = 20;
+export const RECENT_LIMIT = 50;
+
+/** A narrowing an assistant asked for that the server cannot read. */
+export class NarrowingError extends Error {
+  override readonly name = 'NarrowingError';
+}
+
+/** What a search or a list is kept to (ADR-044). */
+export interface Narrowing {
+  /** A folder path, its labels from the corpus root joined by ` / `. */
+  readonly folder?: FolderName | undefined;
+  /** `YYYY-MM-DD`, or a date and time in UTC. */
+  readonly changedSince?: string | undefined;
+}
+
+/** A folder an assistant names: a path string, or its labels. */
+export type FolderName = string | readonly string[];
+
+/**
+ * The labels a folder name may mean, in the order they are tried. A path is
+ * joined by ` / `, as results print it, and a folder's own name may hold a
+ * bare `/`; split on a bare `/` only when the first reading names nothing.
+ */
+function folderReadings(folder: FolderName | undefined): string[][] {
+  const clean = (labels: readonly string[]) =>
+    labels.map((label) => label.trim()).filter((label) => label.length > 0);
+  if (folder === undefined) {
+    return [[]];
+  }
+  if (typeof folder !== 'string') {
+    return [clean(folder)];
+  }
+  const spaced = clean(folder.split(' / '));
+  const bare = clean(folder.split('/'));
+  return spaced.length === bare.length ? [spaced] : [spaced, bare];
+}
+
+/** Labels compare without case or surrounding space. */
+const fold = (label: string) => label.trim().toLowerCase();
+
+function isUnder(
+  path: readonly string[],
+  segments: readonly string[],
+): boolean {
+  return (
+    segments.length <= path.length &&
+    segments.every(
+      (segment, index) => fold(path[index] ?? '') === fold(segment),
+    )
+  );
+}
+
+const DATE_OR_TIME =
+  /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?Z?)?$/u;
+
+/** `changedSince` as milliseconds, read as UTC. */
+function sinceTime(value: string): number {
+  const text = value.trim();
+  const time = DATE_OR_TIME.test(text)
+    ? Date.parse(
+        text.length === 10
+          ? `${text}T00:00:00Z`
+          : text.endsWith('Z')
+            ? text
+            : `${text}Z`,
+      )
+    : Number.NaN;
+  if (Number.isNaN(time)) {
+    throw new NarrowingError(
+      'changedSince must be a date, YYYY-MM-DD, or a date and time in UTC.',
+    );
+  }
+  return time;
+}
+
+/**
+ * The folder's labels among these documents: the first reading of the name
+ * that holds one of them, none for the root, `undefined` when none does.
+ */
+function resolveFolder(
+  documents: readonly AgentDocument[],
+  folder: FolderName | undefined,
+): string[] | undefined {
+  return folderReadings(folder).find(
+    (segments) =>
+      segments.length === 0 ||
+      documents.some((document) => isUnder(document.path, segments)),
+  );
+}
+
+/**
+ * The reader's documents as narrowed: all of them when nothing narrows.
+ * Checking the date first, so a date the server cannot read is refused
+ * whatever the folder.
+ */
+function narrowed(
+  readable: readonly AgentDocument[],
+  narrowing: Narrowing,
+): readonly AgentDocument[] {
+  const since =
+    narrowing.changedSince === undefined
+      ? undefined
+      : sinceTime(narrowing.changedSince);
+  const segments = resolveFolder(readable, narrowing.folder);
+  if (segments === undefined) {
+    return [];
+  }
+  return readable.filter(
+    (document) =>
+      isUnder(document.path, segments) &&
+      (since === undefined ||
+        (document.modified !== null && Date.parse(document.modified) >= since)),
+  );
+}
+
+/** Whether a narrowing asks for anything. */
+const narrows = (narrowing: Narrowing) =>
+  narrowing.changedSince !== undefined ||
+  folderReadings(narrowing.folder)[0]?.length !== 0;
+
+/** A document as `browse` and `recent` list it. */
+export interface ListedDocument {
+  readonly id: string;
+  readonly title: string;
+  readonly url: string;
+  readonly path: readonly string[];
+  readonly modified?: string;
+}
+
+function listed(origin: string, document: AgentDocument): ListedDocument {
+  return {
+    id: document.id,
+    title: document.title,
+    url: permanentLink(origin, document.id),
+    path: document.path,
+    ...(document.modified ? { modified: document.modified } : {}),
+  };
+}
+
+const collator = new Intl.Collator('en', {
+  numeric: true,
+  sensitivity: 'base',
+});
+
+export interface FolderListing {
+  /** The folder's labels, as its documents carry them; none for the root. */
+  readonly folder: readonly string[];
+  /** The folders directly in it, with the documents under each. */
+  readonly folders: readonly {
+    readonly name: string;
+    readonly path: readonly string[];
+    readonly documents: number;
+  }[];
+  /** The documents directly in it, by title. */
+  readonly documents: readonly ListedDocument[];
+  /** Documents directly in it beyond the ones listed. */
+  readonly omitted: number;
+}
+
+/**
+ * A folder's folders and documents, or `undefined` when no document the
+ * reader may open sits under it, which a folder that does not exist shares.
+ */
+export function browseFolder(
+  access: DocumentAccess,
+  folder?: FolderName,
+): FolderListing | undefined {
+  const readable = readableDocuments(access);
+  const segments = resolveFolder(readable, folder);
+  if (segments === undefined) {
+    return undefined;
+  }
+  const depth = segments.length;
+  const under = readable.filter((document) => isUnder(document.path, segments));
+  const [first] = under;
+  if (!first) {
+    return depth === 0
+      ? { folder: [], folders: [], documents: [], omitted: 0 }
+      : undefined;
+  }
+  const folders = new Map<
+    string,
+    { name: string; path: readonly string[]; documents: number }
+  >();
+  const here: AgentDocument[] = [];
+  for (const document of under) {
+    const label = document.path[depth];
+    if (label === undefined) {
+      here.push(document);
+      continue;
+    }
+    const entry = folders.get(fold(label));
+    if (entry) {
+      entry.documents += 1;
+    } else {
+      folders.set(fold(label), {
+        name: label,
+        path: document.path.slice(0, depth + 1),
+        documents: 1,
+      });
+    }
+  }
+  here.sort(
+    (a, b) => collator.compare(a.title, b.title) || (a.id < b.id ? -1 : 1),
+  );
+  return {
+    folder: first.path.slice(0, depth),
+    folders: [...folders.values()].sort((a, b) =>
+      collator.compare(a.name, b.name),
+    ),
+    documents: here
+      .slice(0, BROWSE_LIMIT)
+      .map((document) => listed(access.origin, document)),
+    omitted: Math.max(0, here.length - BROWSE_LIMIT),
+  };
+}
+
+/**
+ * The documents the reader may open that changed last in Drive, newest
+ * first, as narrowed; a document without a Drive time is not listed.
+ */
+export function recentDocuments(
+  access: DocumentAccess,
+  narrowing: Narrowing = {},
+  limit = RECENT_DEFAULT,
+): ListedDocument[] {
+  const count = Math.min(Math.max(Math.trunc(limit), 1), RECENT_LIMIT);
+  return narrowed(readableDocuments(access), narrowing)
+    .filter((document) => document.modified !== null)
+    .map((document) => ({
+      document,
+      time: Date.parse(document.modified ?? ''),
+    }))
+    .sort((a, b) => b.time - a.time || (a.document.id < b.document.id ? -1 : 1))
+    .slice(0, count)
+    .map(({ document }) => listed(access.origin, document));
+}
+
 export interface SearchResult {
   readonly id: string;
   readonly title: string;
@@ -203,12 +473,36 @@ function idOf(key: string): string | undefined {
 export async function searchDocuments(
   access: DocumentAccess,
   query: string,
+  narrowing: Narrowing = {},
 ): Promise<SearchResult[]> {
   const { map, reader, stale, origin, index } = access;
+  // Read first, so a date the server cannot read is refused before searching.
+  const openable = narrows(narrowing) ? readableDocuments(access) : undefined;
+  const matching = openable && narrowed(openable, narrowing);
   const settings = map.agents?.search;
   const classes = readableClasses(map, reader, stale);
   if (!settings || classes.length === 0 || query.trim().length === 0) {
     return [];
+  }
+  // Kept to what the reader may open that matches; the index is asked for
+  // those, or for all but the rest, when either fits its filter.
+  let kept: ReadonlySet<string> | undefined;
+  let restriction: DocumentRestriction | undefined;
+  if (openable && matching) {
+    const inside = matching.map((document) => document.id);
+    if (inside.length === 0) {
+      return [];
+    }
+    kept = new Set(inside);
+    const outside = openable
+      .map((document) => document.id)
+      .filter((id) => !kept?.has(id));
+    restriction =
+      inside.length <= RESTRICTION_LIMIT
+        ? { in: inside }
+        : outside.length <= RESTRICTION_LIMIT
+          ? { notIn: outside }
+          : undefined;
   }
   const {
     results: maxResults,
@@ -224,11 +518,17 @@ export async function searchDocuments(
     string,
     { readonly document: AgentDocument; readonly passages: string[] }
   >();
-  for (const chunk of await index.search(query, classes, settings)) {
+  for (const chunk of await index.search(
+    query,
+    classes,
+    settings,
+    restriction,
+  )) {
     const id = idOf(chunk.key);
     // Judged before the chunk's document takes a place among the results.
     if (
       id === undefined ||
+      (kept !== undefined && !kept.has(id)) ||
       chunk.class === undefined ||
       !readable.has(chunk.class) ||
       chunk.text.trim().length === 0
