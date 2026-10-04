@@ -492,6 +492,7 @@ async function validateGeneratedOutputInternal(
     findBrokenInternalLinks(
       linkDocuments,
       new Set([...Object.keys(manifest.redirects), ...permanentLinkSlugs]),
+      new Set(['', ...(await handAuthoredSlugs(context.repositoryRoot))]),
     ).length > 0
   ) {
     throw new Error('Generated output contains a broken internal page link.');
@@ -531,6 +532,39 @@ async function validateGeneratedOutputInternal(
   ) {
     throw new Error('Generated redirect module does not match the manifest.');
   }
+}
+
+/**
+ * The addresses of the pages a project writes by hand, which a document may
+ * link to like any other. Which pages exist is the project's choice, so they
+ * are read from its content directory rather than named here.
+ */
+async function handAuthoredSlugs(repositoryRoot: string): Promise<string[]> {
+  const root = resolve(repositoryRoot, PROJECT_LAYOUT.documentsDirectory);
+  const generated = resolve(
+    repositoryRoot,
+    PROJECT_LAYOUT.generatedDocumentsDirectory,
+  );
+  let entries;
+  try {
+    entries = await readdir(root, { recursive: true, withFileTypes: true });
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
+  return entries
+    .filter((entry) => entry.isFile() && /\.mdx?$/u.test(entry.name))
+    .map((entry) => resolve(entry.parentPath, entry.name))
+    .filter((path) => relative(generated, path).startsWith('..'))
+    .map((path) =>
+      relative(root, path)
+        .replaceAll('\\', '/')
+        .replace(/\.mdx?$/u, '')
+        .replace(/(?:^|\/)index$/u, '')
+        .toLowerCase(),
+    );
 }
 
 export async function validateGeneratedOutput(

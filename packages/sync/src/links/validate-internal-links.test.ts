@@ -23,8 +23,17 @@ describe('internal page-link validation', () => {
           { stableSlug: 'engineering/relative-target', body: '' },
         ],
         new Set(['legacy/target']),
+        new Set(['', 'about-wiki']),
       ),
     ).toEqual([]);
+  });
+
+  it('knows no hand-authored page unless the caller names it', () => {
+    expect(
+      findBrokenInternalLinks([
+        { stableSlug: 'a/source', body: '[About](/about/)\n' },
+      ]).map((link) => link.targetPath),
+    ).toEqual(['about']);
   });
 
   it('reports missing targets deterministically without checking fragments', () => {

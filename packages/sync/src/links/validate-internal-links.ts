@@ -43,7 +43,7 @@ function routePath(value: string, sourceSlug: string): string | undefined {
 export function findBrokenInternalLinks(
   documents: readonly LinkValidationDocument[],
   redirectSlugs: ReadonlySet<string> = new Set(),
-  staticSlugs: ReadonlySet<string> = new Set(['', 'about-wiki']),
+  staticSlugs: ReadonlySet<string> = new Set(['']),
 ): BrokenInternalLink[] {
   const validSlugs = new Set([
     ...documents.map((document) => document.stableSlug),
