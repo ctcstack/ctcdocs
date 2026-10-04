@@ -640,15 +640,25 @@ document and syncs:
 pnpm exec wrangler r2 object delete <bucket>/agents-published.json --remote
 ```
 
-AI Search's own jobs show whether the index has caught up:
+AI Search's own jobs show whether the index has caught up, and its stats
+whether every document made it:
 
 ```bash
 pnpm exec wrangler ai-search jobs list <instance name>
+pnpm exec wrangler ai-search stats <instance name>
 ```
 
-`search` asks AI Search for up to 50 chunks, matching any word of the query
-and with a low vector threshold, reranks them with `bge-reranker-base` without
-dropping any, and returns up to ten documents with their best passages, their
+A job can end with a document in `error`, such as `workers_ai_timeout_error`,
+or with documents still `running`: indexing a new instance once left one and
+eight. Neither is searchable until indexed. Start another job, and check the
+stats again until nothing is in `error`, `queued` or `running`:
+
+```bash
+pnpm exec wrangler ai-search jobs create <instance name>
+```
+
+`search` asks AI Search for up to 50 chunks, matching any word of the query,
+reranks them with `bge-reranker-base` without dropping any, and returns up to ten documents with their best passages, their
 folders and their date
 ([ADR-042](ADR/042-an-assistants-search-returns-the-passages-that-match.md)).
 All of it is set in each request, so the instance needs no setting of its own,

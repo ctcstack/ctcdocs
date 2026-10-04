@@ -176,7 +176,17 @@ setting was varied alone from this record's defaults:
   server's instructions ask of the assistant, is the remedy, not a setting.
 - **Passages reach their cap.** In an assistant's replayed session every
   result's passage was cut to its share of the budget, so a second passage
-  fitted once in fifty results.
+  fitted once in fifty results. Counted as the Worker counts them, a search
+  over the 1,024-token index showed 11.6 passages, 23,500 characters.
+- **Smaller chunks trade languages, not quality.** A second instance over the
+  same bucket, differing only in 512-token chunks, put as many answers first,
+  20, though not the same ones, with a mean reciprocal rank of 0.731 against
+  0.734 and recall at ten of 0.868 against 0.856: English questions rose
+  (0.76 to 0.81), Russian ones fell (0.70 to 0.63), each by one or two
+  questions. A chunk's text fell to 1,470 characters at the median, under a
+  passage's share, so a search showed 17.4 whole passages instead of 11.6 cut
+  ones in the same budget. Whether more passages give better answers takes
+  graded answers to tell.
 
 The numbers come from one corpus and one person's judgment of the answers:
 a difference of one or two questions is noise. The effects above are larger.
@@ -340,10 +350,11 @@ cache is not relied on for anything.
   this one. The first measurement above was a project's own script, which
   calls AI Search as the Worker does and ranks documents as the Worker does;
   the platform's tool can start from it.
-- Measure smaller chunks: 512 tokens, the most the reranker reads, would let
-  it judge a whole chunk and let a document show two or three passages. It
-  takes a second instance, indexed from the same bucket, to compare.
-- Revisit the passage budget once chunks and passages are measured together.
+- Choose the chunk size by graded answers: 512-token chunks ranked as well as
+  1,024-token ones and showed half again as many passages, which only answers
+  graded against the passages can value. The platform's setup keeps AI
+  Search's default until then.
+- Revisit the passage budget with the chunk size.
 - Turn the cache off in each request if AI Search starts to cache searches:
   a response cached for one reader's classes could hide documents from
   another, though never open one.
