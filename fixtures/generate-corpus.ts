@@ -568,6 +568,24 @@ const htmlArchives = new Map<string, Uint8Array>([
             '<tr><td>Preview</td><td>not deployed</td><td>&#8212;</td>',
             '<td>pull requests</td><td>Authors</td><td>Seven days</td></tr>',
             '</table>',
+            /*
+             * A merged cell keeps a table as HTML. Google writes each cell as
+             * a paragraph of styled spans spaced with no-break spaces, and
+             * every other cell with a span of one; the page keeps the cells'
+             * text and nothing of that.
+             */
+            '<p class="c2"><span class="c1">Who answers for each part:</span></p>',
+            '<table class="c8"><tr class="c4">',
+            '<td class="c3" colspan="1" rowspan="1"><p class="c2"><span class="c1">Area</span></p></td>',
+            '<td class="c3" colspan="2" rowspan="1"><p class="c2"><span class="c1">Owner&nbsp; &nbsp;and backup</span></p></td>',
+            '</tr><tr class="c4">',
+            '<td class="c3" colspan="1" rowspan="2"><p class="c2"><span class="c1">Releases</span></p></td>',
+            '<td class="c3" colspan="1" rowspan="1"><p class="c2"><span class="c1">Release lead</span></p></td>',
+            '<td class="c3" colspan="1" rowspan="1"><p class="c2"><span class="c1">Platform</span></p></td>',
+            '</tr><tr class="c4">',
+            '<td class="c3" colspan="1" rowspan="1"><p class="c2"><span class="c1">Deputy</span></p><p class="c2"><span class="c1">On call in&nbsp;turn</span></p></td>',
+            '<td class="c3" colspan="1" rowspan="1"><p class="c2"><span class="c1"></span></p></td>',
+            '</tr></table>',
             '<p>The pipeline is invoked the same way in every project:</p>',
             '<pre><code>pnpm sync --full</code></pre>',
             /*

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 3,
-  "converterVersion": "hybrid-v3",
+  "converterVersion": "hybrid-v4",
   "normalizerVersion": "remark-html-v2",
   "driveId": "fixture-drive",
   "rootFolderId": "folder-root",
@@ -255,12 +255,13 @@
       "stableSlug": "handbook/tables-and-code",
       "generatedMarkdownPath": "src/content/docs/_generated/doc-tables-and-code.md",
       "generatedAssetsDirectory": "src/assets/generated/doc-tables-and-code",
-      "contentHash": "sha256:251d5df897f505b46fab76b8a2b7c53b2d0631e7950bbe99c003748f8c8419d0",
-      "outputHash": "sha256:68b08c62fe977fb87f0e2799473b8f0cd9c784e45037bb9a3d30145356abb6c6",
+      "contentHash": "sha256:202a3f3c93118f730a5fe48531633375bd8d62827730bbbcb62e119b35afab50",
+      "outputHash": "sha256:80b7e32c88d76a20a4619116f08077864fa467366682beade451315a8d588ebd",
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "hybrid",
       "warnings": [
-        "fallback:table"
+        "fallback:table",
+        "removed_unsafe_html_attribute"
       ],
       "shortId": "14062a",
       "undescribedImages": 0,
