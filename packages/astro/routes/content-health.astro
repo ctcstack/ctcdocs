@@ -566,6 +566,8 @@ const blocks = (groups: Group[]) => {
    * the whole page stays visible. The address keeps the filter, so a view can
    * be sent to the person it is for, and a view that short opens its groups.
    */
+  import { timeAgo } from '../scripts/time-ago';
+
   const UNFOLD_UP_TO = 15;
   const NARROW = '(max-width: 50rem)';
 
@@ -584,17 +586,6 @@ const blocks = (groups: Group[]) => {
     return named.length > 2
       ? `${named.slice(0, 2).join(' · ')} · +${named.length - 2} more`
       : named.join(' · ');
-  }
-
-  /** `3 hours ago`, or nothing for a time in the future or unreadable. */
-  function ago(time: string): string {
-    const minutes = Math.round((Date.now() - Date.parse(time)) / 60_000);
-    if (!(minutes >= 0)) return '';
-    const format = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-    if (minutes < 60) return format.format(-minutes, 'minute');
-    if (minutes < 48 * 60)
-      return format.format(-Math.round(minutes / 60), 'hour');
-    return format.format(-Math.round(minutes / 1440), 'day');
   }
 
   class ContentHealth extends HTMLElement {
@@ -616,7 +607,7 @@ const blocks = (groups: Group[]) => {
       );
 
       const synced = this.querySelector<HTMLTimeElement>('[data-synced]');
-      const relative = synced ? ago(synced.dateTime) : '';
+      const relative = synced ? timeAgo(synced.dateTime) : '';
       if (synced && relative) synced.textContent += ` (${relative})`;
 
       this.watchPriorities();

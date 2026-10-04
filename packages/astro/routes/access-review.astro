@@ -693,6 +693,7 @@ const warnings = (review?.attention ?? []).filter(
     type DirectoryStatus,
     type MachineKey,
   } from '../scripts/directory-status';
+  import { timeAgo } from '../scripts/time-ago';
 
   const fold = (text: string) => text.normalize('NFKC').toLocaleLowerCase();
   const plural = (count: number, one: string, many = `${one}s`) =>
@@ -702,17 +703,6 @@ const warnings = (review?.attention ?? []).filter(
       ? items.join(' and ')
       : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
   const people = (count: number) => plural(count, 'person', 'people');
-
-  /** `3 minutes ago`, or nothing for a time in the future or unreadable. */
-  function ago(time: string): string {
-    const minutes = Math.round((Date.now() - Date.parse(time)) / 60_000);
-    if (!(minutes >= 0)) return '';
-    const format = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-    if (minutes < 60) return format.format(-minutes, 'minute');
-    if (minutes < 48 * 60)
-      return format.format(-Math.round(minutes / 60), 'hour');
-    return format.format(-Math.round(minutes / 1440), 'day');
-  }
 
   /** An element with text, built without parsing markup. */
   function element(
@@ -793,8 +783,13 @@ const warnings = (review?.attention ?? []).filter(
         });
       }
       form.addEventListener('submit', (event) => event.preventDefault());
+      // A search or "hide" keeps the reader the page reads as, key or groups.
       form.addEventListener('input', () =>
-        this.apply(form, status, this.chosen()),
+        this.apply(
+          form,
+          status,
+          this.key ? this.keyGroups(this.key) : this.chosen(),
+        ),
       );
       form.querySelector('[data-clear]')?.addEventListener('click', () => {
         form.reset();
@@ -873,9 +868,9 @@ const warnings = (review?.attention ?? []).filter(
     }
 
     knownGroups(): string[] {
-      return [...this.querySelectorAll<HTMLElement>('.review-chip')].map(
-        (chip) => chip.dataset.as ?? '',
-      );
+      return [
+        ...this.querySelectorAll<HTMLElement>('.review-chip[data-as]'),
+      ].map((chip) => chip.dataset.as ?? '');
     }
 
     /** Lays what holds now over the rules, when the Worker answers. */
@@ -902,7 +897,7 @@ const warnings = (review?.attention ?? []).filter(
       const line = this.querySelector<HTMLElement>('[data-live]');
       if (line) {
         line.textContent = live.takenAt
-          ? `Group membership was read ${ago(live.takenAt)}: ${plural(live.activeUsers, 'active person', 'active people')}. A folder's count includes the admins. Who is in a group is managed in Google Admin.`
+          ? `Group membership was read ${timeAgo(live.takenAt)}: ${plural(live.activeUsers, 'active person', 'active people')}. A folder's count includes the admins. Who is in a group is managed in Google Admin.`
           : 'The directory has not been read yet, so no one is admitted. Who is in a group is managed in Google Admin.';
       }
 
@@ -1074,7 +1069,7 @@ const warnings = (review?.attention ?? []).filter(
       if (!hash.includes('=')) return { as: [], key: '', q: '', hide: false };
       const params = new URLSearchParams(hash);
       const known = new Set(
-        [...this.querySelectorAll<HTMLElement>('.review-chip')].map(
+        [...this.querySelectorAll<HTMLElement>('.review-chip[data-as]')].map(
           (chip) => chip.dataset.as ?? '',
         ),
       );
@@ -1164,7 +1159,7 @@ const warnings = (review?.attention ?? []).filter(
     chosen(): string[] {
       return [
         ...this.querySelectorAll<HTMLButtonElement>(
-          '.review-chip[aria-pressed="true"]',
+          '.review-chip[data-as][aria-pressed="true"]',
         ),
       ].map((chip) => chip.dataset.as ?? '');
     }
