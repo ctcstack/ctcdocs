@@ -8,7 +8,7 @@
 "googleFileId": "doc-tables-and-code"
 "googleModifiedTime": "2026-02-06T16:45:00.000Z"
 "syncedAt": "2026-02-10T06:00:00.000Z"
-"contentHash": "sha256:202a3f3c93118f730a5fe48531633375bd8d62827730bbbcb62e119b35afab50"
+"contentHash": "sha256:ea7d2f49c70af507813d5abb3f90942e422a127d2b6da391ad8ab1cf5444ec77"
 "folderPath":
   - "Handbook"
 "pagefind": true
@@ -22,9 +22,9 @@ Two things a documentation platform gets wrong quietly: wide tables that push a 
 | Production  | docs.example.com | Yes       | main          | Platform  | Indefinite |
 | Preview     | not deployed     | —         | pull requests | Authors   | Seven days |
 
-Who answers for each part:
+**Who answers** for each part:
 
-<table><tbody><tr><td>Area</td><td colspan="2">Owner and backup</td></tr><tr><td rowspan="2">Releases</td><td>Release lead</td><td>Platform</td></tr><tr><td><p>Deputy</p><p>On call in turn</p></td><td></td></tr></tbody></table>
+<table><tbody><tr><td>Area</td><td colspan="2">Owner and backup</td></tr><tr><td rowspan="2">Releases</td><td>Release lead</td><td>Platform</td></tr><tr><td><p>Deputy</p><p><em>On call in turn</em></p></td><td></td></tr></tbody></table>
 
 The pipeline is invoked the same way in every project:
 

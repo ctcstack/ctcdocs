@@ -23,7 +23,7 @@
       "markdown": 8,
       "html": 2
     },
-    "notes": 7
+    "notes": 8
   },
   "reasons": [
     {
@@ -399,6 +399,18 @@
       "slug": "reference/guides/style-guide--244fde",
       "note": "duplicate-name",
       "detail": "Also in this folder: “Style guide” (Google Docs)"
+    },
+    {
+      "id": "doc-tables-and-code",
+      "name": "01 - Tables and code",
+      "folderPath": [
+        "Handbook"
+      ],
+      "type": "Google Docs",
+      "sourceUrl": "https://drive.google.com/open?id=doc-tables-and-code",
+      "lastEditedBy": "Robin Sample",
+      "slug": "handbook/tables-and-code",
+      "note": "formatting-removed"
     },
     {
       "id": "doc-screenshots",
