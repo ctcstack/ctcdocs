@@ -2,6 +2,84 @@
 
 All three packages share a version and are released together.
 
+## 0.17.0
+
+AI assistants can read a private deployment as the person who connected
+them, through an MCP server the site's Worker serves; it is off unless a
+project turns it on. Search returns the passages that match, and the content
+health page names documents too long for an assistant to read whole. See
+[ADR-041](docs/ADR/041-agents-read-the-site-through-an-mcp-server-as-their-reader.md),
+[ADR-042](docs/ADR/042-an-assistants-search-returns-the-passages-that-match.md)
+and
+[ADR-043](docs/ADR/043-content-health-names-documents-too-long-to-read-whole.md);
+the last two are proposed, and their numbers are starting points, each a
+setting.
+
+### Breaking
+
+- The `sync` section of `site.config.json` refuses a setting it does not
+  know, as `mcp` does, so a misspelled line fails instead of falling back to
+  its default. Remove any stray key from it.
+
+### Added
+
+- **An MCP server**, with `"mcp": { "enabled": true }` in `site.config.json`,
+  on a deployment whose every environment is private and has `signIn`.
+  - Any assistant connects at `https://<host>/mcp` — claude.ai, ChatGPT,
+    Claude Code, Cursor — by CIMD or dynamic registration, through one
+    consent page and the site's own Google sign-in. The grant keeps the
+    person's Google ID only, and every request needs the `kb:read` scope.
+  - `search` and `fetch` read the person's groups from the directory snapshot
+    on every request, so an assistant sees exactly what its person may open
+    on the site, and a stale snapshot opens only what every member reads. A
+    document is judged by the build's own list, never by the bucket.
+  - `search` returns up to ten documents, each with up to three passages that
+    matched, its folders and when it changed. A passage counts only when the
+    reader may read the class it came from. `fetch` returns a document's
+    Markdown, cut at `mcp.fetchCharacters`.
+  - Every five minutes the Worker publishes the build's Markdown to an R2
+    bucket and asks AI Search to index it; a rollback publishes its own build.
+  - `mcp.search` and `mcp.fetchCharacters` tune the search per project, each
+    optional and checked against the range AI Search accepts.
+  - `ctcdocs-sync validate` requires, with the server on, each environment's
+    own `OAUTH_KV` namespace, `KB_DOCUMENTS` bucket and `KB_SEARCH` instance,
+    the `global_fetch_strictly_public` flag and the five-minute cron. With it
+    off, the bindings may stay.
+  - The access smoke test checks that `/mcp` asks for a token after a deploy;
+    after a rollback, which may restore a version without the server, it does
+    not require it.
+  - The denial suite publishes the fixture build and asks both tools for
+    every document as each reader.
+- **Long documents on the content health page.** The sync measures every
+  page's Markdown version, the text `fetch` returns, and notes a Google Doc
+  over `sync.largeDocumentCharacters` (40,000 characters unless the project
+  sets it) under Improve, as worth splitting, and one over
+  `mcp.fetchCharacters` (100,000 with the server off) under Fix next, since
+  assistants read only its beginning. A long PDF is noted, not told to split.
+  The sync report records the lines it measured against, and the denial suite
+  requires the documents `fetch` cuts to be the ones the report names.
+- `@ctcstack/ctcdocs-core/published-markdown`, the one serializer of a
+  page's Markdown version, which the site serves and the sync measures.
+
+### Changed
+
+- The Pagefind check searches for the first document of each format before
+  the rest, so a PDF's page is always among its cases.
+- The rollback workflow tells the smoke test that it restores an older
+  version.
+
+### Upgrade note
+
+Bump the packages and the workflow pins. Check that the `sync` section holds
+only `generatedBy`, `commitBotName`, `defaultLocale`, `largeImageMegabytes`
+and `largeDocumentCharacters`. The next sync writes the length notes.
+
+To turn the MCP server on, follow
+[Step 16](docs/NEW_PROJECT.md#step-16-let-ai-assistants-read-the-site-optional)
+and [Cloudflare setup](docs/CLOUDFLARE_SETUP.md#the-mcp-server): per
+environment, an OAuth namespace, a documents bucket and an AI Search instance,
+and the account's AI Search token once.
+
 ## 0.16.2
 
 ### Fixed
