@@ -5,6 +5,7 @@ import test from 'node:test';
 import {
   buildSearchCases,
   casesByBundle,
+  isTitleAlone,
   resultPath,
   sitePathOf,
   unindexedElements,
@@ -238,4 +239,11 @@ test('a class without a bundle fails the check', () => {
       }),
     /names no search bundle/u,
   );
+});
+
+test('the home page may be indexed with the full stop Pagefind adds', () => {
+  assert.equal(isTitleAlone('Example Docs.', 'Example Docs'), true);
+  assert.equal(isTitleAlone('Example [DOCS]', 'Example [DOCS]'), true);
+  assert.equal(isTitleAlone('Example Docs. Recent', 'Example Docs'), false);
+  assert.equal(isTitleAlone('Example', 'Example Docs'), false);
 });
