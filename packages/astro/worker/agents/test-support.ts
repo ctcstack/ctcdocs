@@ -6,7 +6,11 @@ import { MCP_DEFAULTS } from '@ctcstack/ctcdocs-core';
 
 import type { AccessMapFile, AgentSearchSettings } from '../access-map.js';
 import type { Reader } from '../decide.js';
-import type { DocumentIndex, IndexedChunk } from './documents.js';
+import type {
+  DocumentIndex,
+  DocumentRestriction,
+  IndexedChunk,
+} from './documents.js';
 import { MemoryStore } from './memory-store.js';
 
 export const ORIGIN = 'https://docs.example.com';
@@ -118,6 +122,7 @@ export class FixedIndex implements DocumentIndex {
     query: string;
     classes: readonly string[];
     settings: AgentSearchSettings;
+    restriction: DocumentRestriction | undefined;
   }[] = [];
   syncs = 0;
   failSync = false;
@@ -134,8 +139,9 @@ export class FixedIndex implements DocumentIndex {
     query: string,
     classes: readonly string[],
     settings: AgentSearchSettings,
+    restriction?: DocumentRestriction,
   ) {
-    this.queries.push({ query, classes, settings });
+    this.queries.push({ query, classes, settings, restriction });
     return this.chunks;
   }
 

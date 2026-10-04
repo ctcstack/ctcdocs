@@ -658,9 +658,15 @@ pnpm exec wrangler ai-search jobs create <instance name>
 ```
 
 `search` asks AI Search for up to 50 chunks, matching any word of the query,
-reranks them with `bge-reranker-base` without dropping any, and returns up to ten documents with their best passages, their
-folders and their date
+reranks them with `bge-reranker-base` without dropping any, and returns up to
+ten documents with their best passages, their folders and their date
 ([ADR-042](ADR/042-an-assistants-search-returns-the-passages-that-match.md)).
+A search may be kept to a folder or to documents changed since a date, and
+two more tools list documents without searching: `browse`, a folder's folders
+and documents, and `recent`, the latest changes in Drive
+([ADR-044](ADR/044-assistants-list-a-folder-and-recent-changes-and-narrow-a-search.md)).
+They read the build's list of documents, not AI Search, and name no folder
+the person may open nothing in.
 All of it is set in each request, so the instance needs no setting of its own,
 and every number is the project's `mcp.search` setting, with these defaults
 ([configuration](CONFIGURATION.md#ai-assistants-mcp)): to tune search, change
@@ -669,8 +675,9 @@ The Worker checks every passage against the person asking, so the instance's
 similarity cache, on by default, cannot show one person another's results.
 
 The Worker logs each tool call by tool and outcome only, never the query, the
-person or the document. A `tool-failed` event names a tool whose bucket or
-index failed, by the error's name; the assistant is told only to try again.
+folder, the person or the document. A `tool-failed` event names a tool whose
+bucket or index failed, by the error's name; the assistant is told only to try
+again.
 
 ### Disconnecting assistants
 

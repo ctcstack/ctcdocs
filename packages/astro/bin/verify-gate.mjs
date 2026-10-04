@@ -23,8 +23,11 @@ import {
 } from '@ctcstack/ctcdocs-core';
 
 import {
+  browseFolder,
   DOCUMENT_PREFIX,
   fetchDocument,
+  RECENT_LIMIT,
+  recentDocuments,
   searchDocuments,
 } from '../dist-node/worker/agents/documents.js';
 import { MemoryStore } from '../dist-node/worker/agents/memory-store.js';
@@ -360,10 +363,47 @@ async function verifyAgents({ map, projectRoot, distRoot, environment, keys }) {
         `MCP search showed ${name} ${result.id} without a passage.`,
       );
     }
+    // Every folder `browse` names, walked by its labels, and `recent`
+    // (ADR-044): each lists only what the person may open.
+    const listed = new Set();
+    let omitted = false;
+    const folders = [[]];
+    while (folders.length > 0) {
+      const folder = folders.pop();
+      const listing = browseFolder(access, folder);
+      requests += 1;
+      assert.ok(
+        listing,
+        `MCP browse named ${name} a folder it then would not list.`,
+      );
+      omitted ||= listing.omitted > 0;
+      for (const document of listing.documents) {
+        listed.add(document.id);
+      }
+      for (const inner of listing.folders) {
+        assert.ok(
+          inner.documents > 0,
+          `MCP browse named ${name} a folder with nothing for them.`,
+        );
+        folders.push(inner.path);
+      }
+    }
+    for (const document of recentDocuments(access, {}, RECENT_LIMIT)) {
+      listed.add(document.id);
+    }
+    requests += 1;
     for (const document of map.agents.documents) {
       const fileClass = map.files[document.markdown];
       const allowed =
         name === 'admin' || groupsMayRead(map, fileClass, reader.groups);
+      assert.ok(
+        allowed || !listed.has(document.id),
+        `MCP browse or recent listed ${name} ${document.markdown} (${fileClass}).`,
+      );
+      assert.ok(
+        !allowed || omitted || listed.has(document.id),
+        `MCP browse left out ${document.markdown}, which ${name} may open.`,
+      );
       const fetched = await fetchDocument(access, document.id);
       requests += 1;
       assert.equal(
