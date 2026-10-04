@@ -49,7 +49,9 @@ Measured on a deployment's instance, a filter by `short_id` with `$in` or
 `$nin` narrows both search methods up to 40 values. With 41 to 100, a hybrid
 search answers but runs vector search alone: its keyword search refuses more
 than 40 values, and the response says so only in `hybrid_meta`. With more
-than 100 the request fails. None of these limits is documented.
+than 100 the request fails. None of these limits is documented. The same
+holds for the class filter `search` has always sent: a reader who may read
+more than 40 classes lost keyword search on every search, silently.
 
 **What the Worker already holds.** The access map the Worker is bundled with
 lists every document the MCP server offers, with its folders, from the corpus
@@ -81,21 +83,24 @@ may read under looks as absent as one that does not exist.
 ### A folder is named by its path
 
 A folder is the path `search` and `fetch` already return: the folder labels
-from the corpus root, written as one string joined by a slash with a space on
-each side. A request matches it segment by segment, ignoring case and
-surrounding spaces. A folder's own name may hold a slash, so a path is split
-on a spaced slash first, and on a bare one only when that reading names no
-folder. Folder labels
-are what readers see on the site; the Drive identifiers behind them never
-reach an assistant. Two sibling folders with the same label are one folder to
-an assistant.
+from the corpus root, as a list. A request may pass that list, which means
+exactly those folders, or one string, the labels joined by a slash with a
+space on each side, as results print it. A request matches segment by
+segment, ignoring case and surrounding spaces. A folder's own name may hold a
+slash, bare or spaced, so a string is also read split on a bare slash, and
+whole, when a reading before names no folder; the list is the unambiguous
+form. Folder labels are what readers see on the site; the Drive identifiers
+behind them never reach an assistant. Two sibling folders with the same label
+are one folder to an assistant.
 
 ### `search` may be narrowed
 
 `search` takes two optional parameters besides `query`: `folder`, which keeps
 documents under that folder, and `changedSince`, which keeps documents changed
 in Drive on or after a date (`YYYY-MM-DD`, or a date and time in UTC). A
-document without a Drive time does not match `changedSince`.
+date the calendar does not have, such as 30 February, is refused rather than
+rolled into the next month. A document without a Drive time does not match
+`changedSince`.
 
 The Worker turns them into a filter AI Search applies before retrieval,
 without a new metadata field and without reindexing. From the catalog it
@@ -103,10 +108,19 @@ takes the documents the reader may open that match. When none do, the search
 returns nothing. When few do, it asks only for them, by `short_id` with
 `$in`; when few do not, it excludes those, with `$nin`; at most 40 short IDs
 either way, so that keyword search still runs. When neither is few, it asks
-without them. In every case
-the Worker keeps, as before, only chunks of documents the reader may open,
-and now only those that match. A narrowed search finds no document a plain
-one would not show the same reader.
+without them.
+
+One function builds every search's filter within AI Search's limits. The
+reader's classes go as `$in` when they are 40 or fewer; otherwise as `$nin`
+of the other classes when those are, or not at all when there are none; only
+when neither side fits does keyword search give way, to the reader's classes.
+When the whole filter's compact JSON would reach 2,048 bytes, the narrowing
+is left out first, then the classes. No part of the filter decides access, so
+leaving one out ranks more of what the reader cannot see and never shows it.
+
+In every case the Worker keeps, as before, only chunks of documents the reader
+may open, and now only those that match. A narrowed search finds no document a
+plain one would not show the same reader.
 
 ### Descriptions and instructions
 

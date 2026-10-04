@@ -35,6 +35,7 @@ import {
   type AgentSearchSettings,
 } from '../access-map.js';
 import { mayRead, type Reader } from '../decide.js';
+import { FILTER_VALUES } from './search-filter.js';
 
 /** The part of an R2 bucket the server uses. */
 export interface DocumentStore {
@@ -165,12 +166,10 @@ function readableDocuments(access: DocumentAccess): AgentDocument[] {
 }
 
 /**
- * Short IDs a narrowed search asks the index to include or exclude at most.
- * AI Search's keyword search takes 40 values in a filter; with more, a
- * hybrid search silently drops it and ranks by meaning alone, and past 100
- * it fails (ADR-044).
+ * Short IDs a narrowed search asks the index to include or exclude at most:
+ * the values one filter of keyword search takes (ADR-044).
  */
-export const RESTRICTION_LIMIT = 40;
+export const RESTRICTION_LIMIT = FILTER_VALUES;
 /** Documents `browse` lists in one folder at most. */
 const BROWSE_LIMIT = 100;
 /** Documents `recent` lists unless asked for more, and at most. */
@@ -194,9 +193,11 @@ export interface Narrowing {
 export type FolderName = string | readonly string[];
 
 /**
- * The labels a folder name may mean, in the order they are tried. A path is
- * joined by ` / `, as results print it, and a folder's own name may hold a
- * bare `/`; split on a bare `/` only when the first reading names nothing.
+ * The labels a folder name may mean, in the order they are tried. A list of
+ * labels, as results return a path, means exactly that. A string is a path
+ * joined by a spaced slash, as results print it; a folder's own name may
+ * hold a slash, bare or spaced, so a string is also tried split on a bare
+ * slash, and whole, when a reading before names nothing.
  */
 function folderReadings(folder: FolderName | undefined): string[][] {
   const clean = (labels: readonly string[]) =>
@@ -207,9 +208,17 @@ function folderReadings(folder: FolderName | undefined): string[][] {
   if (typeof folder !== 'string') {
     return [clean(folder)];
   }
-  const spaced = clean(folder.split(' / '));
-  const bare = clean(folder.split('/'));
-  return spaced.length === bare.length ? [spaced] : [spaced, bare];
+  const readings = [
+    clean(folder.split(' / ')),
+    clean(folder.split('/')),
+    clean([folder]),
+  ];
+  return readings.filter(
+    (reading, index) =>
+      readings.findIndex(
+        (other) => JSON.stringify(other) === JSON.stringify(reading),
+      ) === index,
+  );
 }
 
 /** Labels compare without case or surrounding space. */
@@ -230,19 +239,17 @@ function isUnder(
 const DATE_OR_TIME =
   /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?Z?)?$/u;
 
-/** `changedSince` as milliseconds, read as UTC. */
+/**
+ * `changedSince` as milliseconds, read as UTC. A date the calendar does not
+ * have, which `Date.parse` would roll into the next month, is refused.
+ */
 function sinceTime(value: string): number {
   const text = value.trim();
+  const given = text.endsWith('Z') ? text.slice(0, -1) : text;
   const time = DATE_OR_TIME.test(text)
-    ? Date.parse(
-        text.length === 10
-          ? `${text}T00:00:00Z`
-          : text.endsWith('Z')
-            ? text
-            : `${text}Z`,
-      )
+    ? Date.parse(given.length === 10 ? `${given}T00:00:00Z` : `${given}Z`)
     : Number.NaN;
-  if (Number.isNaN(time)) {
+  if (Number.isNaN(time) || !new Date(time).toISOString().startsWith(given)) {
     throw new NarrowingError(
       'changedSince must be a date, YYYY-MM-DD, or a date and time in UTC.',
     );

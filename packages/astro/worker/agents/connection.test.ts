@@ -727,6 +727,19 @@ describe('an assistant reading', () => {
       folder: ['Team'],
       documents: [{ id: 'bbbbbb', title: 'Team plan' }],
     });
+    // A path as results return it, a list of folder names, reads the same.
+    expect(
+      (await tool(token, 'browse', { folder: ['Team'] })).body.result
+        ?.structuredContent,
+    ).toMatchObject({ folder: ['Team'] });
+    expect(
+      (await tool(token, 'search', { query: 'plan', folder: ['Team'] })).body
+        .result?.isError,
+    ).not.toBe(true);
+    expect(
+      (await tool(token, 'recent', { changedSince: '2026-02-30' })).body.result
+        ?.isError,
+    ).toBe(true);
     const read = await tool(token, 'fetch', { id: 'bbbbbb' });
     expect(read.body.result?.structuredContent).toMatchObject({
       id: 'bbbbbb',

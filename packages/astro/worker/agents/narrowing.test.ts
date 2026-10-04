@@ -147,6 +147,33 @@ describe('browse', () => {
     expect(ids(listing?.documents)).toEqual(['dddddd', 'eeeeee']);
   });
 
+  it('reads a folder whose name holds a spaced slash, as the path results return', () => {
+    const spaced = catalogMap([
+      ['aaaaaa', 'Form guide', ['Forms / Pages'], 'members', null],
+      [
+        'bbbbbb',
+        'Deep guide',
+        ['Sites', 'Forms / Pages', 'Old'],
+        'members',
+        null,
+      ],
+    ]);
+    const member = access(readers.member, { map: spaced });
+    const top = browseFolder(member);
+    const folder = top?.folders.find((entry) => entry.name === 'Forms / Pages');
+    expect(folder?.path).toEqual(['Forms / Pages']);
+    // The path as returned reads it, and so does its name as a string.
+    expect(ids(browseFolder(member, folder?.path)?.documents)).toEqual([
+      'aaaaaa',
+    ]);
+    expect(ids(browseFolder(member, 'Forms / Pages')?.documents)).toEqual([
+      'aaaaaa',
+    ]);
+    expect(
+      ids(browseFolder(member, ['Sites', 'Forms / Pages', 'Old'])?.documents),
+    ).toEqual(['bbbbbb']);
+  });
+
   it('reads a folder whose name holds a slash, and a path without spaces', () => {
     const slashed = catalogMap([
       ['aaaaaa', 'Form guide', ['Sites', 'Forms/Pages'], 'members', null],
@@ -239,7 +266,16 @@ describe('recent', () => {
     ).toBeLessThanOrEqual(RECENT_LIMIT);
   });
 
-  it.each(['yesterday', '2026-13-45', '04/10/2026', ''])(
+  it.each([
+    'yesterday',
+    '2026-13-45',
+    '04/10/2026',
+    '',
+    '2026-02-30',
+    '2026-04-31',
+    '2026-09-15T24:00',
+    '2026-09-15T12:60Z',
+  ])(
     'refuses %j as a date, in words the assistant can act on',
     (changedSince) => {
       expect(() =>

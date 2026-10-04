@@ -64,9 +64,9 @@ const BROWSE_OUTPUT = z.object({
 const RECENT_OUTPUT = z.object({ results: z.array(LISTED_DOCUMENT) });
 
 const FOLDER = z
-  .string()
+  .union([z.string(), z.array(z.string())])
   .describe(
-    'A folder path as results show it, its folder names from the top joined by " / "',
+    'A folder: its path as results return it, a list of folder names from the top, or those names joined by " / "',
   );
 const CHANGED_SINCE = z
   .string()

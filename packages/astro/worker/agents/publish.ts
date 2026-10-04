@@ -29,8 +29,9 @@ import {
 } from './documents.js';
 
 /**
- * The marker's object: outside the documents' prefix, and without the
- * `class` metadata every search filters on, so no search ever returns it.
+ * The marker's object: outside the documents' prefix and without `class`
+ * metadata, so a search that names classes never returns it, and the Worker
+ * skips it when one that does not (ADR-044) does.
  */
 export const MARKER_KEY = 'agents-published.json';
 
