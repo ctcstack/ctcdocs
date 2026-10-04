@@ -21,6 +21,8 @@ import type { DocumentRestriction } from './documents.js';
 
 /** Values in one `$in` or `$nin` keyword search still takes. */
 export const FILTER_VALUES = 40;
+/** Values in one `$in` or `$nin` past which a search fails. */
+const FILTER_MOST = 100;
 /** A filter's compact JSON stays under this many bytes. */
 const FILTER_BYTES = 2048;
 
@@ -30,25 +32,29 @@ const bytes = (filter: SearchFilter) =>
   new TextEncoder().encode(JSON.stringify(filter)).length;
 
 /**
- * The classes as a filter: the reader's, or all but theirs when those are
- * the ones that fit, or none when every class is the reader's.
+ * The classes as a filter: the reader's, or all but theirs, whichever keyword
+ * search still takes; none when every class is the reader's. When neither
+ * side is forty or fewer, keyword search gives way to whichever side a
+ * search takes at all, the reader's first; when neither is a hundred or
+ * fewer, no class filter is sent.
  */
 function classFilter(
   all: readonly string[],
   readable: readonly string[],
 ): SearchFilter {
-  if (readable.length <= FILTER_VALUES) {
-    return { class: { $in: readable } };
-  }
   const others = all.filter((cls) => !readable.includes(cls));
   if (others.length === 0) {
     return {};
   }
-  // Past forty either way, keyword search is lost; the reader's classes at
-  // least keep the chunks AI Search ranks to ones they may read.
-  return others.length <= FILTER_VALUES
-    ? { class: { $nin: others } }
-    : { class: { $in: readable } };
+  for (const most of [FILTER_VALUES, FILTER_MOST]) {
+    if (readable.length <= most) {
+      return { class: { $in: readable } };
+    }
+    if (others.length <= most) {
+      return { class: { $nin: others } };
+    }
+  }
+  return {};
 }
 
 export function searchFilter(

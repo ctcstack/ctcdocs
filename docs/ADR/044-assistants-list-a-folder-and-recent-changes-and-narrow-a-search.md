@@ -110,12 +110,14 @@ returns nothing. When few do, it asks only for them, by `short_id` with
 either way, so that keyword search still runs. When neither is few, it asks
 without them.
 
-One function builds every search's filter within AI Search's limits. The
-reader's classes go as `$in` when they are 40 or fewer; otherwise as `$nin`
-of the other classes when those are, or not at all when there are none; only
-when neither side fits does keyword search give way, to the reader's classes.
-When the whole filter's compact JSON would reach 2,048 bytes, the narrowing
-is left out first, then the classes. No part of the filter decides access, so
+One function builds every search's filter within AI Search's limits. A
+reader of every class needs no class filter. Otherwise the reader's classes
+go as `$in` when they are 40 or fewer, or as `$nin` of the other classes when
+those are. When neither side is, keyword search gives way to whichever side
+is a hundred or fewer, the reader's first; when neither is, no class filter is
+sent, since a list past a hundred fails the search. When the whole filter's
+compact JSON would reach 2,048 bytes, the narrowing is left out first, then
+the classes. No part of the filter decides access, so
 leaving one out ranks more of what the reader cannot see and never shows it.
 
 In every case the Worker keeps, as before, only chunks of documents the reader
