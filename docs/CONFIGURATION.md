@@ -253,6 +253,14 @@ own class, and a home page folder card takes its description only from a
 document every member may read. See
 [ADR-039](ADR/039-open-a-folder-only-to-the-google-groups-its-rule-names.md).
 
+**Admins see what the rules amount to** at `/access-review/`, which the build
+writes only when the project has an `access` section: every folder with its
+readers and how each group comes to read it, what needs attention, a view as a
+set of groups, and, for a folder without a rule, the rule to paste here. The
+address is reserved like the platform's other routes. See
+[ADR-045](ADR/045-an-access-review-page-shows-admins-who-may-read-each-folder.md)
+and [Who may read what](OPERATIONS.md#who-may-read-what).
+
 **A move in Drive never widens a document's readers by itself.** A change to
 these rules takes effect at once, wider or narrower: it is reviewed where this
 file is. A document moved — or under a folder moved — to a place whose rules

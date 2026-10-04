@@ -1,0 +1,1757 @@
+---
+/**
+ * Who may read each folder, for admins (ADR-045).
+ *
+ * The page answers three questions. Who may read this folder or this
+ * document: the folders as rows, each with its readers in words, the groups
+ * the rules name as columns, and how each group comes to read it or why it
+ * does not. What a reader in some groups may read: "Read as" dims, or hides,
+ * the rest, and counts what is left. Where access is not what the rules say:
+ * folders without a rule, documents that read narrower than their folder,
+ * groups a rule names that a rule above does not, and rules that drifted,
+ * first and in words; the content health page keeps them as tasks.
+ *
+ * It is built from the model the access map is computed from, so it says what
+ * the Worker of the same build enforces. It names groups, never people: who is
+ * in a group is Google Admin's to say (ADR-040). The address keeps a view in
+ * its fragment, which never reaches the server. Without script every folder
+ * is listed, unfolded.
+ *
+ * It is built only when the project has access rules, read by admins only,
+ * and kept out of the sidebar and search.
+ */
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { Icon } from '@astrojs/starlight/components';
+import { PLATFORM_ROUTE_HREFS } from '@ctcstack/ctcdocs-core';
+
+import { loadAccessReview } from '../lib/access-review-source';
+import type {
+  Attention,
+  Mark,
+  Reach,
+  ReviewDocument,
+  ReviewFolder,
+} from '../lib/access-review-view';
+import { siteConfiguration } from '../lib/project';
+
+const review = await loadAccessReview();
+const mcp = siteConfiguration.mcp?.enabled === true;
+
+/** Above this many folders, the tree opens on its top level. */
+const UNFOLDED_UP_TO = 25;
+const ROOT_NAME = 'Top of the Drive';
+
+const plural = (count: number, one: string, many = `${one}s`) =>
+  `${count} ${count === 1 ? one : many}`;
+const list = (items: readonly string[]) =>
+  items.length <= 2
+    ? items.join(' and ')
+    : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
+
+const REACHES: readonly { id: Reach; label: string }[] = [
+  { id: 'members', label: 'Every member' },
+  { id: 'groups', label: 'Some groups' },
+  { id: 'admins', label: 'Admins only' },
+];
+
+const rows = review?.folders ?? [];
+const byId = new Map(rows.map((row) => [row.id, row]));
+const nameOf = (row: ReviewFolder | undefined) =>
+  row ? (row.root ? ROOT_NAME : row.name) : '';
+const anchorOf = (id: string) => `folder-${id}`;
+/** Each row's folders above it, by anchor, for folding and finding. */
+const ancestors = new Map<string, string[]>();
+for (const row of rows) {
+  ancestors.set(
+    row.id,
+    row.parent === null
+      ? []
+      : [...(ancestors.get(row.parent) ?? []), anchorOf(row.parent)],
+  );
+}
+/** Rows a reader is sent to from "Needs attention" stay unfolded. */
+const unfold = new Set(
+  (review?.attention ?? []).flatMap((item) =>
+    item.kind === 'narrower'
+      ? (ancestors.get(item.folder.id) ?? [])
+      : 'trail' in item.finding
+        ? (ancestors.get(item.finding.folder) ?? [])
+        : [],
+  ),
+);
+const foldDeep = rows.length > UNFOLDED_UP_TO;
+
+/** A group address set as its name, then its domain, to wrap between. */
+const parts = (address: string) => {
+  const at = address.indexOf('@');
+  return at < 0
+    ? { name: address, domain: '' }
+    : { name: address.slice(0, at), domain: address.slice(at) };
+};
+const readersText = (readers: ReviewFolder['readers']) =>
+  readers === '*'
+    ? 'Every member'
+    : readers.length === 0
+      ? 'Admins only'
+      : list(readers);
+const readersData = (readers: ReviewFolder['readers']) =>
+  readers === '*' ? '*' : readers.join(' ');
+
+const MARKS: Record<Exclude<Mark, 'none'>, string> = {
+  here: 'Reads: the rule on this folder names it',
+  above: 'Reads: a rule above names it',
+  blocked: 'Named here but not by a rule above, so it admits no one here',
+};
+const EVERY_MEMBER_MARKS: Record<Exclude<Mark, 'none' | 'blocked'>, string> = {
+  here: 'Every member reads it: the rule on this folder says so',
+  above: 'Every member reads it: a rule above says so',
+};
+
+/** Where a folder's readers come from, in words. */
+function origin(row: ReviewFolder): string {
+  if (row.closed === 'no-rule') {
+    return 'No rule on it or above';
+  }
+  const names = row.ruledBy.map((id) =>
+    id === row.id ? 'this folder' : nameOf(byId.get(id)),
+  );
+  const from = `${row.ruledBy.length === 1 ? 'Rule' : 'Rules'} on ${list(names)}`;
+  return row.closed === 'no-reader' ? `${from} name no group in common` : from;
+}
+
+function narrowerText(document: ReviewDocument): string {
+  return document.narrower === 'move'
+    ? `It moved here and keeps the readers it had, ${readersText(document.readers)}, until a rule on this folder or above is added or changed.`
+    : `It keeps the readers it was published with, ${readersText(document.readers)}, until the next sync.`;
+}
+
+/** What an item of "Needs attention" says, after the folder it names. */
+function attentionText(item: Attention): string {
+  if (item.kind === 'narrower') {
+    return item.document.narrower === 'move'
+      ? `${item.document.title} moved here and keeps fewer readers than its folder until a rule on its new place is added or changed`
+      : `${item.document.title} has fewer readers than its folder until the next sync`;
+  }
+  const { finding } = item;
+  switch (finding.code) {
+    case 'folder-without-rule':
+      return `No rule: ${plural(finding.documents, 'document')} open to admins only until a rule names this folder or one above`;
+    case 'rule-group-not-admitted-above':
+      return `${list(finding.groups)} ${finding.groups.length === 1 ? 'is' : 'are'} named here but not by a rule above, so ${finding.groups.length === 1 ? 'it admits' : 'they admit'} no one here`;
+    case 'rule-folder-missing':
+      return `A rule names a folder the site does not have: update or remove it`;
+    case 'rule-label-outdated':
+      return `The rule still calls it “${finding.label}”`;
+  }
+}
+
+function attentionPlace(item: Attention): {
+  name: string;
+  href: string | undefined;
+} {
+  if (item.kind === 'narrower') {
+    return { name: nameOf(item.folder), href: `#${anchorOf(item.folder.id)}` };
+  }
+  const { finding } = item;
+  if (finding.code === 'rule-folder-missing') {
+    return { name: finding.label, href: undefined };
+  }
+  const row = byId.get(finding.folder);
+  return {
+    name: row ? nameOf(row) : finding.name,
+    href: row ? `#${anchorOf(row.id)}` : undefined,
+  };
+}
+
+const ruleSnippet = (row: ReviewFolder) =>
+  row.ruleToAdd
+    ? `{ "folder": ${JSON.stringify(row.ruleToAdd.folder)}, "label": ${JSON.stringify(row.ruleToAdd.label)}, "readers": [] }`
+    : '';
+
+const total = review?.documents.total ?? 0;
+const warnings = (review?.attention ?? []).filter(
+  (item) => item.tone === 'warning',
+).length;
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Access review',
+    description:
+      'Who may read each folder on this site, by Google group, and where access is not what the rules say.',
+    tableOfContents: false,
+    pagefind: false,
+    prev: false,
+    next: false,
+  }}
+>
+  <access-review class="not-content" data-pagefind-ignore>
+    {
+      !review ? (
+        <p class="review-intro">
+          This site has no access rules: every signed-in member reads every
+          document.
+        </p>
+      ) : (
+        <>
+          <p class="review-intro">
+            Who may read each folder on this site
+            {mcp && ', and through its MCP server'}, by Google group. Drive's
+            own sharing and the project repository are not covered; see{' '}
+            <a href="#how-access-works">how access works</a>.
+          </p>
+
+          <section
+            class="review-overview"
+            aria-labelledby="review-overview-title"
+          >
+            <p class="review-eyebrow">Whole knowledge base</p>
+            <p class="review-hero-title" id="review-overview-title">
+              <span class="review-hero-figure">{total}</span>{' '}
+              {total === 1 ? 'document' : 'documents'}, by who may read them
+            </p>
+            {total > 0 && (
+              <div
+                class="review-stack"
+                role="img"
+                aria-label={REACHES.filter(
+                  (reach) => review.documents[reach.id] > 0,
+                )
+                  .map(
+                    (reach) => `${reach.label}: ${review.documents[reach.id]}`,
+                  )
+                  .join(', ')}
+              >
+                {REACHES.filter((reach) => review.documents[reach.id] > 0).map(
+                  (reach) => (
+                    <span
+                      data-reach={reach.id}
+                      style={`--share: ${(review.documents[reach.id] / total) * 100}%`}
+                      title={`${reach.label}: ${review.documents[reach.id]}`}
+                    />
+                  ),
+                )}
+              </div>
+            )}
+            <ul
+              class="review-legend"
+              aria-label="Documents by who may read them"
+            >
+              {REACHES.map((reach) => (
+                <li data-reach={reach.id}>
+                  <span class="review-dot" />
+                  <span>{reach.label}</span>
+                  <strong>{review.documents[reach.id]}</strong>
+                </li>
+              ))}
+            </ul>
+            <p class="review-context">
+              {review.admins.length === 1
+                ? `The admin group, ${review.admins[0]}, reads`
+                : `The admin groups, ${list(review.admins)}, read`}{' '}
+              everything, whatever the rules say. This page shows the rules this
+              build was made with; who is in each group is managed in Google
+              Admin.
+            </p>
+          </section>
+
+          <section
+            class="review-attention"
+            aria-labelledby="review-attention-title"
+            data-tone={warnings > 0 ? 'warning' : 'note'}
+          >
+            {review.attention.length === 0 ? (
+              <p class="review-all-clear" data-tone="good">
+                <Icon name="approve-check-circle" size="1.25rem" />
+                <span id="review-attention-title">
+                  Nothing needs attention: every folder has a rule, and every
+                  document reads as its folder.
+                </span>
+              </p>
+            ) : (
+              <>
+                <h2 id="review-attention-title">
+                  <Icon
+                    name={warnings > 0 ? 'warning' : 'information'}
+                    size="1.25rem"
+                  />
+                  <span>Needs attention</span>
+                  <span class="review-count">{review.attention.length}</span>
+                </h2>
+                <ul class="review-attention-list">
+                  {review.attention.map((item) => {
+                    const place = attentionPlace(item);
+                    return (
+                      <li data-tone={item.tone}>
+                        <Icon
+                          name={item.tone === 'warning' ? 'warning' : 'pencil'}
+                          size="1rem"
+                        />
+                        <span>
+                          {place.href ? (
+                            <a href={place.href} data-goto>
+                              {place.name}
+                            </a>
+                          ) : (
+                            <strong>{place.name}</strong>
+                          )}
+                          {' — '}
+                          {attentionText(item)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p class="review-attention-tasks">
+                  The{' '}
+                  <a
+                    href={`${PLATFORM_ROUTE_HREFS.contentHealth}#folder-access`}
+                  >
+                    content health page
+                  </a>{' '}
+                  lists the folders among its tasks. A rule is changed in the
+                  site's configuration and takes effect with the next deploy.
+                </p>
+              </>
+            )}
+          </section>
+
+          <form
+            class="review-toolbar"
+            aria-label="Read the folders as a reader would"
+            hidden
+            data-toolbar
+          >
+            {review.groups.length > 0 && (
+              <fieldset class="review-as">
+                <legend>Read as</legend>
+                <div class="review-chips">
+                  {review.groups.map((group) => (
+                    <button
+                      type="button"
+                      class="review-chip"
+                      aria-pressed="false"
+                      data-as={group}
+                    >
+                      {group}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+            )}
+            <div class="review-tools">
+              <div class="review-find">
+                <label for="review-find">Find a document or folder</label>
+                <input
+                  id="review-find"
+                  type="search"
+                  name="q"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
+              <label class="review-hide" hidden data-hide-label>
+                <input type="checkbox" name="hide" />
+                Hide what they cannot read
+              </label>
+              <div class="review-actions">
+                <button type="button" data-clear hidden>
+                  Clear
+                </button>
+                <button type="button" data-copy hidden>
+                  Copy link
+                </button>
+                <button type="button" data-expand>
+                  Expand all
+                </button>
+              </div>
+            </div>
+            <p class="review-status" role="status" data-status />
+          </form>
+
+          <div
+            class="review-table-wrap"
+            role="region"
+            aria-labelledby="review-table-title"
+            tabindex="0"
+          >
+            <table class="review-table">
+              <caption id="review-table-title">
+                Who may read each folder
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Folder</th>
+                  <th scope="col">Readers</th>
+                  <th scope="col" class="review-col">
+                    Every member
+                  </th>
+                  {review.groups.map((group) => (
+                    <th scope="col" class="review-col" data-col={group}>
+                      <span class="review-col-name">{parts(group).name}</span>
+                      <span class="review-col-domain">
+                        {parts(group).domain}
+                      </span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const narrower = row.direct.filter(
+                    (document) => document.narrower,
+                  );
+                  const above = ancestors.get(row.id) ?? [];
+                  return (
+                    <tr
+                      id={anchorOf(row.id)}
+                      data-row
+                      data-depth={row.depth}
+                      data-ancestors={above.join(' ')}
+                      data-readers={readersData(row.readers)}
+                      data-reach={row.reach}
+                      data-name={nameOf(row)}
+                      style={`--depth: ${row.depth}`}
+                      data-default-folded={
+                        foldDeep &&
+                        above.some((anchor) => !unfold.has(anchor)) &&
+                        row.depth > 0
+                          ? ''
+                          : undefined
+                      }
+                    >
+                      <th scope="row">
+                        <span class="review-folder">
+                          {row.hasChildren ? (
+                            <button
+                              type="button"
+                              class="review-twisty"
+                              aria-expanded="true"
+                              aria-label={`Subfolders of ${nameOf(row)}`}
+                              data-toggle
+                            />
+                          ) : (
+                            <span class="review-twisty-space" />
+                          )}
+                          {row.href ? (
+                            <a href={row.href}>{nameOf(row)}</a>
+                          ) : (
+                            <span>{nameOf(row)}</span>
+                          )}
+                        </span>
+                        <span class="review-folder-count">
+                          {plural(row.documents, 'document')}
+                          {row.root && ' in all'}
+                        </span>
+                      </th>
+                      <td class="review-readers">
+                        <p class="review-readers-line" data-reach={row.reach}>
+                          <span class="review-dot" />
+                          <strong>{readersText(row.readers)}</strong>
+                        </p>
+                        <p class="review-origin">
+                          {origin(row)}
+                          {row.drive && (
+                            <>
+                              {' · '}
+                              <a
+                                href={row.drive}
+                                rel="noopener noreferrer"
+                                target="_blank"
+                              >
+                                Open in Drive
+                                <Icon name="external" size="0.75rem" />
+                              </a>
+                            </>
+                          )}
+                        </p>
+                        {narrower.map((document) => (
+                          <p class="review-narrower" data-tone="warning">
+                            <Icon name="warning" size="1rem" />
+                            <span>
+                              <a href={document.href}>{document.title}</a> has
+                              fewer readers than its folder.{' '}
+                              {narrowerText(document)}
+                            </span>
+                          </p>
+                        ))}
+                        {row.direct.length > 0 && (
+                          <details class="review-documents" data-documents>
+                            <summary>
+                              {plural(row.direct.length, 'document')} directly
+                              in it
+                            </summary>
+                            <ul>
+                              {row.direct.map((document) => (
+                                <li
+                                  data-title={document.title}
+                                  data-readers={readersData(document.readers)}
+                                >
+                                  <a href={document.href}>{document.title}</a>
+                                  {document.narrower && (
+                                    <span class="review-badge">
+                                      {readersText(document.readers)}
+                                    </span>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        )}
+                        {row.ruleToAdd && (
+                          <details class="review-rule" data-rule>
+                            <summary>Rule to add</summary>
+                            <pre set:text={ruleSnippet(row)} />
+                            <button type="button" data-copy-rule hidden>
+                              Copy rule
+                            </button>
+                            <p>
+                              Add it to <code>access.rules</code> with the
+                              groups that may read the folder in{' '}
+                              <code>readers</code>, or <code>["*"]</code> for
+                              every member. The configuration refuses it until
+                              they are written.
+                            </p>
+                          </details>
+                        )}
+                      </td>
+                      <td class="review-cell" data-mark={row.everyMember}>
+                        {row.everyMember !== 'none' &&
+                          row.everyMember !== 'blocked' && (
+                            <span
+                              class="review-mark"
+                              title={EVERY_MEMBER_MARKS[row.everyMember]}
+                            >
+                              <span class="sr-only">
+                                {EVERY_MEMBER_MARKS[row.everyMember]}
+                              </span>
+                            </span>
+                          )}
+                      </td>
+                      {review.groups.map((group) => {
+                        const mark = row.groups[group] ?? 'none';
+                        return (
+                          <td
+                            class="review-cell"
+                            data-mark={mark}
+                            data-col={group}
+                          >
+                            {mark !== 'none' && (
+                              <span class="review-mark" title={MARKS[mark]}>
+                                <span class="sr-only">{MARKS[mark]}</span>
+                              </span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <ul class="review-key" aria-label="What the marks mean">
+            <li>
+              <span class="review-mark" data-mark="here" aria-hidden="true" />
+              The rule on this folder names it
+            </li>
+            <li>
+              <span class="review-mark" data-mark="above" aria-hidden="true" />A
+              rule above names it
+            </li>
+            <li>
+              <span
+                class="review-mark"
+                data-mark="blocked"
+                aria-hidden="true"
+              />
+              Named here, not above: admits no one
+            </li>
+          </ul>
+
+          <section class="review-how" id="how-access-works">
+            <h2>How access works</h2>
+            <ul>
+              <li>
+                A folder's readers are the groups every rule on it and above
+                names. A rule below can only narrow what a rule above allows;{' '}
+                <code>*</code> is every signed-in member.
+              </li>
+              <li>
+                A folder with no rule on it or above is open to admins only,
+                until a rule names it.
+              </li>
+              <li>
+                A document reads as its folder. One moved in Drive to a place
+                with more readers keeps the readers it had until a rule on its
+                new place is added or changed.
+              </li>
+              <li>
+                Every member sees every document's title in navigation and
+                indexes; only readers see its text.
+              </li>
+              <li>
+                A rule change takes effect with the deploy that carries it. A
+                change of group membership reaches the site within about ten
+                minutes.
+              </li>
+              <li>
+                These rules decide what this site
+                {mcp && ' and its MCP server'} serve. Drive's own sharing is set
+                apart, in Drive, and everyone who can read the project
+                repository reads every folder.
+              </li>
+            </ul>
+          </section>
+          <p class="review-footer">
+            Browse <a href={PLATFORM_ROUTE_HREFS.fullIndex}>all documents</a>,
+            or see the{' '}
+            <a href={PLATFORM_ROUTE_HREFS.contentHealth}>content health</a>{' '}
+            page.
+          </p>
+        </>
+      )
+    }
+  </access-review>
+</StarlightPage>
+
+<script>
+  /**
+   * Folds the tree, reads it as a set of groups and finds a document, in the
+   * browser over the rendered page: nothing is fetched. The fragment keeps the
+   * view, `#as=a@x,b@x&q=text&hide=1`, and never reaches the server; a
+   * fragment without `=` is a folder's anchor, which unfolds its row.
+   */
+  const fold = (text: string) => text.normalize('NFKC').toLocaleLowerCase();
+
+  class AccessReview extends HTMLElement {
+    private rows: HTMLTableRowElement[] = [];
+    private summary = '';
+
+    connectedCallback() {
+      this.rows = [
+        ...this.querySelectorAll<HTMLTableRowElement>('tr[data-row]'),
+      ];
+      const form = this.querySelector<HTMLFormElement>('[data-toolbar]');
+      const status = this.querySelector<HTMLElement>('[data-status]');
+      if (!form || !status) return;
+      form.hidden = false;
+
+      // A long tree opens on its top level and on the rows it points at.
+      for (const row of this.rows) {
+        if (row.hasAttribute('data-default-folded')) {
+          this.setFolded(this.parentOf(row), true);
+        }
+      }
+      for (const toggle of this.querySelectorAll<HTMLButtonElement>(
+        '[data-toggle]',
+      )) {
+        toggle.addEventListener('click', () => {
+          const row = toggle.closest<HTMLTableRowElement>('tr');
+          if (row) this.setFolded(row, toggle.ariaExpanded === 'true');
+          this.labelExpand();
+        });
+      }
+
+      // A group's column header reads as that group too.
+      for (const header of this.querySelectorAll<HTMLElement>('th[data-col]')) {
+        const group = header.dataset.col ?? '';
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'review-col-button';
+        button.dataset.as = group;
+        button.setAttribute('aria-pressed', 'false');
+        button.title = `Read as ${group}`;
+        button.append(...header.childNodes);
+        header.append(button);
+      }
+
+      for (const button of this.querySelectorAll<HTMLButtonElement>(
+        'button[data-as]',
+      )) {
+        button.addEventListener('click', () => {
+          const chosen = this.chosen();
+          const group = button.dataset.as ?? '';
+          this.apply(
+            form,
+            status,
+            chosen.includes(group)
+              ? chosen.filter((entry) => entry !== group)
+              : [...chosen, group],
+          );
+        });
+      }
+      form.addEventListener('submit', (event) => event.preventDefault());
+      form.addEventListener('input', () =>
+        this.apply(form, status, this.chosen()),
+      );
+      form.querySelector('[data-clear]')?.addEventListener('click', () => {
+        form.reset();
+        this.apply(form, status, []);
+      });
+      const expand = this.querySelector<HTMLButtonElement>('[data-expand]');
+      expand?.addEventListener('click', () => {
+        const folded = this.anyFolded();
+        for (const row of this.rows) {
+          if (row.querySelector('[data-toggle]')) this.setFolded(row, !folded);
+        }
+        this.labelExpand();
+      });
+      const copy = this.querySelector<HTMLButtonElement>('[data-copy]');
+      copy?.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(location.href);
+          copy.textContent = 'Link copied';
+        } catch {
+          copy.textContent = 'Copy the address bar';
+        }
+        setTimeout(() => (copy.textContent = 'Copy link'), 2000);
+      });
+
+      // A rule to add is copied whole, ready to paste.
+      for (const rule of this.querySelectorAll<HTMLElement>('[data-rule]')) {
+        const button =
+          rule.querySelector<HTMLButtonElement>('[data-copy-rule]');
+        if (!button || !navigator.clipboard) continue;
+        button.hidden = false;
+        button.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(
+              rule.querySelector('pre')?.textContent ?? '',
+            );
+            button.textContent = 'Copied';
+          } catch {
+            button.textContent = 'Select it to copy';
+          }
+          setTimeout(() => (button.textContent = 'Copy rule'), 2000);
+        });
+      }
+
+      this.summary = status.textContent ?? '';
+      const restore = () => {
+        const state = this.readFragment();
+        const find = form.elements.namedItem('q');
+        if (find instanceof HTMLInputElement) find.value = state.q;
+        const hide = form.elements.namedItem('hide');
+        if (hide instanceof HTMLInputElement) hide.checked = state.hide;
+        this.apply(form, status, state.as, false);
+      };
+      restore();
+      this.goTo(location.hash);
+      // A link to a view, or to a folder, followed on this page.
+      window.addEventListener('hashchange', () => {
+        if (location.hash.includes('=')) restore();
+        else this.goTo(location.hash);
+      });
+      this.labelExpand();
+    }
+
+    /** The view the fragment names; an anchor names none. */
+    readFragment(): { as: string[]; q: string; hide: boolean } {
+      const hash = location.hash.slice(1);
+      if (!hash.includes('=')) return { as: [], q: '', hide: false };
+      const params = new URLSearchParams(hash);
+      const known = new Set(
+        [...this.querySelectorAll<HTMLElement>('.review-chip')].map(
+          (chip) => chip.dataset.as ?? '',
+        ),
+      );
+      return {
+        as: (params.get('as') ?? '')
+          .split(',')
+          .filter((group) => known.has(group)),
+        q: params.get('q') ?? '',
+        hide: params.get('hide') === '1',
+      };
+    }
+
+    /** Unfolds the way to a folder's row a link points at. */
+    goTo(hash: string) {
+      const id = decodeURIComponent(hash.slice(1));
+      if (!id || id.includes('=')) return;
+      const target = document.getElementById(id);
+      if (!(target instanceof HTMLTableRowElement)) return;
+      const folded = target.hasAttribute('data-folded');
+      for (const anchor of (target.dataset.ancestors ?? '').split(' ')) {
+        const row = anchor ? document.getElementById(anchor) : null;
+        if (row instanceof HTMLTableRowElement) this.setFolded(row, false);
+      }
+      this.labelExpand();
+      /*
+       * The browser has already gone to a row it could see. One that was
+       * folded is gone to now, down the page only: the table keeps its
+       * sideways scroll.
+       */
+      if (folded) {
+        const margin = parseFloat(getComputedStyle(target).scrollMarginTop);
+        window.scrollTo({
+          top: target.getBoundingClientRect().top + window.scrollY - margin,
+        });
+      }
+    }
+
+    parentOf(row: HTMLTableRowElement): HTMLTableRowElement {
+      const anchors = (row.dataset.ancestors ?? '').split(' ');
+      const parent = document.getElementById(anchors.at(-1) ?? '');
+      return parent instanceof HTMLTableRowElement ? parent : row;
+    }
+
+    childrenOf(row: HTMLTableRowElement): HTMLTableRowElement[] {
+      return this.rows.filter((candidate) =>
+        (candidate.dataset.ancestors ?? '').split(' ').includes(row.id),
+      );
+    }
+
+    /** Folds or unfolds every row below this one. */
+    setFolded(row: HTMLTableRowElement, folded: boolean) {
+      const toggle = row.querySelector<HTMLButtonElement>('[data-toggle]');
+      if (!toggle) return;
+      toggle.setAttribute('aria-expanded', String(!folded));
+      for (const child of this.childrenOf(row)) {
+        child.toggleAttribute('data-folded', folded);
+        // Unfolding a row shows its children as they were left.
+        if (!folded) {
+          const above = (child.dataset.ancestors ?? '')
+            .split(' ')
+            .filter(Boolean)
+            .map((anchor) => document.getElementById(anchor));
+          child.toggleAttribute(
+            'data-folded',
+            above.some(
+              (entry) =>
+                entry?.querySelector('[data-toggle]')?.ariaExpanded === 'false',
+            ),
+          );
+        }
+      }
+    }
+
+    anyFolded(): boolean {
+      return this.rows.some((row) => row.hasAttribute('data-folded'));
+    }
+
+    labelExpand() {
+      const expand = this.querySelector<HTMLButtonElement>('[data-expand]');
+      if (!expand) return;
+      expand.hidden = !this.querySelector('[data-toggle]');
+      expand.textContent = this.anyFolded() ? 'Expand all' : 'Collapse all';
+    }
+
+    chosen(): string[] {
+      return [
+        ...this.querySelectorAll<HTMLButtonElement>(
+          '.review-chip[aria-pressed="true"]',
+        ),
+      ].map((chip) => chip.dataset.as ?? '');
+    }
+
+    /** Applies "Read as" and the search, and writes them to the fragment. */
+    apply(
+      form: HTMLFormElement,
+      status: HTMLElement,
+      groups: string[],
+      write = true,
+    ) {
+      const chosen = new Set(groups);
+      for (const button of this.querySelectorAll<HTMLButtonElement>(
+        'button[data-as]',
+      )) {
+        button.setAttribute(
+          'aria-pressed',
+          String(chosen.has(button.dataset.as ?? '')),
+        );
+      }
+      for (const cell of this.querySelectorAll<HTMLElement>('[data-col]')) {
+        cell.toggleAttribute('data-chosen', chosen.has(cell.dataset.col ?? ''));
+      }
+      const data = new FormData(form);
+      const query = fold(String(data.get('q') ?? '').trim());
+      const hide = data.get('hide') === 'on' && chosen.size > 0;
+      const reading = chosen.size > 0;
+      const reads = (readers: string) =>
+        readers === '*' ||
+        readers.split(' ').some((group) => chosen.has(group));
+
+      // Which rows the search or "Read as" keeps, and the rows above them.
+      const kept = new Set<HTMLTableRowElement>();
+      let documents = 0;
+      let readable = 0;
+      let found = 0;
+      let foldersFound = 0;
+      for (const row of this.rows) {
+        const items = [
+          ...row.querySelectorAll<HTMLElement>('[data-documents] li'),
+        ];
+        let matched = false;
+        for (const item of items) {
+          documents += 1;
+          const open = !reading || reads(item.dataset.readers ?? '');
+          if (reading && open) readable += 1;
+          const hit = !!query && fold(item.dataset.title ?? '').includes(query);
+          item.toggleAttribute('data-hit', hit);
+          item.toggleAttribute('data-closed', reading && !open);
+          if (hit && (!hide || open)) {
+            matched = true;
+            found += 1;
+          }
+        }
+        const named = !!query && fold(row.dataset.name ?? '').includes(query);
+        if (named) foldersFound += 1;
+        const open = !reading || reads(row.dataset.readers ?? '');
+        row.toggleAttribute('data-closed', reading && !open);
+        const details =
+          row.querySelector<HTMLDetailsElement>('[data-documents]');
+        if (details && query) details.open = matched;
+        const keep =
+          (!query || matched || named) &&
+          (!hide ||
+            open ||
+            items.some((item) => !item.hasAttribute('data-closed')));
+        if (keep) {
+          kept.add(row);
+          for (const anchor of (row.dataset.ancestors ?? '').split(' ')) {
+            const above = anchor ? document.getElementById(anchor) : null;
+            if (above instanceof HTMLTableRowElement) kept.add(above);
+          }
+        }
+      }
+      const narrowed = !!query || hide;
+      for (const row of this.rows) {
+        row.toggleAttribute('data-filtered', narrowed && !kept.has(row));
+        // A search shows what it found, wherever it is folded.
+        if (query && kept.has(row)) row.removeAttribute('data-folded');
+      }
+      if (query) {
+        for (const row of this.rows) {
+          const toggle = row.querySelector('[data-toggle]');
+          if (toggle && kept.has(row))
+            toggle.setAttribute('aria-expanded', 'true');
+        }
+      }
+
+      const parts: string[] = [];
+      if (reading) {
+        parts.push(
+          `A reader in ${[...chosen].join(' and ')} may open ${readable} of ${documents} ${documents === 1 ? 'document' : 'documents'}.`,
+        );
+      }
+      if (query) {
+        const matches = [
+          found > 0 && `${found} ${found === 1 ? 'document' : 'documents'}`,
+          foldersFound > 0 &&
+            `${foldersFound} ${foldersFound === 1 ? 'folder' : 'folders'}`,
+        ].filter(Boolean);
+        parts.push(
+          matches.length === 0
+            ? 'Nothing matches.'
+            : `${matches.join(' and ')} ${found + foldersFound === 1 ? 'matches' : 'match'}.`,
+        );
+      }
+      status.textContent = parts.length > 0 ? parts.join(' ') : this.summary;
+
+      const hideLabel = form.querySelector<HTMLElement>('[data-hide-label]');
+      if (hideLabel) hideLabel.hidden = !reading;
+      for (const [selector, hidden] of [
+        ['[data-clear]', !reading && !query],
+        ['[data-copy]', (!reading && !query) || !navigator.clipboard],
+      ] as const) {
+        const button = form.querySelector<HTMLElement>(selector);
+        if (button) button.hidden = hidden;
+      }
+      this.labelExpand();
+
+      if (!write) return;
+      const params = new URLSearchParams();
+      if (reading) params.set('as', [...chosen].join(','));
+      if (query) params.set('q', String(data.get('q') ?? '').trim());
+      if (hide) params.set('hide', '1');
+      // An address is easier to read, and to send, with its @ and commas.
+      const fragment = params
+        .toString()
+        .replaceAll('%40', '@')
+        .replaceAll('%2C', ',');
+      const url = new URL(location.href);
+      url.hash = fragment;
+      if (url.href !== location.href) {
+        history.replaceState(
+          history.state,
+          '',
+          fragment ? url : url.pathname + url.search,
+        );
+      }
+    }
+  }
+
+  customElements.define('access-review', AccessReview);
+</script>
+
+<style is:global>
+  @layer starlight.components {
+    access-review {
+      display: block;
+      font-size: var(--kb-text-body);
+
+      /*
+       * The status hues of the content health page (ADR-037, ADR-045): a hue
+       * marks a dot, a bar, an icon or a rule, never text, and always comes
+       * with words. Who may read takes hues that read as neither good nor bad.
+       */
+      --review-members: var(--kb-gray-4);
+      --review-groups: color-mix(
+        in oklab,
+        var(--kb-blue) 70%,
+        var(--kb-gray-4)
+      );
+      --review-admins: var(--kb-purple);
+      --review-warning: color-mix(
+        in oklab,
+        var(--kb-orange) 70%,
+        var(--kb-gray-4)
+      );
+      --review-note: var(--kb-gray-4);
+      --review-good: color-mix(in oklab, var(--kb-green) 50%, var(--kb-gray-4));
+      --review-mark: var(--kb-ink);
+    }
+
+    :root[data-theme='light'] access-review {
+      --review-warning: color-mix(
+        in oklab,
+        var(--kb-orange) 70%,
+        var(--kb-gray-1)
+      );
+      --review-members: color-mix(
+        in oklab,
+        var(--kb-gray-3) 60%,
+        var(--kb-gray-4)
+      );
+      --review-good: color-mix(in oklab, var(--kb-green) 70%, var(--kb-gray-1));
+    }
+
+    access-review [data-reach='members'] {
+      --tone: var(--review-members);
+    }
+
+    access-review [data-reach='groups'] {
+      --tone: var(--review-groups);
+    }
+
+    access-review [data-reach='admins'] {
+      --tone: var(--review-admins);
+    }
+
+    access-review [data-tone='warning'] {
+      --tone: var(--review-warning);
+      --tone-low: var(--kb-orange-low);
+    }
+
+    access-review [data-tone='note'] {
+      --tone: var(--review-note);
+      --tone-low: var(--kb-gray-6);
+    }
+
+    access-review [data-tone='good'] {
+      --tone: var(--review-good);
+      --tone-low: var(--kb-green-low);
+    }
+
+    access-review [hidden] {
+      display: none !important;
+    }
+
+    access-review p,
+    access-review ul {
+      margin: 0;
+    }
+
+    access-review a {
+      color: var(--kb-text-accent);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.2em;
+    }
+
+    access-review code {
+      font-size: 0.875em;
+    }
+
+    access-review .review-intro {
+      color: var(--kb-gray-3);
+    }
+
+    /* ---------------------------------------------------------- overview */
+
+    access-review .review-overview,
+    access-review .review-attention {
+      border: 1px solid var(--kb-hairline);
+      border-radius: 0.75rem;
+      margin-top: 1.5rem;
+      padding: 1rem 1.5rem 1.25rem;
+    }
+
+    access-review .review-eyebrow {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-xs);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    access-review .review-hero-title {
+      color: var(--kb-ink);
+      font-size: var(--kb-text-h3);
+      font-weight: 600;
+      line-height: 1.2;
+      margin-top: 0.5rem;
+    }
+
+    access-review .review-hero-figure {
+      font-size: 3rem;
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+
+    access-review .review-stack {
+      display: flex;
+      gap: 2px;
+      height: 0.75rem;
+      margin-block: 1rem 0.875rem;
+    }
+
+    access-review .review-stack span {
+      background: var(--tone);
+      flex: 0 1 var(--share);
+      min-width: 4px;
+    }
+
+    access-review .review-stack span:first-child {
+      border-end-start-radius: 4px;
+      border-start-start-radius: 4px;
+    }
+
+    access-review .review-stack span:last-child {
+      border-end-end-radius: 4px;
+      border-start-end-radius: 4px;
+    }
+
+    access-review .review-legend {
+      display: flex;
+      flex-wrap: wrap;
+      font-size: var(--kb-text-sm);
+      gap: 0.5rem 1.5rem;
+      list-style: none;
+      padding: 0;
+    }
+
+    access-review .review-legend li,
+    access-review .review-readers-line {
+      align-items: center;
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    access-review .review-legend strong {
+      color: var(--kb-ink);
+      font-variant-numeric: tabular-nums;
+    }
+
+    access-review .review-dot {
+      background: var(--tone);
+      border-radius: 50%;
+      flex: none;
+      height: 0.625rem;
+      width: 0.625rem;
+    }
+
+    access-review .review-context {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-sm);
+      margin-top: 1rem;
+    }
+
+    /* --------------------------------------------------------- attention */
+
+    access-review .review-attention > h2 {
+      align-items: center;
+      color: var(--kb-ink);
+      display: flex;
+      font-size: var(--kb-text-h3);
+      gap: 0.5rem;
+      line-height: 1.25;
+    }
+
+    access-review .review-attention > h2 > svg,
+    access-review .review-attention-list svg,
+    access-review .review-narrower svg,
+    access-review .review-all-clear svg {
+      color: var(--tone);
+      flex: none;
+    }
+
+    access-review .review-count {
+      background: var(--tone-low);
+      border-radius: 999px;
+      font-size: var(--kb-text-sm);
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
+      padding: 0.125rem 0.625rem;
+    }
+
+    access-review .review-attention-list {
+      display: grid;
+      gap: 0.5rem;
+      list-style: none;
+      margin-top: 0.75rem;
+      padding: 0;
+    }
+
+    access-review .review-attention-list li,
+    access-review .review-narrower {
+      align-items: baseline;
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    access-review .review-attention-list li > svg,
+    access-review .review-narrower > svg {
+      align-self: center;
+    }
+
+    access-review .review-attention-tasks {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-sm);
+      margin-top: 0.875rem;
+    }
+
+    access-review .review-all-clear {
+      align-items: center;
+      color: var(--kb-ink);
+      display: flex;
+      font-weight: 500;
+      gap: 0.5rem;
+    }
+
+    access-review .review-attention:has(.review-all-clear) {
+      background: var(--kb-green-low);
+      border-color: transparent;
+      padding-block: 0.75rem;
+    }
+
+    /* ------------------------------------------------------------ toolbar */
+
+    access-review .review-toolbar {
+      background: var(--kb-ground);
+      border-bottom: 1px solid var(--kb-hairline);
+      display: grid;
+      gap: 0.625rem;
+      margin-top: 1.5rem;
+      padding-block: 0.75rem;
+      scroll-margin-top: var(--kb-nav-height);
+    }
+
+    @media (min-width: 50rem) {
+      access-review .review-toolbar {
+        position: sticky;
+        top: var(--kb-nav-height);
+        z-index: 3;
+      }
+    }
+
+    access-review .review-as {
+      border: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin: 0;
+      padding: 0;
+    }
+
+    access-review .review-as legend {
+      color: var(--kb-gray-3);
+      float: left;
+      font-size: var(--kb-text-sm);
+      margin-inline-end: 0.5rem;
+      padding: 0.25rem 0;
+    }
+
+    access-review .review-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    access-review .review-chip,
+    access-review .review-actions button,
+    access-review .review-find input {
+      background: var(--kb-ground);
+      border: 1px solid var(--kb-border-strong);
+      border-radius: 0.375rem;
+      color: var(--kb-ink);
+      font: inherit;
+      font-size: var(--kb-text-sm);
+      max-width: 100%;
+      padding: 0.25rem 0.625rem;
+    }
+
+    access-review .review-chip {
+      border-radius: 999px;
+      cursor: pointer;
+    }
+
+    access-review .review-chip[aria-pressed='true'],
+    access-review .review-col-button[aria-pressed='true'] {
+      background: var(--kb-ink);
+      border-color: var(--kb-ink);
+      color: var(--kb-ground);
+    }
+
+    access-review .review-tools {
+      align-items: end;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1rem;
+    }
+
+    access-review .review-find {
+      display: grid;
+      flex: 1 1 14rem;
+      font-size: var(--kb-text-sm);
+      gap: 0.25rem;
+      max-width: 22rem;
+    }
+
+    access-review .review-hide {
+      align-items: center;
+      display: flex;
+      font-size: var(--kb-text-sm);
+      gap: 0.375rem;
+      padding-block: 0.375rem;
+    }
+
+    access-review .review-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-inline-start: auto;
+    }
+
+    access-review .review-actions button {
+      cursor: pointer;
+      padding-block: 0.375rem;
+    }
+
+    access-review .review-status {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-sm);
+    }
+
+    access-review .review-status:empty {
+      display: none;
+    }
+
+    /* -------------------------------------------------------------- table */
+
+    access-review .review-table-wrap {
+      margin-top: 1rem;
+      overflow-x: auto;
+    }
+
+    access-review .review-table-wrap:focus-visible {
+      outline: 2px solid var(--kb-text-accent);
+      outline-offset: 2px;
+    }
+
+    access-review .review-table {
+      border-collapse: collapse;
+      font-size: var(--kb-text-sm);
+      width: 100%;
+    }
+
+    access-review .review-table caption {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-xs);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      padding-block-end: 0.5rem;
+      text-align: start;
+      text-transform: uppercase;
+    }
+
+    access-review .review-folder {
+      align-items: center;
+      color: var(--kb-ink);
+      display: flex;
+      font-weight: 600;
+      gap: 0.25rem;
+    }
+
+    access-review .review-folder-count {
+      color: var(--kb-gray-3);
+      display: block;
+      font-size: var(--kb-text-xs);
+      padding-inline-start: 1.5rem;
+    }
+
+    access-review .review-twisty,
+    access-review .review-twisty-space {
+      flex: none;
+      height: 1.25rem;
+      width: 1.25rem;
+    }
+
+    access-review .review-twisty {
+      background: none;
+      border: 0;
+      border-radius: 0.25rem;
+      cursor: pointer;
+      display: grid;
+      padding: 0;
+      place-items: center;
+    }
+
+    access-review .review-twisty::before {
+      border-block: 0.3em solid transparent;
+      border-inline-start: 0.45em solid var(--kb-gray-3);
+      content: '';
+      transform: rotate(90deg);
+      transition: transform 0.15s;
+    }
+
+    access-review .review-twisty[aria-expanded='false']::before {
+      transform: none;
+    }
+
+    /* Without script the tree cannot fold: the twisty keeps its place only. */
+    access-review:not(:defined) .review-twisty {
+      visibility: hidden;
+    }
+
+    access-review .review-twisty:hover {
+      background: var(--kb-surface-sunken);
+    }
+
+    access-review .review-readers {
+      display: grid;
+      gap: 0.375rem;
+      min-width: 13rem;
+    }
+
+    access-review .review-readers-line strong {
+      color: var(--kb-ink);
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+
+    access-review .review-origin {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-xs);
+    }
+
+    access-review .review-origin svg {
+      display: inline;
+      vertical-align: -0.1em;
+    }
+
+    access-review .review-narrower {
+      background: var(--tone-low);
+      border-radius: 0.375rem;
+      padding: 0.375rem 0.5rem;
+    }
+
+    access-review .review-documents > summary,
+    access-review .review-rule > summary {
+      color: var(--kb-gray-3);
+      cursor: pointer;
+      font-size: var(--kb-text-xs);
+    }
+
+    access-review .review-documents ul {
+      display: grid;
+      gap: 0.25rem;
+      list-style: none;
+      margin-top: 0.375rem;
+      padding-inline-start: 0.875rem;
+    }
+
+    access-review .review-documents li[data-hit] {
+      background: var(--kb-surface-sunken);
+      border-radius: 0.25rem;
+      outline: 1px solid var(--kb-border-strong);
+      padding-inline: 0.25rem;
+    }
+
+    access-review .review-badge {
+      background: var(--kb-orange-low);
+      border-radius: 999px;
+      color: var(--kb-ink);
+      font-size: var(--kb-text-xs);
+      margin-inline-start: 0.375rem;
+      padding: 0 0.5rem;
+    }
+
+    access-review .review-rule pre {
+      background: var(--kb-surface-sunken);
+      border-radius: 0.375rem;
+      margin-top: 0.375rem;
+      overflow-x: auto;
+      padding: 0.5rem 0.625rem;
+      font-family: var(--kb-font-mono);
+      font-size: var(--kb-text-xs);
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+
+    access-review .review-rule button {
+      background: var(--kb-ground);
+      border: 1px solid var(--kb-border-strong);
+      border-radius: 0.375rem;
+      color: var(--kb-ink);
+      cursor: pointer;
+      font: inherit;
+      font-size: var(--kb-text-xs);
+      margin-top: 0.375rem;
+      padding: 0.125rem 0.5rem;
+    }
+
+    access-review .review-rule p {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-xs);
+      margin-top: 0.375rem;
+    }
+
+    /*
+     * A group's name stays whole; its domain, shared by most groups, is set
+     * small below it and cut where the column ends. The whole address is in
+     * the text, for a screen reader, and in the button's title.
+     */
+    access-review .review-col-name {
+      color: var(--kb-ink);
+      display: block;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    access-review .review-col-domain {
+      display: block;
+      font-size: var(--kb-text-xs);
+      max-width: 5.5rem;
+      margin-inline: auto;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    access-review .review-col-button {
+      background: none;
+      border: 1px solid transparent;
+      border-radius: 0.375rem;
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+      padding: 0.25rem 0.375rem;
+      width: 100%;
+    }
+
+    access-review .review-col-button:hover {
+      border-color: var(--kb-border-strong);
+    }
+
+    access-review .review-col-button[aria-pressed='true'] .review-col-name {
+      color: inherit;
+    }
+
+    /* A mark is a shape first, so it reads without its hue. */
+    access-review .review-mark {
+      border-radius: 50%;
+      display: inline-block;
+      height: 0.875rem;
+      vertical-align: middle;
+      width: 0.875rem;
+    }
+
+    access-review [data-mark='here'] .review-mark,
+    access-review .review-mark[data-mark='here'] {
+      background: var(--review-groups);
+    }
+
+    access-review [data-mark='above'] .review-mark,
+    access-review .review-mark[data-mark='above'] {
+      border: 2px solid var(--review-groups);
+    }
+
+    access-review [data-mark='blocked'] .review-mark,
+    access-review .review-mark[data-mark='blocked'] {
+      background: linear-gradient(
+        135deg,
+        transparent 42%,
+        var(--review-warning) 42% 58%,
+        transparent 58%
+      );
+      border: 2px solid var(--review-warning);
+    }
+
+    /* "Read as": what the reader cannot open recedes, or goes. */
+    access-review tr[data-closed] > :is(th, td) > *,
+    access-review li[data-closed] {
+      opacity: 0.45;
+    }
+
+    access-review tr[data-folded],
+    access-review tr[data-filtered] {
+      display: none;
+    }
+
+    /* A link to a row lands below the header and the toolbar, marked. */
+    access-review tr[data-row] {
+      scroll-margin-top: calc(var(--kb-nav-height) + 9rem);
+    }
+
+    access-review .review-key {
+      color: var(--kb-gray-3);
+      display: flex;
+      flex-wrap: wrap;
+      font-size: var(--kb-text-xs);
+      gap: 0.5rem 1.25rem;
+      list-style: none;
+      margin-top: 0.75rem;
+      padding: 0;
+    }
+
+    access-review .review-key li {
+      align-items: center;
+      display: flex;
+      gap: 0.375rem;
+    }
+
+    /* On a phone each folder is a card, and its readers are words. */
+    @media (max-width: 50rem) {
+      access-review .review-table thead,
+      access-review .review-table .review-cell {
+        display: none;
+      }
+
+      access-review .review-table,
+      access-review .review-table tbody,
+      access-review .review-table tr,
+      access-review .review-table tbody :is(th, td) {
+        display: block;
+      }
+
+      access-review .review-table tr[data-folded],
+      access-review .review-table tr[data-filtered] {
+        display: none;
+      }
+
+      access-review .review-key {
+        display: none;
+      }
+    }
+
+    /* --------------------------------------------------------------- end */
+
+    access-review .review-how {
+      margin-top: 2.5rem;
+    }
+
+    access-review .review-how > h2 {
+      color: var(--kb-ink);
+      font-size: var(--kb-text-h3);
+    }
+
+    access-review .review-how ul {
+      color: var(--kb-gray-3);
+      display: grid;
+      font-size: var(--kb-text-sm);
+      gap: 0.375rem;
+      margin-top: 0.5rem;
+      max-width: 44rem;
+      padding-inline-start: 1.25rem;
+    }
+
+    access-review .review-footer {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-sm);
+      margin-top: 1.5rem;
+    }
+  }
+
+  /*
+   * The documentation's headings own 2.5rem above them, in an unlayered rule a
+   * layered one cannot outrank. A section's own heading sits at its top.
+   */
+  access-review .review-attention > h2 {
+    margin-top: 0;
+  }
+
+  access-review .review-how > h2 {
+    margin-top: 0;
+  }
+
+  /*
+   * The platform styles every table in the documentation unlayered (a raised
+   * header, hairlines below each row, its own padding and type), and a layered
+   * rule cannot outrank that. This table's cells are set here, the same way.
+   */
+  access-review .review-table :is(th, td) {
+    background: none;
+    border: 0;
+    border-top: 1px solid var(--kb-hairline);
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+    padding: 0.625rem 0.5rem;
+    text-align: start;
+    vertical-align: top;
+  }
+
+  access-review .review-table thead th {
+    border-top: 0;
+    color: var(--kb-gray-3);
+    font-weight: 500;
+    vertical-align: bottom;
+  }
+
+  /* The folder stays in view while the groups scroll sideways. */
+  access-review .review-table tbody th {
+    background: var(--kb-ground);
+    inset-inline-start: 0;
+    min-width: 9rem;
+    padding-inline-start: calc(0.25rem + var(--depth, 0) * 1.25rem);
+    position: sticky;
+    z-index: 1;
+  }
+
+  access-review .review-table :is(th.review-col, td.review-cell) {
+    min-width: 4.5rem;
+    text-align: center;
+  }
+
+  access-review .review-table td.review-cell {
+    vertical-align: middle;
+  }
+
+  access-review .review-table :is(th, td)[data-chosen] {
+    background: var(--kb-surface-sunken);
+  }
+
+  access-review .review-table tr[data-row]:target > th {
+    box-shadow: inset 3px 0 0 var(--kb-text-accent);
+  }
+
+  @media (max-width: 50rem) {
+    access-review .review-table tbody th {
+      position: static;
+    }
+
+    access-review .review-table td.review-readers {
+      border-top: 0;
+      min-width: 0;
+      padding-block-start: 0;
+      padding-inline-start: calc(1.75rem + var(--depth, 0) * 1.25rem);
+    }
+
+    access-review .review-table caption {
+      display: block;
+    }
+  }
+</style>

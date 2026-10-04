@@ -507,6 +507,36 @@ A private deployment decides every request in its Worker against a snapshot
 of group membership that its directory Worker refreshes every ten minutes
 (ADR-038, ADR-040). Nothing about a reader's groups is stored in their session.
 
+### Who may read what
+
+Once the project has access rules, the site publishes `/access-review/`, for
+admins only
+([ADR-045](ADR/045-an-access-review-page-shows-admins-who-may-read-each-folder.md)).
+It opens on every document split by who may read it — every member, some
+groups, admins only — and then what needs attention: folders without a rule,
+documents with fewer readers than their folder, groups a rule names that a
+rule above does not, and rules that drifted. The content health page keeps the
+same folders as tasks and links each one here.
+
+Below, each folder is a row: its readers in words, where they come from, a
+link to the folder in Drive, its documents, and a column per group the rules
+name, marked where the rule on the folder names the group, where a rule above
+does, and where a rule names a group no rule above admits. A folder without a
+rule offers the rule to paste into the configuration.
+
+- **Who may read this?** Find the document by its title; its folder's row
+  answers.
+- **What does someone read?** Choose their groups under "Read as", or a
+  group's column; what they cannot open is dimmed, or hidden on request, and
+  the page counts what is left.
+- **Send a view.** The address keeps it after `#`, which never reaches the
+  server, and "Copy link" copies it.
+
+The page shows the rules this build was made with and names groups, never
+people: who is in a group is managed in Google Admin, and the snapshot's
+counts are at `/_kb/status`, below. It does not cover Drive's own sharing, and
+everyone who can read the project repository reads every folder.
+
 ### When a reader leaves or changes groups
 
 Membership changes in Google take effect at the next refresh plus up to a

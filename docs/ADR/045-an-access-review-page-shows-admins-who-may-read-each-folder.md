@@ -64,9 +64,10 @@ project has an `access` section, which validation already rejects on a public
 deployment. Without one, the address is not served.
 
 **The access map places the page in the admins class.** It is not in the
-sidebar, the search index, the sitemap, `llms.txt` or the full index. It
-carries titles and folder names, which every member already sees (ADR-039),
-and group addresses, which a refusal page names; it carries no body text.
+sidebar, the search index, `llms.txt` or the full index; the sitemap lists its
+address, as it lists the content health page's. It carries titles and folder
+names, which every member already sees (ADR-039), and group addresses, which a
+refusal page names; it carries no body text.
 
 **The page says what it covers.** One line under its title: who may read each
 folder on this site, and through its MCP server when it has one, by Google
@@ -98,9 +99,10 @@ with the number of documents under it. Each row shows:
   validation refuses until they are.
 
 A folder's row unfolds to the documents directly in it and to its
-subfolders. **A document whose class is not its folder's** — a move that waits
-— is listed under its folder even while the row is folded, with the readers it
-has and the ones its place would give it once a rule there is confirmed.
+subfolders. **A document whose class is not its folder's** — a move that
+waits, or readers the next sync brings up to its folder's — is listed under
+its folder even while the row is folded, with the readers it has beside the
+ones its place gives.
 
 **Groups are the columns** on a wide screen: every member, then each group the
 rules name, sorted by address. The admin groups read everything and are named
@@ -178,7 +180,7 @@ Worker decides every request by them, as before.
 dot, a bar, an icon or a badge, never text, and comes with an icon and a
 label. A group that admits no one and a stale snapshot are red; a folder
 without a rule, a move that waits and a group not admitted above are amber;
-a label that drifted is grey. The bar's three reaches take blue, purple and
+a label that drifted and a rule whose folder is gone are grey. The bar's three reaches take blue, purple and
 grey, which do not read as good or bad.
 
 ## Consequences
@@ -222,5 +224,4 @@ grey, which do not read as good or bad.
   Drive (ADR-039).
 - Give a document its own row once rules on single documents exist
   (ADR-039).
-- Mark ADR-037 and ADR-011 superseded in part when this record is accepted,
-  and update `docs/CONFIGURATION.md` and `docs/OPERATIONS.md`.
+- Mark ADR-037 and ADR-011 superseded in part when this record is accepted.

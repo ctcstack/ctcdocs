@@ -75,6 +75,7 @@ describe('buildAccessMap', () => {
     pages: [
       page({ path: '/' }),
       page({ path: '/content-health/' }),
+      page({ path: '/access-review/' }),
       page({ path: '/d/abc123/', redirect: true }),
       page({ path: '/about/', source: 'manual', searchable: true }),
       page({
@@ -114,6 +115,7 @@ describe('buildAccessMap', () => {
     expect(map.files).toMatchObject({
       '/': MEMBERS_CLASS,
       '/content-health/': ADMINS_CLASS,
+      '/access-review/': ADMINS_CLASS,
       '/d/abc123/': MEMBERS_CLASS,
       '/about/': MEMBERS_CLASS,
       '/open/guide/': MEMBERS_CLASS,
@@ -147,6 +149,9 @@ describe('buildAccessMap', () => {
     });
     expect(open.files['/stray.bin']).toBe(MEMBERS_CLASS);
     expect(open.files['/content-health/']).toBe(MEMBERS_CLASS);
+    // The access review is never built without rules; if it were, it stays
+    // closed rather than open to every member.
+    expect(open.files['/access-review/']).toBe(ADMINS_CLASS);
   });
 
   it('finds a listing that shows a restricted document’s image', () => {
