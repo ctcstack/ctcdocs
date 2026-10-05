@@ -274,9 +274,6 @@ export function fetchCharacterLimit(mcp: McpConfiguration | undefined): number {
 /** About 10,000 tokens of English: a starting value, not a measured one. */
 const LARGE_DOCUMENT_CHARACTERS = 40_000;
 
-/** A passage of fewer characters than this says too little to judge by. */
-const SHORTEST_PASSAGE = 100;
-
 export interface SiteConfiguration {
   /** Required to serve a private environment through the platform's Worker. */
   readonly signIn?: SignInConfiguration;
@@ -614,7 +611,9 @@ function mcpSearch(value: unknown): McpSearchConfiguration {
       'passageCharacters',
       'mcp.search.passageCharacters',
       defaults.passageCharacters,
-      { min: results * SHORTEST_PASSAGE, whole: true },
+      // Chunks are shown whole, so the budget answers to the chunk size, not
+      // to the results: those it cannot hold are listed without text.
+      { min: 1_000, whole: true },
     ),
   };
 }

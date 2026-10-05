@@ -40,14 +40,14 @@ const DOCUMENTS: [string, string, string[], string, string | null][] = [
   [
     'dddddd',
     'Deliveries',
-    ['Tools', 'LeadByte'],
+    ['Tools', 'Mailer'],
     'members',
     '2026-09-01T00:00:00.000Z',
   ],
   [
     'eeeeee',
     'Returns',
-    ['Tools', 'LeadByte'],
+    ['Tools', 'Mailer'],
     'members',
     '2026-09-15T12:00:00.000Z',
   ],
@@ -159,7 +159,7 @@ describe('browse', () => {
           documents: [{ id: 'gggggg', title: 'Undated', characters: 1_000 }],
           folders: [
             {
-              name: 'LeadByte',
+              name: 'Mailer',
               count: 2,
               documents: [
                 {
@@ -199,26 +199,26 @@ describe('browse', () => {
     });
     expect(
       browseFolder(access(readers.member), undefined, 2)?.folders[0]?.folders,
-    ).toEqual([{ name: 'LeadByte', count: 2, collapsed: true }]);
+    ).toEqual([{ name: 'Mailer', count: 2, collapsed: true }]);
   });
 
   it('lists a folder, its folders counted by what the reader may open', () => {
     const tools = browseFolder(access(readers.member), 'Tools', 1);
     expect(tools?.folder).toEqual(['Tools']);
     expect(tools?.folders).toEqual([
-      { name: 'LeadByte', count: 2, collapsed: true },
+      { name: 'Mailer', count: 2, collapsed: true },
     ]);
     expect(ids(tools?.documents)).toEqual(['gggggg']);
     expect(
       browseFolder(access(readers.team), 'Tools', 1)?.folders.map(
         (folder) => folder.name,
       ),
-    ).toEqual(['Hidden', 'LeadByte']);
+    ).toEqual(['Hidden', 'Mailer']);
   });
 
   it('matches a path without case or surrounding space', () => {
-    const listing = browseFolder(access(readers.member), ' tools /LEADBYTE ');
-    expect(listing?.folder).toEqual(['Tools', 'LeadByte']);
+    const listing = browseFolder(access(readers.member), ' tools /MAILER ');
+    expect(listing?.folder).toEqual(['Tools', 'Mailer']);
     expect(ids(listing?.documents)).toEqual(['dddddd', 'eeeeee']);
   });
 
@@ -265,7 +265,7 @@ describe('browse', () => {
       ids(browseFolder(member, ['Sites', 'Forms/Pages'])?.documents),
     ).toEqual(['aaaaaa']);
     expect(
-      ids(browseFolder(access(readers.member), 'Tools/LeadByte')?.documents),
+      ids(browseFolder(access(readers.member), 'Tools/Mailer')?.documents),
     ).toEqual(['dddddd', 'eeeeee']);
   });
 
@@ -462,6 +462,15 @@ describe('recent', () => {
     expect(
       recentDocuments(access(readers.team), {}, 999).length,
     ).toBeLessThanOrEqual(agentSettings.recent.results);
+  });
+
+  it('gives the time in UTC, whatever offset Drive wrote it with', () => {
+    const map = catalogMap([
+      ['aaaaaa', 'Late', [], 'members', '2026-10-01T01:30:00+02:00'],
+    ]);
+    const member = access(readers.member, { map });
+    expect(recentDocuments(member)[0]?.modified).toBe('2026-09-30T23:30Z');
+    expect(browseFolder(member)?.documents[0]?.modified).toBe('2026-09-30');
   });
 
   it('lists as many as the project sets, unless asked, and no more than it allows', () => {

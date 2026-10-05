@@ -89,15 +89,20 @@ const normalized = (text) =>
   text.toLocaleLowerCase('en').replace(/\s+/gu, ' ').trim();
 
 /**
- * Whether a result's passages show an answer: whether any of them holds any
- * of the answer's words. `null` when the question names none.
+ * Whether the passages of the documents a question needs show its answer:
+ * whether any of them holds any of the answer's words. Another document that
+ * happens to hold them does not count. `null` when the question names none.
  */
-export function answerShown(results, answers) {
-  if (!answers?.length) {
+export function answerShown(results, question) {
+  if (!question.answers?.length) {
     return null;
   }
-  const wanted = answers.map(normalized);
+  const needed = new Set([question.primary, ...question.expected]);
+  const wanted = question.answers.map(normalized);
   return results.some((result) => {
+    if (!needed.has(result.id)) {
+      return false;
+    }
     const text = normalized(result.text ?? '');
     return wanted.some((answer) => text.includes(answer));
   });
@@ -132,7 +137,7 @@ export function scored(question, results) {
     recall: recallOf(ids.slice(0, 10)),
     recallListed: recallOf(ids),
     withText: results.filter((result) => result.text).length,
-    answerShown: answerShown(results, question.answers),
+    answerShown: answerShown(results, question),
     documents: ids,
     passages: passagesOf(results),
   };

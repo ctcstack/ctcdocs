@@ -313,6 +313,21 @@ describe('passages', () => {
     expect(results[4]).toMatchObject({ id: 'fffff4', morePassages: 2 });
   });
 
+  it('shows a chunk once when a shown one of its document already holds it', async () => {
+    // Neighbouring chunks joined to a match repeat the chunk beside it.
+    const index = new FixedIndex([
+      chunkOf('docs/aaaaaa.md', { text: 'One. Two. Three.' }),
+      chunkOf('docs/aaaaaa.md', { text: 'Two.' }),
+      chunkOf('docs/aaaaaa.md', { text: 'Four.' }),
+    ]);
+    const [result] = await searchDocuments(
+      access(readers.member, { index }),
+      'x',
+    );
+    expect(result?.text).toBe('One. Two. Three.\n\n…\n\nFour.');
+    expect(result).not.toHaveProperty('morePassages');
+  });
+
   it('leaves out a chunk that does not fit and shows a later one that does', async () => {
     const search = { ...agentSettings.search, passageCharacters: 1_500 };
     const map: AccessMapFile = {

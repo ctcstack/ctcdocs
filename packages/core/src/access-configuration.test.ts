@@ -226,6 +226,14 @@ describe('MCP configuration', () => {
     });
   });
 
+  it('takes the passage budget a project set before results defaulted to 15', () => {
+    expect(
+      parseSiteConfiguration(
+        withMcp({ enabled: true, search: { passageCharacters: 1_200 } }),
+      ).mcp?.search,
+    ).toMatchObject({ results: 15, passageCharacters: 1_200 });
+  });
+
   it('lists no more recent changes by default than a call may ask for', () => {
     expect(
       parseSiteConfiguration(withMcp({ enabled: true, recent: { results: 5 } }))
@@ -301,8 +309,8 @@ describe('MCP configuration', () => {
       /passagesPerResult must be a whole number of at least 1/u,
     ],
     [
-      { passageCharacters: 1_499 },
-      /passageCharacters must be a whole number of at least 1500/u,
+      { passageCharacters: 999 },
+      /passageCharacters must be a whole number of at least 1000/u,
     ],
     [{ extra: 1 }, /mcp\.search\.extra is not a known/u],
     ['many', /mcp\.search must be an object/u],
