@@ -216,12 +216,17 @@ document was among the first ten, six showed no answer.
 A search no longer cuts. It takes the chunks that count in the order the
 index ranked them, across documents, and shows each whole while the budget
 holds, at most `passagesPerResult` of one document; a chunk that does not
-fit is left out, never cut, and a smaller one ranked after it may still fit.
+fit is left out, never cut, and a smaller one ranked after it may still fit. A
+chunk whose text a shown chunk of its document already holds, as neighbouring
+chunks joined to a match can, is shown once.
 Every other document found is listed without text, by id, title, link,
 folders and date, and `morePassages` counts each document's matching chunks
 left out. The order of the index gives the strongest documents most of the
 text without a rule of its own, and a document ranked ninth costs a line, not
-a share. `results` lists 15 documents unless the project sets another.
+a share. `results` lists 15 documents unless the project sets another, and
+`passageCharacters` takes 1,000 or more, no longer 100 for each result: the
+budget answers to the size of a chunk, and a result it cannot hold is listed
+without text.
 
 A question answered by one or two documents is answered by their chunks; one
 that needs many gets their list, to read with `fetch`. The server does not
@@ -240,12 +245,16 @@ Russian, with each answerable question naming words its answer holds:
 | --------------------------------------------- | ------------- | ----- | ------------------ | ------------------- |
 | Passages cut to a share, ten documents        | 23 of 32      | 0.721 | 0.859              | 10                  |
 | Whole chunks, 1,024 tokens, fifteen documents | 25            | 0.724 | 0.916              | 7.5                 |
-| Whole chunks, 512 tokens, fifteen documents   | 26            | 0.727 | 0.924              | 10.8                |
+| Whole chunks, 800 tokens, fifteen documents   | 25            | 0.761 | 0.916              | 8.6                 |
+| Whole chunks, 512 tokens, fifteen documents   | 25            | 0.724 | 0.893              | 10.8                |
 
 On 512-token chunks the English questions ranked better and the Russian ones
-worse (MRR 0.861 and 0.555, against 0.792 and 0.636), as ADR-042 found; the
-answers shown rose in both. The chunk size is the instance's setting, a
-project's choice, which this record does not change.
+worse (MRR 0.861 and 0.549, against 0.792 and 0.636), as ADR-042 found; on
+800-token chunks the English ones ranked as on 512 and the Russian ones as on
+1,024 (0.863 and 0.630). Two runs of the same 512-token instance differed by
+an answer and by 0.03 of recall, which is the noise of one corpus and one
+person's questions. The chunk size is the instance's setting, a project's
+choice, which this record does not change.
 
 ### Every tool says the same things the same way
 
@@ -292,7 +301,9 @@ project keeps `evaluation/search-questions.json` and writes each run to
 `evaluation/results/<date>-<label>/`. A question names the document that
 answers it and every one it needs, and may name words the answer holds, so a
 run tells a document found from an answer shown: whether the passages an
-assistant reads hold the answer, which is what the cut of a passage decides.
+assistant reads of the documents the question needs hold the answer, which is
+what the choice of passages decides. Another document that happens to hold
+the words does not count.
 A run writes document IDs, scores and lengths, never document text.
 
 ### Descriptions and instructions

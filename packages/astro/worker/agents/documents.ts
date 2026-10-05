@@ -307,10 +307,26 @@ const narrows = (narrowing: Narrowing) =>
   narrowing.changedSince !== undefined ||
   folderReadings(narrowing.folder)[0]?.length !== 0;
 
-/** A Drive time as the day it falls on, `YYYY-MM-DD` (ADR-044). */
-const dayOf = (time: string) => time.slice(0, 10);
+/** A Drive time in UTC, whatever offset it was written with. */
+function utc(time: string): string | undefined {
+  const date = new Date(time);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+/** A Drive time as the day it falls on in UTC, `YYYY-MM-DD` (ADR-044). */
+const dayOf = (time: string) => utc(time)?.slice(0, 10);
 /** A Drive time to the minute, `YYYY-MM-DDTHH:MMZ`, as `recent` lists it. */
-const minuteOf = (time: string) => `${time.slice(0, 16)}Z`;
+const minuteOf = (time: string) => {
+  const iso = utc(time);
+  return iso && `${iso.slice(0, 16)}Z`;
+};
+/** `modified` as `when` writes it, or nothing when it has no time. */
+const modifiedAs = (
+  document: AgentDocument,
+  when: (time: string) => string | undefined,
+) => {
+  const time = document.modified === null ? undefined : when(document.modified);
+  return time ? { modified: time } : {};
+};
 
 /** A document as `search` and `recent` list it. */
 export interface ListedDocument {
@@ -326,14 +342,14 @@ export interface ListedDocument {
 function listed(
   origin: string,
   document: AgentDocument,
-  when: (time: string) => string = dayOf,
+  when: (time: string) => string | undefined = dayOf,
 ): ListedDocument {
   return {
     id: document.id,
     title: document.title,
     url: permanentLink(origin, document.id),
     path: document.path,
-    ...(document.modified ? { modified: when(document.modified) } : {}),
+    ...modifiedAs(document, when),
     characters: document.characters,
   };
 }
@@ -348,7 +364,8 @@ interface BrowsedDocument {
   readonly id: string;
   readonly title: string;
   /** The day it last changed in Drive, `YYYY-MM-DD`, when known. */
-  readonly modified?: string; /** Characters of its text, which `fetch` returns. */
+  readonly modified?: string;
+  /** Characters of its text, which `fetch` returns. */
   readonly characters: number;
 }
 
@@ -397,7 +414,7 @@ function browsed(document: AgentDocument): BrowsedDocument {
   return {
     id: document.id,
     title: document.title,
-    ...(document.modified ? { modified: dayOf(document.modified) } : {}),
+    ...modifiedAs(document, dayOf),
     characters: document.characters,
   };
 }
@@ -450,25 +467,52 @@ function folderTree(
   return root;
 }
 
-/** A folder whose contents are not listed. */
-type Collapsed = { name: string; count: number; collapsed?: true } & {
-  documents?: readonly BrowsedDocument[];
-  folders?: readonly BrowsedFolder[];
-};
-const collapsed = (node: FolderNode): Collapsed => ({
+/** A folder with only its name and count. */
+const collapsed = (node: FolderNode): BrowsedFolder => ({
   name: node.name,
   count: node.count,
   collapsed: true,
 });
 
+/** A folder with its documents, and its own folders collapsed. */
+function opened(node: FolderNode): BrowsedFolder {
+  const documents = documentsOf(node);
+  const folders = foldersOf(node).map(collapsed);
+  return {
+    name: node.name,
+    count: node.count,
+    ...(documents.length > 0 ? { documents } : {}),
+    ...(folders.length > 0 ? { folders } : {}),
+  };
+}
+
+/** A folder as the tree shows it: listed when it is open, else collapsed. */
+function rendered(
+  node: FolderNode,
+  open: ReadonlySet<FolderNode>,
+): BrowsedFolder {
+  if (!open.has(node)) {
+    return collapsed(node);
+  }
+  const documents = documentsOf(node);
+  const folders = foldersOf(node).map((child) => rendered(child, open));
+  return {
+    name: node.name,
+    count: node.count,
+    ...(documents.length > 0 ? { documents } : {}),
+    ...(folders.length > 0 ? { folders } : {}),
+  };
+}
+
 /**
  * A folder as a tree, listed level by level, as deep as `depth` and the
- * project's `browseCharacters` allow (ADR-044). One level lists what is directly in the
- * folder, with its folders collapsed. Each level after lists more of the
- * folders the level before listed, those taking the fewest characters first,
- * each whole or not at all; a folder left out stays collapsed, with its name
- * and count. When what is directly in the folder does not fit, its folders
- * are listed first, then as many documents as fit, and the rest are counted.
+ * project's `browseCharacters` allow (ADR-044). One level lists what is
+ * directly in the folder, with its folders collapsed. Each level after lists
+ * more of the folders the level before listed, those taking the fewest
+ * characters first, each whole or not at all; a folder left out stays
+ * collapsed, with its name and count. When what is directly in the folder
+ * does not fit, its folders are listed first, then as many documents as fit,
+ * and the rest are counted.
  *
  * `undefined` when no document the reader may open sits under the folder,
  * which a folder that does not exist shares.
@@ -494,82 +538,69 @@ export function browseFolder(
   const root = folderTree(under, segments);
   // The project's budget (ADR-044); a map without one lists nothing.
   const budget = access.map.agents?.browseCharacters ?? 0;
+  const head = { folder: first.path.slice(0, segments.length), links };
 
   // What is directly in the folder: its folders first, then its documents,
   // each while it fits.
-  const tree = {
-    folder: first.path.slice(0, segments.length),
-    documents: [] as BrowsedDocument[],
-    folders: [] as Collapsed[],
-    links,
-  };
-  let used = length(tree);
-  const add = <T>(list: T[], item: T) => {
-    const cost = length(item) + (list.length > 0 ? 1 : 0);
-    if (used + cost > budget) {
-      return false;
-    }
-    list.push(item);
-    used += cost;
-    return true;
-  };
   const children = foldersOf(root);
-  const shown = new Map<Collapsed, FolderNode>();
-  for (const node of children) {
-    const view = collapsed(node);
-    if (!add(tree.folders, view)) {
-      break;
-    }
-    shown.set(view, node);
-  }
   const here = documentsOf(root);
-  for (const document of here) {
-    if (!add(tree.documents, document)) {
-      break;
+  let used = length({ ...head, documents: [], folders: [] });
+  const fitting = <T>(items: readonly T[]): T[] => {
+    const kept: T[] = [];
+    for (const item of items) {
+      const cost = length(item) + (kept.length > 0 ? 1 : 0);
+      if (used + cost > budget) {
+        break;
+      }
+      kept.push(item);
+      used += cost;
     }
-  }
-  const omitted = {
-    documents: here.length - tree.documents.length,
-    folders: children.length - tree.folders.length,
+    return kept;
   };
-  if (omitted.documents > 0 || omitted.folders > 0) {
-    return { ...tree, omitted };
+  const shownFolders = fitting(children.map(collapsed));
+  const shownDocuments = fitting(here);
+  if (
+    shownFolders.length < children.length ||
+    shownDocuments.length < here.length
+  ) {
+    return {
+      ...head,
+      documents: shownDocuments,
+      folders: shownFolders,
+      omitted: {
+        documents: here.length - shownDocuments.length,
+        folders: children.length - shownFolders.length,
+      },
+    };
   }
 
-  // Then level by level, the folders that take the fewest characters first.
-  let frontier = [...shown.keys()];
+  // Then level by level, the folders that take the fewest characters first:
+  // opening one replaces its collapsed entry with its listing.
+  const open = new Set<FolderNode>();
+  let frontier = children;
   for (let level = 1; level < depth && frontier.length > 0; level += 1) {
-    const listed = new Set<Collapsed>();
-    const costs = frontier.map((view, order) => {
-      const node = shown.get(view) as FolderNode;
-      const documents = documentsOf(node);
-      const folders = foldersOf(node).map((child) => {
-        const inner = collapsed(child);
-        shown.set(inner, child);
-        return inner;
-      });
-      const open = {
-        name: node.name,
-        count: node.count,
-        ...(documents.length > 0 ? { documents } : {}),
-        ...(folders.length > 0 ? { folders } : {}),
-      };
-      return { view, open, order, cost: length(open) - length(view) };
-    });
-    costs.sort((a, b) => a.cost - b.cost || a.order - b.order);
-    for (const { view, open, cost } of costs) {
+    const costs = frontier
+      .map((node, order) => ({
+        node,
+        order,
+        cost: length(opened(node)) - length(collapsed(node)),
+      }))
+      .sort((a, b) => a.cost - b.cost || a.order - b.order);
+    for (const { node, cost } of costs) {
       if (used + cost <= budget) {
-        delete view.collapsed;
-        Object.assign(view, open);
+        open.add(node);
         used += cost;
-        listed.add(view);
       }
     }
     frontier = frontier
-      .filter((view) => listed.has(view))
-      .flatMap((view) => (view.folders ?? []) as Collapsed[]);
+      .filter((node) => open.has(node))
+      .flatMap((node) => foldersOf(node));
   }
-  return tree;
+  return {
+    ...head,
+    documents: here,
+    folders: children.map((node) => rendered(node, open)),
+  };
 }
 
 /** The folders a tree leaves collapsed. */
@@ -708,7 +739,9 @@ export async function searchDocuments(
       }
       found.set(id, document);
     }
-    ranked.push({ id, text: chunk.text.trim() });
+    if (!compact) {
+      ranked.push({ id, text: chunk.text.trim() });
+    }
   }
 
   if (compact) {
@@ -717,13 +750,18 @@ export async function searchDocuments(
 
   // Whole chunks in the index's order, never cut, while the budget lasts: a
   // chunk that does not fit is left out and counted, and a document none of
-  // whose chunks fit is listed without them.
+  // whose chunks fit is listed without them. A chunk whose text a shown one
+  // of its document already holds, as neighbouring chunks joined to a match
+  // can, is shown once.
   const shown = new Map<string, string[]>();
   const matched = new Map<string, number>();
   let budget = passageCharacters;
   for (const { id, text } of ranked) {
-    matched.set(id, (matched.get(id) ?? 0) + 1);
     const passages = shown.get(id) ?? [];
+    if (passages.some((passage) => passage.includes(text))) {
+      continue;
+    }
+    matched.set(id, (matched.get(id) ?? 0) + 1);
     if (passages.length < passagesPerResult && text.length <= budget) {
       shown.set(id, [...passages, text]);
       budget -= text.length;
@@ -793,7 +831,7 @@ export async function fetchDocument(
     title: document.title,
     url,
     metadata: {
-      ...(document.modified ? { modified: dayOf(document.modified) } : {}),
+      ...modifiedAs(document, dayOf),
       path: document.path,
       ...(document.source ? { source: document.source } : {}),
       format: document.format,

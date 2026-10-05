@@ -89,10 +89,23 @@ test('tells an answer shown from a document found', () => {
   const results = [
     { id: 'bbbbbb', text: 'Leave is requested\nin the HR portal.' },
   ];
-  assert.equal(answerShown(results, ['hr portal']), true);
-  assert.equal(answerShown(results, ['payroll']), false);
-  assert.equal(answerShown([{ id: 'bbbbbb' }], ['hr portal']), false);
-  assert.equal(answerShown(results, undefined), null);
+  const asked = (answers) => ({
+    primary: 'bbbbbb',
+    expected: ['bbbbbb'],
+    answers,
+  });
+  assert.equal(answerShown(results, asked(['hr portal'])), true);
+  assert.equal(answerShown(results, asked(['payroll'])), false);
+  assert.equal(answerShown([{ id: 'bbbbbb' }], asked(['hr portal'])), false);
+  assert.equal(answerShown(results, asked(undefined)), null);
+  // A document the question does not need, holding the words, does not count.
+  assert.equal(
+    answerShown(
+      [{ id: 'zzzzzz', text: 'The HR portal.' }],
+      asked(['hr portal']),
+    ),
+    false,
+  );
 });
 
 test('counts the passages a search shows', () => {
