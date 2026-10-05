@@ -76,7 +76,11 @@ export const VARIANTS = [
   },
   {
     name: 'results-5',
-    change: (s) => ({ results: Math.min(5, s.results) }),
+    change: (s) => ({ results: Math.min(5, s.chunks) }),
+  },
+  {
+    name: 'results-15',
+    change: (s) => ({ results: Math.min(15, s.chunks) }),
   },
 ];
 
@@ -118,12 +122,16 @@ export function passagesOf(results) {
 export function scored(question, results) {
   const ids = results.map((result) => result.id);
   const rank = question.primary ? ids.indexOf(question.primary) + 1 : 0;
+  const recallOf = (listed) =>
+    question.expected.length
+      ? question.expected.filter((id) => listed.includes(id)).length /
+        question.expected.length
+      : null;
   return {
     rank: rank || null,
-    recall: question.expected.length
-      ? question.expected.filter((id) => ids.includes(id)).length /
-        question.expected.length
-      : null,
+    recall: recallOf(ids.slice(0, 10)),
+    recallListed: recallOf(ids),
+    withText: results.filter((result) => result.text).length,
     answerShown: answerShown(results, question.answers),
     documents: ids,
     passages: passagesOf(results),
@@ -150,9 +158,11 @@ export function metrics(rows, questions) {
     top10: ranks.filter(Boolean).length,
     mrr: fixed(mean(ranks.map((rank) => (rank ? 1 / rank : 0)))),
     recallAt10: fixed(mean(asked.map((row) => row.recall))),
+    recallListed: fixed(mean(asked.map((row) => row.recallListed))),
     answersShown: answered.filter((row) => row.answerShown).length,
     answersAsked: answered.length,
     documentsPerSearch: fixed(mean(rows.map((row) => row.documents.length)), 1),
+    withTextPerSearch: fixed(mean(rows.map((row) => row.withText)), 1),
     passagesPerSearch: fixed(mean(rows.map((row) => row.passages.count)), 1),
     passageCharactersPerSearch: Math.round(
       mean(rows.map((row) => row.passages.characters)) ?? 0,
@@ -365,8 +375,8 @@ function report({ name, questions, summary, runs, map }) {
     '',
     '## Variants',
     '',
-    '| Variant | Answer first | Top 3 | Top 10 | MRR | MRR ru | MRR en | Recall at 10 | Answers shown | Documents per search | Passages per search | Passage characters per search |',
-    '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+    '| Variant | Answer first | Top 3 | Top 10 | MRR | MRR ru | MRR en | Recall at 10 | Recall listed | Answers shown | Documents per search | With text | Passages per search | Passage characters per search |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
     ...Object.entries(summary.variants).map(([variant, value]) =>
       [
         '',
@@ -378,10 +388,12 @@ function report({ name, questions, summary, runs, map }) {
         value.ru?.mrr ?? '',
         value.en?.mrr ?? '',
         value.all.recallAt10,
+        value.all.recallListed,
         value.all.answersAsked
           ? `${value.all.answersShown} of ${value.all.answersAsked}`
           : '',
         value.all.documentsPerSearch,
+        value.all.withTextPerSearch,
         value.all.passagesPerSearch,
         value.all.passageCharactersPerSearch,
         '',

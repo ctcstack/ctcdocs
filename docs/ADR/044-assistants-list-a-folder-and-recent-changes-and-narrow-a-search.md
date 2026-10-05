@@ -4,9 +4,9 @@
 - Date: 2026-10-04
 - Owners: CTCDocs maintainers
 - Supersedes: ADR-042 in part, once accepted: the MCP server serves four
-  tools, not two; a passage's share of the budget follows the documents
-  a search finds; and a note is a field of the answer, not a text item beside
-  it
+  tools, not two; a search shows whole chunks in the index's order and
+  lists the other documents it finds, instead of cutting a passage of each;
+  and a note is a field of the answer, not a text item beside it
 
 ## Context
 
@@ -201,11 +201,51 @@ search finds a document only through such a chunk, so neither shows anything
 a full search would not show the same reader. ChatGPT's shape for a search
 result needs only `id`, `title` and `url`, so `text` becomes optional.
 
-A passage's share of the budget is the budget divided by the documents a
-search found, not by the most it may return: two documents found share the
-24,000 characters ten would, and a passage is cut only where a chunk is longer
-than its share. The budget, the passages per document and the breadth-first
-order stay as ADR-042 set them.
+### Whole chunks above, the other documents below
+
+A measurement that counted answers shown, not only documents found (below),
+found two faults in how ADR-042 cut passages. A passage kept the middle of
+its chunk, which only means something when neighbouring chunks surround the
+match; with none, an answer at the edge of a chunk was cut away. And the
+budget went breadth first, every document's first passage before any second
+one, so ten first passages of 2,400 characters spent it: a second passage
+almost never showed, and the second chunk of the document ranked first,
+which held the answer, was the one left out. Of 29 questions whose answer
+document was among the first ten, six showed no answer.
+
+A search no longer cuts. It takes the chunks that count in the order the
+index ranked them, across documents, and shows each whole while the budget
+holds, at most `passagesPerResult` of one document; a chunk that does not
+fit is left out, never cut, and a smaller one ranked after it may still fit.
+Every other document found is listed without text, by id, title, link,
+folders and date, and `morePassages` counts each document's matching chunks
+left out. The order of the index gives the strongest documents most of the
+text without a rule of its own, and a document ranked ninth costs a line, not
+a share. `results` lists 15 documents unless the project sets another.
+
+A question answered by one or two documents is answered by their chunks; one
+that needs many gets their list, to read with `fetch`. The server does not
+guess which a question is: the assistant does, and `limit` and `compact` let
+it ask for less. Nothing here reads a score of the index or calls a model:
+the search needs only chunks in ranked order with their text and document,
+which any index returns, so moving off AI Search changes none of it.
+
+A chunk is the unit an assistant reads, so the instance's chunk size decides
+how many fit the budget: about seven of AI Search's default 1,024 tokens,
+about fifteen of 512, each under the 512 tokens the reranker reads of a chunk.
+Measured on one deployment's corpus of about 140 documents in English and
+Russian, with each answerable question naming words its answer holds:
+
+| Search                                        | Answers shown | MRR   | Recall of the list | Documents with text |
+| --------------------------------------------- | ------------- | ----- | ------------------ | ------------------- |
+| Passages cut to a share, ten documents        | 23 of 32      | 0.721 | 0.859              | 10                  |
+| Whole chunks, 1,024 tokens, fifteen documents | 25            | 0.724 | 0.916              | 7.5                 |
+| Whole chunks, 512 tokens, fifteen documents   | 26            | 0.727 | 0.924              | 10.8                |
+
+On 512-token chunks the English questions ranked better and the Russian ones
+worse (MRR 0.861 and 0.555, against 0.792 and 0.636), as ADR-042 found; the
+answers shown rose in both. The chunk size is the instance's setting, a
+project's choice, which this record does not change.
 
 ### A project measures its search with the platform's own
 
@@ -250,8 +290,12 @@ that a compact search shows which documents match without their passages.
 - An answer's note reaches the model in every client.
 - A question about which documents exist costs a compact search, a few
   hundred characters a document, instead of the whole passage budget.
-- A search that finds few documents shows their passages whole, up to the
-  chunk, instead of cutting each at a tenth of the budget.
+- A passage is a whole chunk: an answer at its edge is not cut away, and
+  nothing is cut that an assistant would not know of, since `morePassages`
+  counts what was left out.
+- A question needing many documents gets fifteen to choose from at the cost
+  of a line each, and a weak document ranked above a needed one no longer
+  takes its text.
 
 ### Negative
 
@@ -264,8 +308,10 @@ that a compact search shows which documents match without their passages.
 - `changedSince` and `recent` know Drive's time, which a typo fix moves as
   much as a rewrite.
 - ChatGPT has not been seen calling the new tools or the optional parameters.
-- A search that finds few documents returns more characters than before,
-  still within the budget.
+- Fewer documents show text: about seven on 1,024-token chunks, where ten
+  showed cut passages before; the rest show only their titles.
+- A chunk longer than what is left of the budget is left out even when its
+  document ranked first; a budget smaller than a chunk shows no text at all.
 - An assistant builds a document's link from `browse`'s pattern, which it
   may get wrong; `fetch` and `search` still return each link whole.
 - Which folders a tree collapses depends on how long their titles are, not
@@ -277,9 +323,13 @@ that a compact search shows which documents match without their passages.
   and called, and that deep research still calls `search` with a query alone.
 - Measure the questions that ask for every document of a kind with `browse`,
   against `search` alone.
-- Give a project's questions the words their answers hold, and measure how a
-  passage is cut and how many documents a search returns by answers shown,
-  not by rank alone.
+- Measure an instance of 800-token chunks against 512 and 1,024 on the
+  answers shown, the English and the Russian questions apart, before
+  recommending a chunk size to projects.
+- A window of a chunk around the words of the query, for a chunk longer than
+  the budget, if chunks that do not fit turn out to cost answers. It is
+  cheap and calls no model, but it is a cut, and a query in another language
+  than the document finds no words to centre on.
 - Mark ADR-042 superseded in part when this record is accepted.
 - Raise forty if AI Search's keyword search comes to take more values. It is
   AI Search's limit, not a project's choice, so it is not a setting.

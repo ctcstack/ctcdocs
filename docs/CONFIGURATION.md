@@ -184,7 +184,7 @@ Every setting is optional, and the defaults are the values shown:
       "model": "@cf/baai/bge-reranker-base",
       "threshold": 0
     },
-    "results": 10,
+    "results": 15,
     "passagesPerResult": 3,
     "passageCharacters": 24000
   },
@@ -206,9 +206,9 @@ Every setting is optional, and the defaults are the values shown:
 | `mcp.search.reranking.enabled`   | Whether AI Search reranks the chunks before the Worker groups them.                                                                                                                                                              |
 | `mcp.search.reranking.model`     | The reranking model.                                                                                                                                                                                                             |
 | `mcp.search.reranking.threshold` | Reranking score, 0 to 1, below which a chunk is dropped; 0 keeps every chunk. Needed documents can score near 0, those in another language than the question first, so a threshold cuts them with the noise.                     |
-| `mcp.search.results`             | Documents a search returns at most: no more than `chunks`, which is also the default when it is under 10.                                                                                                                        |
-| `mcp.search.passagesPerResult`   | Passages each document shows at most.                                                                                                                                                                                            |
-| `mcp.search.passageCharacters`   | Characters of passage text a search returns in all; at least 100 for each result.                                                                                                                                                |
+| `mcp.search.results`             | Documents a search lists at most, those whose chunks fit the budget with them and the rest by title: no more than `chunks`, which is also the default when it is under 15.                                                       |
+| `mcp.search.passagesPerResult`   | Chunks each document shows at most.                                                                                                                                                                                              |
+| `mcp.search.passageCharacters`   | Characters of chunk text a search shows in all, at least 100 for each result. Chunks are shown whole, never cut: one that does not fit is left out and counted, so the budget should hold several of the instance's chunks.      |
 | `mcp.fetchCharacters`            | Characters `fetch` returns at most, 1,000 or more; a longer document is cut there, and the content health page names it.                                                                                                         |
 | `mcp.browseCharacters`           | Characters of JSON a `browse` tree takes at most, 1,000 or more: as many levels of folders are listed as fit, and the rest collapsed.                                                                                            |
 | `mcp.recent.defaultResults`      | Documents `recent` lists when a call does not ask for a number: no more than `recent.results`, which is also the default when it is under 20.                                                                                    |

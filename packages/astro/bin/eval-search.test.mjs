@@ -109,6 +109,8 @@ test('scores a search by the rank of its answer and what it recalls', () => {
   ]);
   assert.equal(row.rank, 2);
   assert.equal(row.recall, 1);
+  assert.equal(row.recallListed, 1);
+  assert.equal(row.withText, 2);
   assert.equal(row.answerShown, true);
   assert.equal(scored(questions[1], []).rank, null);
 });

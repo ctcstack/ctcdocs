@@ -703,8 +703,11 @@ pnpm exec wrangler ai-search jobs create <instance name>
 
 `search` asks AI Search for up to 50 chunks, matching any word of the query,
 reranks them with `bge-reranker-base` without dropping any, and returns up to
-ten documents with their best passages, their folders and their date
-([ADR-042](ADR/042-an-assistants-search-returns-the-passages-that-match.md)).
+fifteen documents with their folders and their date: the best matching chunks
+whole, as many as the budget holds, and the other documents by title
+([ADR-042](ADR/042-an-assistants-search-returns-the-passages-that-match.md),
+[ADR-044](ADR/044-assistants-list-a-folder-and-recent-changes-and-narrow-a-search.md)).
+A chunk is never cut, so the instance's chunk size decides how many fit.
 A search may be kept to a folder or to documents changed since a date, and
 to fewer documents or to their titles alone, without passages. Two more tools
 list documents without searching: `browse`, a folder's folders and documents,

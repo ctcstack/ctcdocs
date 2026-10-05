@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import type { AccessMapFile } from '../access-map.js';
 import type { Reader } from '../decide.js';
 import {
-  excerpt,
   fetchDocument,
   readableClasses,
   searchDocuments,
@@ -155,8 +154,8 @@ describe('search', () => {
     expect(index.queries).toEqual([]);
   });
 
-  it('returns at most ten documents', async () => {
-    const documents = Array.from({ length: 15 }, (_, n) => ({
+  it('lists at most as many documents as the project sets', async () => {
+    const documents = Array.from({ length: 20 }, (_, n) => ({
       id: `${n}`.padStart(6, 'e'),
       title: `Page ${n}`,
       markdown: '/handbook/index.md',
@@ -178,7 +177,7 @@ describe('search', () => {
     );
     expect(
       await searchDocuments(access(readers.member, { index, map }), 'x'),
-    ).toHaveLength(10);
+    ).toHaveLength(agentSettings.search.results);
   });
 });
 
@@ -258,8 +257,8 @@ describe('passages', () => {
     ).toEqual([]);
   });
 
-  it('gives every document its best passage before any a second', async () => {
-    const documents = Array.from({ length: 10 }, (_, n) => ({
+  it('shows chunks whole in the index’s order while the budget lasts, and lists the rest', async () => {
+    const documents = Array.from({ length: 12 }, (_, n) => ({
       id: `${n}`.padStart(6, 'f'),
       title: `Page ${n}`,
       markdown: '/handbook/index.md',
@@ -272,12 +271,14 @@ describe('passages', () => {
       ...agentMap,
       agents: { ...agentSettings, digest: 'digest-long', documents },
     };
-    const long = `${'A sentence of the passage. '.repeat(200)}`;
+    // Each chunk a little over 3,000 characters: seven fit 24,000.
+    const long = (n: number) =>
+      `Chunk ${n}. ${'A sentence of the chunk. '.repeat(120)}`;
     const index = new FixedIndex(
-      documents.flatMap((document) =>
-        [1, 2, 3].map((n) => ({
+      documents.flatMap((document, n) =>
+        [0, 1].map((k) => ({
           key: `docs/${document.id}.md`,
-          text: `${n} ${long}`,
+          text: long(n * 2 + k),
           class: 'members',
         })),
       ),
@@ -286,43 +287,45 @@ describe('passages', () => {
       access(readers.member, { index, map }),
       'x',
     );
-    expect(results).toHaveLength(10);
-    const lengths = results.map((result) => result.text?.length ?? 0);
-    expect(lengths.every((length) => length > 0 && length <= 2_400)).toBe(true);
-    expect(
-      lengths.reduce((sum, length) => sum + length, 0),
-    ).toBeLessThanOrEqual(24_000);
-    expect(results.every((result) => !result.text?.includes('…'))).toBe(true);
+    expect(results).toHaveLength(12);
+    const shown = results.flatMap((result) =>
+      result.text ? result.text.split('\n\n…\n\n') : [],
+    );
+    // Never cut: every passage is a chunk, whole, in the index's order.
+    expect(shown).toEqual(
+      Array.from({ length: shown.length }, (_, n) => long(n).trim()),
+    );
+    expect(shown.join('').length).toBeLessThanOrEqual(24_000);
+    expect(shown.length).toBe(7);
+    // The fourth document shows one chunk and counts the other.
+    expect(results[3]).toMatchObject({ morePassages: 1 });
+    // The rest are listed by title, with the chunks that matched counted.
+    expect(results[4]).not.toHaveProperty('text');
+    expect(results[4]).toMatchObject({ id: 'fffff4', morePassages: 2 });
   });
 
-  it('cuts a long passage around its middle, at sentence boundaries', () => {
-    const sentences = Array.from(
-      { length: 40 },
-      (_, n) => `Sentence ${n} of the passage.`,
+  it('leaves out a chunk that does not fit and shows a later one that does', async () => {
+    const search = { ...agentSettings.search, passageCharacters: 1_500 };
+    const map: AccessMapFile = {
+      ...agentMap,
+      agents: {
+        ...(agentMap.agents ?? { ...agentSettings, digest: '', documents: [] }),
+        search,
+      },
+    };
+    const index = new FixedIndex([
+      chunkOf('docs/aaaaaa.md', { text: 'x'.repeat(2_000) }),
+      chunkOf('docs/bbbbbb.md', { text: 'Plan.' }),
+    ]);
+    const results = await searchDocuments(
+      access(readers.team, { index, map }),
+      'x',
     );
-    const passage = sentences.join(' ');
-    const cut = excerpt(passage, 300);
-    expect(cut.length).toBeLessThanOrEqual(300);
-    expect(cut.startsWith('Sentence ')).toBe(true);
-    expect(cut.endsWith('passage.')).toBe(true);
-    expect(cut).toContain('Sentence 20 of the passage.');
-    expect(excerpt('  Short.  ', 300)).toBe('Short.');
-    // One word longer than the limit is cut as it is.
-    expect(excerpt('x'.repeat(500), 300)).toHaveLength(300);
-  });
-
-  it('cuts a passage without a sentence end between words', () => {
-    // A table kept as HTML: one line, and no full stop to end a sentence.
-    const cells = Array.from(
-      { length: 60 },
-      (_, n) => `<td><p>cell number ${n}</p></td>`,
-    );
-    const passage = `<table><tr>${cells.join('')}</tr></table>`;
-    const cut = excerpt(passage, 300);
-    expect(cut.length).toBeLessThanOrEqual(300);
-    expect(cut.length).toBeGreaterThan(250);
-    // It starts and ends with whole words, never inside one.
-    expect(passage).toContain(` ${cut} `);
+    expect(results).toEqual([
+      expect.objectContaining({ id: 'aaaaaa', morePassages: 1 }),
+      expect.objectContaining({ id: 'bbbbbb', text: 'Plan.' }),
+    ]);
+    expect(results[0]).not.toHaveProperty('text');
   });
 });
 
@@ -365,31 +368,6 @@ describe('a shaped search', () => {
         ),
       ),
     ).toEqual(['aaaaaa']);
-  });
-
-  it('gives fewer documents longer passages, within the same budget', async () => {
-    const long = 'A sentence of the passage. '.repeat(200);
-    const index = new FixedIndex([
-      chunkOf('docs/aaaaaa.md', { text: long }),
-      chunkOf('docs/bbbbbb.md', { text: long }),
-    ]);
-    const results = await searchDocuments(access(readers.team, { index }), 'x');
-    expect(ids(results)).toEqual(['aaaaaa', 'bbbbbb']);
-    // Two documents share the budget ten would: each passage whole here.
-    expect(results.map((result) => result.text)).toEqual([
-      long.trim(),
-      long.trim(),
-    ]);
-    const one = await searchDocuments(
-      access(readers.team, {
-        index: new FixedIndex([
-          chunkOf('docs/aaaaaa.md', { text: long.repeat(10) }),
-        ]),
-      }),
-      'x',
-    );
-    expect(one[0]?.text?.length).toBeGreaterThan(2_400);
-    expect(one[0]?.text?.length).toBeLessThanOrEqual(24_000);
   });
 
   it('leaves the passages out of a compact search, and finds the same documents', async () => {
@@ -451,6 +429,7 @@ describe('settings', () => {
         text: `${'Long sentence here. '.repeat(20)}`,
       }),
       chunkOf('docs/aaaaaa.md', { text: 'Second passage.' }),
+      chunkOf('docs/aaaaaa.md', { text: 'Third passage.' }),
       'docs/bbbbbb.md',
     ]);
     const results = await searchDocuments(
@@ -459,11 +438,15 @@ describe('settings', () => {
     );
     // The index is asked with the project's settings.
     expect(index.queries[0]?.settings).toEqual(search);
-    expect(ids(results)).toEqual(['aaaaaa']);
-    expect(results[0]?.text?.length).toBeLessThanOrEqual(120);
-    expect(results[0]?.text).not.toContain('Second passage.');
+    // One document, one whole chunk within 120 characters, two counted.
+    expect(results).toEqual([
+      expect.objectContaining({
+        id: 'aaaaaa',
+        text: 'Second passage.',
+        morePassages: 2,
+      }),
+    ]);
   });
-
   it('cuts a document where the project says', async () => {
     const map: AccessMapFile = {
       ...agentMap,
