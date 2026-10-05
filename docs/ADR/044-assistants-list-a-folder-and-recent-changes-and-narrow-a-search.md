@@ -82,14 +82,17 @@ document against the reader with it.
 ### Two more tools, from the build's catalog
 
 - **`browse`** lists a folder as a tree, within a budget: its documents and
-  its folders, and the folders in those as deep as 24,000 characters of JSON
-  allow, about 6,000 tokens, the budget a search's passages take. Without a
+  its folders, and the folders in those as deep as the project's
+  `mcp.browseCharacters` of JSON allow: 24,000 unless it sets another, about
+  6,000 tokens, the budget a search's passages take. Without a
   folder it lists the corpus root, so a small corpus is listed whole in one
   call. Each folder carries the number of documents under it the reader may
   open, and is either listed, with its documents and folders, or collapsed,
   with its name and count alone.
 - **`recent`** lists the documents most recently changed in Drive, newest
-  first: twenty unless the call asks for up to fifty, optionally since a
+  first: `mcp.recent.defaultResults` unless the call asks for up to
+  `mcp.recent.results`, twenty and fifty unless the project sets others,
+  optionally since a
   date and under a folder.
 
 `recent` lists each document with `id`, `title`, `url`, `path` and
@@ -123,6 +126,18 @@ title or a folder name is as long as its author made it. The order of folders
 and documents is by name, so an answer is the same for the same build and
 reader. There is no cursor: a folder whose own documents do not fit is rare,
 and search within it finds what the list leaves out.
+
+### The numbers are the project's
+
+The budget of a tree and the counts `recent` lists are settings of the
+project's `mcp` section, as ADR-042 made every number of `search` and
+`fetch`: `browseCharacters`, and `recent.defaultResults` and `recent.results`,
+each optional and checked. The build writes the resolved values into the
+access map, and the Worker holds no number of its own, so a project that
+wants a larger tree changes its configuration and deploys, with no release of
+the platform. The forty short IDs a narrowed search sends at most stay a
+constant: they are AI Search's undocumented limit, which a setting could only
+break.
 
 ### Notes are part of the answer
 
@@ -244,6 +259,5 @@ that a compact search shows which documents match without their passages.
 - Measure the questions that ask for every document of a kind with `browse`,
   against `search` alone.
 - Mark ADR-042 superseded in part when this record is accepted.
-- Make the limits (twenty, fifty, a hundred, forty) project settings if a
-  corpus needs others, and raise forty if AI Search's keyword search comes to
-  take more values.
+- Raise forty if AI Search's keyword search comes to take more values. It is
+  AI Search's limit, not a project's choice, so it is not a setting.

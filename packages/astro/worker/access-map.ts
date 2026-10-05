@@ -84,6 +84,13 @@ export interface AccessMapFile {
     readonly search: AgentSearchSettings;
     /** Characters `fetch` returns at most. */
     readonly fetchCharacters: number;
+    /** Characters of JSON a `browse` tree takes at most (ADR-044). */
+    readonly browseCharacters: number;
+    /** Documents `recent` lists unless asked, and at most (ADR-044). */
+    readonly recent: {
+      readonly defaultResults: number;
+      readonly results: number;
+    };
   };
 }
 

@@ -217,6 +217,14 @@ export interface McpSearchConfiguration {
   readonly passageCharacters: number;
 }
 
+/** What `recent` lists (ADR-044). */
+export interface McpRecentConfiguration {
+  /** Documents it lists when a call does not ask for a number. */
+  readonly defaultResults: number;
+  /** Documents a call may ask for at most. */
+  readonly results: number;
+}
+
 /**
  * The MCP server through which AI assistants read the site as the person who
  * connected them (ADR-041). It needs the Worker's sign-in, so it is accepted
@@ -227,6 +235,9 @@ export interface McpConfiguration {
   readonly search: McpSearchConfiguration;
   /** Characters `fetch` returns at most; a longer document is cut there. */
   readonly fetchCharacters: number;
+  /** Characters of JSON a `browse` tree takes at most (ADR-044). */
+  readonly browseCharacters: number;
+  readonly recent: McpRecentConfiguration;
 }
 
 /** What `mcp` holds when a project sets only `enabled` (ADR-042). */
@@ -246,6 +257,8 @@ export const MCP_DEFAULTS: Omit<McpConfiguration, 'enabled'> = Object.freeze({
     passageCharacters: 24_000,
   }),
   fetchCharacters: 100_000,
+  browseCharacters: 24_000,
+  recent: Object.freeze({ defaultResults: 20, results: 50 }),
 });
 
 /**
@@ -606,6 +619,33 @@ function mcpSearch(value: unknown): McpSearchConfiguration {
   };
 }
 
+function mcpRecent(value: unknown): McpRecentConfiguration {
+  const defaults = MCP_DEFAULTS.recent;
+  if (value === undefined) {
+    return defaults;
+  }
+  const source = record(value, 'mcp.recent');
+  knownKeys(source, 'mcp.recent', Object.keys(defaults));
+  const results = optionalNumber(
+    source,
+    'results',
+    'mcp.recent.results',
+    defaults.results,
+    { min: 1, whole: true },
+  );
+  // The default, like a set value, is no more than a call may ask for.
+  return {
+    defaultResults: optionalNumber(
+      source,
+      'defaultResults',
+      'mcp.recent.defaultResults',
+      Math.min(defaults.defaultResults, results),
+      { min: 1, max: results, whole: true },
+    ),
+    results,
+  };
+}
+
 function optionalMegabytes(
   source: Record<string, unknown>,
   key: string,
@@ -806,7 +846,13 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
   let mcp: McpConfiguration | undefined;
   if (root.mcp !== undefined) {
     const source = record(root.mcp, 'mcp');
-    knownKeys(source, 'mcp', ['enabled', 'search', 'fetchCharacters']);
+    knownKeys(source, 'mcp', [
+      'enabled',
+      'search',
+      'fetchCharacters',
+      'browseCharacters',
+      'recent',
+    ]);
     const enabled = flag(source, 'enabled', 'mcp.enabled');
     if (enabled) {
       if (!signIn) {
@@ -829,6 +875,14 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
         MCP_DEFAULTS.fetchCharacters,
         { min: 1_000, whole: true },
       ),
+      browseCharacters: optionalNumber(
+        source,
+        'browseCharacters',
+        'mcp.browseCharacters',
+        MCP_DEFAULTS.browseCharacters,
+        { min: 1_000, whole: true },
+      ),
+      recent: mcpRecent(source.recent),
     };
   }
   const fetchLimit = fetchCharacterLimit(mcp);

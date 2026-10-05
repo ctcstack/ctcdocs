@@ -502,6 +502,8 @@ export async function writeBuildOutput({
             search: site.mcp.search,
             // The one value the content health note reads too (ADR-043).
             fetchCharacters: fetchCharacterLimit(site.mcp),
+            browseCharacters: site.mcp.browseCharacters,
+            recent: site.mcp.recent,
           },
         }
       : {}),
