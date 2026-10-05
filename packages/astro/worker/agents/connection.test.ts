@@ -675,7 +675,8 @@ describe('an assistant reading', () => {
           url: `${ORIGIN}/d/aaaaaa/`,
           text: 'A passage of Handbook.',
           path: [],
-          modified: '2026-10-01T00:00:00.000Z',
+          modified: '2026-10-01',
+          characters: 11,
         },
       ],
     });
@@ -689,7 +690,14 @@ describe('an assistant reading', () => {
     // The whole tree, which passes the tool's declared output schema.
     expect(top.body.result?.structuredContent).toEqual({
       folder: [],
-      documents: [{ id: 'aaaaaa', title: 'Handbook', modified: '2026-10-01' }],
+      documents: [
+        {
+          id: 'aaaaaa',
+          title: 'Handbook',
+          modified: '2026-10-01',
+          characters: 11,
+        },
+      ],
       folders: [],
       links: `${ORIGIN}/d/{id}/`,
     });
@@ -705,7 +713,8 @@ describe('an assistant reading', () => {
           title: 'Handbook',
           url: `${ORIGIN}/d/aaaaaa/`,
           path: [],
-          modified: '2026-10-01T00:00:00.000Z',
+          modified: '2026-10-01T00:00Z',
+          characters: 11,
         },
       ],
     });
@@ -768,9 +777,11 @@ describe('an assistant reading', () => {
         ?.structuredContent,
     ).toMatchObject({
       metadata: {
-        modified: '2026-10-01T00:00:00.000Z',
+        modified: '2026-10-01',
         path: [],
         source: 'https://docs.google.com/document/d/handbook/edit',
+        format: 'doc',
+        characters: 11,
       },
     });
 
@@ -795,7 +806,8 @@ describe('an assistant reading', () => {
           title: 'Handbook',
           url: `${ORIGIN}/d/aaaaaa/`,
           path: [],
-          modified: '2026-10-01T00:00:00.000Z',
+          modified: '2026-10-01',
+          characters: 11,
         },
       ],
     });
@@ -830,7 +842,8 @@ describe('an assistant reading', () => {
           url: `${ORIGIN}/d/aaaaaa/`,
           text: 'A passage of Handbook.',
           path: [],
-          modified: '2026-10-01T00:00:00.000Z',
+          modified: '2026-10-01',
+          characters: 11,
         },
       ],
     });

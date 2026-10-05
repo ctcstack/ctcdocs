@@ -56,6 +56,12 @@ export interface AgentDocument {
   readonly path: readonly string[];
   /** The Google Doc or PDF in Drive it is published from (ADR-042). */
   readonly source: string | null;
+  /** Whether it is published from a Google Doc or a PDF (ADR-044). */
+  readonly format: 'doc' | 'pdf';
+  /** A PDF's pages, when the sync counted them. */
+  readonly pages?: number;
+  /** Characters of the stored text, which `fetch` returns (ADR-044). */
+  readonly characters: number;
   readonly hash: string;
 }
 

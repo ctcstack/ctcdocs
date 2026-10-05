@@ -164,6 +164,49 @@ describe('agent catalog', () => {
     ]);
   });
 
+  it('says whether a document is a PDF, its pages, and how long its text is', async () => {
+    const page = (path: string, source: string, pdfPages?: number) => ({
+      path,
+      source,
+      pdfPages,
+      redirect: false,
+      searchable: true,
+      images: [],
+    });
+    const result = await buildAgentCatalog({
+      documents: [
+        document('handbook', { shortId: 'aaaaaa' }),
+        document('team/plan', { shortId: 'bbbbbb' }),
+        document('shared', { shortId: 'cccccc' }),
+      ],
+      folders: FOLDERS,
+      files: new Map([
+        ['/handbook/index.md', 'members'],
+        ['/team/plan/index.md', 'members'],
+        ['/shared/index.md', 'members'],
+      ]),
+      pages: [
+        page('/handbook/', 'google-doc'),
+        page('/team/plan/', 'drive-pdf', 4),
+        // A PDF whose pages the sync could not count.
+        page('/shared/', 'drive-pdf'),
+      ],
+      readMarkdown: (path) => Promise.resolve(PROJECTIONS[path]),
+    });
+    expect(
+      result.documents.map(({ id, format, pages, characters }) => ({
+        id,
+        format,
+        pages,
+        characters,
+      })),
+    ).toEqual([
+      { id: 'aaaaaa', format: 'doc', pages: undefined, characters: 11 },
+      { id: 'bbbbbb', format: 'pdf', pages: 4, characters: 7 },
+      { id: 'cccccc', format: 'pdf', pages: undefined, characters: 9 },
+    ]);
+  });
+
   it('falls back to the slug for a title and to null for a time or a source', async () => {
     const result = await catalog(
       [document('handbook', {}, ['title', 'modified', 'source'])],

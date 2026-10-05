@@ -38,6 +38,7 @@ const SEARCH_OUTPUT = z.object({
       morePassages: z.number().int().optional(),
       path: z.array(z.string()),
       modified: z.string().optional(),
+      characters: z.number().int(),
     }),
   ),
   note: z.string().optional(),
@@ -49,12 +50,14 @@ const LISTED_DOCUMENT = z.object({
   url: z.string(),
   path: z.array(z.string()),
   modified: z.string().optional(),
+  characters: z.number().int(),
 });
 
 const BROWSED_DOCUMENT = z.object({
   id: z.string(),
   title: z.string(),
   modified: z.string().optional(),
+  characters: z.number().int(),
 });
 
 /** A folder of a tree, listed or collapsed, and the folders in it. */
@@ -104,12 +107,12 @@ const NOTHING_FOUND =
 const FETCH_OUTPUT = z.object({
   id: z.string(),
   title: z.string(),
-  text: z.string(),
   url: z.string(),
   metadata: z.record(
     z.string(),
-    z.union([z.string(), z.boolean(), z.array(z.string())]),
+    z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]),
   ),
+  text: z.string(),
 });
 
 /**
@@ -188,7 +191,7 @@ function server(context: ToolContext): McpServer {
     'search',
     {
       title: `Search ${site}`,
-      description: `Search ${site}, the organization's knowledge base, for documents the signed-in person may read.${about} Returns up to ${mostResults} documents, best first, each with its id, title, link, the folders it sits in and when it last changed. The best matching passages are shown whole, as many as one answer holds; the other documents are listed without text, as candidates to read with fetch, and morePassages counts a document's matching passages not shown. Optionally kept to a folder, to documents changed since a date, or to fewer documents; compact, it shows no passages.`,
+      description: `Search ${site}, the organization's knowledge base, for documents the signed-in person may read.${about} Returns up to ${mostResults} documents, best first, each with its id, title, link, the folders it sits in, the day it last changed and its length in characters, which tells what reading it whole with fetch costs. The best matching passages are shown whole, as many as one answer holds; the other documents are listed without text, as candidates to read with fetch, and morePassages counts a document's matching passages not shown. Optionally kept to a folder, to documents changed since a date, or to fewer documents; compact, it shows no passages.`,
       inputSchema: z.object({
         query: z.string().describe('What to look for, in any language'),
         folder: FOLDER.optional(),
@@ -231,7 +234,7 @@ function server(context: ToolContext): McpServer {
     'fetch',
     {
       title: `Read a document from ${site}`,
-      description: `Read one ${site} document by the id search returned: its whole Markdown text, its link to cite, and in its metadata when it last changed, the folders it sits in and the Google Doc or PDF it is published from.`,
+      description: `Read one ${site} document by the id search, browse or recent returned: its link to cite; in its metadata the day it last changed, the folders it sits in, the Google Doc or PDF it is published from (format, and a PDF's pages), its length in characters and whether the text was cut; then its whole Markdown text.`,
       inputSchema: z.object({
         id: z.string().describe('A document id from search'),
       }),
@@ -244,7 +247,9 @@ function server(context: ToolContext): McpServer {
       );
       log({ event: 'tool', tool: 'fetch', found: document !== undefined });
       if (!document) {
-        throw new Error('No document with that id.');
+        throw new Error(
+          'No document with that id for this person. Find a document’s id with search, browse or recent.',
+        );
       }
       return result({ ...document });
     },
@@ -254,7 +259,7 @@ function server(context: ToolContext): McpServer {
     'browse',
     {
       title: `Browse ${site}`,
-      description: `List a folder of ${site} as a tree: its documents and its folders, each folder with how many documents under it the signed-in person may read, and the folders in those as deep as one answer allows. A folder that does not fit is collapsed, with its name and count; browse it to list it. Each document has its id, title and the day it last changed; its link is \`links\` with its id in place of {id}. Without a folder, lists the whole knowledge base from the top.`,
+      description: `List a folder of ${site} as a tree: its documents and its folders, each folder with how many documents under it the signed-in person may read, and the folders in those as deep as one answer allows. A folder that does not fit is collapsed, with its name and count; browse it to list it. Each document has its id, title, the day it last changed and its length in characters; its link is \`links\` with its id in place of {id}. Without a folder, lists the whole knowledge base from the top.`,
       inputSchema: z.object({
         folder: FOLDER.optional(),
         depth: z
@@ -299,7 +304,7 @@ function server(context: ToolContext): McpServer {
     'recent',
     {
       title: `Recent changes in ${site}`,
-      description: `List the documents of ${site} the signed-in person may read that changed most recently in Google Drive, newest first, each with its id, title, link, folders and when it changed: ${recent.defaultResults} unless asked for up to ${recent.results}. Optionally since a date, and under a folder.`,
+      description: `List the documents of ${site} the signed-in person may read that changed most recently in Google Drive, newest first, each with its id, title, link, folders, when it changed, to the minute in UTC, and its length in characters: ${recent.defaultResults} unless asked for up to ${recent.results}. Optionally since a date, and under a folder.`,
       inputSchema: z.object({
         changedSince: CHANGED_SINCE.optional(),
         folder: FOLDER.optional(),

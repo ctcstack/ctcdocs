@@ -75,6 +75,12 @@ const jsonLd =
    */
 }
 <meta name="ctcdocs:source" content={data.sourceType} />
+{/* How many pages a PDF has, which assistants are told (ADR-044). */}
+{
+  typeof data.pdf?.pages === 'number' && (
+    <meta name="ctcdocs:pdf-pages" content={String(data.pdf.pages)} />
+  )
+}
 {
   markdownPath && (
     <link rel="alternate" type="text/markdown" href={markdownPath} />

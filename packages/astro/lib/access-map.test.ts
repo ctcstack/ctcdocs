@@ -214,6 +214,7 @@ describe('readBuiltPage', () => {
     expect(built).toEqual({
       path: '/team/plan/',
       source: 'google-doc',
+      pdfPages: undefined,
       redirect: false,
       searchable: true,
       images: [
@@ -231,5 +232,18 @@ describe('readBuiltPage', () => {
         '<meta http-equiv="refresh" content="0;url=/team/plan/">',
       ).redirect,
     ).toBe(true);
+  });
+
+  it('reads the pages of a PDF, and only a whole number of them', () => {
+    const pages = (content: string) =>
+      readBuiltPage(
+        '/forms/scan/',
+        `<meta name="ctcdocs:source" content="drive-pdf"><meta name="ctcdocs:pdf-pages" content="${content}">`,
+      ).pdfPages;
+    expect(pages('12')).toBe(12);
+    expect(pages('0')).toBe(0);
+    expect(pages('1.5')).toBeUndefined();
+    expect(pages('many')).toBeUndefined();
+    expect(pages('')).toBeUndefined();
   });
 });

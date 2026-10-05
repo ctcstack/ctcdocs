@@ -63,6 +63,8 @@ export const agentMap: AccessMapFile = {
         modified: '2026-10-01T00:00:00.000Z',
         path: [],
         source: 'https://docs.google.com/document/d/handbook/edit',
+        format: 'doc',
+        characters: '# Handbook\n'.length,
         hash: 'h-handbook',
       },
       {
@@ -72,6 +74,9 @@ export const agentMap: AccessMapFile = {
         modified: null,
         path: ['Team'],
         source: null,
+        format: 'pdf',
+        pages: 3,
+        characters: '# Team plan\n'.length,
         hash: 'h-plan',
       },
       {
@@ -81,6 +86,8 @@ export const agentMap: AccessMapFile = {
         modified: null,
         path: ['Unruled'],
         source: null,
+        format: 'doc',
+        characters: '# Unruled notes\n'.length,
         hash: 'h-notes',
       },
     ],
