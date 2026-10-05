@@ -363,30 +363,42 @@ async function verifyAgents({ map, projectRoot, distRoot, environment, keys }) {
         `MCP search showed ${name} ${result.id} without a passage.`,
       );
     }
-    // Every folder `browse` names, walked by its labels, and `recent`
-    // (ADR-044): each lists only what the person may open.
+    // Every folder `browse` names, in its tree or collapsed and browsed by
+    // its labels, and `recent` (ADR-044): each lists only what the person
+    // may open.
     const listed = new Set();
     let omitted = false;
-    const folders = [[]];
-    while (folders.length > 0) {
-      const folder = folders.pop();
-      const listing = browseFolder(access, folder);
-      requests += 1;
-      assert.ok(
-        listing,
-        `MCP browse named ${name} a folder it then would not list.`,
-      );
-      omitted ||= listing.omitted > 0;
-      for (const document of listing.documents) {
-        listed.add(document.id);
-      }
-      for (const inner of listing.folders) {
+    const collapsed = [[]];
+    const walk = (path, folders) => {
+      for (const inner of folders) {
         assert.ok(
-          inner.documents > 0,
+          inner.count > 0,
           `MCP browse named ${name} a folder with nothing for them.`,
         );
-        folders.push(inner.path);
+        const labels = [...path, inner.name];
+        if (inner.collapsed) {
+          collapsed.push(labels);
+          continue;
+        }
+        for (const document of inner.documents ?? []) {
+          listed.add(document.id);
+        }
+        walk(labels, inner.folders ?? []);
       }
+    };
+    while (collapsed.length > 0) {
+      const folder = collapsed.pop();
+      const tree = browseFolder(access, folder);
+      requests += 1;
+      assert.ok(
+        tree,
+        `MCP browse named ${name} a folder it then would not list.`,
+      );
+      omitted ||= tree.omitted !== undefined;
+      for (const document of tree.documents) {
+        listed.add(document.id);
+      }
+      walk(tree.folder, tree.folders);
     }
     for (const document of recentDocuments(access, {}, RECENT_LIMIT)) {
       listed.add(document.id);

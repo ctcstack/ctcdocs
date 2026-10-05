@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import type { AccessMapFile, AgentDocument } from '../access-map.js';
 import type { Reader } from '../decide.js';
 import {
+  BROWSE_CHARACTERS,
   browseFolder,
+  collapsedFolders,
   NarrowingError,
   RECENT_LIMIT,
   recentDocuments,
@@ -13,6 +15,7 @@ import {
   type IndexedChunk,
 } from './documents.js';
 import { MemoryStore } from './memory-store.js';
+import { serveMcp } from './tools.js';
 import { agentMap, FixedIndex, ORIGIN, readers } from './test-support.js';
 
 /**
@@ -113,31 +116,56 @@ const ids = (results: readonly { id: string }[] | undefined) =>
   (results ?? []).map((result) => result.id);
 
 describe('browse', () => {
-  it('lists the top level a member may see, and no other folder', () => {
+  const links = `${ORIGIN}/d/{id}/`;
+
+  it('lists the whole tree a member may see, and no other folder', () => {
     expect(browseFolder(access(readers.member))).toEqual({
       folder: [],
-      folders: [{ name: 'Tools', path: ['Tools'], documents: 3 }],
-      documents: [
+      documents: [{ id: 'aaaaaa', title: 'Handbook', modified: '2026-10-01' }],
+      folders: [
         {
-          id: 'aaaaaa',
-          title: 'Handbook',
-          url: `${ORIGIN}/d/aaaaaa/`,
-          path: [],
-          modified: '2026-10-01T00:00:00.000Z',
+          name: 'Tools',
+          count: 3,
+          documents: [{ id: 'gggggg', title: 'Undated' }],
+          folders: [
+            {
+              name: 'LeadByte',
+              count: 2,
+              documents: [
+                { id: 'dddddd', title: 'Deliveries', modified: '2026-09-01' },
+                { id: 'eeeeee', title: 'Returns', modified: '2026-09-15' },
+              ],
+            },
+          ],
         },
       ],
-      omitted: 0,
+      links,
     });
   });
 
+  it('lists only the levels asked for, the rest collapsed', () => {
+    expect(browseFolder(access(readers.member), undefined, 1)).toEqual({
+      folder: [],
+      documents: [{ id: 'aaaaaa', title: 'Handbook', modified: '2026-10-01' }],
+      folders: [{ name: 'Tools', count: 3, collapsed: true }],
+      links,
+    });
+    expect(
+      browseFolder(access(readers.member), undefined, 2)?.folders[0]?.folders,
+    ).toEqual([{ name: 'LeadByte', count: 2, collapsed: true }]);
+  });
+
   it('lists a folder, its folders counted by what the reader may open', () => {
-    const tools = browseFolder(access(readers.member), 'Tools');
+    const tools = browseFolder(access(readers.member), 'Tools', 1);
+    expect(tools?.folder).toEqual(['Tools']);
     expect(tools?.folders).toEqual([
-      { name: 'LeadByte', path: ['Tools', 'LeadByte'], documents: 2 },
+      { name: 'LeadByte', count: 2, collapsed: true },
     ]);
     expect(ids(tools?.documents)).toEqual(['gggggg']);
     expect(
-      browseFolder(access(readers.team), 'Tools')?.folders.map((f) => f.name),
+      browseFolder(access(readers.team), 'Tools', 1)?.folders.map(
+        (folder) => folder.name,
+      ),
     ).toEqual(['Hidden', 'LeadByte']);
   });
 
@@ -159,11 +187,11 @@ describe('browse', () => {
       ],
     ]);
     const member = access(readers.member, { map: spaced });
-    const top = browseFolder(member);
-    const folder = top?.folders.find((entry) => entry.name === 'Forms / Pages');
-    expect(folder?.path).toEqual(['Forms / Pages']);
-    // The path as returned reads it, and so does its name as a string.
-    expect(ids(browseFolder(member, folder?.path)?.documents)).toEqual([
+    expect(
+      browseFolder(member, undefined, 1)?.folders.map((folder) => folder.name),
+    ).toEqual(['Forms / Pages', 'Sites']);
+    // Its names as a list read it, and so does its name as a string.
+    expect(ids(browseFolder(member, ['Forms / Pages'])?.documents)).toEqual([
       'aaaaaa',
     ]);
     expect(ids(browseFolder(member, 'Forms / Pages')?.documents)).toEqual([
@@ -208,26 +236,137 @@ describe('browse', () => {
   it('shows a stale directory only what every member reads', () => {
     const stale = access(readers.team, { stale: true });
     expect(browseFolder(stale, 'Team')).toBe(undefined);
-    expect(browseFolder(stale)?.folders.map((f) => f.name)).toEqual(['Tools']);
+    expect(browseFolder(stale)?.folders.map((folder) => folder.name)).toEqual([
+      'Tools',
+    ]);
+    expect(browseFolder(stale)).toEqual(browseFolder(access(readers.member)));
   });
 
-  it('lists a hundred documents of a folder and counts the rest', () => {
-    const many = Array.from(
-      { length: 105 },
-      (_, n): [string, string, string[], string, string | null] => [
-        `${n}`.padStart(6, 'a'),
-        `Page ${n}`,
-        ['Big'],
-        'members',
-        null,
-      ],
+  /** `count` documents with long titles in the folder at `path`. */
+  const filled = (
+    prefix: string,
+    count: number,
+    path: string[],
+  ): [string, string, string[], string, string | null][] =>
+    Array.from({ length: count }, (_, n) => [
+      `${prefix}${n}`.padStart(6, '0'),
+      `A document with a long enough title, number ${n}`,
+      path,
+      'members',
+      '2026-10-01T00:00:00.000Z',
+    ]);
+
+  it('keeps a tree within its budget, collapsing the largest folders first', () => {
+    const map = catalogMap([
+      ...filled('b', 600, ['Big']),
+      ...filled('s', 3, ['Small']),
+      ...filled('i', 2, ['Small', 'Inner']),
+    ]);
+    const tree = browseFolder(access(readers.member, { map }));
+    expect(JSON.stringify(tree).length).toBeLessThanOrEqual(BROWSE_CHARACTERS);
+    expect(tree?.folders).toMatchObject([
+      { name: 'Big', count: 600, collapsed: true },
+      {
+        name: 'Small',
+        count: 5,
+        folders: [{ name: 'Inner', count: 2 }],
+      },
+    ]);
+    expect(tree?.folders[1]?.folders?.[0]?.documents).toHaveLength(2);
+    expect(collapsedFolders(tree?.folders ?? [])).toBe(1);
+  });
+
+  it('lists a folder too large to fit as far as it fits, and counts the rest', () => {
+    const map = catalogMap([
+      ...filled('b', 600, ['Big']),
+      ...filled('i', 2, ['Big', 'Inner']),
+    ]);
+    const tree = browseFolder(access(readers.member, { map }), 'Big');
+    expect(JSON.stringify(tree).length).toBeLessThanOrEqual(BROWSE_CHARACTERS);
+    // Its folders first, collapsed, then as many documents as fit.
+    expect(tree?.folders).toEqual([
+      { name: 'Inner', count: 2, collapsed: true },
+    ]);
+    const listed = tree?.documents.length ?? 0;
+    expect(listed).toBeGreaterThan(100);
+    expect(tree?.omitted).toEqual({ documents: 600 - listed, folders: 0 });
+  });
+});
+
+describe('browse through the MCP server', () => {
+  /** A `browse` call for `reader`, as an assistant makes it. */
+  async function browse(reader: Reader, args: object, map = MAP) {
+    const response = await serveMcp(
+      new Request(`${ORIGIN}/mcp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          'MCP-Protocol-Version': '2025-11-25',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: { name: 'browse', arguments: args },
+        }),
+      }),
+      { ...access(reader, { map }), log: () => undefined },
     );
-    const listing = browseFolder(
-      access(readers.member, { map: catalogMap(many) }),
-      'Big',
+    // Answered over SSE: one `data:` line for the one message.
+    const data = (await response.text())
+      .split('\n')
+      .find((line) => line.startsWith('data: '))
+      ?.slice('data: '.length);
+    return JSON.parse(data ?? '{}') as {
+      result?: {
+        content?: { text?: string }[];
+        structuredContent?: Record<string, unknown>;
+        isError?: boolean;
+      };
+    };
+  }
+
+  it('answers a nested tree that passes its declared output schema', async () => {
+    const { result } = await browse(readers.team, {});
+    expect(result?.isError).not.toBe(true);
+    expect(result?.structuredContent).toEqual(
+      browseFolder(access(readers.team)),
     );
-    expect(listing?.documents).toHaveLength(100);
-    expect(listing?.omitted).toBe(5);
+    expect(JSON.parse(result?.content?.[0]?.text ?? '')).toEqual(
+      result?.structuredContent,
+    );
+  });
+
+  it('says inside the answer what it collapsed or left out', async () => {
+    expect(
+      (await browse(readers.member, { depth: 1 })).result?.structuredContent,
+    ).toMatchObject({
+      folders: [{ name: 'Tools', collapsed: true }],
+      note: expect.stringContaining('1 folder is collapsed'),
+    });
+    const big = catalogMap(
+      Array.from(
+        { length: 600 },
+        (_, n): [string, string, string[], string, string | null] => [
+          `${n}`.padStart(6, 'b'),
+          `A document with a long enough title, number ${n}`,
+          ['Big'],
+          'members',
+          null,
+        ],
+      ),
+    );
+    const answer = (await browse(readers.member, { folder: 'Big' }, big)).result
+      ?.structuredContent;
+    expect(answer?.note).toContain('documents and 0 folders directly in it');
+    expect(
+      (await browse(readers.member, { folder: 'Team' })).result
+        ?.structuredContent,
+    ).toMatchObject({
+      folders: [],
+      note: expect.stringContaining('No folder by that path'),
+    });
   });
 });
 

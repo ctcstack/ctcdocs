@@ -4,8 +4,9 @@
 - Date: 2026-10-04
 - Owners: CTCDocs maintainers
 - Supersedes: ADR-042 in part, once accepted: the MCP server serves four
-  tools, not two, and a passage's share of the budget follows the documents
-  a search finds
+  tools, not two; a passage's share of the budget follows the documents
+  a search finds; and a note is a field of the answer, not a text item beside
+  it
 
 ## Context
 
@@ -27,6 +28,17 @@ for everything of a kind, or for what is new, is not a question of meaning:
   for fewer or for titles alone. And a passage was cut at a tenth of the
   budget however few documents a search found, so a list in a matching chunk
   ended mid-item and the assistant read the whole document for one line.
+- **A tree takes a call a folder, and a list repeats itself.** `browse`
+  listed one level, so the same review took four calls to see which folders
+  under one held documents of a kind. Each folder repeated its parents' path
+  and each document its whole link and a time to the millisecond, which a
+  tree and one pattern for the links say once.
+- **Clients give the model different parts of an answer.** Claude Desktop
+  gives the model a tool result's text and drops its structured content;
+  Claude Code, when both are present, gives it the structured content alone
+  (<https://github.com/anthropics/claude-code/issues/55677>). A note sent as
+  a text item after the JSON, as `search` and `browse` sent theirs, never
+  reached the model in Claude Code.
 
 ADR-041 notes a `browse` tool for when people ask for it, and ADR-042's
 follow-ups name the rest: tools to list a folder and recent changes, and
@@ -69,23 +81,55 @@ document against the reader with it.
 
 ### Two more tools, from the build's catalog
 
-- **`browse`** lists a folder: the folders directly in it, each with the
-  number of documents under it the reader may open, and the documents
-  directly in it, a hundred at most, saying how many more there are. Without
-  a folder it lists the corpus root.
+- **`browse`** lists a folder as a tree, within a budget: its documents and
+  its folders, and the folders in those as deep as 24,000 characters of JSON
+  allow, about 6,000 tokens, the budget a search's passages take. Without a
+  folder it lists the corpus root, so a small corpus is listed whole in one
+  call. Each folder carries the number of documents under it the reader may
+  open, and is either listed, with its documents and folders, or collapsed,
+  with its name and count alone.
 - **`recent`** lists the documents most recently changed in Drive, newest
   first: twenty unless the call asks for up to fifty, optionally since a
   date and under a folder.
 
-Each document they list carries `id`, `title`, `url`, `path` and `modified`,
-as a search result does without its passages, so `fetch` reads it. Both are
-read-only and annotated so.
+`recent` lists each document with `id`, `title`, `url`, `path` and
+`modified`, as a search result does without its passages, so `fetch` reads
+it. `browse` lists each with `id`, `title` and the day it last changed: its
+folders are where it sits in the tree, and its link is the answer's `links`
+pattern, with its id in place of `{id}`. Both are read-only and annotated so.
 
 Neither calls AI Search. Both read the catalog in the access map and keep only
 the documents the reader may open, by the rule `fetch` uses, stale directory
 included. A folder exists for a reader only when it holds, directly or below,
 a document they may open: neither tool names any other, and a folder no one
 may read under looks as absent as one that does not exist.
+
+### A tree is listed level by level
+
+What is directly in the folder is listed first: its folders, collapsed, then
+its documents, by title. When that alone does not fit, as many documents as
+fit are listed, the rest are counted in `omitted`, and nothing below is
+listed; the answer says to browse its folders or search within it. Otherwise
+each level after lists more of the folders the level before listed: those
+whose listing takes the fewest characters first, each whole or not at all,
+while the budget holds. A folder left out stays collapsed, and the answer
+says how many are and that browsing one by its path lists it. A large folder
+is collapsed before many small ones, since its own `browse` lists it; a level
+is never listed before the one above it. An optional `depth` caps the levels:
+one lists only what is directly in the folder.
+
+The budget, not a count of documents or levels, bounds the answer, since a
+title or a folder name is as long as its author made it. The order of folders
+and documents is by name, so an answer is the same for the same build and
+reader. There is no cursor: a folder whose own documents do not fit is rare,
+and search within it finds what the list leaves out.
+
+### Notes are part of the answer
+
+Every tool answers with one value, as JSON text and as structured content
+alike. A note for the assistant, such as why a search found nothing, why a
+folder is not there, or what a tree collapsed, is a `note` field of that
+value, not a text item of its own, so every client gives it to the model.
 
 ### A folder is named by its path
 
@@ -153,7 +197,7 @@ order stay as ADR-042 set them.
 Each tool's description says what it returns; `search` names the project's
 `results` rather than ten. The server's instructions add that a question
 asking for every document of a kind, or for what is new, is answered by
-`browse` and `recent`, that a search can be kept to a folder or a date, and
+`browse`, which lists a tree, and `recent`, that a search can be kept to a folder or a date, and
 that a compact search shows which documents match without their passages.
 
 ## Consequences
@@ -167,6 +211,9 @@ that a compact search shows which documents match without their passages.
 - Nothing is reindexed and no AI Search setting changes: the folder and date
   come from the build, as access does.
 - No tool names a folder or a document the reader may not open.
+- A small corpus is listed whole by one `browse`, and a large one as deep as
+  the budget allows, the large folders collapsed for a call of their own.
+- An answer's note reaches the model in every client.
 - A question about which documents exist costs a compact search, a few
   hundred characters a document, instead of the whole passage budget.
 - A search that finds few documents shows their passages whole, up to the
@@ -185,6 +232,10 @@ that a compact search shows which documents match without their passages.
 - ChatGPT has not been seen calling the new tools or the optional parameters.
 - A search that finds few documents returns more characters than before,
   still within the budget.
+- An assistant builds a document's link from `browse`'s pattern, which it
+  may get wrong; `fetch` and `search` still return each link whole.
+- Which folders a tree collapses depends on how long their titles are, not
+  on which matter more to the question.
 
 ### Follow-up
 
