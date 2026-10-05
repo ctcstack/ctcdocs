@@ -218,7 +218,8 @@ The build writes the resolved values into the access map, so a change takes
 effect with the project's next deploy. ADR-042 records what each setting did
 when the defaults were first measured, and what AI Search does with the
 settings its documentation leaves unsaid; measure a change against the
-project's own questions before keeping it.
+project's own questions with `ctcdocs-eval-search` before keeping it
+([operations](OPERATIONS.md)).
 
 ## Who may read which folder
 

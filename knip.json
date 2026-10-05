@@ -9,7 +9,8 @@
   "workspaces": {
     ".": {},
     "packages/astro": {
-      "entry": ["worker/index.ts", "worker/directory/index.ts"]
+      "entry": ["worker/index.ts", "worker/directory/index.ts"],
+      "ignoreDependencies": ["wrangler"]
     },
     "packages/core": {
       "entry": ["src/index.ts", "src/published-markdown.ts"]
