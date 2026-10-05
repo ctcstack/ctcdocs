@@ -2,6 +2,77 @@
 
 All three packages share a version and are released together.
 
+## 0.20.0
+
+An assistant's search shows the chunks that match whole, never cut, and lists
+the other documents it found, fifteen in all; `browse` lists a folder as a
+tree within a budget; and every tool gives a document's date, length and
+format the same way
+([ADR-044](docs/ADR/044-assistants-list-a-folder-and-recent-changes-and-narrow-a-search.md),
+still proposed). A project measures its search with the platform's own code.
+
+### Added
+
+- **`search` takes `limit` and `compact`**: fewer documents, or titles,
+  links, folders and dates alone.
+- **`characters` on every document a tool lists**, the length of the text
+  `fetch` returns, so an assistant knows what reading one costs; `fetch`
+  gives the whole document's length however much it returned.
+- **`fetch` names its `format`**, `doc` or `pdf`, and a PDF's `pages`, which
+  the build reads from a new `ctcdocs:pdf-pages` meta on the document's page.
+- **`browse` takes `depth`**, to cap the levels of its tree.
+- **`mcp.browseCharacters`**, the budget of a `browse` tree, 24,000 unless a
+  project sets another, and **`mcp.recent.defaultResults`** and
+  **`mcp.recent.results`**, twenty and fifty: the numbers `browse` and
+  `recent` used to fix.
+- **`ctcdocs-eval-search`** runs a project's own questions,
+  `evaluation/search-questions.json`, through the Worker's `searchDocuments`
+  against its AI Search instance, under variants that change one setting
+  each, and writes each run to `evaluation/results/<date>-<label>/`: rank,
+  recall, and whether the passages of the documents a question needs show the
+  words its answer holds. It writes no document text.
+
+### Changed
+
+- **`search` no longer cuts a passage.** It takes the chunks that count in
+  the index's order, across documents, and shows each whole while the budget
+  holds, at most `passagesPerResult` of one document; a chunk that does not
+  fit is left out and counted in `morePassages`, and a chunk a shown one of
+  its document already holds is shown once. The other documents found are
+  listed without `text`. Measured on one deployment's corpus, the answers
+  shown rose from 23 to 25 of 32 and the recall of the list from 0.859 to
+  0.916.
+- **`mcp.search.results` lists 15 documents unless set**, not ten.
+  `mcp.search.passageCharacters` takes 1,000 or more, no longer 100 for each
+  result, so every configuration 0.19.0 accepted is still accepted.
+- **`browse` returns a nested tree**: what is directly in the folder, then its
+  folders level by level, those taking the fewest characters first, each
+  listed whole or collapsed with its name and count. A document is listed
+  with its id, title, day and length, and one `links` pattern replaces a URL
+  on each entry. Without a folder it lists the whole knowledge base, as far as
+  the budget holds.
+- **Dates are `YYYY-MM-DD`** in `search`, `browse` and `fetch`, and to the
+  minute in UTC in `recent`, instead of Drive's time to the millisecond.
+- **`fetch` puts `metadata` before `text`**, and an unknown id says to find
+  one with `search`, `browse` or `recent`.
+- **A note for the assistant is a `note` field of the answer**, not a text
+  item beside the JSON: Claude Code gives the model only a result's structured
+  content, so it never saw the notes `search` and `browse` sent.
+
+### Upgrade note
+
+Bump the packages and the workflow pins. Assistants see the new shapes after
+their next tool listing; a script that parsed the old ones, `search` results
+always carrying `text` or `browse`'s flat lists, needs updating.
+
+Every passage is now a whole chunk, so the instance's chunk size decides how
+many fit the budget: about seven of AI Search's default 1,024 tokens. Measure
+an instance of smaller chunks over the same bucket with
+`ctcdocs-eval-search --instance <name>` before binding it; on the corpus
+measured, 800 tokens ranked best in both of its languages. Keep
+`mcp.search.contextChunks` at 0: neighbouring chunks now lengthen every
+passage instead of being cut away.
+
 ## 0.19.0
 
 Assistants can list a folder and the latest changes, and keep a search to a
