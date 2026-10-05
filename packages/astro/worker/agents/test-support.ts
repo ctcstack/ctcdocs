@@ -19,6 +19,8 @@ export const ORIGIN = 'https://docs.example.com';
 export const agentSettings = {
   search: MCP_DEFAULTS.search,
   fetchCharacters: MCP_DEFAULTS.fetchCharacters,
+  browseCharacters: MCP_DEFAULTS.browseCharacters,
+  recent: MCP_DEFAULTS.recent,
 };
 
 export const agentMap: AccessMapFile = {

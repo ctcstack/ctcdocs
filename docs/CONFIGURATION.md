@@ -167,7 +167,8 @@ in `wrangler.jsonc` so that turning it on again is one change.
 
 How the server searches and how much it returns can be tuned for the
 project's corpus, without a new version of the platform
-([ADR-042](ADR/042-an-assistants-search-returns-the-passages-that-match.md)).
+([ADR-042](ADR/042-an-assistants-search-returns-the-passages-that-match.md),
+[ADR-044](ADR/044-assistants-list-a-folder-and-recent-changes-and-narrow-a-search.md)).
 Every setting is optional, and the defaults are the values shown:
 
 ```json
@@ -187,7 +188,12 @@ Every setting is optional, and the defaults are the values shown:
     "passagesPerResult": 3,
     "passageCharacters": 24000
   },
-  "fetchCharacters": 100000
+  "fetchCharacters": 100000,
+  "browseCharacters": 24000,
+  "recent": {
+    "defaultResults": 20,
+    "results": 50
+  }
 }
 ```
 
@@ -204,6 +210,9 @@ Every setting is optional, and the defaults are the values shown:
 | `mcp.search.passagesPerResult`   | Passages each document shows at most.                                                                                                                                                                                            |
 | `mcp.search.passageCharacters`   | Characters of passage text a search returns in all; at least 100 for each result.                                                                                                                                                |
 | `mcp.fetchCharacters`            | Characters `fetch` returns at most, 1,000 or more; a longer document is cut there, and the content health page names it.                                                                                                         |
+| `mcp.browseCharacters`           | Characters of JSON a `browse` tree takes at most, 1,000 or more: as many levels of folders are listed as fit, and the rest collapsed.                                                                                            |
+| `mcp.recent.defaultResults`      | Documents `recent` lists when a call does not ask for a number: no more than `recent.results`, which is also the default when it is under 20.                                                                                    |
+| `mcp.recent.results`             | Documents a call to `recent` may ask for at most.                                                                                                                                                                                |
 
 The build writes the resolved values into the access map, so a change takes
 effect with the project's next deploy. ADR-042 records what each setting did

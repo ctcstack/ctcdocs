@@ -19,8 +19,6 @@ import {
   fetchDocument,
   linkPattern,
   NarrowingError,
-  RECENT_DEFAULT,
-  RECENT_LIMIT,
   recentDocuments,
   searchDocuments,
   type DocumentAccess,
@@ -175,6 +173,7 @@ function result(value: Record<string, unknown>, note?: string) {
 function server(context: ToolContext): McpServer {
   const { map, log } = context;
   const mostResults = map.agents?.search.results ?? 1;
+  const recent = map.agents?.recent ?? { defaultResults: 1, results: 1 };
   const site = map.site.title;
   const about = map.site.description ? ` ${map.site.description}.` : '';
   const mcp = new McpServer(
@@ -299,11 +298,11 @@ function server(context: ToolContext): McpServer {
     'recent',
     {
       title: `Recent changes in ${site}`,
-      description: `List the documents of ${site} the signed-in person may read that changed most recently in Google Drive, newest first, each with its id, title, link, folders and when it changed: ${RECENT_DEFAULT} unless asked for up to ${RECENT_LIMIT}. Optionally since a date, and under a folder.`,
+      description: `List the documents of ${site} the signed-in person may read that changed most recently in Google Drive, newest first, each with its id, title, link, folders and when it changed: ${recent.defaultResults} unless asked for up to ${recent.results}. Optionally since a date, and under a folder.`,
       inputSchema: z.object({
         changedSince: CHANGED_SINCE.optional(),
         folder: FOLDER.optional(),
-        limit: z.number().int().min(1).max(RECENT_LIMIT).optional(),
+        limit: z.number().int().min(1).max(recent.results).optional(),
       }),
       outputSchema: RECENT_OUTPUT,
       annotations: { readOnlyHint: true, openWorldHint: false },

@@ -80,6 +80,7 @@ export type {
   DeploymentVisibility,
   HomeConfiguration,
   McpConfiguration,
+  McpRecentConfiguration,
   McpSearchConfiguration,
   NavigationConfiguration,
   SignInConfiguration,

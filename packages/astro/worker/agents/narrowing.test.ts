@@ -3,11 +3,9 @@ import { describe, expect, it } from 'vitest';
 import type { AccessMapFile, AgentDocument } from '../access-map.js';
 import type { Reader } from '../decide.js';
 import {
-  BROWSE_CHARACTERS,
   browseFolder,
   collapsedFolders,
   NarrowingError,
-  RECENT_LIMIT,
   recentDocuments,
   RESTRICTION_LIMIT,
   searchDocuments,
@@ -16,7 +14,13 @@ import {
 } from './documents.js';
 import { MemoryStore } from './memory-store.js';
 import { serveMcp } from './tools.js';
-import { agentMap, FixedIndex, ORIGIN, readers } from './test-support.js';
+import {
+  agentMap,
+  agentSettings,
+  FixedIndex,
+  ORIGIN,
+  readers,
+} from './test-support.js';
 
 /**
  * A corpus where what a member may not open is newer than what they may,
@@ -84,6 +88,23 @@ function catalogMap(
 }
 
 const MAP = catalogMap(DOCUMENTS);
+
+/** The budget a `browse` tree keeps to, as the project sets it. */
+const BUDGET = agentSettings.browseCharacters;
+
+/** `map` with the project's MCP settings changed. */
+function withSettings(
+  map: AccessMapFile,
+  settings: Partial<NonNullable<AccessMapFile['agents']>>,
+): AccessMapFile {
+  return {
+    ...map,
+    agents: {
+      ...(map.agents as NonNullable<AccessMapFile['agents']>),
+      ...settings,
+    },
+  };
+}
 
 /** An index that returns a chunk of every document, whatever it is asked. */
 function everything(
@@ -263,7 +284,7 @@ describe('browse', () => {
       ...filled('i', 2, ['Small', 'Inner']),
     ]);
     const tree = browseFolder(access(readers.member, { map }));
-    expect(JSON.stringify(tree).length).toBeLessThanOrEqual(BROWSE_CHARACTERS);
+    expect(JSON.stringify(tree).length).toBeLessThanOrEqual(BUDGET);
     expect(tree?.folders).toMatchObject([
       { name: 'Big', count: 600, collapsed: true },
       {
@@ -276,13 +297,25 @@ describe('browse', () => {
     expect(collapsedFolders(tree?.folders ?? [])).toBe(1);
   });
 
+  it('keeps to the budget the project sets', () => {
+    const map = catalogMap([
+      ...filled('b', 600, ['Big']),
+      ...filled('s', 3, ['Small']),
+    ]);
+    const larger = withSettings(map, { browseCharacters: BUDGET * 4 });
+    const tree = browseFolder(access(readers.member, { map: larger }));
+    expect(JSON.stringify(tree).length).toBeGreaterThan(BUDGET);
+    expect(JSON.stringify(tree).length).toBeLessThanOrEqual(BUDGET * 4);
+    expect(collapsedFolders(tree?.folders ?? [])).toBe(0);
+  });
+
   it('lists a folder too large to fit as far as it fits, and counts the rest', () => {
     const map = catalogMap([
       ...filled('b', 600, ['Big']),
       ...filled('i', 2, ['Big', 'Inner']),
     ]);
     const tree = browseFolder(access(readers.member, { map }), 'Big');
-    expect(JSON.stringify(tree).length).toBeLessThanOrEqual(BROWSE_CHARACTERS);
+    expect(JSON.stringify(tree).length).toBeLessThanOrEqual(BUDGET);
     // Its folders first, collapsed, then as many documents as fit.
     expect(tree?.folders).toEqual([
       { name: 'Inner', count: 2, collapsed: true },
@@ -402,7 +435,16 @@ describe('recent', () => {
     expect(recentDocuments(member, {}, 0)).toHaveLength(1);
     expect(
       recentDocuments(access(readers.team), {}, 999).length,
-    ).toBeLessThanOrEqual(RECENT_LIMIT);
+    ).toBeLessThanOrEqual(agentSettings.recent.results);
+  });
+
+  it('lists as many as the project sets, unless asked, and no more than it allows', () => {
+    const map = withSettings(MAP, {
+      recent: { defaultResults: 1, results: 2 },
+    });
+    const team = access(readers.team, { map });
+    expect(ids(recentDocuments(team))).toEqual(['ffffff']);
+    expect(ids(recentDocuments(team, {}, 999))).toEqual(['ffffff', 'bbbbbb']);
   });
 
   it.each([

@@ -206,6 +206,8 @@ describe('MCP configuration', () => {
           results: 5,
         },
         fetchCharacters: 60_000,
+        browseCharacters: 48_000,
+        recent: { results: 100 },
       }),
     ).mcp;
     expect(mcp).toEqual({
@@ -219,7 +221,16 @@ describe('MCP configuration', () => {
         results: 5,
       },
       fetchCharacters: 60_000,
+      browseCharacters: 48_000,
+      recent: { defaultResults: 20, results: 100 },
     });
+  });
+
+  it('lists no more recent changes by default than a call may ask for', () => {
+    expect(
+      parseSiteConfiguration(withMcp({ enabled: true, recent: { results: 5 } }))
+        .mcp?.recent,
+    ).toEqual({ defaultResults: 5, results: 5 });
   });
 
   it.each([
@@ -253,6 +264,8 @@ describe('MCP configuration', () => {
         passageCharacters: 24_000,
       },
       fetchCharacters: 100_000,
+      browseCharacters: 24_000,
+      recent: { defaultResults: 20, results: 50 },
     });
   });
 
@@ -303,6 +316,29 @@ describe('MCP configuration', () => {
     expect(() =>
       parseSiteConfiguration(withMcp({ enabled: true, fetchCharacters: 500 })),
     ).toThrow(/mcp\.fetchCharacters must be a whole number of at least 1000/u);
+  });
+
+  it('refuses a browse budget under 1,000 characters', () => {
+    expect(() =>
+      parseSiteConfiguration(withMcp({ enabled: true, browseCharacters: 500 })),
+    ).toThrow(/mcp\.browseCharacters must be a whole number of at least 1000/u);
+  });
+
+  it.each([
+    [
+      { results: 0 },
+      /mcp\.recent\.results must be a whole number of at least 1/u,
+    ],
+    [
+      { results: 10, defaultResults: 11 },
+      /mcp\.recent\.defaultResults must be a whole number from 1 to 10/u,
+    ],
+    [{ extra: 1 }, /mcp\.recent\.extra is not a known/u],
+    ['many', /mcp\.recent must be an object/u],
+  ])('rejects the recent setting %j', (recent, message) => {
+    expect(() =>
+      parseSiteConfiguration(withMcp({ enabled: true, recent })),
+    ).toThrow(message);
   });
 
   it.each([

@@ -179,11 +179,6 @@ function readableDocuments(access: DocumentAccess): AgentDocument[] {
  * the values one filter of keyword search takes (ADR-044).
  */
 export const RESTRICTION_LIMIT = FILTER_VALUES;
-/** Characters of JSON a folder's tree takes at most in `browse`. */
-export const BROWSE_CHARACTERS = 24_000;
-/** Documents `recent` lists unless asked for more, and at most. */
-export const RECENT_DEFAULT = 20;
-export const RECENT_LIMIT = 50;
 
 /** A narrowing an assistant asked for that the server cannot read. */
 export class NarrowingError extends Error {
@@ -452,8 +447,8 @@ const collapsed = (node: FolderNode): Collapsed => ({
 });
 
 /**
- * A folder as a tree, listed level by level, as deep as `depth` and
- * BROWSE_CHARACTERS allow (ADR-044). One level lists what is directly in the
+ * A folder as a tree, listed level by level, as deep as `depth` and the
+ * project's `browseCharacters` allow (ADR-044). One level lists what is directly in the
  * folder, with its folders collapsed. Each level after lists more of the
  * folders the level before listed, those taking the fewest characters first,
  * each whole or not at all; a folder left out stays collapsed, with its name
@@ -482,6 +477,8 @@ export function browseFolder(
       : undefined;
   }
   const root = folderTree(under, segments);
+  // The project's budget (ADR-044); a map without one lists nothing.
+  const budget = access.map.agents?.browseCharacters ?? 0;
 
   // What is directly in the folder: its folders first, then its documents,
   // each while it fits.
@@ -494,7 +491,7 @@ export function browseFolder(
   let used = length(tree);
   const add = <T>(list: T[], item: T) => {
     const cost = length(item) + (list.length > 0 ? 1 : 0);
-    if (used + cost > BROWSE_CHARACTERS) {
+    if (used + cost > budget) {
       return false;
     }
     list.push(item);
@@ -546,7 +543,7 @@ export function browseFolder(
     });
     costs.sort((a, b) => a.cost - b.cost || a.order - b.order);
     for (const { view, open, cost } of costs) {
-      if (used + cost <= BROWSE_CHARACTERS) {
+      if (used + cost <= budget) {
         delete view.collapsed;
         Object.assign(view, open);
         used += cost;
@@ -571,14 +568,22 @@ export function collapsedFolders(folders: readonly BrowsedFolder[]): number {
 
 /**
  * The documents the reader may open that changed last in Drive, newest
- * first, as narrowed; a document without a Drive time is not listed.
+ * first, as narrowed; a document without a Drive time is not listed. As many
+ * as the project lists unless asked, and never more than it allows (ADR-044).
  */
 export function recentDocuments(
   access: DocumentAccess,
   narrowing: Narrowing = {},
-  limit = RECENT_DEFAULT,
+  limit?: number,
 ): ListedDocument[] {
-  const count = Math.min(Math.max(Math.trunc(limit), 1), RECENT_LIMIT);
+  const settings = access.map.agents?.recent;
+  if (!settings) {
+    return [];
+  }
+  const count = Math.min(
+    Math.max(Math.trunc(limit ?? settings.defaultResults), 1),
+    settings.results,
+  );
   return narrowed(readableDocuments(access), narrowing)
     .filter((document) => document.modified !== null)
     .map((document) => ({

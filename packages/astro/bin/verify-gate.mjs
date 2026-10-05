@@ -26,7 +26,6 @@ import {
   browseFolder,
   DOCUMENT_PREFIX,
   fetchDocument,
-  RECENT_LIMIT,
   recentDocuments,
   searchDocuments,
 } from '../dist-node/worker/agents/documents.js';
@@ -400,7 +399,11 @@ async function verifyAgents({ map, projectRoot, distRoot, environment, keys }) {
       }
       walk(tree.folder, tree.folders);
     }
-    for (const document of recentDocuments(access, {}, RECENT_LIMIT)) {
+    for (const document of recentDocuments(
+      access,
+      {},
+      map.agents.recent.results,
+    )) {
       listed.add(document.id);
     }
     requests += 1;

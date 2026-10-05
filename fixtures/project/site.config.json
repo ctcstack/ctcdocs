@@ -29,7 +29,8 @@
   },
   "mcp": {
     "enabled": true,
-    "fetchCharacters": 3000
+    "fetchCharacters": 3000,
+    "browseCharacters": 1000
   },
   "brand": {
     "name": "Example Corp",
