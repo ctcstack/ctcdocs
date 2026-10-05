@@ -686,10 +686,12 @@ describe('an assistant reading', () => {
     // A folder holding nothing the person may open is not named, and an
     // explicit request for it reads as one that does not exist.
     const top = await tool(token, 'browse', {});
-    expect(top.body.result?.structuredContent).toMatchObject({
+    // The whole tree, which passes the tool's declared output schema.
+    expect(top.body.result?.structuredContent).toEqual({
       folder: [],
+      documents: [{ id: 'aaaaaa', title: 'Handbook', modified: '2026-10-01' }],
       folders: [],
-      documents: [{ id: 'aaaaaa', title: 'Handbook' }],
+      links: `${ORIGIN}/d/{id}/`,
     });
     const team = await tool(token, 'browse', { folder: 'Team' });
     const missing = await tool(token, 'browse', { folder: 'No such folder' });
@@ -711,15 +713,29 @@ describe('an assistant reading', () => {
     expect(
       (await tool(token, 'search', { query: 'plan', folder: 'Team' })).body
         .result?.structuredContent,
-    ).toEqual({ results: [] });
+    ).toMatchObject({ results: [] });
 
     // Joining the team opens its document to the same connection.
     snapshot = snapshotWith(['user-member'], ['user-member']);
     expect(
       (await tool(token, 'browse', {})).body.result?.structuredContent,
     ).toMatchObject({
-      folders: [{ name: 'Team', path: ['Team'], documents: 1 }],
+      folders: [
+        {
+          name: 'Team',
+          count: 1,
+          documents: [{ id: 'bbbbbb', title: 'Team plan' }],
+        },
+      ],
     });
+    // A level asked for leaves the folders in it collapsed, and says so in
+    // the answer itself, which some clients give the model alone.
+    const level = await tool(token, 'browse', { depth: 1 });
+    expect(level.body.result?.structuredContent).toMatchObject({
+      folders: [{ name: 'Team', count: 1, collapsed: true }],
+      note: expect.stringContaining('1 folder is collapsed'),
+    });
+    expect(level.body.result?.content).toHaveLength(1);
     expect(
       (await tool(token, 'browse', { folder: ' team ' })).body.result
         ?.structuredContent,
@@ -909,15 +925,20 @@ describe('an assistant reading', () => {
     }
   });
 
-  it('says what to do when nothing matches, beside the empty list', async () => {
+  it('says what to do when nothing matches, inside the answer', async () => {
     const { tokens } = await connect('user-member');
     index = new FixedIndex([]);
     const found = await tool(tokens.access_token, 'search', { query: 'x' });
     expect(found.body.result?.isError).not.toBe(true);
-    expect(found.body.result?.structuredContent).toEqual({ results: [] });
-    const [json, note] = found.body.result?.content ?? [];
-    expect(JSON.parse(json?.text ?? '')).toEqual({ results: [] });
-    expect(note?.text).toContain('No document this person may open matches');
+    // The note is in the answer, as text and as structured content alike.
+    const answer = found.body.result?.structuredContent;
+    expect(answer).toEqual({
+      results: [],
+      note: expect.stringContaining('No document this person may open matches'),
+    });
+    const [json, ...rest] = found.body.result?.content ?? [];
+    expect(JSON.parse(json?.text ?? '')).toEqual(answer);
+    expect(rest).toEqual([]);
   });
 
   it('answers a failing index plainly, and logs it by name', async () => {

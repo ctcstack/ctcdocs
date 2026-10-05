@@ -130,6 +130,11 @@ function permanentLink(origin: string, id: string): string {
   return `${origin}${PERMANENT_LINK_PREFIX}${id}/`;
 }
 
+/** Every permanent link, with `{id}` in place of the short ID. */
+export function linkPattern(origin: string): string {
+  return permanentLink(origin, '{id}');
+}
+
 /** The classes whose documents the reader may open. */
 export function readableClasses(
   map: AccessMapFile,
@@ -174,8 +179,8 @@ function readableDocuments(access: DocumentAccess): AgentDocument[] {
  * the values one filter of keyword search takes (ADR-044).
  */
 export const RESTRICTION_LIMIT = FILTER_VALUES;
-/** Documents `browse` lists in one folder at most. */
-const BROWSE_LIMIT = 100;
+/** Characters of JSON a folder's tree takes at most in `browse`. */
+export const BROWSE_CHARACTERS = 24_000;
 /** Documents `recent` lists unless asked for more, and at most. */
 export const RECENT_DEFAULT = 20;
 export const RECENT_LIMIT = 50;
@@ -330,77 +335,238 @@ const collator = new Intl.Collator('en', {
   sensitivity: 'base',
 });
 
-export interface FolderListing {
-  /** The folder's labels, as its documents carry them; none for the root. */
-  readonly folder: readonly string[];
-  /** The folders directly in it, with the documents under each. */
-  readonly folders: readonly {
-    readonly name: string;
-    readonly path: readonly string[];
-    readonly documents: number;
-  }[];
-  /** The documents directly in it, by title. */
-  readonly documents: readonly ListedDocument[];
-  /** Documents directly in it beyond the ones listed. */
-  readonly omitted: number;
+/** A document as `browse` lists it: its link follows the tree's pattern. */
+interface BrowsedDocument {
+  readonly id: string;
+  readonly title: string;
+  /** The day it last changed in Drive, `YYYY-MM-DD`, when known. */
+  readonly modified?: string;
 }
 
 /**
- * A folder's folders and documents, or `undefined` when no document the
- * reader may open sits under it, which a folder that does not exist shares.
+ * A folder in a tree: listed, with its documents and folders, or collapsed,
+ * with only its name and count.
+ */
+export interface BrowsedFolder {
+  readonly name: string;
+  /** Documents under it the reader may open, at any depth. */
+  readonly count: number;
+  readonly collapsed?: true;
+  readonly documents?: readonly BrowsedDocument[];
+  readonly folders?: readonly BrowsedFolder[];
+}
+
+export interface FolderTree {
+  /** The folder's labels, as its documents carry them; none for the root. */
+  readonly folder: readonly string[];
+  /** The documents directly in it, by title. */
+  readonly documents: readonly BrowsedDocument[];
+  /** The folders directly in it, by name, listed as deep as the budget allows. */
+  readonly folders: readonly BrowsedFolder[];
+  /** Every document's link, with its id in place of `{id}`. */
+  readonly links: string;
+  /** What is directly in it that the budget left out, when anything is. */
+  readonly omitted?: { readonly documents: number; readonly folders: number };
+}
+
+/** A folder of the reader's documents, as the tree is built from them. */
+interface FolderNode {
+  readonly name: string;
+  readonly path: readonly string[];
+  readonly documents: AgentDocument[];
+  readonly folders: Map<string, FolderNode>;
+  count: number;
+}
+
+const length = (value: unknown) => JSON.stringify(value).length;
+
+/** The folders in a node, by name. */
+const foldersOf = (node: FolderNode) =>
+  [...node.folders.values()].sort((a, b) => collator.compare(a.name, b.name));
+
+function browsed(document: AgentDocument): BrowsedDocument {
+  return {
+    id: document.id,
+    title: document.title,
+    ...(document.modified ? { modified: document.modified.slice(0, 10) } : {}),
+  };
+}
+
+/** The documents in a node, by title. */
+const documentsOf = (node: FolderNode) =>
+  [...node.documents]
+    .sort(
+      (a, b) => collator.compare(a.title, b.title) || (a.id < b.id ? -1 : 1),
+    )
+    .map(browsed);
+
+/** The tree of folders under `segments`, from the reader's documents. */
+function folderTree(
+  documents: readonly AgentDocument[],
+  segments: readonly string[],
+): FolderNode {
+  const root: FolderNode = {
+    name: '',
+    path: [],
+    documents: [],
+    folders: new Map(),
+    count: 0,
+  };
+  for (const document of documents) {
+    let node = root;
+    node.count += 1;
+    for (
+      let level = segments.length;
+      level < document.path.length;
+      level += 1
+    ) {
+      const label = document.path[level] ?? '';
+      let next = node.folders.get(fold(label));
+      if (!next) {
+        next = {
+          name: label,
+          path: document.path.slice(0, level + 1),
+          documents: [],
+          folders: new Map(),
+          count: 0,
+        };
+        node.folders.set(fold(label), next);
+      }
+      next.count += 1;
+      node = next;
+    }
+    node.documents.push(document);
+  }
+  return root;
+}
+
+/** A folder whose contents are not listed. */
+type Collapsed = { name: string; count: number; collapsed?: true } & {
+  documents?: readonly BrowsedDocument[];
+  folders?: readonly BrowsedFolder[];
+};
+const collapsed = (node: FolderNode): Collapsed => ({
+  name: node.name,
+  count: node.count,
+  collapsed: true,
+});
+
+/**
+ * A folder as a tree, listed level by level, as deep as `depth` and
+ * BROWSE_CHARACTERS allow (ADR-044). One level lists what is directly in the
+ * folder, with its folders collapsed. Each level after lists more of the
+ * folders the level before listed, those taking the fewest characters first,
+ * each whole or not at all; a folder left out stays collapsed, with its name
+ * and count. When what is directly in the folder does not fit, its folders
+ * are listed first, then as many documents as fit, and the rest are counted.
+ *
+ * `undefined` when no document the reader may open sits under the folder,
+ * which a folder that does not exist shares.
  */
 export function browseFolder(
   access: DocumentAccess,
   folder?: FolderName,
-): FolderListing | undefined {
+  depth = Number.POSITIVE_INFINITY,
+): FolderTree | undefined {
   const readable = readableDocuments(access);
   const segments = resolveFolder(readable, folder);
   if (segments === undefined) {
     return undefined;
   }
-  const depth = segments.length;
   const under = readable.filter((document) => isUnder(document.path, segments));
+  const links = linkPattern(access.origin);
   const [first] = under;
   if (!first) {
-    return depth === 0
-      ? { folder: [], folders: [], documents: [], omitted: 0 }
+    return segments.length === 0
+      ? { folder: [], documents: [], folders: [], links }
       : undefined;
   }
-  const folders = new Map<
-    string,
-    { name: string; path: readonly string[]; documents: number }
-  >();
-  const here: AgentDocument[] = [];
-  for (const document of under) {
-    const label = document.path[depth];
-    if (label === undefined) {
-      here.push(document);
-      continue;
+  const root = folderTree(under, segments);
+
+  // What is directly in the folder: its folders first, then its documents,
+  // each while it fits.
+  const tree = {
+    folder: first.path.slice(0, segments.length),
+    documents: [] as BrowsedDocument[],
+    folders: [] as Collapsed[],
+    links,
+  };
+  let used = length(tree);
+  const add = <T>(list: T[], item: T) => {
+    const cost = length(item) + (list.length > 0 ? 1 : 0);
+    if (used + cost > BROWSE_CHARACTERS) {
+      return false;
     }
-    const entry = folders.get(fold(label));
-    if (entry) {
-      entry.documents += 1;
-    } else {
-      folders.set(fold(label), {
-        name: label,
-        path: document.path.slice(0, depth + 1),
-        documents: 1,
-      });
+    list.push(item);
+    used += cost;
+    return true;
+  };
+  const children = foldersOf(root);
+  const shown = new Map<Collapsed, FolderNode>();
+  for (const node of children) {
+    const view = collapsed(node);
+    if (!add(tree.folders, view)) {
+      break;
+    }
+    shown.set(view, node);
+  }
+  const here = documentsOf(root);
+  for (const document of here) {
+    if (!add(tree.documents, document)) {
+      break;
     }
   }
-  here.sort(
-    (a, b) => collator.compare(a.title, b.title) || (a.id < b.id ? -1 : 1),
-  );
-  return {
-    folder: first.path.slice(0, depth),
-    folders: [...folders.values()].sort((a, b) =>
-      collator.compare(a.name, b.name),
-    ),
-    documents: here
-      .slice(0, BROWSE_LIMIT)
-      .map((document) => listed(access.origin, document)),
-    omitted: Math.max(0, here.length - BROWSE_LIMIT),
+  const omitted = {
+    documents: here.length - tree.documents.length,
+    folders: children.length - tree.folders.length,
   };
+  if (omitted.documents > 0 || omitted.folders > 0) {
+    return { ...tree, omitted };
+  }
+
+  // Then level by level, the folders that take the fewest characters first.
+  let frontier = [...shown.keys()];
+  for (let level = 1; level < depth && frontier.length > 0; level += 1) {
+    const listed = new Set<Collapsed>();
+    const costs = frontier.map((view, order) => {
+      const node = shown.get(view) as FolderNode;
+      const documents = documentsOf(node);
+      const folders = foldersOf(node).map((child) => {
+        const inner = collapsed(child);
+        shown.set(inner, child);
+        return inner;
+      });
+      const open = {
+        name: node.name,
+        count: node.count,
+        ...(documents.length > 0 ? { documents } : {}),
+        ...(folders.length > 0 ? { folders } : {}),
+      };
+      return { view, open, order, cost: length(open) - length(view) };
+    });
+    costs.sort((a, b) => a.cost - b.cost || a.order - b.order);
+    for (const { view, open, cost } of costs) {
+      if (used + cost <= BROWSE_CHARACTERS) {
+        delete view.collapsed;
+        Object.assign(view, open);
+        used += cost;
+        listed.add(view);
+      }
+    }
+    frontier = frontier
+      .filter((view) => listed.has(view))
+      .flatMap((view) => (view.folders ?? []) as Collapsed[]);
+  }
+  return tree;
+}
+
+/** The folders a tree leaves collapsed. */
+export function collapsedFolders(folders: readonly BrowsedFolder[]): number {
+  return folders.reduce(
+    (sum, folder) =>
+      sum + (folder.collapsed ? 1 : collapsedFolders(folder.folders ?? [])),
+    0,
+  );
 }
 
 /**

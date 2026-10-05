@@ -706,8 +706,9 @@ reranks them with `bge-reranker-base` without dropping any, and returns up to
 ten documents with their best passages, their folders and their date
 ([ADR-042](ADR/042-an-assistants-search-returns-the-passages-that-match.md)).
 A search may be kept to a folder or to documents changed since a date, and
-to fewer documents or to their titles alone, without passages; two more tools list documents without searching: `browse`, a folder's folders
-and documents, and `recent`, the latest changes in Drive
+to fewer documents or to their titles alone, without passages. Two more tools
+list documents without searching: `browse`, a folder's folders and documents,
+as a tree as deep as one answer allows, and `recent`, the latest changes in Drive
 ([ADR-044](ADR/044-assistants-list-a-folder-and-recent-changes-and-narrow-a-search.md)).
 They read the build's list of documents, not AI Search, and name no folder
 the person may open nothing in.
