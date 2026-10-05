@@ -247,6 +247,35 @@ worse (MRR 0.861 and 0.555, against 0.792 and 0.636), as ADR-042 found; the
 answers shown rose in both. The chunk size is the instance's setting, a
 project's choice, which this record does not change.
 
+### Every tool says the same things the same way
+
+The four tools describe a document with the same fields, in the same form:
+
+- **A day, `YYYY-MM-DD`**, for when it last changed, in `search`, `browse`
+  and `fetch`: the milliseconds of Drive's time cost every entry fourteen
+  characters and tell an assistant nothing. `recent`, whose order is the
+  time and which answers what changed today, gives it to the minute in UTC,
+  `YYYY-MM-DDTHH:MMZ`. `changedSince` still takes either.
+- **`characters`**, the length of the text `fetch` returns, on every document
+  each tool lists, and in `fetch`'s metadata the length of the whole text
+  however much of it was returned. Characters of the Markdown, not bytes of
+  the Google Doc or PDF: they are what `fetchCharacters` cuts by and what an
+  assistant pays to read, so it can tell a short document it should read
+  whole from a long one it should search within, and what reading ten of
+  them costs. The build counts them from the text it publishes.
+- **`format`**, `doc` or `pdf`, and a PDF's `pages` when the sync counted
+  them, in `fetch`'s metadata, which the build reads from each document's
+  page.
+- **A link on every entry** of `search`, `recent` and `fetch`, as ChatGPT's
+  shape asks of the first and the last and as `recent` lists what a compact
+  search does; `browse`, the one long list, gives a pattern once.
+
+`fetch` puts `metadata` before `text`, so an assistant reads where a document
+sits, how long it is and whether it was cut before up to `fetchCharacters`
+of its text; ChatGPT's shape fixes the fields, not their order. An unknown id
+says to find one with `search`, `browse` or `recent`, and says it for this
+person, which tells no one whether a document they may not open exists.
+
 ### A project measures its search with the platform's own
 
 A project chooses its search settings by measuring them against its own
@@ -288,6 +317,8 @@ that a compact search shows which documents match without their passages.
 - A small corpus is listed whole by one `browse`, and a large one as deep as
   the budget allows, the large folders collapsed for a call of their own.
 - An answer's note reaches the model in every client.
+- An assistant knows what a document costs to read before it reads it, and
+  reads the same date in the same form from every tool.
 - A question about which documents exist costs a compact search, a few
   hundred characters a document, instead of the whole passage budget.
 - A passage is a whole chunk: an answer at its edge is not cut away, and

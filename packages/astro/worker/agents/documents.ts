@@ -307,22 +307,34 @@ const narrows = (narrowing: Narrowing) =>
   narrowing.changedSince !== undefined ||
   folderReadings(narrowing.folder)[0]?.length !== 0;
 
-/** A document as `browse` and `recent` list it. */
+/** A Drive time as the day it falls on, `YYYY-MM-DD` (ADR-044). */
+const dayOf = (time: string) => time.slice(0, 10);
+/** A Drive time to the minute, `YYYY-MM-DDTHH:MMZ`, as `recent` lists it. */
+const minuteOf = (time: string) => `${time.slice(0, 16)}Z`;
+
+/** A document as `search` and `recent` list it. */
 export interface ListedDocument {
   readonly id: string;
   readonly title: string;
   readonly url: string;
   readonly path: readonly string[];
   readonly modified?: string;
+  /** Characters of its text, which `fetch` returns (ADR-044). */
+  readonly characters: number;
 }
 
-function listed(origin: string, document: AgentDocument): ListedDocument {
+function listed(
+  origin: string,
+  document: AgentDocument,
+  when: (time: string) => string = dayOf,
+): ListedDocument {
   return {
     id: document.id,
     title: document.title,
     url: permanentLink(origin, document.id),
     path: document.path,
-    ...(document.modified ? { modified: document.modified } : {}),
+    ...(document.modified ? { modified: when(document.modified) } : {}),
+    characters: document.characters,
   };
 }
 
@@ -336,7 +348,8 @@ interface BrowsedDocument {
   readonly id: string;
   readonly title: string;
   /** The day it last changed in Drive, `YYYY-MM-DD`, when known. */
-  readonly modified?: string;
+  readonly modified?: string; /** Characters of its text, which `fetch` returns. */
+  readonly characters: number;
 }
 
 /**
@@ -384,7 +397,8 @@ function browsed(document: AgentDocument): BrowsedDocument {
   return {
     id: document.id,
     title: document.title,
-    ...(document.modified ? { modified: document.modified.slice(0, 10) } : {}),
+    ...(document.modified ? { modified: dayOf(document.modified) } : {}),
+    characters: document.characters,
   };
 }
 
@@ -593,13 +607,11 @@ export function recentDocuments(
     }))
     .sort((a, b) => b.time - a.time || (a.document.id < b.document.id ? -1 : 1))
     .slice(0, count)
-    .map(({ document }) => listed(access.origin, document));
+    .map(({ document }) => listed(access.origin, document, minuteOf));
 }
 
-export interface SearchResult {
-  readonly id: string;
-  readonly title: string;
-  readonly url: string;
+/** A document a search found: as `recent` lists one, with what matched. */
+export interface SearchResult extends ListedDocument {
   /**
    * The chunks that matched, whole, best first; none for a document listed
    * without them, or in a compact search.
@@ -607,10 +619,6 @@ export interface SearchResult {
   readonly text?: string;
   /** Chunks of it that matched beyond those shown, when any did. */
   readonly morePassages?: number;
-  /** The folders from the corpus root to the document. */
-  readonly path: readonly string[];
-  /** When the document last changed in Drive, when known. */
-  readonly modified?: string;
 }
 
 /** The short ID an index key names, if it names a document object. */
@@ -703,15 +711,8 @@ export async function searchDocuments(
     ranked.push({ id, text: chunk.text.trim() });
   }
 
-  const listedResult = (id: string, document: AgentDocument) => ({
-    id,
-    title: document.title,
-    url: permanentLink(origin, id),
-    path: document.path,
-    ...(document.modified ? { modified: document.modified } : {}),
-  });
   if (compact) {
-    return [...found].map(([id, document]) => listedResult(id, document));
+    return [...found.values()].map((document) => listed(origin, document));
   }
 
   // Whole chunks in the index's order, never cut, while the budget lasts: a
@@ -733,7 +734,7 @@ export async function searchDocuments(
     const passages = shown.get(id) ?? [];
     const more = (matched.get(id) ?? 0) - passages.length;
     return {
-      ...listedResult(id, document),
+      ...listed(origin, document),
       ...(passages.length > 0
         ? { text: passages.join(PASSAGE_SEPARATOR) }
         : {}),
@@ -745,15 +746,17 @@ export async function searchDocuments(
 export interface FetchedDocument {
   readonly id: string;
   readonly title: string;
-  readonly text: string;
   readonly url: string;
   /**
-   * When it last changed, the folders it sits in, the source it is
-   * published from, and whether its text was cut (ADR-042).
+   * The day it last changed, the folders it sits in, the source it is
+   * published from, whether that is a Google Doc or a PDF and a PDF's pages,
+   * its whole length in characters, and whether its text was cut (ADR-042,
+   * ADR-044). Before the text, so an assistant reads it first.
    */
   readonly metadata: Readonly<
-    Record<string, string | boolean | readonly string[]>
+    Record<string, string | number | boolean | readonly string[]>
   >;
+  readonly text: string;
 }
 
 /**
@@ -788,13 +791,16 @@ export async function fetchDocument(
   return {
     id,
     title: document.title,
-    text: truncated ? cut(text, limit, url) : text,
     url,
     metadata: {
-      ...(document.modified ? { modified: document.modified } : {}),
+      ...(document.modified ? { modified: dayOf(document.modified) } : {}),
       path: document.path,
       ...(document.source ? { source: document.source } : {}),
+      format: document.format,
+      ...(document.pages !== undefined ? { pages: document.pages } : {}),
+      characters: text.length,
       ...(truncated ? { truncated: true } : {}),
     },
+    text: truncated ? cut(text, limit, url) : text,
   };
 }

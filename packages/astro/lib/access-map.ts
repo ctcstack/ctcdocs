@@ -30,6 +30,8 @@ export interface BuiltPage {
   readonly path: string;
   /** `ctcdocs:source` from the head, when a content page carries it. */
   readonly source: string | undefined;
+  /** `ctcdocs:pdf-pages` from the head, when a PDF's page carries it. */
+  readonly pdfPages?: number | undefined;
   /** A meta refresh page Astro writes for a redirect. */
   readonly redirect: boolean;
   /** Whether the page has a `data-pagefind-body` region. */

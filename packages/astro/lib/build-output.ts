@@ -126,10 +126,17 @@ export function readBuiltPage(path: string, html: string): BuiltPage {
   return {
     path,
     source: $('meta[name="ctcdocs:source"]').attr('content'),
+    pdfPages: pageCount($('meta[name="ctcdocs:pdf-pages"]').attr('content')),
     redirect: $('meta[http-equiv="refresh" i]').length > 0,
     searchable: $('[data-pagefind-body]').length > 0,
     images: [...images].sort(),
   };
+}
+
+/** A PDF's page count from its page's head, when it is a whole number. */
+function pageCount(content: string | undefined): number | undefined {
+  const pages = content?.trim() ? Number(content) : Number.NaN;
+  return Number.isInteger(pages) && pages >= 0 ? pages : undefined;
 }
 
 function stylesheetImages(text: string, path: string): string[] {
@@ -460,6 +467,7 @@ export async function writeBuildOutput({
         documents: [...corpus.documents.values()],
         folders: corpus.folders,
         files,
+        pages,
         readMarkdown: (path) =>
           readFile(resolve(distRoot, path.slice(1)), 'utf8').catch(
             () => undefined,

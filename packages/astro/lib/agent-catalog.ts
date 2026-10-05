@@ -21,7 +21,7 @@ import {
 } from '@ctcstack/ctcdocs-core';
 
 import { documentText } from '../worker/agents/document-text.js';
-import type { FileClass } from './access-map.js';
+import type { BuiltPage, FileClass } from './access-map.js';
 
 interface AgentDocument {
   /** The permanent short ID: the tool's `id` and the R2 object's name. */
@@ -34,6 +34,12 @@ interface AgentDocument {
   readonly path: readonly string[];
   /** The Google Doc or PDF in Drive, as the page links it. */
   readonly source: string | null;
+  /** Whether it is published from a Google Doc or a PDF (ADR-044). */
+  readonly format: 'doc' | 'pdf';
+  /** A PDF's pages, when the sync counted them. */
+  readonly pages?: number;
+  /** Characters of the stored text, which `fetch` returns (ADR-044). */
+  readonly characters: number;
   /** SHA-256 of the stored text, its class and its title. */
   readonly hash: string;
 }
@@ -67,14 +73,18 @@ export async function buildAgentCatalog({
   documents,
   folders,
   files,
+  pages = [],
   readMarkdown,
 }: {
   readonly documents: Iterable<CorpusDocument>;
   readonly folders: ReadonlyMap<string, CorpusFolder>;
   readonly files: ReadonlyMap<string, FileClass>;
+  /** The built pages, which say what a document is published from. */
+  readonly pages?: readonly BuiltPage[];
   /** The built projection at a site path; `undefined` when there is none. */
   readonly readMarkdown: (path: string) => Promise<string | undefined>;
 }): Promise<AgentCatalog> {
+  const pageAt = new Map(pages.map((page) => [page.path, page]));
   const listed: AgentDocument[] = [];
   for (const document of documents) {
     if (!document.shortId) {
@@ -93,6 +103,8 @@ export async function buildAgentCatalog({
       continue;
     }
     const title = document.title ?? document.slug;
+    const page = pageAt.get(`/${document.slug}/`);
+    const pdf = page?.source === 'drive-pdf';
     listed.push({
       id: document.shortId,
       title,
@@ -100,6 +112,9 @@ export async function buildAgentCatalog({
       modified: document.modified ?? null,
       path: folderPath(document, folders),
       source: document.source ?? null,
+      format: pdf ? 'pdf' : 'doc',
+      ...(pdf && page.pdfPages !== undefined ? { pages: page.pdfPages } : {}),
+      characters: text.length,
       hash: sha256(JSON.stringify([text, fileClass, title])),
     });
   }

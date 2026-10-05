@@ -72,6 +72,8 @@ function catalogMap(
       modified,
       path,
       source: null,
+      format: 'doc',
+      characters: 1_000,
       hash: `h-${id}`,
     }),
   );
@@ -142,19 +144,36 @@ describe('browse', () => {
   it('lists the whole tree a member may see, and no other folder', () => {
     expect(browseFolder(access(readers.member))).toEqual({
       folder: [],
-      documents: [{ id: 'aaaaaa', title: 'Handbook', modified: '2026-10-01' }],
+      documents: [
+        {
+          id: 'aaaaaa',
+          title: 'Handbook',
+          modified: '2026-10-01',
+          characters: 1_000,
+        },
+      ],
       folders: [
         {
           name: 'Tools',
           count: 3,
-          documents: [{ id: 'gggggg', title: 'Undated' }],
+          documents: [{ id: 'gggggg', title: 'Undated', characters: 1_000 }],
           folders: [
             {
               name: 'LeadByte',
               count: 2,
               documents: [
-                { id: 'dddddd', title: 'Deliveries', modified: '2026-09-01' },
-                { id: 'eeeeee', title: 'Returns', modified: '2026-09-15' },
+                {
+                  id: 'dddddd',
+                  title: 'Deliveries',
+                  modified: '2026-09-01',
+                  characters: 1_000,
+                },
+                {
+                  id: 'eeeeee',
+                  title: 'Returns',
+                  modified: '2026-09-15',
+                  characters: 1_000,
+                },
               ],
             },
           ],
@@ -167,7 +186,14 @@ describe('browse', () => {
   it('lists only the levels asked for, the rest collapsed', () => {
     expect(browseFolder(access(readers.member), undefined, 1)).toEqual({
       folder: [],
-      documents: [{ id: 'aaaaaa', title: 'Handbook', modified: '2026-10-01' }],
+      documents: [
+        {
+          id: 'aaaaaa',
+          title: 'Handbook',
+          modified: '2026-10-01',
+          characters: 1_000,
+        },
+      ],
       folders: [{ name: 'Tools', count: 3, collapsed: true }],
       links,
     });

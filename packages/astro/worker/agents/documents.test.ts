@@ -75,7 +75,8 @@ describe('search', () => {
         url: `${ORIGIN}/d/aaaaaa/`,
         text: 'A passage of Handbook.',
         path: [],
-        modified: '2026-10-01T00:00:00.000Z',
+        modified: '2026-10-01',
+        characters: 11,
       },
       {
         id: 'bbbbbb',
@@ -83,6 +84,7 @@ describe('search', () => {
         url: `${ORIGIN}/d/bbbbbb/`,
         text: 'A passage of Team plan.',
         path: ['Team'],
+        characters: 12,
       },
     ]);
   });
@@ -142,6 +144,7 @@ describe('search', () => {
         url: `${ORIGIN}/d/bbbbbb/`,
         text: 'A passage of Team plan.',
         path: ['Team'],
+        characters: 12,
       },
     ]);
   });
@@ -162,6 +165,8 @@ describe('search', () => {
       modified: null,
       path: [],
       source: null,
+      format: 'doc' as const,
+      characters: 100,
       hash: `h-${n}`,
     }));
     const map: AccessMapFile = {
@@ -225,6 +230,8 @@ describe('passages', () => {
       modified: null,
       path: [],
       source: null,
+      format: 'doc' as const,
+      characters: 100,
       hash: `h-${n}`,
     }));
     const map: AccessMapFile = {
@@ -265,6 +272,8 @@ describe('passages', () => {
       modified: null,
       path: [],
       source: null,
+      format: 'doc' as const,
+      characters: 100,
       hash: `h-${n}`,
     }));
     const map: AccessMapFile = {
@@ -465,23 +474,34 @@ describe('settings', () => {
 
 describe('fetch', () => {
   it('returns a readable document with its permanent link', async () => {
-    expect(await fetchDocument(access(readers.member), 'aaaaaa')).toEqual({
+    const document = await fetchDocument(access(readers.member), 'aaaaaa');
+    // The metadata before the text, so an assistant reads it first.
+    expect(Object.keys(document ?? {})).toEqual([
+      'id',
+      'title',
+      'url',
+      'metadata',
+      'text',
+    ]);
+    expect(document).toEqual({
       id: 'aaaaaa',
       title: 'Handbook',
       text: '# Handbook\n',
       url: `${ORIGIN}/d/aaaaaa/`,
       metadata: {
-        modified: '2026-10-01T00:00:00.000Z',
+        modified: '2026-10-01',
         path: [],
         source: 'https://docs.google.com/document/d/handbook/edit',
+        format: 'doc',
+        characters: 11,
       },
     });
   });
 
-  it('names the folders of a document, and no time or source it lacks', async () => {
+  it('names the folders of a document and the pages of a PDF, and no time or source it lacks', async () => {
     expect(
       (await fetchDocument(access(readers.team), 'bbbbbb'))?.metadata,
-    ).toEqual({ path: ['Team'] });
+    ).toEqual({ path: ['Team'], format: 'pdf', pages: 3, characters: 12 });
   });
 
   it.each([
@@ -563,7 +583,13 @@ describe('fetch', () => {
     expect(document?.text.slice(fetchCharacters)).toBe(
       `\n\n…\n\nThe document continues: this is its first ${fetchCharacters} characters. The whole of it is on its page, ${ORIGIN}/d/cccccc/\n`,
     );
-    expect(document?.metadata).toEqual({ path: ['Unruled'], truncated: true });
+    expect(document?.metadata).toEqual({
+      path: ['Unruled'],
+      format: 'doc',
+      // The whole document's length, not the part returned.
+      characters: fetchCharacters + 10,
+      truncated: true,
+    });
   });
 
   it('cuts a document whole characters at a time', async () => {
