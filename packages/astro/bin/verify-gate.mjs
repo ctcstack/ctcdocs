@@ -356,9 +356,10 @@ async function verifyAgents({ map, projectRoot, distRoot, environment, keys }) {
     const results = await searchDocuments(access, 'anything');
     const found = new Set(results.map((result) => result.id));
     requests += 1;
+    // Each result shows a chunk that matched, or counts those left out.
     for (const result of results) {
       assert.ok(
-        result.text.length > 0,
+        (result.text ?? '').length > 0 || result.morePassages > 0,
         `MCP search showed ${name} ${result.id} without a passage.`,
       );
     }

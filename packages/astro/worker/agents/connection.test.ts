@@ -800,7 +800,7 @@ describe('an assistant reading', () => {
       ],
     });
     expect(
-      (await tool(token, 'search', { query: 'plan', limit: 11 })).body.result
+      (await tool(token, 'search', { query: 'plan', limit: 16 })).body.result
         ?.isError,
     ).toBe(true);
   });

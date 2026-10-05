@@ -21,9 +21,10 @@
  * syncs; it never reaches a reader outside the class of the text it was taken
  * from.
  *
- * A search may ask for fewer documents, or for none of their passages; the
- * passages of fewer documents may each be longer, within the same budget
- * (ADR-044).
+ * A search shows the chunks that matched whole, never cut, in the order the
+ * index ranked them while its budget lasts, and lists every other document it
+ * found by its title, with how many of its chunks matched unshown. It may ask
+ * for fewer documents, or for none of their text (ADR-044).
  *
  * A search may be kept to a folder or to documents changed since a date, and
  * `browse` and `recent` list documents without searching (ADR-044). All three
@@ -599,50 +600,17 @@ export interface SearchResult {
   readonly id: string;
   readonly title: string;
   readonly url: string;
-  /** The passages that matched, best first; none in a compact search. */
+  /**
+   * The chunks that matched, whole, best first; none for a document listed
+   * without them, or in a compact search.
+   */
   readonly text?: string;
+  /** Chunks of it that matched beyond those shown, when any did. */
+  readonly morePassages?: number;
   /** The folders from the corpus root to the document. */
   readonly path: readonly string[];
   /** When the document last changed in Drive, when known. */
   readonly modified?: string;
-}
-
-const sentences = new Intl.Segmenter('en', { granularity: 'sentence' });
-
-/**
- * A passage cut to `limit` characters around its middle, where the chunk that
- * matched sits between the neighbours the index adds, at sentence boundaries
- * when a whole sentence fits. A line break ends a sentence too, so a list or
- * a table is cut between its lines. Text with no sentence end inside the
- * window, such as a table kept as HTML on one line, is cut between words,
- * and only text without a space is cut where the window falls.
- */
-export function excerpt(text: string, limit: number): string {
-  const passage = text.trim();
-  if (passage.length <= limit) {
-    return passage;
-  }
-  const start = Math.floor((passage.length - limit) / 2);
-  const end = start + limit;
-  let from: number | undefined;
-  let to: number | undefined;
-  for (const { index, segment } of sentences.segment(passage)) {
-    if (index >= start && from === undefined) {
-      from = index;
-    }
-    if (index + segment.length <= end) {
-      to = index + segment.length;
-    }
-  }
-  if (from !== undefined && to !== undefined && to > from) {
-    return passage.slice(from, to).trim();
-  }
-  const window = passage.slice(start, end);
-  const first = window.search(/\s/u);
-  const last = window.search(/\s\S*$/u);
-  return first >= 0 && last > first
-    ? window.slice(first, last).trim()
-    : window.trim();
 }
 
 /** The short ID an index key names, if it names a document object. */
@@ -703,12 +671,10 @@ export async function searchDocuments(
   const compact = shape.compact === true;
   const readable = new Set(classes);
 
-  // The documents found through chunks that count, in rank order, each with
-  // the text of its best chunks.
-  const found = new Map<
-    string,
-    { readonly document: AgentDocument; readonly chunks: string[] }
-  >();
+  // The documents found through chunks that count, in rank order, and every
+  // such chunk, in the order the index ranked them.
+  const found = new Map<string, AgentDocument>();
+  const ranked: { readonly id: string; readonly text: string }[] = [];
   for (const chunk of await index.search(
     query,
     classes,
@@ -726,19 +692,15 @@ export async function searchDocuments(
     ) {
       continue;
     }
-    let entry = found.get(id);
-    if (!entry) {
+    if (!found.has(id)) {
       const document =
         found.size < maxResults ? readableDocument(access, id) : undefined;
       if (!document) {
         continue;
       }
-      entry = { document, chunks: [] };
-      found.set(id, entry);
+      found.set(id, document);
     }
-    if (!compact && entry.chunks.length < passagesPerResult) {
-      entry.chunks.push(chunk.text);
-    }
+    ranked.push({ id, text: chunk.text.trim() });
   }
 
   const listedResult = (id: string, document: AgentDocument) => ({
@@ -749,33 +711,35 @@ export async function searchDocuments(
     ...(document.modified ? { modified: document.modified } : {}),
   });
   if (compact) {
-    return [...found].map(([id, { document }]) => listedResult(id, document));
+    return [...found].map(([id, document]) => listedResult(id, document));
   }
 
-  // Each passage short enough that every document found has room for its
-  // best one: the fewer found, the longer each may be.
-  const passageLimit = Math.floor(passageCharacters / Math.max(found.size, 1));
-  // Breadth first: every document's best passage before any second one.
-  const shown = new Map<string, string[]>(
-    [...found.keys()].map((id) => [id, []]),
-  );
+  // Whole chunks in the index's order, never cut, while the budget lasts: a
+  // chunk that does not fit is left out and counted, and a document none of
+  // whose chunks fit is listed without them.
+  const shown = new Map<string, string[]>();
+  const matched = new Map<string, number>();
   let budget = passageCharacters;
-  for (let rank = 0; rank < passagesPerResult; rank += 1) {
-    for (const [id, { chunks }] of found) {
-      const text = chunks[rank];
-      const passage =
-        text === undefined ? undefined : excerpt(text, passageLimit);
-      if (passage !== undefined && passage.length <= budget) {
-        shown.get(id)?.push(passage);
-        budget -= passage.length;
-      }
+  for (const { id, text } of ranked) {
+    matched.set(id, (matched.get(id) ?? 0) + 1);
+    const passages = shown.get(id) ?? [];
+    if (passages.length < passagesPerResult && text.length <= budget) {
+      shown.set(id, [...passages, text]);
+      budget -= text.length;
     }
   }
 
-  return [...found].map(([id, { document }]) => ({
-    ...listedResult(id, document),
-    text: (shown.get(id) ?? []).join(PASSAGE_SEPARATOR),
-  }));
+  return [...found].map(([id, document]) => {
+    const passages = shown.get(id) ?? [];
+    const more = (matched.get(id) ?? 0) - passages.length;
+    return {
+      ...listedResult(id, document),
+      ...(passages.length > 0
+        ? { text: passages.join(PASSAGE_SEPARATOR) }
+        : {}),
+      ...(more > 0 ? { morePassages: more } : {}),
+    };
+  });
 }
 
 export interface FetchedDocument {

@@ -252,7 +252,7 @@ export const MCP_DEFAULTS: Omit<McpConfiguration, 'enabled'> = Object.freeze({
       model: '@cf/baai/bge-reranker-base',
       threshold: 0,
     }),
-    results: 10,
+    results: 15,
     passagesPerResult: 3,
     passageCharacters: 24_000,
   }),

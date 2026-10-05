@@ -236,7 +236,7 @@ describe('MCP configuration', () => {
   it.each([
     [1, 1],
     [5, 5],
-    [20, 10],
+    [20, 15],
   ])(
     'returns no more results by default than the %d chunks it asks for',
     (chunks, results) => {
@@ -259,7 +259,7 @@ describe('MCP configuration', () => {
           model: '@cf/baai/bge-reranker-base',
           threshold: 0,
         },
-        results: 10,
+        results: 15,
         passagesPerResult: 3,
         passageCharacters: 24_000,
       },
@@ -301,8 +301,8 @@ describe('MCP configuration', () => {
       /passagesPerResult must be a whole number of at least 1/u,
     ],
     [
-      { passageCharacters: 999 },
-      /passageCharacters must be a whole number of at least 1000/u,
+      { passageCharacters: 1_499 },
+      /passageCharacters must be a whole number of at least 1500/u,
     ],
     [{ extra: 1 }, /mcp\.search\.extra is not a known/u],
     ['many', /mcp\.search must be an object/u],
