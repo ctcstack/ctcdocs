@@ -715,7 +715,18 @@ the person may open nothing in.
 All of it is set in each request, so the instance needs no setting of its own,
 and every number is the project's `mcp.search` setting, with these defaults
 ([configuration](CONFIGURATION.md#ai-assistants-mcp)): to tune search, change
-it and deploy.
+it and deploy. Measure a change first against the project's own questions:
+
+```bash
+pnpm build
+pnpm exec ctcdocs-eval-search --label <what-changed>
+```
+
+It reads `evaluation/search-questions.json`, searches the instance
+`wrangler.jsonc` binds, or the one `--instance` names, through the Worker's own
+code, and writes a run to `evaluation/results/<date>-<label>/` without any
+document text. `CLOUDFLARE_API_TOKEN` needs AI Search Read and Run
+([ADR-044](ADR/044-assistants-list-a-folder-and-recent-changes-and-narrow-a-search.md)).
 The Worker checks every passage against the person asking, so the instance's
 similarity cache, on by default, cannot show one person another's results.
 

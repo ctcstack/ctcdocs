@@ -207,6 +207,25 @@ search found, not by the most it may return: two documents found share the
 than its share. The budget, the passages per document and the breadth-first
 order stay as ADR-042 set them.
 
+### A project measures its search with the platform's own
+
+A project chooses its search settings by measuring them against its own
+questions (ADR-042), so the measurement must rank and cut exactly as the
+Worker does. `ctcdocs-eval-search`
+([`packages/astro/bin/eval-search.mjs`](../../packages/astro/bin/eval-search.mjs))
+calls the project's AI Search instance through the Worker's own
+`searchDocuments`, with the settings of the project's last build, as a member
+and as an admin, and under variants that each change one setting. A copy of
+the Worker's ranking in a project falls behind the Worker; this one cannot.
+
+The questions and the results are the project's, never the platform's: a
+project keeps `evaluation/search-questions.json` and writes each run to
+`evaluation/results/<date>-<label>/`. A question names the document that
+answers it and every one it needs, and may name words the answer holds, so a
+run tells a document found from an answer shown: whether the passages an
+assistant reads hold the answer, which is what the cut of a passage decides.
+A run writes document IDs, scores and lengths, never document text.
+
 ### Descriptions and instructions
 
 Each tool's description says what it returns; `search` names the project's
@@ -258,6 +277,9 @@ that a compact search shows which documents match without their passages.
   and called, and that deep research still calls `search` with a query alone.
 - Measure the questions that ask for every document of a kind with `browse`,
   against `search` alone.
+- Give a project's questions the words their answers hold, and measure how a
+  passage is cut and how many documents a search returns by answers shown,
+  not by rank alone.
 - Mark ADR-042 superseded in part when this record is accepted.
 - Raise forty if AI Search's keyword search comes to take more values. It is
   AI Search's limit, not a project's choice, so it is not a setting.
