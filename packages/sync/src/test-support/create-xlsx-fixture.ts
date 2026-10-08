@@ -4,7 +4,62 @@
  * pictures. Tests and the fixture corpus use it instead of a real workbook, so
  * no real content reaches the repository.
  */
-import { createStoredZipFixture } from './create-zip-fixture.js';
+
+/*
+ * The archive is written here rather than by `create-zip-fixture`: the fixture
+ * corpus generator runs this file with Node's type stripping, which does not
+ * resolve a sibling's `.js` import to its `.ts` source.
+ */
+function crc32(bytes: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+/** A ZIP archive of stored, uncompressed entries. */
+function storedZip(
+  entries: ReadonlyArray<{ path: string; bytes: string }>,
+): Uint8Array {
+  const locals: Buffer[] = [];
+  const centrals: Buffer[] = [];
+  let offset = 0;
+  for (const entry of entries) {
+    const path = Buffer.from(entry.path, 'utf8');
+    const bytes = Buffer.from(entry.bytes, 'utf8');
+    const checksum = crc32(bytes);
+    const local = Buffer.alloc(30 + path.length);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt32LE(checksum, 14);
+    local.writeUInt32LE(bytes.length, 18);
+    local.writeUInt32LE(bytes.length, 22);
+    local.writeUInt16LE(path.length, 26);
+    path.copy(local, 30);
+    const central = Buffer.alloc(46 + path.length);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt32LE(checksum, 16);
+    central.writeUInt32LE(bytes.length, 20);
+    central.writeUInt32LE(bytes.length, 24);
+    central.writeUInt16LE(path.length, 28);
+    central.writeUInt32LE(offset, 42);
+    path.copy(central, 46);
+    locals.push(local, bytes);
+    centrals.push(central);
+    offset += local.length + bytes.length;
+  }
+  const directory = Buffer.concat(centrals);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10);
+  end.writeUInt32LE(directory.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return new Uint8Array(Buffer.concat([...locals, directory, end]));
+}
 
 export type XlsxFixtureValue = string | number | boolean;
 
@@ -235,7 +290,7 @@ export function createXlsxFixture(fixture: XlsxFixture): Uint8Array {
       bytes: `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${formats.length ? `<numFmts count="${formats.length}">${formats.map((code, formatIndex) => `<numFmt numFmtId="${164 + formatIndex}" formatCode="${escapeXml(code)}"/>`).join('')}</numFmts>` : ''}<cellXfs count="${formats.length + 1}"><xf numFmtId="0"/>${formats.map((_, formatIndex) => `<xf numFmtId="${164 + formatIndex}" applyNumberFormat="1"/>`).join('')}</cellXfs></styleSheet>`,
     },
   );
-  return createStoredZipFixture(
+  return storedZip(
     entries.sort((left, right) => (left.path < right.path ? -1 : 1)),
   );
 }

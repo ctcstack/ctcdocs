@@ -307,6 +307,44 @@ describe('workbookToMarkdown', () => {
     );
   });
 
+  it('says which cells a defined name in a formula stands for', () => {
+    const result = page({
+      sheets: [
+        {
+          name: 'Tax',
+          cells: {
+            A1: 'Price',
+            B1: 100,
+            A2: 'Rate',
+            B2: 0.2,
+            A3: 'Tax',
+            B3: { formula: 'B1*TaxRate', value: 20 },
+          },
+        },
+      ],
+      names: { TaxRate: 'Tax!$B$2' },
+    });
+    expect(result.body).toContain(
+      '- **Tax** (`B3`): `=B1*TaxRate`, where `B1` is Price and `TaxRate` is B2',
+    );
+    expect(result.body).toContain('- **TaxRate** (`B2`): 0.2');
+  });
+
+  it('leaves out a caption that repeats the title', () => {
+    const result = page(
+      {
+        sheets: [
+          {
+            name: 'Only',
+            cells: { A1: 'Budget', A2: 'Item', B2: 'Cost', A3: 'Ads', B3: 1 },
+          },
+        ],
+      },
+      'budget',
+    );
+    expect(result.body.startsWith('| Item | Cost |')).toBe(true);
+  });
+
   it('describes an empty spreadsheet with nothing', () => {
     const result = page({ sheets: [{ name: 'Empty' }] });
     expect(result.body).toBe('');
