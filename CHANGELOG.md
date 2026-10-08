@@ -2,6 +2,21 @@
 
 All three packages share a version and are released together.
 
+## 0.21.4
+
+### Fixed
+
+- **A deployment no longer fails between a platform upgrade and the next
+  sync.** The sync report records the version of the Markdown its lengths
+  were measured on, `documentLengths.markdownVersion`, and the gate compares
+  the content health page's length notes with what the MCP server returns
+  only when that version is the one the build writes. After 0.21.0 changed
+  the Markdown, every deployment before the first sync failed on notes the
+  last sync had measured on the old text.
+
+`PUBLISHED_MARKDOWN_VERSION` in `@ctcstack/ctcdocs-core/published-markdown`
+moves whenever the Markdown version of a page changes.
+
 ## 0.21.3
 
 ### Fixed
