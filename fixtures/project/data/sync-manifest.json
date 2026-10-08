@@ -376,7 +376,7 @@
       "exportMode": "sheet",
       "warnings": [],
       "shortId": "60c873",
-      "sheetVersion": 1,
+      "sheetVersion": 2,
       "publishedReaders": [
         "engineering@example.com",
         "writers@example.com"
@@ -405,7 +405,7 @@
       "warnings": [],
       "shortId": "70da01",
       "sourceChecksum": "sha256:f7d94818de586b0c13af038fa3939a92de7557d1d1ac1e6bfbd0099f38f6d6d5",
-      "sheetVersion": 1,
+      "sheetVersion": 2,
       "publishedReaders": "*",
       "publishedChain": [
         "folder-handbook",
@@ -433,7 +433,7 @@
       ],
       "shortId": "845a78",
       "sourceChecksum": "sha256:d45fbb84e57e03a7e8bf7da1104e641ae4fb7eb1c0ae6b9235c66c64066a5a73",
-      "sheetVersion": 1,
+      "sheetVersion": 2,
       "publishedReaders": "*",
       "publishedChain": [
         "folder-handbook",
