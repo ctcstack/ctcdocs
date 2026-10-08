@@ -27,6 +27,15 @@ overrides:
   # names the pinned version, so the override stops applying once Miniflare
   # pins another; drop it then.
   'miniflare>undici@7.29.0': 7.29.1
+  # Miniflare pins `sharp` to exactly 0.35.4, whose bundled librsvg
+  # GHSA-wq5f-xc86-pv6w reports (high). Miniflare loads it only for the
+  # fixture project's local image service; 0.35.5 is the fix on the same line.
+  # Drop this once Miniflare pins another.
+  'miniflare>sharp@0.35.4': 0.35.5
+  # source-map-js before 1.2.2 can be made to loop on crafted section offsets,
+  # GHSA-68fv-2mgg-jv7q (high). It reaches PostCSS and Vite in the build and
+  # test tooling, which read only this repository's own source maps.
+  'source-map-js@<1.2.2': 1.2.2
 
 auditConfig:
   ignoreGhsas:
