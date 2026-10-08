@@ -548,6 +548,97 @@ div:has(> mobile-starlight-toc details > div > ul > li:only-child) {
   line-height: var(--kb-line-height-table);
 }
 
+/* A column a table aligns right holds numbers, which line up by their digits. */
+.sl-markdown-content :is(th, td)[align='right'] {
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+/*
+ * A spreadsheet's long table scrolls on its own, with its header row held in
+ * view, and has a filter field above it (ADR-046).
+ */
+sheet-tables {
+  display: block;
+}
+
+.kb-sheet-tall {
+  max-block-size: min(70vh, 40rem);
+  overflow: auto;
+}
+
+.kb-sheet-tall thead th {
+  inset-block-start: 0;
+  position: sticky;
+  z-index: 1;
+}
+
+.kb-sheet-tools {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-block: 1rem -0.5rem;
+}
+
+.kb-sheet-filter {
+  align-items: center;
+  color: var(--kb-gray-3);
+  display: inline-flex;
+  font-size: var(--kb-text-sm);
+  gap: 0.5rem;
+}
+
+.kb-sheet-filter input {
+  background: var(--kb-ground);
+  border: 1px solid var(--kb-border-strong);
+  border-radius: 0.375rem;
+  color: var(--kb-ink);
+  font: inherit;
+  inline-size: min(16rem, 60vw);
+  padding: 0.25rem 0.5rem;
+}
+
+.kb-sheet-filter input:focus-visible,
+.kb-sheet-sort:focus-visible {
+  outline: 2px solid var(--kb-text-accent);
+  outline-offset: 2px;
+}
+
+.kb-sheet-count {
+  color: var(--kb-gray-3);
+  font-size: var(--kb-text-sm);
+}
+
+.kb-sheet-sort {
+  align-items: center;
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  gap: 0.25rem;
+  padding: 0;
+  text-align: inherit;
+}
+
+.kb-sheet-sort-icon::after {
+  color: var(--kb-gray-3);
+  content: '↕';
+  font-size: 0.85em;
+}
+
+[aria-sort='ascending'] .kb-sheet-sort-icon::after {
+  color: var(--kb-ink);
+  content: '↑';
+}
+
+[aria-sort='descending'] .kb-sheet-sort-icon::after {
+  color: var(--kb-ink);
+  content: '↓';
+}
+
 /*
  * The frame already closes the table, so the last row drops its rule rather
  * than doubling it. The last row of the last section, not of every section:

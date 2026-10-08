@@ -109,6 +109,8 @@ const PRIORITY_BY_CODE: Readonly<Record<string, Priority>> = {
   'pdf-no-text': 'fix-next',
   'pdf-over-site-limit': 'fix-next',
   'pdf-too-large': 'fix-next',
+  // Readers see where the page stops, but not what comes after (ADR-046).
+  'sheet-truncated': 'fix-next',
   'duplicate-name': 'fix-next',
   'table-merge-removed': 'fix-next',
   'formatting-removed': 'fix-next',
@@ -124,6 +126,8 @@ const PRIORITY_BY_CODE: Readonly<Record<string, Priority>> = {
   'pdf-text-truncated': 'improve',
   'document-long': 'improve',
   'pdf-long': 'improve',
+  'sheet-long': 'improve',
+  'sheet-not-shown': 'improve',
   'heading-skips-level': 'improve',
   'heading-repeated': 'improve',
   'several-landing-documents': 'improve',
@@ -403,7 +407,9 @@ export function buildHealthView(
   }
 
   const published = state
-    ? state.summary.published.googleDocs + state.summary.published.pdfs
+    ? state.summary.published.googleDocs +
+      state.summary.published.pdfs +
+      (state.summary.published.sheets ?? 0)
     : undefined;
   /*
    * A file the site shows in an earlier version, or in part, is among the

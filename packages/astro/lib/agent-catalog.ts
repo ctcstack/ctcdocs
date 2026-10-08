@@ -32,10 +32,13 @@ interface AgentDocument {
   readonly modified: string | null;
   /** The folders from the corpus root to the document, as the site names them. */
   readonly path: readonly string[];
-  /** The Google Doc or PDF in Drive, as the page links it. */
+  /** The Google Doc, PDF or spreadsheet in Drive, as the page links it. */
   readonly source: string | null;
-  /** Whether it is published from a Google Doc or a PDF (ADR-044). */
-  readonly format: 'doc' | 'pdf';
+  /**
+   * Whether it is published from a Google Doc, a PDF (ADR-044) or a
+   * spreadsheet (ADR-046).
+   */
+  readonly format: 'doc' | 'pdf' | 'sheet';
   /** A PDF's pages, when the sync counted them. */
   readonly pages?: number;
   /** Characters of the stored text, which `fetch` returns (ADR-044). */
@@ -105,6 +108,7 @@ export async function buildAgentCatalog({
     const title = document.title ?? document.slug;
     const page = pageAt.get(`/${document.slug}/`);
     const pdf = page?.source === 'drive-pdf';
+    const sheet = page?.source === 'drive-sheet';
     listed.push({
       id: document.shortId,
       title,
@@ -112,7 +116,7 @@ export async function buildAgentCatalog({
       modified: document.modified ?? null,
       path: folderPath(document, folders),
       source: document.source ?? null,
-      format: pdf ? 'pdf' : 'doc',
+      format: pdf ? 'pdf' : sheet ? 'sheet' : 'doc',
       ...(pdf && page.pdfPages !== undefined ? { pages: page.pdfPages } : {}),
       characters: text.length,
       hash: sha256(JSON.stringify([text, fileClass, title])),

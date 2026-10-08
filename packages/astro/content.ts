@@ -9,7 +9,13 @@ export const collections = {
     schema: docsSchema({
       extend: z.object({
         sourceType: z
-          .enum(['google-doc', 'drive-pdf', 'manual', 'section-index'])
+          .enum([
+            'google-doc',
+            'drive-pdf',
+            'drive-sheet',
+            'manual',
+            'section-index',
+          ])
           .default('manual'),
         googleFileId: z.string().min(1).optional(),
         /*
@@ -57,6 +63,16 @@ export const collections = {
             file: z.string().optional(),
             bytes: z.number().int().nonnegative(),
             pages: z.number().int().nonnegative().nullable(),
+          })
+          .optional(),
+        /*
+         * A page that publishes a spreadsheet (ADR-046): how many sheets and
+         * formulas it shows.
+         */
+        sheet: z
+          .object({
+            sheets: z.number().int().nonnegative(),
+            formulas: z.number().int().nonnegative(),
           })
           .optional(),
         pagefind: z.boolean().default(true),

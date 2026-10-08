@@ -545,9 +545,11 @@ const blocks = (groups: Group[]) => {
               How the pages were made:{' '}
               {plural(state.summary.conversion.markdown, 'Google Doc')} from
               Google's Markdown export, {state.summary.conversion.html} through
-              its HTML export for images, tables or drawings, and{' '}
+              its HTML export for images, tables or drawings,{' '}
               {plural(state.summary.published.pdfs, 'PDF')} published as files
-              with their text.
+              with their text, and{' '}
+              {plural(state.summary.published.sheets ?? 0, 'spreadsheet')} as
+              tables.
             </p>
           )}
           <p class="health-footer">

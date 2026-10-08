@@ -66,7 +66,7 @@ export interface AccessMap {
 
 const OPTIMIZED_IMAGE = /^\/_astro\/.+\.(?:avif|gif|jpe?g|png|svg|webp)$/iu;
 const PLATFORM_ASSET = /^\/_astro\/.+\.(?:css|js|mjs|woff2?|ttf|otf)$/iu;
-const DOCUMENT_SOURCES = new Set(['google-doc', 'drive-pdf']);
+const DOCUMENT_SOURCES = new Set(['google-doc', 'drive-pdf', 'drive-sheet']);
 
 /** The canonical site path of a file written at `relativePath` under `dist`. */
 export function canonicalSitePath(relativePath: string): string {
