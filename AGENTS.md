@@ -50,8 +50,8 @@ library, the adapter and that step, and nothing else.
 
 ## Product invariants
 
-- Editorial source of truth: Google Docs, PDF files and spreadsheets, in a
-  Shared Drive.
+- Editorial source of truth: Google Docs, PDF files, spreadsheets, and the
+  Drive descriptions of video and audio files, in a Shared Drive.
   Technical source of truth: the generated Markdown, assets, manifest, sidebar
   and index committed to the project repository.
 - Synchronization is one way: Drive → Markdown → static site.
@@ -77,7 +77,9 @@ library, the adapter and that step, and nothing else.
   build it holds. Neither the bucket nor the index decides access: the access
   map does, on every request.
 - Do not broaden scope to Slides, comments, suggestions, webhooks, or
-  bidirectional editing. Spreadsheets are published as tables (ADR-046).
+  bidirectional editing. Spreadsheets are published as tables (ADR-046);
+  a video or audio file gets a page from its Drive metadata, and is never
+  downloaded, transcribed or played on the site (ADR-047).
 
 ## Priorities
 
