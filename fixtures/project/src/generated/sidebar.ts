@@ -44,6 +44,16 @@ export const generatedSidebar = [
         "label": "Support capacity",
         "slug": "handbook/support-capacity",
         "badge": "Sheet"
+      },
+      {
+        "label": "Weekly standup",
+        "slug": "handbook/weekly-standup",
+        "badge": "Audio"
+      },
+      {
+        "label": "Welcome to the team",
+        "slug": "handbook/welcome-to-the-team",
+        "badge": "Video"
       }
     ]
   },
@@ -103,6 +113,11 @@ export const generatedSidebar = [
       {
         "label": "Screenshots",
         "slug": "reference/screenshots"
+      },
+      {
+        "label": "Walkthrough",
+        "slug": "reference/walkthrough",
+        "badge": "Video"
       }
     ]
   }

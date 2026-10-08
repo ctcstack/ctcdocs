@@ -93,6 +93,36 @@
       "format": "google-doc"
     },
     {
+      "id": "audio-standup",
+      "title": "Weekly standup",
+      "slug": "handbook/weekly-standup",
+      "markdownPath": "src/content/docs/_generated/audio-standup.md",
+      "sourceUrl": "https://drive.google.com/file/d/audio-standup/view",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "syncedAt": "2026-02-10T06:00:00.000Z",
+      "contentHash": "sha256:acbed2a06cb1f769cdd0f37472e29c963aaf1852fb1b8bf795645138c805ce7b",
+      "folderPath": [
+        "Handbook"
+      ],
+      "language": "en",
+      "format": "audio"
+    },
+    {
+      "id": "vids-welcome",
+      "title": "Welcome to the team",
+      "slug": "handbook/welcome-to-the-team",
+      "markdownPath": "src/content/docs/_generated/vids-welcome.md",
+      "sourceUrl": "https://docs.google.com/videos/d/vids-welcome/edit",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "syncedAt": "2026-02-10T06:00:00.000Z",
+      "contentHash": "sha256:b2d6b505e7684d0bb2293632398ddbd4756811a63ca94c7e51b0541c001dd4f4",
+      "folderPath": [
+        "Handbook"
+      ],
+      "language": "en",
+      "format": "video"
+    },
+    {
       "id": "doc-decision-log",
       "title": "Decision log",
       "slug": "reference/decision-log",
@@ -213,6 +243,21 @@
       ],
       "language": "en",
       "format": "google-doc"
+    },
+    {
+      "id": "video-walkthrough",
+      "title": "Walkthrough",
+      "slug": "reference/walkthrough",
+      "markdownPath": "src/content/docs/_generated/video-walkthrough.md",
+      "sourceUrl": "https://drive.google.com/file/d/video-walkthrough/view",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "syncedAt": "2026-02-10T06:00:00.000Z",
+      "contentHash": "sha256:84ac9873c7ab359655eeb63c904f45a60c037c7e6aca7fb6e7209d874cac6ad8",
+      "folderPath": [
+        "Reference"
+      ],
+      "language": "en",
+      "format": "video"
     },
     {
       "id": "doc-getting-started",

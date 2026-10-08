@@ -154,9 +154,30 @@ const items: DriveItem[] = [
     mimeType:
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   },
+  /*
+   * Recordings (ADR-047): an uploaded video its editor described, a Google
+   * Vids video nobody has, which the content health page notes, and an audio
+   * file.
+   */
   {
     ...document('video-walkthrough', 'Walkthrough.mp4', 'folder-reference'),
     mimeType: 'video/mp4',
+    size: '48234496',
+    sha256Checksum: 'c'.repeat(64),
+    description:
+      'A tour of the site for a new editor: where a page comes from, how its address follows its name, and where the content health page lists what to fix.\n\nSee the release process for when a change reaches readers.',
+    videoMediaMetadata: { width: 1920, height: 1080, durationMillis: 312_000 },
+  },
+  {
+    ...document('vids-welcome', 'Welcome to the team', 'folder-handbook'),
+    mimeType: 'application/vnd.google-apps.vid',
+  },
+  {
+    ...document('audio-standup', 'Weekly standup.m4a', 'folder-handbook'),
+    mimeType: 'audio/mp4',
+    size: '2097152',
+    sha256Checksum: 'd'.repeat(64),
+    description: 'Notes read aloud from the weekly standup.',
   },
   folder(IGNORED_FOLDER_ID, 'Drafts', ROOT_ID),
   document('doc-draft', 'Unfinished draft', IGNORED_FOLDER_ID),
