@@ -174,7 +174,7 @@ smoke test** workflow:
 Google Drive inventory dry-run passed.
 Items visible: <count>
 Folders selected: <count>
-Documents selected (Google Docs, PDF files and spreadsheets): <count>
+Documents selected (Google Docs, PDF files, spreadsheets and recordings): <count>
 Unsupported items selected: <count>
 Ignored items: <count>
 Warnings: <count>
@@ -308,6 +308,30 @@ with charts or images the page does not show, as "Incomplete on the site". A
 Google Sheet over 10 MB is held back like a document; an uploaded file over
 50 MB, or one that is not a workbook, is held back with the reason.
 
+## Video and audio
+
+A video or audio file in a published folder, uploaded or made in Google Vids,
+gets a page
+([ADR-047](ADR/047-publish-a-page-for-each-video-and-audio-file.md)). Its
+title and address are its Drive name without the extension, and the sidebar
+marks it `Video` or `Audio`. The file is never downloaded, and the site does
+not play it: the page links to it in Google Drive or Google Vids, whose
+sharing decides who may play it.
+
+The page is written from what Drive says about the file: a sentence with its
+length and frame size when Drive reports them, then the description its editor
+wrote in Drive, which is also its summary. That description is all search and
+assistants know of a recording, so:
+
+- **Describe each recording in Drive**: right-click it, choose File
+  information → Details and fill in its description. The content health page
+  notes every recording without one.
+- **Name it** for what it shows, not what the recorder chose.
+- **Move the file** out of the published folders to keep it off the site.
+
+A page is written again whenever its description, length or name changes,
+without a download.
+
 An uploaded file is downloaded when it is new or its content changed, as a
 PDF is. A Google Sheet is exported again whenever Drive reports it changed, so
 a sheet with `NOW()` or `RAND()` changes its page on every full sync.
@@ -366,7 +390,7 @@ findings, under its priority:
 - **Fix next**: files the site does not show
   ([ADR-025](ADR/025-name-every-file-left-off-the-site.md)), by kind — Word
   and text files, presentations, archives, images, diagrams, spreadsheets in
-  an older format, video and audio, other files, shortcuts — PDFs with no
+  an older format, other files, shortcuts — PDFs with no
   readable text or too large for the site, and spreadsheets cut short
   ([ADR-046](ADR/046-publish-spreadsheets-as-tables.md)); files in one folder
   the site cannot tell apart; a
@@ -375,7 +399,9 @@ findings, under its priority:
   ([ADR-043](ADR/043-content-health-names-documents-too-long-to-read-whole.md)).
 - **Improve**: images with no alt text
   ([ADR-029](ADR/029-say-when-an-image-has-no-alt-text.md)), a page with no
-  summary, images larger than `sync.largeImageMegabytes` (2 MB unless the
+  summary, a recording with no description in Drive
+  ([ADR-047](ADR/047-publish-a-page-for-each-video-and-audio-file.md)), images
+  larger than `sync.largeImageMegabytes` (2 MB unless the
   project sets it), a link to a Google file outside the published folders, a
   link to a heading that opens the top of a page, a PDF only partly
   searchable, a heading that skips a level and a heading with the words of an
