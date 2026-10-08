@@ -163,6 +163,47 @@ function readingOrder(areas: readonly Area[]): Area[] {
   );
 }
 
+function rowsOf(areas: readonly Area[]): Set<number> {
+  const rows = new Set<number>();
+  for (const { range } of areas) {
+    for (let row = range.top; row <= range.bottom; row += 1) {
+      rows.add(row);
+    }
+  }
+  return rows;
+}
+
+/**
+ * A column of text beside a block, on rows the block fills, is a column of
+ * notes on those rows, as a model writes "assumption" or "source" next to
+ * its inputs: it joins the block, even across an empty column, rather than
+ * being cut off into a list of its own.
+ */
+function joinSideNotes(groups: readonly Area[][]): Area[][] {
+  const joined: Area[][] = [];
+  for (const group of groups) {
+    const previous = joined.at(-1);
+    const column = group[0]?.range.left;
+    if (
+      previous &&
+      group.every(
+        (area) =>
+          area.cell.kind === 'text' &&
+          area.range.left === column &&
+          area.range.right === column,
+      )
+    ) {
+      const rows = rowsOf(previous);
+      if ([...rowsOf(group)].every((row) => rows.has(row))) {
+        joined[joined.length - 1] = [...previous, ...group];
+        continue;
+      }
+    }
+    joined.push([...group]);
+  }
+  return joined;
+}
+
 /** The blocks of a set of areas, in reading order. */
 export function cutIntoBlocks(areas: readonly Area[]): SheetBlock[] {
   if (areas.length === 0) {
@@ -172,7 +213,7 @@ export function cutIntoBlocks(areas: readonly Area[]): SheetBlock[] {
   if (bands.length > 1) {
     return bands.flatMap((band) => cutIntoBlocks(band));
   }
-  const columns = split(areas, 'columns');
+  const columns = joinSideNotes(split(areas, 'columns'));
   if (columns.length > 1) {
     return columns.flatMap((column) => cutIntoBlocks(column));
   }
@@ -205,6 +246,11 @@ export function labelBlock(
   grid: SheetGrid,
   block: CellRange,
   labels: Map<number, CellLabel>,
+  /**
+   * The header a table takes from the one above it, by column, when its own
+   * first row is data: every row of the block is then labelled by it.
+   */
+  inherited?: ReadonlyMap<number, SheetCell>,
 ): void {
   for (let row = block.top; row <= block.bottom; row += 1) {
     let rowLabel: string | undefined;
@@ -216,8 +262,10 @@ export function labelBlock(
         if (rowLabel !== undefined) {
           label.row = rowLabel;
         }
-        if (row > block.top) {
-          const header = grid.shown(block.top, column);
+        if (inherited || row > block.top) {
+          const header = inherited
+            ? inherited.get(column)
+            : grid.shown(block.top, column);
           if (header?.kind === 'text' && header !== cell) {
             label.column = labelText(header.text);
           }
