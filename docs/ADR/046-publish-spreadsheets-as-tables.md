@@ -40,7 +40,10 @@ These are spreadsheets:
   limit for exports (ADR-026 holds one back above it);
 - an Excel workbook, `.xlsx` or `.xlsm`, which it downloads, up to 100 MiB,
   as it downloads a PDF; macros are never run;
-- a CSV or tab-separated file, which it downloads.
+- a CSV or tab-separated file, which it downloads and reads as UTF-16 when it
+  opens with that byte order mark, as UTF-8 when it is valid UTF-8, and
+  otherwise as Windows-1251, the code page Excel saves CSV in on a Russian
+  system.
 
 An `.xls` or `.ods` file is still listed (ADR-025), with the advice to open it
 in Google Sheets and save it as one.
@@ -60,8 +63,13 @@ points at its page, as in a document.
 no rule of simple and complex.
 
 - Each visible sheet is a section headed with its name, unless the workbook
-  has one. A hidden sheet is left out: hiding a tab is how an editor keeps it
-  off the site. A chart sheet has no cells and is left out with a note.
+  has one. A hidden sheet, row or column is left out: hiding is how an editor
+  keeps part of a spreadsheet off the site. The page never names a hidden
+  sheet, not even in a formula that refers to one, and a defined name that
+  points into one is not used. A chart sheet has no cells and is left out with
+  a note.
+- A merged cell is cut to the part of the sheet that holds values, so a merge
+  across a whole row does not make its block as wide as the sheet.
 - A sheet is cut into blocks at its empty rows and columns. A block of two
   columns or more is a table whose first row is its header; a single line of
   text above it is its caption. A block of one column is a list of its lines,
@@ -103,8 +111,11 @@ rows gets a filter field and columns sorted by a click on their header, in the
 browser, without changing what search indexes.
 
 **Nothing is read twice.** An uploaded file whose SHA-256 is unchanged is not
-downloaded again, as a PDF is not (ADR-027); a Google Sheet is exported again
-when Drive reports it changed. A better conversion reads every spreadsheet
+downloaded again, as a PDF is not (ADR-027), unless its page would come out
+differently: after a rename, since the title decides a caption the page leaves
+out, or when a page one of its cells links to has left the site, since the
+link's Google address is no longer on the page. A Google Sheet is exported
+again when Drive reports it changed. A better conversion reads every spreadsheet
 again once.
 
 **The data records it.** The manifest's `exportMode` gains `sheet`; a

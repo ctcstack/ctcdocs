@@ -16,7 +16,9 @@ calculates.
   sidebar, `sheet` in `data/docs-index.json`, `llms.txt` and the MCP server's
   `format`. A Google Sheet is exported as `.xlsx`; an uploaded `.xlsx`,
   `.xlsm`, `.csv` or `.tsv` file is downloaded, and not again while Drive's
-  checksum is unchanged. Hidden sheets are left out.
+  checksum is unchanged. Hidden sheets, rows and columns are left out, and
+  the page never names a hidden sheet. A CSV file may be UTF-8, UTF-16 or
+  Windows-1251.
 - **"How it is calculated"** under a sheet with formulas: each distinct
   formula once, the cells it uses named by their row and column labels or the
   workbook's defined names, then its inputs and results.
