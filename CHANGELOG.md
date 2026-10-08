@@ -2,6 +2,28 @@
 
 All three packages share a version and are released together.
 
+## 0.21.3
+
+### Fixed
+
+Spreadsheet pages read the way a model is laid out:
+
+- **A note beside an input stays with it.** A column of text beside a
+  block, on rows the block fills, joins it even across an empty column, and
+  a label and value with notes reads `Label: value — note`. It used to be cut
+  off into a list of its own after the inputs.
+- **A table split by empty rows keeps its header.** A table whose first row
+  is data, written with a currency, a percent, a fraction or more than four
+  digits, takes the header of the table above it on the same columns, and
+  its formulas are named by that header. It used to take its first row of
+  data for a header. A header of years is still a header.
+- **A sentence on its own line is a paragraph.** A caption is a heading when
+  it is at most 80 characters and does not end like a sentence.
+- An empty column a block spans is no column of its table.
+
+`sheetVersion` moves to 2, so the next sync reads every spreadsheet again
+once, unchanged uploaded files included.
+
 ## 0.21.2
 
 ### Fixed
