@@ -279,7 +279,8 @@ version of a PDF stays in the repository's history.
 ## Spreadsheets
 
 A Google Sheet, an Excel workbook (`.xlsx`, `.xlsm`) or a CSV or
-tab-separated file in a published folder is published
+tab-separated file (UTF-8, UTF-16 or Windows-1251) in a published folder is
+published
 ([ADR-046](ADR/046-publish-spreadsheets-as-tables.md)). Its title and address
 are its Drive name without the extension, and the sidebar marks it `Sheet`.
 The file itself is not published: its page links to it in Drive.
@@ -295,7 +296,8 @@ into parts that each repeat its header, for assistants.
 
 What editors control:
 
-- **Hide a sheet** to keep it off the site. A hidden sheet is not read.
+- **Hide a sheet, a row or a column** to keep it off the site. What is hidden
+  is not read, and the page never names a hidden sheet.
 - **Move the file** out of the published folders to keep all of it off.
 - An `.xls` or `.ods` file is listed as not published, with the advice to save
   it as a Google Sheet.
