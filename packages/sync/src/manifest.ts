@@ -23,7 +23,7 @@ const manifestDocumentSchema = z.object({
   contentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
   outputHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
   lastSuccessfulSyncAt: z.iso.datetime(),
-  exportMode: z.enum(['markdown', 'html-zip', 'hybrid', 'pdf']),
+  exportMode: z.enum(['markdown', 'html-zip', 'hybrid', 'pdf', 'sheet']),
   warnings: z.array(z.string()),
   /**
    * The permanent identifier behind `/d/<short ID>/` (ADR-022). Optional only
@@ -32,8 +32,8 @@ const manifestDocumentSchema = z.object({
    */
   shortId: z.string().regex(SHORT_ID_PATTERN).optional(),
   /**
-   * For a PDF, the SHA-256 Drive reports for the file, so an unchanged file is
-   * not downloaded again (ADR-027).
+   * For a PDF or an uploaded spreadsheet, the SHA-256 Drive reports for the
+   * file, so an unchanged file is not downloaded again (ADR-027, ADR-046).
    */
   sourceChecksum: z
     .string()
@@ -44,6 +44,11 @@ const manifestDocumentSchema = z.object({
    * so a better extraction reads every PDF again once.
    */
   pdfTextVersion: z.number().int().positive().optional(),
+  /**
+   * For a spreadsheet, the version of the conversion its page was written
+   * with, so a better conversion reads every spreadsheet again once (ADR-046).
+   */
+  sheetVersion: z.number().int().positive().optional(),
   /**
    * For a Google Doc converted through the HTML export, how many of its images
    * have no alt text and are published with an empty one (ADR-029). A page
@@ -143,6 +148,11 @@ export type SyncManifest = z.infer<typeof syncManifestSchema>;
 export type SyncedDocumentRecord = z.infer<typeof manifestDocumentSchema>;
 export type SyncedFolderRecord = z.infer<typeof manifestFolderSchema>;
 export type ManifestRedirect = z.infer<typeof manifestRedirectSchema>;
+
+/** A page published from a Google Doc, not a PDF or a spreadsheet. */
+export function isGoogleDocRecord(record: SyncedDocumentRecord): boolean {
+  return record.exportMode !== 'pdf' && record.exportMode !== 'sheet';
+}
 
 export class ManifestError extends Error {
   override readonly name = 'ManifestError';

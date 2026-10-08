@@ -43,7 +43,10 @@ export const syncReportSchema = z.object({
     notPublished: z.number().int().nonnegative(),
     /** Documents whose earlier version stays on the site. */
     outOfDate: z.number().int().nonnegative(),
-    /** Entries for pages with part of their file missing, such as a PDF. */
+    /**
+     * Entries for pages with part of their file missing, such as a PDF or a
+     * spreadsheet.
+     */
     incomplete: z.number().int().nonnegative(),
     /** Items below the folders the configuration ignores. */
     ignored: z.number().int().nonnegative(),
@@ -51,6 +54,7 @@ export const syncReportSchema = z.object({
     published: z.object({
       googleDocs: z.number().int().nonnegative(),
       pdfs: z.number().int().nonnegative(),
+      sheets: z.number().int().nonnegative(),
     }),
     /** How the Google Docs on the site were converted. */
     conversion: z.object({

@@ -151,7 +151,7 @@ function printInventorySummary(
   console.log(`Items visible: ${summary.allItems}`);
   console.log(`Folders selected: ${summary.folders}`);
   console.log(
-    `Documents selected (Google Docs and PDF files): ${summary.documents}`,
+    `Documents selected (Google Docs, PDF files and spreadsheets): ${summary.documents}`,
   );
   console.log(`Unsupported items selected: ${summary.unsupported}`);
   console.log(`Ignored items: ${summary.ignored}`);

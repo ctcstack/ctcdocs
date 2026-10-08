@@ -118,7 +118,7 @@ export function renderRunSummary(
             .slice(0, MAX_ROWS_PER_GROUP)
             .map(
               (page) =>
-                `- ${linked ? `[${cell(page.title)}](${pageUrl(siteUrl, page.slug)})` : cell(page.title)}${page.format === 'pdf' ? ' · PDF' : ''}`,
+                `- ${linked ? `[${cell(page.title)}](${pageUrl(siteUrl, page.slug)})` : cell(page.title)}${page.format === 'pdf' ? ' · PDF' : page.format === 'sheet' ? ' · Sheet' : ''}`,
             )
             .concat(
               pages.length > MAX_ROWS_PER_GROUP
@@ -164,7 +164,7 @@ export function renderSiteSummary(
   const lines = [
     '## Knowledge Base',
     '',
-    `**On the site: ${plural(summary.published.googleDocs + summary.published.pdfs, 'page')}** — ${plural(summary.published.googleDocs, 'Google Doc')}, ${plural(summary.published.pdfs, 'PDF')}. ` +
+    `**On the site: ${plural(summary.published.googleDocs + summary.published.pdfs + summary.published.sheets, 'page')}** — ${plural(summary.published.googleDocs, 'Google Doc')}, ${plural(summary.published.pdfs, 'PDF')}, ${plural(summary.published.sheets, 'spreadsheet')}. ` +
       `**Not on the site: ${summary.notPublished}** · out of date: ${summary.outOfDate} · incomplete: ${summary.incomplete} · notes: ${summary.notes}.`,
     '',
     `The same lists, with filters by section and editor: [content health page](${contentHealthUrl}).`,
@@ -279,7 +279,7 @@ export function renderSiteSummary(
   lines.push(
     '### How the pages were made',
     '',
-    `${plural(summary.conversion.markdown, 'Google Doc')} from Google's Markdown export, ${summary.conversion.html} through its HTML export for images, tables or drawings, ${plural(summary.published.pdfs, 'PDF')} published as files with their text.`,
+    `${plural(summary.conversion.markdown, 'Google Doc')} from Google's Markdown export, ${summary.conversion.html} through its HTML export for images, tables or drawings, ${plural(summary.published.pdfs, 'PDF')} published as files with their text, ${plural(summary.published.sheets, 'spreadsheet')} as tables.`,
     '',
   );
   return lines.join('\n');

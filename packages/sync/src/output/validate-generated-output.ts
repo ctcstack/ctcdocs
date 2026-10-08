@@ -27,7 +27,7 @@ import {
   extractGeneratedDocumentBody,
   sha256,
 } from '../markdown/generated-document.js';
-import { syncManifestSchema } from '../manifest.js';
+import { isGoogleDocRecord, syncManifestSchema } from '../manifest.js';
 import { titleReportSchema } from '../titles/title-report.js';
 import type { SyncContext } from '../project-context.js';
 
@@ -48,14 +48,22 @@ const frontmatterSchema = z.object({
   slug: z.string().min(1),
   shortId: z.string().regex(SHORT_ID_PATTERN),
   editUrl: z.url(),
-  sourceType: z.enum(['google-doc', 'drive-pdf']),
+  sourceType: z.enum(['google-doc', 'drive-pdf', 'drive-sheet']),
   googleFileId: z.string().min(1),
   googleModifiedTime: z.iso.datetime(),
   syncedAt: z.iso.datetime(),
   contentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
   folderPath: z.array(z.string()),
   pagefind: z.literal(true),
-  tableOfContents: z.literal(false).optional(),
+  tableOfContents: z
+    .union([
+      z.literal(false),
+      z.strictObject({
+        minHeadingLevel: z.literal(2),
+        maxHeadingLevel: z.literal(2),
+      }),
+    ])
+    .optional(),
   /** Present on the page of a PDF, and only there (ADR-027). */
   pdf: z
     .strictObject({
@@ -65,6 +73,13 @@ const frontmatterSchema = z.object({
         .optional(),
       bytes: z.number().int().nonnegative(),
       pages: z.number().int().nonnegative().nullable(),
+    })
+    .optional(),
+  /** Present on the page of a spreadsheet, and only there (ADR-046). */
+  sheet: z
+    .strictObject({
+      sheets: z.number().int().nonnegative(),
+      formulas: z.number().int().nonnegative(),
     })
     .optional(),
 });
@@ -203,7 +218,7 @@ async function validateGeneratedOutputInternal(
     ) !==
     JSON.stringify(
       Object.values(manifest.documents)
-        .filter((record) => record.exportMode !== 'pdf')
+        .filter(isGoogleDocRecord)
         .map((record) => record.googleFileId)
         .sort(),
     )
@@ -304,13 +319,16 @@ async function validateGeneratedOutputInternal(
       parseFrontmatter(content, markdownHeader),
     );
     const isPdf = record.exportMode === 'pdf';
+    const isSheet = record.exportMode === 'sheet';
     if (
       frontmatter.googleFileId !== record.googleFileId ||
       frontmatter.slug !== record.stableSlug ||
       frontmatter.shortId !== record.shortId ||
       frontmatter.contentHash !== record.contentHash ||
       (frontmatter.sourceType === 'drive-pdf') !== isPdf ||
-      (frontmatter.pdf !== undefined) !== isPdf
+      (frontmatter.pdf !== undefined) !== isPdf ||
+      (frontmatter.sourceType === 'drive-sheet') !== isSheet ||
+      (frontmatter.sheet !== undefined) !== isSheet
     ) {
       throw new Error('Generated frontmatter does not match the manifest.');
     }

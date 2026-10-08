@@ -1,6 +1,7 @@
 import {
   documentName,
   GOOGLE_DRIVE_PDF_MIME_TYPE,
+  spreadsheetFormat,
 } from '../google/drive-types.js';
 import type {
   InventoryFolderNode,
@@ -18,7 +19,10 @@ import { parseOrderedLabel } from '../ordered-label.js';
 interface SidebarLink {
   label: string;
   slug: string;
-  /** Marks a page that presents a PDF rather than a document (ADR-027). */
+  /**
+   * Marks a page that presents a PDF (ADR-027) or a spreadsheet (ADR-046)
+   * rather than a document.
+   */
   badge?: string;
   /**
    * A folder's page names its folder here, since its label names only what
@@ -54,7 +58,9 @@ function documentLink(
     slug: record.stableSlug,
     ...(document.item.mimeType === GOOGLE_DRIVE_PDF_MIME_TYPE
       ? { badge: 'PDF' }
-      : {}),
+      : spreadsheetFormat(document.item.mimeType) !== undefined
+        ? { badge: 'Sheet' }
+        : {}),
   };
 }
 

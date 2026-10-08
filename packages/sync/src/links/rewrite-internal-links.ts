@@ -13,16 +13,25 @@ const GOOGLE_FILE_ID = /^[A-Za-z0-9_-]+$/u;
 const READABLE_ANCHOR = /^[\p{L}\p{N}][\p{L}\p{N}_.:-]*$/u;
 const GOOGLE_SPECIFIC_ANCHOR = /^(?:bookmark=id\.|heading=h\.)/u;
 
+const stringifyOptions = {
+  bullet: '-',
+  emphasis: '*',
+  fences: true,
+  listItemIndent: 'one',
+  strong: '*',
+} as const;
 const processor = unified()
   .use(remarkParse)
   .use(remarkGfm)
-  .use(remarkStringify, {
-    bullet: '-',
-    emphasis: '*',
-    fences: true,
-    listItemIndent: 'one',
-    strong: '*',
-  });
+  .use(remarkStringify, stringifyOptions);
+/*
+ * A spreadsheet's tables are written without padding (ADR-046): one long cell
+ * would otherwise pad every row of its column to its length.
+ */
+const compactProcessor = unified()
+  .use(remarkParse)
+  .use(remarkGfm, { tablePipeAlign: false })
+  .use(remarkStringify, stringifyOptions);
 
 export interface InternalLinkRewrite {
   body: string;
@@ -52,11 +61,17 @@ interface GoogleDocumentLink {
   fileId: string;
   fragment: string;
   /**
-   * Whether the address says what the file is. `/document/` is a Google Doc
-   * and `/file/` a file Drive stores; `open?id=` could be anything, such as a
-   * spreadsheet the site does not publish.
+   * Whether the address says what the file is. `/document/` is a Google Doc,
+   * `/spreadsheets/` a Google Sheet and `/file/` a file Drive stores;
+   * `open?id=` could be anything, such as a presentation the site does not
+   * publish.
    */
   typed: boolean;
+  /**
+   * A Google Sheet's address names a tab, `#gid=0`, rather than a heading:
+   * the page has no such anchor, and dropping it shortens nothing.
+   */
+  sheet: boolean;
 }
 
 /*
@@ -66,6 +81,9 @@ interface GoogleDocumentLink {
  */
 const GOOGLE_DOC_PATH =
   /^\/document(?:\/u\/\d+)?\/d\/([^/]+)(?:\/(?:edit|view|preview|mobilebasic|pub))?\/?$/u;
+/** A Google Sheet the site publishes as a page (ADR-046). */
+const GOOGLE_SHEET_PATH =
+  /^\/spreadsheets(?:\/u\/\d+)?\/d\/([^/]+)(?:\/(?:edit|view|preview|htmlview|pubhtml))?\/?$/u;
 const DRIVE_FILE_PATH = /^\/file\/d\/([^/]+)(?:\/(?:view|edit|preview))?\/?$/u;
 
 function parseGoogleDocumentLink(
@@ -80,9 +98,14 @@ function parseGoogleDocumentLink(
 
   let fileId: string | null = null;
   let typed = true;
+  let sheet = false;
   if (url.hostname === 'docs.google.com') {
     // `/u/<n>/` names the signed-in account a link was copied from.
     fileId = GOOGLE_DOC_PATH.exec(url.pathname)?.[1] ?? null;
+    if (!fileId) {
+      fileId = GOOGLE_SHEET_PATH.exec(url.pathname)?.[1] ?? null;
+      sheet = fileId !== null;
+    }
   } else if (url.hostname === 'drive.google.com') {
     // A Drive file, such as a PDF this site publishes (ADR-027).
     fileId = DRIVE_FILE_PATH.exec(url.pathname)?.[1] ?? null;
@@ -95,7 +118,7 @@ function parseGoogleDocumentLink(
     return undefined;
   }
 
-  return { fileId, fragment: url.hash, typed };
+  return { fileId, fragment: url.hash, typed, sheet };
 }
 
 function safeFragment(fragment: string): {
@@ -193,7 +216,9 @@ function rewriteUrl(
     ? targets.shortIds.get(googleLink.fileId)
     : undefined;
   if (googleLink && shortId) {
-    const fragment = safeFragment(googleLink.fragment);
+    const fragment = googleLink.sheet
+      ? { fragment: '', removed: false }
+      : safeFragment(googleLink.fragment);
     return {
       rewritten: {
         url: `${permanentLinkPath(shortId)}${fragment.fragment}`,
@@ -222,7 +247,7 @@ function rewriteUrl(
       ? { rewritten: { url: unwrapped, removedFragment: false } }
       : {}),
     // Only when the address says what the file is: `open?id=` may well be a
-    // spreadsheet, which no editor could move onto the site.
+    // presentation, which no editor could move onto the site.
     outsideSite: googleLink?.typed === true,
   };
 }
@@ -244,6 +269,7 @@ function walk(
 export function rewriteInternalGoogleLinks(
   body: string,
   targets: InternalLinkTargets,
+  { compactTables = false }: { compactTables?: boolean } = {},
 ): InternalLinkRewrite {
   const tree = processor.parse(body) as Root;
   const warnings = new Set<string>();
@@ -286,7 +312,9 @@ export function rewriteInternalGoogleLinks(
     }
   });
 
-  const rewritten = processor.stringify(tree).trimEnd();
+  const rewritten = (compactTables ? compactProcessor : processor)
+    .stringify(tree)
+    .trimEnd();
   return {
     body: rewritten ? `${rewritten}\n` : '',
     warnings: [...warnings].sort(),
