@@ -76,7 +76,7 @@ function* records(text: string, separator: string): Generator<string[]> {
  * Windows-1251, the code page Excel saves CSV in on a Russian system, where a
  * UTF-8 reading would turn every Cyrillic letter into a replacement mark.
  */
-export function decodeText(bytes: Uint8Array): string {
+function decodeText(bytes: Uint8Array): string {
   if (bytes[0] === 0xff && bytes[1] === 0xfe) {
     return new TextDecoder('utf-16le').decode(bytes.subarray(2));
   }
