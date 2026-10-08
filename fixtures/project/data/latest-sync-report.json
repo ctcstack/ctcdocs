@@ -250,7 +250,8 @@
   ],
   "documentLengths": {
     "largeDocumentCharacters": 1500,
-    "fetchCharacters": 3000
+    "fetchCharacters": 3000,
+    "markdownVersion": 2
   },
   "noteKinds": [
     {
