@@ -1,9 +1,9 @@
 /**
  * Reading a CSV or tab-separated file as a spreadsheet of one sheet
  * (ADR-046). Fields follow RFC 4180: a quoted field may hold the separator,
- * line breaks and doubled quotes. The text is read as UTF-8. A CSV file saved
- * where a comma is the decimal mark separates fields with semicolons, so a
- * header line with more semicolons than commas is read that way.
+ * line breaks and doubled quotes. A CSV file saved where a comma is the
+ * decimal mark separates fields with semicolons, so a header line with more
+ * semicolons than commas is read that way.
  */
 import {
   CellBudget,
@@ -70,13 +70,33 @@ function* records(text: string, separator: string): Generator<string[]> {
   }
 }
 
+/**
+ * The file's text. UTF-16 when it opens with that byte order mark, as Excel's
+ * "Unicode text" does; otherwise UTF-8 when it is valid UTF-8; otherwise
+ * Windows-1251, the code page Excel saves CSV in on a Russian system, where a
+ * UTF-8 reading would turn every Cyrillic letter into a replacement mark.
+ */
+export function decodeText(bytes: Uint8Array): string {
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) {
+    return new TextDecoder('utf-16le').decode(bytes.subarray(2));
+  }
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+    return new TextDecoder('utf-16be').decode(bytes.subarray(2));
+  }
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return new TextDecoder('windows-1251').decode(bytes);
+  }
+}
+
 /** A delimited file as a workbook with one sheet, named after the file. */
 export function readDelimited(
   bytes: Uint8Array,
   name: string,
   tabs: boolean,
 ): WorkbookData {
-  const text = new TextDecoder('utf-8').decode(bytes).replace(/^\uFEFF/u, '');
+  const text = decodeText(bytes).replace(/^\uFEFF/u, '');
   const separator = separatorOf(text, tabs);
   const budget = new CellBudget();
   const cells: SheetCell[] = [];
@@ -117,7 +137,7 @@ export function readDelimited(
         ...(truncatedAfterRow === undefined ? {} : { truncatedAfterRow }),
       },
     ],
-    hiddenSheets: 0,
+    hiddenSheets: [],
     chartSheets: 0,
     omittedSheets: 0,
     names: [],

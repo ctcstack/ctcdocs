@@ -76,7 +76,7 @@ describe('readXlsx', () => {
       }),
     );
     expect(workbook.sheets.map((sheet) => sheet.name)).toEqual(['Shown']);
-    expect(workbook.hiddenSheets).toBe(1);
+    expect(workbook.hiddenSheets).toEqual(['Hidden']);
     expect(workbook.chartSheets).toBe(1);
     expect(JSON.stringify(workbook)).not.toContain('secret');
   });
@@ -181,5 +181,93 @@ describe('readXlsx', () => {
     expect(() =>
       readXlsx(createStoredZipFixture([{ path: 'other.txt', bytes: 'x' }])),
     ).toThrow(/no list of sheets/u);
+  });
+
+  it('leaves out rows and columns hidden in the sheet', () => {
+    const bytes = createXlsxFixture({
+      sheets: [
+        {
+          name: 'Prices',
+          hiddenRows: [3],
+          hiddenColumns: ['C'],
+          cells: {
+            A1: 'Item',
+            B1: 'Price',
+            C1: 'Margin',
+            A2: 'Tea',
+            B2: 2,
+            C2: 0.4,
+            A3: 'Internal',
+            B3: 9,
+          },
+        },
+      ],
+    });
+    expect(texts(bytes)).toEqual({
+      '0,0': 'Item',
+      '0,1': 'Price',
+      '1,0': 'Tea',
+      '1,1': '2',
+    });
+  });
+
+  it('links every cell a link covers, however large its range', () => {
+    const workbook = readXlsx(
+      createXlsxFixture({
+        sheets: [
+          {
+            name: 'Links',
+            cells: { A1: 'One', A2: 'Two', B1: 'Three', C5: 'Four' },
+            linkRanges: {
+              'A1:A2': 'https://example.com/a',
+              'B1:Z1000': 'https://example.com/b',
+            },
+          },
+        ],
+      }),
+    );
+    expect(
+      workbook.sheets[0]?.cells.map((cell) => [cell.text, cell.link]),
+    ).toEqual([
+      ['One', 'https://example.com/a'],
+      ['Three', 'https://example.com/b'],
+      ['Two', 'https://example.com/a'],
+      ['Four', 'https://example.com/b'],
+    ]);
+  });
+
+  it('formats with the currency and East Asian date formats Excel builds in', () => {
+    const bytes = createXlsxFixture({
+      sheets: [
+        {
+          name: 'Built in',
+          cells: {
+            A1: { value: 5000, format: 5 },
+            B1: { value: -5000, format: 5 },
+            C1: { value: 45_000, format: 31 },
+            D1: { value: 0.5, format: 32 },
+          },
+        },
+      ],
+    });
+    expect(texts(bytes)).toEqual({
+      '0,0': '$5,000',
+      '0,1': '($5,000)',
+      '0,2': '2023-03-15',
+      '0,3': '12:00',
+    });
+  });
+
+  it('keeps no name that points into a hidden sheet', () => {
+    const workbook = readXlsx(
+      createXlsxFixture({
+        sheets: [
+          { name: 'Shown', cells: { A1: 1 } },
+          { name: 'Secret', hidden: true, cells: { A1: 2 } },
+        ],
+        names: { Visible: 'Shown!$A$1', Private: 'Secret!$A$1' },
+      }),
+    );
+    expect(workbook.names.map((name) => name.name)).toEqual(['Visible']);
   });
 });

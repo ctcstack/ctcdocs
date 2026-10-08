@@ -379,4 +379,56 @@ describe('workbookToMarkdown', () => {
     expect(result.body).toBe('');
     expect(result.description).toBeUndefined();
   });
+
+  it('keeps a whole-row merge as wide as the cells beside it', () => {
+    const result = page({
+      sheets: [
+        {
+          name: 'Wide',
+          merges: ['A1:XFD1'],
+          cells: { A1: 'Title', A2: 'a', B2: 'b', A3: 1, B3: 2 },
+        },
+      ],
+    });
+    expect(result.body).toBe('## Title\n\n| a | b |\n| -: | -: |\n| 1 | 2 |\n');
+  });
+
+  it('never names a hidden sheet a formula refers to', () => {
+    const result = page({
+      sheets: [
+        {
+          name: 'Shown',
+          cells: {
+            A1: 'Pay',
+            B1: { formula: "'Salaries 2026'!B5*1.2", value: 12 },
+          },
+        },
+        { name: 'Salaries 2026', hidden: true, cells: { B5: 10 } },
+      ],
+      names: { Base: "'Salaries 2026'!$B$5" },
+    });
+    expect(result.body).toContain('`=[hidden sheet]!B5*1.2`');
+    expect(result.body).not.toContain('Salaries');
+  });
+
+  it('finds a defined name only where a formula uses it as one', () => {
+    const result = page({
+      sheets: [
+        {
+          name: 'Rate',
+          cells: {
+            A1: 'Rate',
+            B1: 0.2,
+            A2: 'Card',
+            B2: { formula: 'IF(A1="Rate card",1,0)', value: 0 },
+            A3: 'Same sheet',
+            B3: { formula: 'Rate!B1*2', value: 0.4 },
+          },
+        },
+      ],
+      names: { Rate: 'Rate!$B$1' },
+    });
+    expect(result.body).not.toContain('`Rate` is');
+    expect(result.body).toContain('`Rate!B1` is Rate');
+  });
 });

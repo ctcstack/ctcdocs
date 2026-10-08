@@ -50,4 +50,17 @@ describe('readDelimited', () => {
       'text',
     ]);
   });
+
+  it('reads UTF-16 with a byte order mark, and Windows-1251 that is not UTF-8', () => {
+    const utf16 = new Uint8Array([
+      0xff,
+      0xfe,
+      ...Buffer.from('Имя\tКод\n', 'utf16le'),
+    ]);
+    const fromUtf16 = readDelimited(utf16, 'data', true).sheets[0];
+    expect(fromUtf16?.cells.map((cell) => cell.text)).toEqual(['Имя', 'Код']);
+    const cp1251 = new Uint8Array([0xc8, 0xec, 0xff, 0x2c, 0x31]);
+    const fromCp1251 = readDelimited(cp1251, 'data', false).sheets[0];
+    expect(fromCp1251?.cells.map((cell) => cell.text)).toEqual(['Имя', '1']);
+  });
 });

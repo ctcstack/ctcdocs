@@ -105,12 +105,15 @@ function dependencies(
   files: Record<string, Uint8Array>,
   downloads: string[] = [],
   timestamp = firstTimestamp,
+  { alpha = true }: { alpha?: boolean } = {},
 ) {
   const selection = buildInventorySelection(
     [
       item('root', 'Published', GOOGLE_DRIVE_FOLDER_MIME_TYPE, 'drive'),
       item('team', 'Team', GOOGLE_DRIVE_FOLDER_MIME_TYPE, 'root'),
-      item('doc-alpha', 'Alpha', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+      ...(alpha
+        ? [item('doc-alpha', 'Alpha', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team')]
+        : []),
       ...extra,
     ],
     'root',
@@ -329,5 +332,93 @@ describe('spreadsheets', () => {
         reason: 'content-rejected',
       }),
     ]);
+  });
+
+  it('reads a file again when a page it links to has left the site', async () => {
+    const root = await repository();
+    const downloads: string[] = [];
+    const extra = [
+      uploaded('sheet-budget', 'Budget.xlsx', XLSX_MIME_TYPE, budget),
+    ];
+    await runBasicMarkdownSync(
+      testSyncContext(root),
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: false },
+      dependencies(extra, { 'sheet-budget': budget }, downloads),
+    );
+
+    // The linked document is gone; the workbook has not changed.
+    const second = await runBasicMarkdownSync(
+      testSyncContext(root),
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: false },
+      dependencies(
+        extra,
+        { 'sheet-budget': budget },
+        downloads,
+        secondTimestamp,
+        { alpha: false },
+      ),
+    );
+
+    expect(downloads).toEqual(['sheet-budget', 'sheet-budget']);
+    expect(second.report.summary.removed).toBe(1);
+    const page = await readFile(
+      resolve(root, 'src/content/docs/_generated/sheet-budget.md'),
+      'utf8',
+    );
+    expect(page).toContain(
+      '[Read](https://docs.google.com/document/d/doc-alpha/edit)',
+    );
+  });
+
+  it('writes the page of a renamed file again, for its new title', async () => {
+    const root = await repository();
+    const downloads: string[] = [];
+    const titled = createXlsxFixture({
+      sheets: [
+        {
+          name: 'Plan',
+          cells: {
+            A1: 'Quarter plan',
+            A2: 'Item',
+            B2: 'Cost',
+            A3: 'Hosting',
+            B3: 1,
+          },
+        },
+      ],
+    });
+    await runBasicMarkdownSync(
+      testSyncContext(root),
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: false },
+      dependencies(
+        [uploaded('sheet-plan', 'Plan.xlsx', XLSX_MIME_TYPE, titled)],
+        { 'sheet-plan': titled },
+        downloads,
+      ),
+    );
+    const pagePath = resolve(root, 'src/content/docs/_generated/sheet-plan.md');
+    expect(await readFile(pagePath, 'utf8')).toContain('## Quarter plan');
+
+    await runBasicMarkdownSync(
+      testSyncContext(root),
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: false },
+      dependencies(
+        [uploaded('sheet-plan', 'Quarter plan.xlsx', XLSX_MIME_TYPE, titled)],
+        { 'sheet-plan': titled },
+        downloads,
+        secondTimestamp,
+      ),
+    );
+
+    expect(downloads).toEqual(['sheet-plan', 'sheet-plan']);
+    expect(await readFile(pagePath, 'utf8')).not.toContain('## Quarter plan');
   });
 });

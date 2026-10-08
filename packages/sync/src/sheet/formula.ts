@@ -147,19 +147,28 @@ function corner(token: string): {
   };
 }
 
-/** The spans of a formula's string literals, which hold no references. */
-function stringSpans(formula: string): Array<[number, number]> {
+/**
+ * The spans of a formula's string literals, `"..."`, which hold no
+ * references; with `quotedNames`, also its quoted sheet names, `'...'`, which
+ * hold no defined names. One scan from the left tells the two apart, so a
+ * quote of either kind inside the other is read as text.
+ */
+function literalSpans(
+  formula: string,
+  quotedNames = false,
+): Array<[number, number]> {
   const spans: Array<[number, number]> = [];
   let index = 0;
   while (index < formula.length) {
-    const open = formula.indexOf('"', index);
-    if (open < 0) {
-      break;
+    const quote = formula[index];
+    if (quote !== '"' && quote !== "'") {
+      index += 1;
+      continue;
     }
-    let close = open + 1;
+    let close = index + 1;
     while (close < formula.length) {
-      if (formula[close] === '"') {
-        if (formula[close + 1] === '"') {
+      if (formula[close] === quote) {
+        if (formula[close + 1] === quote) {
           close += 2;
           continue;
         }
@@ -167,21 +176,45 @@ function stringSpans(formula: string): Array<[number, number]> {
       }
       close += 1;
     }
-    spans.push([open, close]);
+    if (quote === '"' || quotedNames) {
+      spans.push([index, close]);
+    }
     index = close + 1;
   }
   return spans;
 }
 
+function within(spans: ReadonlyArray<[number, number]>, position: number) {
+  return spans.some(([open, close]) => position >= open && position <= close);
+}
+
+/*
+ * A name a formula uses: not a function, which `(` follows, nor a sheet, which
+ * `!` follows, nor part of a longer name or a reference.
+ */
+const IDENTIFIER =
+  /(?<![\p{L}\p{N}_.$'\]!\\])[\p{L}_\\][\p{L}\p{N}_.\\]*(?![\p{L}\p{N}_.(!'\\])/gu;
+
+/**
+ * The words a formula uses as names, outside its strings and quoted sheet
+ * names, in the order it writes them: where a defined name, such as
+ * `TaxRate`, can stand. Cell references and `TRUE` are among them too; a
+ * caller looks each word up among the names it knows.
+ */
+export function formulaIdentifiers(formula: string): string[] {
+  const spans = literalSpans(formula, true);
+  return [...formula.matchAll(IDENTIFIER)]
+    .filter((match) => !within(spans, match.index))
+    .map((match) => match[0]);
+}
+
 /** Every reference in a formula, in the order it writes them. */
 export function formulaReferences(formula: string): FormulaReference[] {
-  const strings = stringSpans(formula);
-  const inString = (position: number) =>
-    strings.some(([open, close]) => position >= open && position <= close);
+  const strings = literalSpans(formula);
   const references: FormulaReference[] = [];
   for (const match of formula.matchAll(REFERENCE)) {
     const start = match.index;
-    if (inString(start)) {
+    if (within(strings, start)) {
       continue;
     }
     const groups = match.groups ?? {};

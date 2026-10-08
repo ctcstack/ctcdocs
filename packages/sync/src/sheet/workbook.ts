@@ -46,8 +46,12 @@ export interface DefinedName {
 export interface WorkbookData {
   /** The visible worksheets, in the workbook's order. */
   sheets: WorksheetData[];
-  /** Worksheets hidden in the workbook, which are left out. */
-  hiddenSheets: number;
+  /**
+   * The names of sheets hidden in the workbook, which are left out. A page
+   * never shows them: a formula that refers to one says only that the sheet
+   * is hidden.
+   */
+  hiddenSheets: string[];
   /** Sheets that hold only a chart, which are left out. */
   chartSheets: number;
   /** Visible sheets past the most a page publishes. */

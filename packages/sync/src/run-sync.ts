@@ -8,6 +8,8 @@ import {
   folderChain,
   nextPublishedReaders,
   parseCorpusStructure,
+  permanentLinkPath,
+  PLATFORM_ROUTES,
   PROJECT_LAYOUT,
   widensReaders,
   type AccessConfiguration,
@@ -90,7 +92,10 @@ import {
   type GeneratedPdfFacts,
   type GeneratedSheetFacts,
 } from './markdown/generated-document.js';
-import { detectMarkdownFallbackReasons } from './markdown/analyze-markdown.js';
+import {
+  collectMarkdownLinkUrls,
+  detectMarkdownFallbackReasons,
+} from './markdown/analyze-markdown.js';
 import {
   MarkdownNormalizationError,
   normalizeMarkdown,
@@ -1158,6 +1163,9 @@ async function synchronize(
       ]),
     ],
   };
+  const publishedPermanentLinks = new Set(
+    [...linkTargets.shortIds.values()].map(permanentLinkPath),
+  );
   const sectionIndexPages = site.navigation.sectionIndexPages;
   /*
    * The title report, read once: its facts are reused for documents this run
@@ -1506,12 +1514,30 @@ async function synchronize(
       };
     };
 
+    /*
+     * The page is reused only as it would be written again: under the same
+     * title, which decides a caption it leaves out and its description, and
+     * with every link to another page still leading to one. A link to a
+     * document that has left the site cannot be turned back into its Google
+     * address from the page, so the file is read again.
+     */
     const recorded = planned.existingRecord;
+    const linksStillLead = (body: string) =>
+      collectMarkdownLinkUrls(body).every((url) => {
+        if (!url.startsWith(`/${PLATFORM_ROUTES.permanentLinks}/`)) {
+          return true;
+        }
+        const path = url.replace(/[?#].*$/u, '');
+        return publishedPermanentLinks.has(
+          path.endsWith('/') ? path : `${path}/`,
+        );
+      });
     if (
       recorded?.exportMode === 'sheet' &&
       sourceChecksum !== undefined &&
       recorded.sourceChecksum === sourceChecksum &&
       recorded.sheetVersion === SHEET_VERSION &&
+      recorded.displayTitle === title &&
       !planned.existingOutputInvalid &&
       planned.existingContent !== undefined
     ) {
@@ -1520,7 +1546,7 @@ async function synchronize(
         planned.existingContent,
         markdownHeader,
       );
-      if (facts && body !== undefined) {
+      if (facts && body !== undefined && linksStillLead(body)) {
         return {
           ...common,
           ...linked(
