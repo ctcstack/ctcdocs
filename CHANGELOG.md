@@ -2,6 +2,21 @@
 
 All three packages share a version and are released together.
 
+## 0.21.1
+
+### Fixed
+
+- **A column of single values is a list again.** Its first line was taken
+  for a caption over the rest, line after line, so every value became a
+  heading, and a column of a few thousand values, a list of keywords,
+  overflowed the stack and stopped the sync. A caption is now a line on its
+  own above a table, or above a single note.
+- **One spreadsheet no longer stops a sync.** Whatever stops a
+  spreadsheet's conversion holds back that spreadsheet (ADR-026), with the
+  kind of error as its detail, and the rest of the site is published.
+- **An unexpected sync failure names the kind of error**, such as
+  `RangeError`, and still never its message.
+
 ## 0.21.0
 
 Spreadsheets are published
