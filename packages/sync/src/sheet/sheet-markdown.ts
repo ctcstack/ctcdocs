@@ -357,6 +357,7 @@ function referencedFormulaCells(
 interface FormulaGroup {
   range: CellRange;
   first: SheetCell;
+  cells: SheetCell[];
 }
 
 function groupFormulas(cells: readonly SheetCell[]): FormulaGroup[] {
@@ -374,11 +375,13 @@ function groupFormulas(cells: readonly SheetCell[]): FormulaGroup[] {
       last.range.right === cell.column - 1
     ) {
       last.range.right = cell.column;
+      last.cells.push(cell);
       continue;
     }
     runs.push({
       shape,
       first: cell,
+      cells: [cell],
       range: {
         top: cell.row,
         left: cell.column,
@@ -394,6 +397,7 @@ function groupFormulas(cells: readonly SheetCell[]): FormulaGroup[] {
     const above = open.get(key);
     if (above && above.range.bottom === run.range.top - 1) {
       above.range.bottom = run.range.top;
+      above.cells.push(...run.cells);
       continue;
     }
     open.set(key, run);
@@ -492,12 +496,20 @@ function referenceLabel(
   const target = reference.sheet ?? sheet;
   const { range } = reference;
   let label: string | undefined;
+  const down = group.range.bottom > group.range.top;
+  const across = group.range.right > group.range.left;
   if (range.top !== range.bottom || range.left !== range.right) {
-    label = namer.range(target, range);
+    /*
+     * A range that moves with the group, as `B2:X2` does down a column of
+     * row totals, is not named by the row or column it starts in.
+     */
+    const [fixedTop, fixedLeft] = reference.fixed;
+    const moves =
+      (range.top === range.bottom && down && !fixedTop) ||
+      (range.left === range.right && across && !fixedLeft);
+    label = moves ? undefined : namer.range(target, range);
   } else {
     const [fixedRow, fixedColumn] = reference.fixed;
-    const down = group.range.bottom > group.range.top;
-    const across = group.range.right > group.range.left;
     label =
       (down && !fixedRow
         ? namer.part(target, range.top, range.left, 'column')
@@ -601,6 +613,26 @@ function valueItem(
   ];
 }
 
+function groupResultItem(
+  group: FormulaGroup,
+  sheet: string,
+  namer: Namer,
+): PhrasingContent[] {
+  const label = groupLabel(group, sheet, namer);
+  const { top, left, bottom, right } = group.range;
+  const each = top === bottom ? 'column' : left === right ? 'row' : 'cell';
+  return [
+    ...(label
+      ? [
+          { type: 'strong', children: [text(label)] } satisfies PhrasingContent,
+          text(' ('),
+        ]
+      : []),
+    { type: 'inlineCode', value: rangeAddress(group.range) },
+    text(`${label ? ')' : ''}: one for each ${each}, in the table above`),
+  ];
+}
+
 function capped(
   title: string,
   items: PhrasingContent[][],
@@ -639,9 +671,23 @@ function calculations(
       referencedSingles.has(cellKey(cell.row, cell.column)),
   );
   const referenced = referencedFormulaCells(sheet, index);
-  const results = formulaCells.filter(
-    (cell) => !referenced.has(cellKey(cell.row, cell.column)),
-  );
+  /*
+   * A result is a formula cell nothing else uses. A whole group of them, as a
+   * column of row totals is, is one entry rather than one per row.
+   */
+  const results: PhrasingContent[][] = [];
+  for (const group of groups) {
+    const unused = group.cells.filter(
+      (cell) => !referenced.has(cellKey(cell.row, cell.column)),
+    );
+    if (unused.length > 1 && unused.length === group.cells.length) {
+      results.push(groupResultItem(group, sheet.name, namer));
+      continue;
+    }
+    for (const cell of unused) {
+      results.push(valueItem(cell, sheet.name, namer));
+    }
+  }
   return [
     heading(depth, 'How it is calculated'),
     ...capped(
@@ -658,7 +704,7 @@ function calculations(
     ),
     ...capped(
       'Results',
-      results.map((cell) => valueItem(cell, sheet.name, namer)),
+      results,
       MAX_RESULTS,
       (count) => `And ${plural(count, 'more result')}, in the tables above.`,
     ),
