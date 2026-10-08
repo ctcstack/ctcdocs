@@ -6,18 +6,19 @@
     "exported": 1,
     "added": 0,
     "changed": 1,
-    "unchanged": 12,
+    "unchanged": 15,
     "removed": 0,
     "folders": 5,
     "unsupported": 4,
     "warnings": 0,
     "notPublished": 5,
     "outOfDate": 0,
-    "incomplete": 1,
+    "incomplete": 2,
     "ignored": 2,
     "published": {
       "googleDocs": 10,
-      "pdfs": 3
+      "pdfs": 3,
+      "sheets": 3
     },
     "conversion": {
       "markdown": 8,
@@ -75,6 +76,18 @@
       "instruction": "The site does not download a PDF over 100 MB, so its page only links to Drive and search does not find its text. Save a smaller copy and replace this one."
     },
     {
+      "code": "sheet-truncated",
+      "title": "Only part of the spreadsheet is on the site",
+      "action": "Split it or hide what is not needed",
+      "instruction": "The site publishes up to 2,000 rows of a sheet, 50,000 filled cells and 100 sheets of a spreadsheet, and its page says where it stops. Split the spreadsheet, or hide the sheets readers do not need: a hidden sheet is not published."
+    },
+    {
+      "code": "sheet-not-shown",
+      "title": "The spreadsheet has charts or images the site does not show",
+      "action": "Nothing, or add them to a document",
+      "instruction": "The page shows the cells, and says that the sheet has charts or images readers will find only in the spreadsheet. If a chart matters to readers, copy it into the Google Doc that explains the numbers."
+    },
+    {
       "code": "word-file",
       "title": "Word and text files",
       "action": "Save as Google Docs",
@@ -90,7 +103,7 @@
       "code": "archive-file",
       "title": "Archives",
       "action": "Unpack and upload the files",
-      "instruction": "The site does not open archives. Unpack it and upload what it holds: Google Docs and PDF files are published, and anything else is listed here with its own advice. Then delete the archive."
+      "instruction": "The site does not open archives. Unpack it and upload what it holds: Google Docs, PDF files and spreadsheets are published, and anything else is listed here with its own advice. Then delete the archive."
     },
     {
       "code": "image-file",
@@ -106,9 +119,9 @@
     },
     {
       "code": "spreadsheet-file",
-      "title": "Spreadsheets",
-      "action": "Link from a document",
-      "instruction": "The site does not publish spreadsheets. Link to each one from the document that explains it, or paste a small table into that document. Move the ones nobody needs out of the published folders."
+      "title": "Spreadsheets in an older format",
+      "action": "Save as Google Sheets",
+      "instruction": "The site publishes Google Sheets, Excel workbooks (.xlsx) and CSV files, not .xls or OpenDocument spreadsheets. Open each one in Drive, choose File → Save as Google Sheets, check the result and delete the original. The new spreadsheet is published on the next sync."
     },
     {
       "code": "media-file",
@@ -120,7 +133,7 @@
       "code": "unsupported-type",
       "title": "Other files the site does not publish",
       "action": "Convert, link or move out",
-      "instruction": "The site publishes Google Docs and PDF files. If this content belongs on the site, save it as one of those. Otherwise link to it from a document, or move it out of the published folders."
+      "instruction": "The site publishes Google Docs, PDF files and spreadsheets. If this content belongs on the site, save it as one of those. Otherwise link to it from a document, or move it out of the published folders."
     },
     {
       "code": "shortcut",
@@ -142,6 +155,22 @@
       "reason": "export-too-large",
       "sourceUrl": "https://drive.google.com/open?id=doc-brand-assets",
       "lastEditedBy": "Avery Example"
+    },
+    {
+      "id": "sheet-channel-model",
+      "name": "Channel model.xlsx",
+      "folderPath": [
+        "Handbook"
+      ],
+      "type": "Excel workbook",
+      "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "status": "incomplete",
+      "reason": "sheet-not-shown",
+      "detail": "It has charts.",
+      "sourceUrl": "https://drive.google.com/open?id=sheet-channel-model",
+      "lastEditedBy": "Robin Sample",
+      "slug": "handbook/channel-model",
+      "publishedVersion": "2026-01-05T09:00:00.000Z"
     },
     {
       "id": "word-onboarding",
@@ -185,16 +214,16 @@
       "publishedVersion": "2026-01-05T09:00:00.000Z"
     },
     {
-      "id": "sheet-glossary",
-      "name": "Glossary",
+      "id": "sheet-old-budget",
+      "name": "Old budget.xls",
       "folderPath": [
         "Reference"
       ],
-      "type": "Google Sheets",
-      "mimeType": "application/vnd.google-apps.spreadsheet",
+      "type": "Excel 97–2003 workbook",
+      "mimeType": "application/vnd.ms-excel",
       "status": "not-published",
       "reason": "spreadsheet-file",
-      "sourceUrl": "https://drive.google.com/open?id=sheet-glossary",
+      "sourceUrl": "https://drive.google.com/open?id=sheet-old-budget",
       "lastEditedBy": "Avery Example"
     },
     {
@@ -301,6 +330,12 @@
       "title": "A PDF is long to read whole",
       "action": "Nothing, if it must stay a PDF",
       "instruction": "The PDF holds more text than the length this site notes. The site publishes a PDF as it is, so this is a note rather than a task: an AI agent reads all of it to answer about one part, and past the length an agent is given at once it reads only the beginning. If the PDF was saved from a Google Doc, publishing the document instead, split into shorter ones, lets people and agents read the part they need."
+    },
+    {
+      "code": "sheet-long",
+      "title": "A spreadsheet is long to read whole",
+      "action": "Hide or split what readers do not need",
+      "instruction": "The spreadsheet holds more than the length this site notes, so an AI agent reads all of it to answer about one table, and past the length an agent is given at once it reads only the beginning. Hide the sheets readers do not need, since a hidden sheet is not published, or split the spreadsheet into one per subject."
     },
     {
       "code": "image-undescribed",

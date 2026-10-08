@@ -27,8 +27,18 @@ export const generatedSidebar = [
         "slug": "handbook/tables-and-code"
       },
       {
+        "label": "Channel model",
+        "slug": "handbook/channel-model",
+        "badge": "Sheet"
+      },
+      {
         "label": "Contacts",
         "slug": "handbook/contacts"
+      },
+      {
+        "label": "Price list",
+        "slug": "handbook/price-list",
+        "badge": "Sheet"
       },
       {
         "label": "Scanned form",
@@ -75,6 +85,11 @@ export const generatedSidebar = [
       {
         "label": "Diagrams",
         "slug": "reference/diagrams"
+      },
+      {
+        "label": "Glossary",
+        "slug": "reference/glossary",
+        "badge": "Sheet"
       },
       {
         "label": "Release checklist",

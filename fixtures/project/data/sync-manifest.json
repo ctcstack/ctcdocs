@@ -357,6 +357,88 @@
         "folder-reference",
         "folder-root"
       ]
+    },
+    "sheet-channel-model": {
+      "googleFileId": "sheet-channel-model",
+      "googleParentId": "folder-handbook",
+      "googleName": "Channel model.xlsx",
+      "displayTitle": "Channel model",
+      "description": "A spreadsheet with the columns Metric, January, February and March.",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "googleCreatedTime": "2026-01-05T09:00:00.000Z",
+      "sourceUrl": "https://drive.google.com/file/d/sheet-channel-model/view",
+      "stableSlug": "handbook/channel-model",
+      "generatedMarkdownPath": "src/content/docs/_generated/sheet-channel-model.md",
+      "generatedAssetsDirectory": "src/assets/generated/sheet-channel-model",
+      "contentHash": "sha256:d45959cd8cde6b3ead558c9f08c71c5436e6593e442a619174f16b7d54115919",
+      "outputHash": "sha256:51ed191e0fb8161ecfeb378523573c894a121ab11f09cfb73dc54e3902c4580a",
+      "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
+      "exportMode": "sheet",
+      "warnings": [
+        "sheet:charts"
+      ],
+      "shortId": "db8b74",
+      "sourceChecksum": "sha256:d37f840ec2fdb9bb6633298d25a9e4df659890e110604f6190c9189cd1b5544c",
+      "sheetVersion": 1,
+      "publishedReaders": "*",
+      "publishedChain": [
+        "folder-handbook",
+        "folder-root"
+      ]
+    },
+    "sheet-glossary": {
+      "googleFileId": "sheet-glossary",
+      "googleParentId": "folder-reference",
+      "googleName": "Glossary",
+      "displayTitle": "Glossary",
+      "description": "A spreadsheet with the columns Term and Meaning.",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "googleCreatedTime": "2026-01-05T09:00:00.000Z",
+      "sourceUrl": "https://docs.google.com/spreadsheets/d/sheet-glossary/edit",
+      "stableSlug": "reference/glossary",
+      "generatedMarkdownPath": "src/content/docs/_generated/sheet-glossary.md",
+      "generatedAssetsDirectory": "src/assets/generated/sheet-glossary",
+      "contentHash": "sha256:bb319d3c4db8acd7aaf20159e748b81f31df11e296bb661f8f16b856e4d6d244",
+      "outputHash": "sha256:fbf0d51f64af980ef6d3e20428c841fcb2418761c32bb7e3ca0400b8364c851f",
+      "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
+      "exportMode": "sheet",
+      "warnings": [],
+      "shortId": "60c873",
+      "sheetVersion": 1,
+      "publishedReaders": [
+        "engineering@example.com",
+        "writers@example.com"
+      ],
+      "publishedChain": [
+        "folder-reference",
+        "folder-root"
+      ]
+    },
+    "sheet-price-list": {
+      "googleFileId": "sheet-price-list",
+      "googleParentId": "folder-handbook",
+      "googleName": "Price list.csv",
+      "displayTitle": "Price list",
+      "description": "A spreadsheet with the columns Plan, Seats and Price per month.",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "googleCreatedTime": "2026-01-05T09:00:00.000Z",
+      "sourceUrl": "https://drive.google.com/file/d/sheet-price-list/view",
+      "stableSlug": "handbook/price-list",
+      "generatedMarkdownPath": "src/content/docs/_generated/sheet-price-list.md",
+      "generatedAssetsDirectory": "src/assets/generated/sheet-price-list",
+      "contentHash": "sha256:b0b0b283dff91739574feb076e64945c31566d6578b02e420cdeb6dfea4faa46",
+      "outputHash": "sha256:c3df02dc65f76d89e426062949e61374c6be9ce706db19b40a1fae488d917000",
+      "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
+      "exportMode": "sheet",
+      "warnings": [],
+      "shortId": "d4beb4",
+      "sourceChecksum": "sha256:f7d94818de586b0c13af038fa3939a92de7557d1d1ac1e6bfbd0099f38f6d6d5",
+      "sheetVersion": 1,
+      "publishedReaders": "*",
+      "publishedChain": [
+        "folder-handbook",
+        "folder-root"
+      ]
     }
   },
   "folders": {
