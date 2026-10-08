@@ -29,7 +29,7 @@ export interface CorpusFixture {
   title: string;
   folderPath: string[];
   /** Absent from an index written before PDF files were published. */
-  format?: 'google-doc' | 'pdf';
+  format?: 'google-doc' | 'pdf' | 'sheet';
 }
 
 /*
@@ -60,10 +60,18 @@ function readDocuments(): CorpusFixture[] {
 
 const allDocuments = readDocuments();
 /*
- * Google Docs: the samples below are about a document's page, and a PDF's page
- * is a file and its text (ADR-027), sampled on its own.
+ * Google Docs: the samples below are about a document's page. A PDF's page is
+ * a file and its text (ADR-027), and a spreadsheet's its tables (ADR-046),
+ * each sampled on its own.
  */
-const documents = allDocuments.filter((document) => document.format !== 'pdf');
+const documents = allDocuments.filter(
+  (document) => document.format !== 'pdf' && document.format !== 'sheet',
+);
+
+/** The pages that publish a spreadsheet. */
+export function sheetDocuments(): CorpusFixture[] {
+  return allDocuments.filter((document) => document.format === 'sheet');
+}
 
 /** A page that publishes a PDF, with the file when the site serves it. */
 export function pdfDocument():

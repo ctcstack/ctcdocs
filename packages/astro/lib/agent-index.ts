@@ -47,6 +47,10 @@ export interface IndexedDocument {
    */
   pdf: boolean;
   /**
+   * A published spreadsheet (ADR-046), which the link text names the same way.
+   */
+  sheet?: boolean;
+  /**
    * The document's access class (ADR-039). An index describes only documents
    * of its own class and lists the rest by title and address; without one, a
    * document is in the members class.
@@ -64,6 +68,7 @@ interface AgentIndexEntry {
   title: string;
   description: string | undefined;
   pdf: boolean;
+  sheet: boolean;
   classId: string;
 }
 
@@ -137,6 +142,7 @@ export function buildAgentIndex(
       title: document.title,
       description: oneLine(document.description),
       pdf: document.pdf,
+      sheet: document.sheet ?? false,
       classId: document.classId ?? MEMBERS_CLASS,
     };
   }
@@ -205,6 +211,7 @@ export function buildAgentIndex(
       title: document.title,
       description: oneLine(document.description),
       pdf: document.pdf,
+      sheet: document.sheet ?? false,
       classId: document.classId ?? MEMBERS_CLASS,
     }))
     .sort(
@@ -230,7 +237,8 @@ export function buildAgentIndex(
  */
 function documentLine(document: AgentIndexEntry, indexClass: string): string {
   const title = inlineMarkdown(document.title);
-  const link = `- [${document.pdf ? `${title} (PDF)` : title}](${markdownProjectionPath(document.slug)})`;
+  const kind = document.pdf ? ' (PDF)' : document.sheet ? ' (spreadsheet)' : '';
+  const link = `- [${title}${kind}](${markdownProjectionPath(document.slug)})`;
   return document.description && document.classId === indexClass
     ? `${link}: ${inlineMarkdown(document.description)}`
     : link;

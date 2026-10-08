@@ -145,7 +145,8 @@ export interface IgnoredFolder {
 export interface SyncState {
   generatedAt: string;
   summary: {
-    published: { googleDocs: number; pdfs: number };
+    /** `sheets` is absent from a report written before ADR-046. */
+    published: { googleDocs: number; pdfs: number; sheets?: number };
     conversion: { markdown: number; html: number };
     notPublished: number;
     outOfDate: number;

@@ -438,7 +438,9 @@ async function verifyAgents({ map, projectRoot, distRoot, environment, keys }) {
         const truncated = fetched.metadata.truncated === true;
         assert.ok(
           truncated
-            ? note === 'document-over-agent-limit' || note === 'pdf-long'
+            ? note === 'document-over-agent-limit' ||
+                note === 'pdf-long' ||
+                note === 'sheet-long'
             : note !== 'document-over-agent-limit',
           truncated
             ? `MCP fetch cut ${document.markdown}, which the content health page does not name.`
@@ -477,7 +479,8 @@ async function lengthNotesAgainst(projectRoot, fetchCharacters) {
         (note) =>
           note.slug &&
           (note.note === 'document-over-agent-limit' ||
-            note.note === 'pdf-long'),
+            note.note === 'pdf-long' ||
+            note.note === 'sheet-long'),
       )
       .map((note) => [markdownProjectionPath(note.slug), note.note]),
   );

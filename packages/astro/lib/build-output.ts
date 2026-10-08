@@ -174,7 +174,7 @@ async function writeBundle(
   return written;
 }
 
-const DOCUMENT_SOURCES = new Set(['google-doc', 'drive-pdf']);
+const DOCUMENT_SOURCES = new Set(['google-doc', 'drive-pdf', 'drive-sheet']);
 
 /**
  * Reads every text file the build wrote, with the bodies of its documents and

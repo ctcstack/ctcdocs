@@ -8,7 +8,14 @@
  * component can import it without pulling in the Markdown pipeline.
  */
 
-/** A synchronized Google document or published PDF has a Markdown version. */
+/**
+ * A synchronized Google document, published PDF or published spreadsheet has
+ * a Markdown version.
+ */
 export function hasMarkdownProjection(sourceType: string | undefined): boolean {
-  return sourceType === 'google-doc' || sourceType === 'drive-pdf';
+  return (
+    sourceType === 'google-doc' ||
+    sourceType === 'drive-pdf' ||
+    sourceType === 'drive-sheet'
+  );
 }

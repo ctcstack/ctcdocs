@@ -117,7 +117,8 @@ export async function loadCorpus(): Promise<Corpus> {
   const synced = docs.filter(
     (doc) =>
       doc.data.sourceType === 'google-doc' ||
-      doc.data.sourceType === 'drive-pdf',
+      doc.data.sourceType === 'drive-pdf' ||
+      doc.data.sourceType === 'drive-sheet',
   );
   const sections = await loadSectionHrefs();
 

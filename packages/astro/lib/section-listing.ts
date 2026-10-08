@@ -38,7 +38,7 @@ const EXPECTED_SOURCES: Readonly<
   Record<'folder' | 'document', readonly string[]>
 > = {
   folder: ['section-index'],
-  document: ['google-doc', 'drive-pdf'],
+  document: ['google-doc', 'drive-pdf', 'drive-sheet'],
 };
 
 /**

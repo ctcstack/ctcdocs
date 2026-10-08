@@ -54,8 +54,10 @@ const rows = await loadRows();
  * A PDF's page (ADR-027) shows the file first, and its text below, folded
  * while the file is there to read. Search indexes the text either way.
  */
-const { pdf, googleFileId, editUrl, title } = entry.data;
+const { pdf, googleFileId, editUrl, title, sourceType } = entry.data;
 const pdfText = Boolean(entry.body?.trim());
+// A spreadsheet's tables hold their header and sort and filter (ADR-046).
+const sheet = sourceType === 'drive-sheet';
 ---
 
 <Default>
@@ -79,11 +81,19 @@ const pdfText = Boolean(entry.body?.trim());
         <summary>Text of the PDF</summary>
         <slot />
       </details>
+    ) : sheet ? (
+      <sheet-tables>
+        <slot />
+      </sheet-tables>
     ) : (
       <slot />
     )
   }
 </Default>
+
+<script>
+  import '../scripts/sheet-tables';
+</script>
 
 <style>
   @layer starlight.components {

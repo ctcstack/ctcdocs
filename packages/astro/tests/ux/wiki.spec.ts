@@ -27,6 +27,7 @@ import {
   folderPages,
   pdfDocument,
   sectionWithSubfolder,
+  sheetDocuments,
 } from '../support/corpus-fixtures.js';
 
 /*
@@ -999,5 +1000,55 @@ test('a PDF has a page with the file and its text', async ({
     expect(file.ok()).toBe(true);
     expect(file.headers()['content-type']).toMatch(/^application\/pdf/u);
   }
+  await expectNoAccessibilityViolations(page);
+});
+
+test('a spreadsheet has a page whose long tables filter and sort', async ({
+  page,
+}) => {
+  const sheets = sheetDocuments();
+  test.skip(sheets.length === 0, 'The corpus has no spreadsheets.');
+
+  let found = false;
+  for (const sheet of sheets) {
+    await page.goto(`/${sheet.slug}/`);
+    await expect(
+      page.getByRole('heading', { level: 1, name: sheet.title }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: /^Open in Google (?:Sheets|Drive)$/u }),
+    ).toBeVisible();
+    if ((await page.locator('.kb-sheet-tall').count()) > 0) {
+      found = true;
+      break;
+    }
+  }
+  test.skip(!found, 'No spreadsheet has a table long enough to filter.');
+
+  const wrapper = page.locator('.kb-sheet-tall').first();
+  const rows = wrapper.locator('tbody tr');
+  const total = await rows.count();
+  const filter = page.getByRole('searchbox', { name: 'Filter rows' }).first();
+  const status = page.locator('.kb-sheet-count').first();
+
+  await filter.fill('no row says this 7d1f');
+  await expect(rows.filter({ visible: true })).toHaveCount(0);
+  await expect(status).toHaveText(`0 of ${total} rows`);
+  await filter.fill('');
+  await expect(rows.filter({ visible: true })).toHaveCount(total);
+
+  const header = wrapper.locator('thead th').first();
+  const sort = header.getByRole('button');
+  await sort.click();
+  await expect(header).toHaveAttribute('aria-sort', 'ascending');
+  await sort.click();
+  await expect(header).toHaveAttribute('aria-sort', 'descending');
+
+  // The header stays in view while the table scrolls.
+  await wrapper.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect(header).toBeInViewport();
+
   await expectNoAccessibilityViolations(page);
 });
