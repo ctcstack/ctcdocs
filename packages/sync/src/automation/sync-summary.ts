@@ -24,6 +24,14 @@ import type { TitleReport } from '../titles/title-report.js';
 /** The most rows one group lists; the content health page lists every one. */
 const MAX_ROWS_PER_GROUP = 100;
 
+/** How a page that is not a Google Doc is marked in a run's lists. */
+const FORMAT_LABELS: Readonly<Record<string, string>> = {
+  pdf: ' · PDF',
+  sheet: ' · Sheet',
+  video: ' · Video',
+  audio: ' · Audio',
+};
+
 /**
  * A Drive name or folder label as literal text in a table cell. Every ASCII
  * punctuation mark is escaped, so a name reads as typed and never becomes a
@@ -118,7 +126,7 @@ export function renderRunSummary(
             .slice(0, MAX_ROWS_PER_GROUP)
             .map(
               (page) =>
-                `- ${linked ? `[${cell(page.title)}](${pageUrl(siteUrl, page.slug)})` : cell(page.title)}${page.format === 'pdf' ? ' · PDF' : page.format === 'sheet' ? ' · Sheet' : ''}`,
+                `- ${linked ? `[${cell(page.title)}](${pageUrl(siteUrl, page.slug)})` : cell(page.title)}${FORMAT_LABELS[page.format] ?? ''}`,
             )
             .concat(
               pages.length > MAX_ROWS_PER_GROUP
@@ -164,7 +172,7 @@ export function renderSiteSummary(
   const lines = [
     '## Knowledge Base',
     '',
-    `**On the site: ${plural(summary.published.googleDocs + summary.published.pdfs + summary.published.sheets, 'page')}** — ${plural(summary.published.googleDocs, 'Google Doc')}, ${plural(summary.published.pdfs, 'PDF')}, ${plural(summary.published.sheets, 'spreadsheet')}. ` +
+    `**On the site: ${plural(summary.published.googleDocs + summary.published.pdfs + summary.published.sheets + summary.published.media, 'page')}** — ${plural(summary.published.googleDocs, 'Google Doc')}, ${plural(summary.published.pdfs, 'PDF')}, ${plural(summary.published.sheets, 'spreadsheet')}, ${plural(summary.published.media, 'recording')}. ` +
       `**Not on the site: ${summary.notPublished}** · out of date: ${summary.outOfDate} · incomplete: ${summary.incomplete} · notes: ${summary.notes}.`,
     '',
     `The same lists, with filters by section and editor: [content health page](${contentHealthUrl}).`,
@@ -279,7 +287,7 @@ export function renderSiteSummary(
   lines.push(
     '### How the pages were made',
     '',
-    `${plural(summary.conversion.markdown, 'Google Doc')} from Google's Markdown export, ${summary.conversion.html} through its HTML export for images, tables or drawings, ${plural(summary.published.pdfs, 'PDF')} published as files with their text, ${plural(summary.published.sheets, 'spreadsheet')} as tables.`,
+    `${plural(summary.conversion.markdown, 'Google Doc')} from Google's Markdown export, ${summary.conversion.html} through its HTML export for images, tables or drawings, ${plural(summary.published.pdfs, 'PDF')} published as files with their text, ${plural(summary.published.sheets, 'spreadsheet')} as tables, ${plural(summary.published.media, 'recording')} from their description in Drive.`,
     '',
   );
   return lines.join('\n');

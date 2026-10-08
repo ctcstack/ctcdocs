@@ -23,7 +23,15 @@ const manifestDocumentSchema = z.object({
   contentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
   outputHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
   lastSuccessfulSyncAt: z.iso.datetime(),
-  exportMode: z.enum(['markdown', 'html-zip', 'hybrid', 'pdf', 'sheet']),
+  exportMode: z.enum([
+    'markdown',
+    'html-zip',
+    'hybrid',
+    'pdf',
+    'sheet',
+    'video',
+    'audio',
+  ]),
   warnings: z.array(z.string()),
   /**
    * The permanent identifier behind `/d/<short ID>/` (ADR-022). Optional only
@@ -34,6 +42,8 @@ const manifestDocumentSchema = z.object({
   /**
    * For a PDF or an uploaded spreadsheet, the SHA-256 Drive reports for the
    * file, so an unchanged file is not downloaded again (ADR-027, ADR-046).
+   * For a recording, a digest of the metadata its page is written from
+   * (ADR-047).
    */
   sourceChecksum: z
     .string()
@@ -149,9 +159,18 @@ export type SyncedDocumentRecord = z.infer<typeof manifestDocumentSchema>;
 export type SyncedFolderRecord = z.infer<typeof manifestFolderSchema>;
 export type ManifestRedirect = z.infer<typeof manifestRedirectSchema>;
 
-/** A page published from a Google Doc, not a PDF or a spreadsheet. */
+/** A page published from a Google Doc, not a PDF, spreadsheet or recording. */
 export function isGoogleDocRecord(record: SyncedDocumentRecord): boolean {
-  return record.exportMode !== 'pdf' && record.exportMode !== 'sheet';
+  return (
+    record.exportMode !== 'pdf' &&
+    record.exportMode !== 'sheet' &&
+    !isMediaRecord(record)
+  );
+}
+
+/** A page published from a video or audio file (ADR-047). */
+export function isMediaRecord(record: SyncedDocumentRecord): boolean {
+  return record.exportMode === 'video' || record.exportMode === 'audio';
 }
 
 export class ManifestError extends Error {

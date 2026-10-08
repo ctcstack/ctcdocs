@@ -8,7 +8,7 @@
  * checks are (ADR-024). The wording lives here, once, and travels in the sync
  * report, so the page, the job summary and the terminal say the same thing.
  * Files the site does not publish are grouped by what an editor would do with
- * them, a Word file apart from a video (ADR-028).
+ * them, a Word file apart from an image (ADR-028).
  *
  * The list is a pure function of the inventory and the run's export failures:
  * an unchanged Drive rewrites it byte for byte.
@@ -47,9 +47,15 @@ export type UnpublishedReasonCode =
   | 'image-file'
   | 'diagram-file'
   | 'spreadsheet-file'
-  | 'media-file'
   | 'unsupported-type'
+  /** Retired by ADR-047: video and audio files have pages. */
+  | 'media-file'
   | 'shortcut';
+
+/** Reasons an earlier version wrote that no file is given any longer. */
+export const RETIRED_REASON_CODES: readonly UnpublishedReasonCode[] = [
+  'media-file',
+];
 
 export interface UnpublishedReason {
   code: UnpublishedReasonCode;
@@ -164,7 +170,7 @@ export const UNPUBLISHED_REASONS: readonly UnpublishedReason[] = [
     title: 'Archives',
     action: 'Unpack and upload the files',
     instruction:
-      'The site does not open archives. Unpack it and upload what it holds: Google Docs, PDF files and spreadsheets are published, and anything else is listed here with its own advice. Then delete the archive.',
+      'The site does not open archives. Unpack it and upload what it holds: Google Docs, PDF files, spreadsheets, video and audio are published, and anything else is listed here with its own advice. Then delete the archive.',
   },
   {
     code: 'image-file',
@@ -188,18 +194,11 @@ export const UNPUBLISHED_REASONS: readonly UnpublishedReason[] = [
       'The site publishes Google Sheets, Excel workbooks (.xlsx) and CSV files, not .xls or OpenDocument spreadsheets. Open each one in Drive, choose File → Save as Google Sheets, check the result and delete the original. The new spreadsheet is published on the next sync.',
   },
   {
-    code: 'media-file',
-    title: 'Video and audio',
-    action: 'Link from a document',
-    instruction:
-      'The site does not host video or audio. Link to each file from a document, for example one page that lists the video instructions of a section and says what each one shows.',
-  },
-  {
     code: 'unsupported-type',
     title: 'Other files the site does not publish',
     action: 'Convert, link or move out',
     instruction:
-      'The site publishes Google Docs, PDF files and spreadsheets. If this content belongs on the site, save it as one of those. Otherwise link to it from a document, or move it out of the published folders.',
+      'The site publishes Google Docs, PDF files, spreadsheets, video and audio. If this content belongs on the site, save it as one of those. Otherwise link to it from a document, or move it out of the published folders.',
   },
   {
     code: 'shortcut',
@@ -277,13 +276,6 @@ export function unsupportedFileReason(
   }
   if (mimeType.startsWith('image/')) {
     return 'image-file';
-  }
-  if (
-    mimeType.startsWith('video/') ||
-    mimeType.startsWith('audio/') ||
-    mimeType === 'application/vnd.google-apps.vid'
-  ) {
-    return 'media-file';
   }
   return 'unsupported-type';
 }

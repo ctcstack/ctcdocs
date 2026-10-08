@@ -18,10 +18,12 @@ export const aiDocsIndexSchema = z.object({
       folderPath: z.array(z.string()),
       language: z.string().min(2).optional(),
       /**
-       * What the page publishes: a Google Doc, a PDF file (ADR-027) or a
-       * spreadsheet (ADR-046).
+       * What the page publishes: a Google Doc, a PDF file (ADR-027), a
+       * spreadsheet (ADR-046) or a video or audio file (ADR-047).
        */
-      format: z.enum(['google-doc', 'pdf', 'sheet']).optional(),
+      format: z
+        .enum(['google-doc', 'pdf', 'sheet', 'video', 'audio'])
+        .optional(),
     }),
   ),
 });
@@ -58,11 +60,12 @@ export function createAiDocsIndex(
         folderPath: folderPaths.get(record.googleFileId) ?? [],
         language: defaultLocale,
         format:
-          record.exportMode === 'pdf'
-            ? 'pdf'
-            : record.exportMode === 'sheet'
-              ? 'sheet'
-              : 'google-doc',
+          record.exportMode === 'pdf' ||
+          record.exportMode === 'sheet' ||
+          record.exportMode === 'video' ||
+          record.exportMode === 'audio'
+            ? record.exportMode
+            : 'google-doc',
       })),
   };
 }

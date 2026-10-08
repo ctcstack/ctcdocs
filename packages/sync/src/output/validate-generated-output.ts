@@ -27,7 +27,11 @@ import {
   extractGeneratedDocumentBody,
   sha256,
 } from '../markdown/generated-document.js';
-import { isGoogleDocRecord, syncManifestSchema } from '../manifest.js';
+import {
+  isGoogleDocRecord,
+  isMediaRecord,
+  syncManifestSchema,
+} from '../manifest.js';
 import { titleReportSchema } from '../titles/title-report.js';
 import type { SyncContext } from '../project-context.js';
 
@@ -48,7 +52,7 @@ const frontmatterSchema = z.object({
   slug: z.string().min(1),
   shortId: z.string().regex(SHORT_ID_PATTERN),
   editUrl: z.url(),
-  sourceType: z.enum(['google-doc', 'drive-pdf', 'drive-sheet']),
+  sourceType: z.enum(['google-doc', 'drive-pdf', 'drive-sheet', 'drive-media']),
   googleFileId: z.string().min(1),
   googleModifiedTime: z.iso.datetime(),
   syncedAt: z.iso.datetime(),
@@ -80,6 +84,15 @@ const frontmatterSchema = z.object({
     .strictObject({
       sheets: z.number().int().nonnegative(),
       formulas: z.number().int().nonnegative(),
+    })
+    .optional(),
+  /** Present on the page of a recording, and only there (ADR-047). */
+  media: z
+    .strictObject({
+      kind: z.enum(['video', 'audio']),
+      seconds: z.number().int().positive().nullable(),
+      width: z.number().int().positive().nullable(),
+      height: z.number().int().positive().nullable(),
     })
     .optional(),
 });
@@ -320,6 +333,7 @@ async function validateGeneratedOutputInternal(
     );
     const isPdf = record.exportMode === 'pdf';
     const isSheet = record.exportMode === 'sheet';
+    const isMedia = isMediaRecord(record);
     if (
       frontmatter.googleFileId !== record.googleFileId ||
       frontmatter.slug !== record.stableSlug ||
@@ -328,7 +342,10 @@ async function validateGeneratedOutputInternal(
       (frontmatter.sourceType === 'drive-pdf') !== isPdf ||
       (frontmatter.pdf !== undefined) !== isPdf ||
       (frontmatter.sourceType === 'drive-sheet') !== isSheet ||
-      (frontmatter.sheet !== undefined) !== isSheet
+      (frontmatter.sheet !== undefined) !== isSheet ||
+      (frontmatter.sourceType === 'drive-media') !== isMedia ||
+      (frontmatter.media !== undefined) !== isMedia ||
+      (isMedia && frontmatter.media?.kind !== record.exportMode)
     ) {
       throw new Error('Generated frontmatter does not match the manifest.');
     }

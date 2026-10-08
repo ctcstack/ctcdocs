@@ -32,30 +32,48 @@ export function spreadsheetFormat(
   return SPREADSHEET_FORMATS.get(mimeType);
 }
 
+export const GOOGLE_VIDS_MIME_TYPE = 'application/vnd.google-apps.vid';
+
+export type MediaKind = 'video' | 'audio';
+
 /**
- * What the site publishes as a page: Google Docs, PDF files (ADR-027) and
- * spreadsheets (ADR-046). Everything else under the root is listed as not on
- * the site (ADR-025).
+ * Whether a file is a recording the site gives a page (ADR-047): a video or
+ * audio file, or a Google Vids video. `undefined` for anything else.
+ */
+export function mediaKind(mimeType: string): MediaKind | undefined {
+  if (mimeType === GOOGLE_VIDS_MIME_TYPE || mimeType.startsWith('video/')) {
+    return 'video';
+  }
+  return mimeType.startsWith('audio/') ? 'audio' : undefined;
+}
+
+/**
+ * What the site publishes as a page: Google Docs, PDF files (ADR-027),
+ * spreadsheets (ADR-046) and recordings (ADR-047). Everything else under the
+ * root is listed as not on the site (ADR-025).
  */
 export function isPublishedFileType(mimeType: string): boolean {
   return (
     mimeType === GOOGLE_DRIVE_DOCUMENT_MIME_TYPE ||
     mimeType === GOOGLE_DRIVE_PDF_MIME_TYPE ||
-    SPREADSHEET_FORMATS.has(mimeType)
+    SPREADSHEET_FORMATS.has(mimeType) ||
+    mediaKind(mimeType) !== undefined
   );
 }
 
 /** The extension an uploaded file carries from the computer it came from. */
-const UPLOADED_EXTENSION = /\.(?:pdf|xlsx|xlsm|csv|tsv)\s*$/iu;
+const UPLOADED_EXTENSION =
+  /\.(?:pdf|xlsx|xlsm|csv|tsv|mp4|m4v|mov|qt|webm|mkv|avi|wmv|mpe?g|3gp|mp3|m4a|wav|ogg|oga|opus|aac|flac|wma)\s*$/iu;
 
 /**
  * The name a document is published under: its Drive name, without the
- * extension an uploaded PDF or spreadsheet carries.
+ * extension an uploaded PDF, spreadsheet or recording carries.
  */
 export function documentName(item: { name: string; mimeType: string }): string {
   if (
     item.mimeType !== GOOGLE_DRIVE_PDF_MIME_TYPE &&
-    spreadsheetFormat(item.mimeType) === undefined
+    spreadsheetFormat(item.mimeType) === undefined &&
+    mediaKind(item.mimeType) === undefined
   ) {
     return item.name;
   }
@@ -94,6 +112,22 @@ export const driveItemSchema = z.object({
    */
   lastModifyingUser: z
     .object({ displayName: z.string().optional() })
+    .optional(),
+  /**
+   * What the file's editor wrote about it in Drive. A recording's page is
+   * written from it (ADR-047).
+   */
+  description: z.string().optional(),
+  /**
+   * A video's length and frame size, once Drive has processed it (ADR-047).
+   * Drive reports the length in milliseconds, as a string or a number.
+   */
+  videoMediaMetadata: z
+    .object({
+      width: z.number().int().nonnegative().optional(),
+      height: z.number().int().nonnegative().optional(),
+      durationMillis: z.coerce.number().int().nonnegative().optional(),
+    })
     .optional(),
 });
 

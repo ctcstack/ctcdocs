@@ -68,6 +68,8 @@ import {
   documentName,
   GOOGLE_DRIVE_PDF_MIME_TYPE,
   GOOGLE_SHEETS_MIME_TYPE,
+  GOOGLE_VIDS_MIME_TYPE,
+  mediaKind,
   spreadsheetFormat,
 } from './google/drive-types.js';
 import { GoogleApiError } from './google/google-api-error.js';
@@ -90,6 +92,7 @@ import {
   extractGeneratedFrontmatter,
   generateMarkdownDocument,
   sha256,
+  type GeneratedMediaFacts,
   type GeneratedPdfFacts,
   type GeneratedSheetFacts,
 } from './markdown/generated-document.js';
@@ -108,6 +111,7 @@ import {
 import {
   CONVERTER_VERSION,
   isGoogleDocRecord,
+  isMediaRecord,
   loadManifest,
   NORMALIZER_VERSION,
   serializeManifest,
@@ -128,6 +132,11 @@ import {
   readPdfText,
 } from './pdf/read-pdf.js';
 import { validateGeneratedOutput } from './output/validate-generated-output.js';
+import {
+  mediaChecksum,
+  mediaFacts,
+  mediaToMarkdown,
+} from './media/media-page.js';
 import { readDelimited } from './sheet/read-delimited.js';
 import { readXlsx } from './sheet/read-xlsx.js';
 import { SHEET_VERSION, workbookToMarkdown } from './sheet/sheet-markdown.js';
@@ -185,7 +194,7 @@ interface RunPage {
   id: string;
   title: string;
   slug: string;
-  format: 'google-doc' | 'pdf' | 'sheet';
+  format: 'google-doc' | 'pdf' | 'sheet' | 'video' | 'audio';
 }
 
 /** What one run changed on the site, for the run's own summary (ADR-028). */
@@ -304,8 +313,12 @@ function sourceUrl(fileId: string, mimeType: string): string {
   if (mimeType === GOOGLE_SHEETS_MIME_TYPE) {
     return `https://docs.google.com/spreadsheets/d/${id}/edit`;
   }
+  if (mimeType === GOOGLE_VIDS_MIME_TYPE) {
+    return `https://docs.google.com/videos/d/${id}/edit`;
+  }
   return mimeType === GOOGLE_DRIVE_PDF_MIME_TYPE ||
-    spreadsheetFormat(mimeType) !== undefined
+    spreadsheetFormat(mimeType) !== undefined ||
+    mediaKind(mimeType) !== undefined
     ? `https://drive.google.com/file/d/${id}/view`
     : `https://docs.google.com/document/d/${id}/edit`;
 }
@@ -834,6 +847,7 @@ interface ConvertedDocument {
   titleFacts: NonNullable<GoogleDocumentStructure['titleFacts']> | null;
   pdf?: GeneratedPdfFacts;
   sheet?: GeneratedSheetFacts;
+  media?: GeneratedMediaFacts;
   sourceChecksum?: string;
   pdfTextVersion?: number;
   sheetVersion?: number;
@@ -1276,6 +1290,10 @@ async function synchronize(
                 // A spreadsheet written by an earlier conversion (ADR-046).
                 (spreadsheetFormat(selected.item.mimeType) !== undefined &&
                   existingRecord.sheetVersion !== SHEET_VERSION) ||
+                // A recording whose page would come out differently (ADR-047).
+                (mediaKind(selected.item.mimeType) !== undefined &&
+                  existingRecord.sourceChecksum !==
+                    mediaChecksum(selected.item)) ||
                 // Images converted before they were counted, or cropped
                 // before crops were applied (ADR-031).
                 (existingRecord.exportMode === 'hybrid' &&
@@ -1612,6 +1630,29 @@ async function synchronize(
     };
   };
 
+  /**
+   * A recording's page (ADR-047), from the metadata the inventory already
+   * holds: the file is never downloaded. Its description's links are
+   * rewritten as a document's are.
+   */
+  const convertMedia = (planned: PlannedDocument): ConvertedDocument => {
+    const { item } = planned.selected;
+    const facts = mediaFacts(item);
+    const markdown = mediaToMarkdown(item);
+    const rewritten = rewriteInternalGoogleLinks(markdown.body, linkTargets);
+    return {
+      body: rewritten.body,
+      ...(markdown.description ? { description: markdown.description } : {}),
+      removedTitleHeading: false,
+      assets: [],
+      exportMode: facts.kind,
+      warnings: rewritten.warnings,
+      titleFacts: null,
+      media: facts,
+      sourceChecksum: mediaChecksum(item),
+    };
+  };
+
   const exportDocument = async (planned: PlannedDocument) => {
     const { item } = planned.selected;
     const title = parseOrderedLabel(documentName(item)).label;
@@ -1620,7 +1661,9 @@ async function synchronize(
         ? await convertPdf(planned, title)
         : spreadsheetFormat(item.mimeType) !== undefined
           ? await convertSheet(planned, title)
-          : await convertGoogleDocument(planned, title);
+          : mediaKind(item.mimeType) !== undefined
+            ? convertMedia(planned)
+            : await convertGoogleDocument(planned, title);
     const folderPath = planned.selected.path
       .slice(1, -1)
       .map((segment) => parseOrderedLabel(segment).label);
@@ -1668,6 +1711,7 @@ async function synchronize(
         contentHash,
         ...(converted.pdf ? { pdf: converted.pdf } : {}),
         ...(converted.sheet ? { sheet: converted.sheet } : {}),
+        ...(converted.media ? { media: converted.media } : {}),
       },
       markdownHeader,
     );
@@ -1869,11 +1913,12 @@ async function synchronize(
     title: record.displayTitle,
     slug: record.stableSlug,
     format:
-      record.exportMode === 'pdf'
-        ? 'pdf'
-        : record.exportMode === 'sheet'
-          ? 'sheet'
-          : 'google-doc',
+      record.exportMode === 'pdf' ||
+      record.exportMode === 'sheet' ||
+      record.exportMode === 'video' ||
+      record.exportMode === 'audio'
+        ? record.exportMode
+        : 'google-doc',
   });
   const bySlug = (left: { slug: string }, right: { slug: string }) =>
     compareText(left.slug, right.slug);
@@ -2014,6 +2059,7 @@ async function synchronize(
   const sheets = publishedRecords.filter(
     (record) => record.exportMode === 'sheet',
   ).length;
+  const media = publishedRecords.filter(isMediaRecord).length;
   const markdown = publishedRecords.filter(
     (record) => record.exportMode === 'markdown',
   ).length;
@@ -2039,13 +2085,14 @@ async function synchronize(
         .length,
       ignored: selection.ignoredItemCount,
       published: {
-        googleDocs: publishedRecords.length - pdfs - sheets,
+        googleDocs: publishedRecords.length - pdfs - sheets - media,
         pdfs,
         sheets,
+        media,
       },
       conversion: {
         markdown,
-        html: publishedRecords.length - pdfs - sheets - markdown,
+        html: publishedRecords.length - pdfs - sheets - media - markdown,
       },
       notes: notes.length,
     },

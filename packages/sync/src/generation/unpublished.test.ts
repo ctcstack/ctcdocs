@@ -53,8 +53,6 @@ describe('unsupportedFileReason', () => {
     ['application/vnd.google-apps.presentation', 'Deck', 'presentation-file'],
     ['application/vnd.google-apps.spreadsheet', 'Budget', 'spreadsheet-file'],
     ['text/csv', 'Import.csv', 'spreadsheet-file'],
-    ['video/quicktime', 'Demo.mov', 'media-file'],
-    ['application/vnd.google-apps.vid', 'Walkthrough', 'media-file'],
     ['image/jpeg', 'Map.png', 'image-file'],
     ['application/zip', 'Audit.zip', 'archive-file'],
     // Drive does not know draw.io, so the name decides.

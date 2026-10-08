@@ -2,15 +2,20 @@ import { z } from 'zod';
 
 import { NOTE_KINDS, type NoteCode } from './notes.js';
 import {
+  RETIRED_REASON_CODES,
   UNPUBLISHED_REASONS,
   type HeldDocument,
   type UnpublishedReasonCode,
 } from './unpublished.js';
 
-const reasonCodes = UNPUBLISHED_REASONS.map((reason) => reason.code) as [
-  UnpublishedReasonCode,
-  ...UnpublishedReasonCode[],
-];
+/*
+ * A report an earlier version wrote may name a reason since retired; it stays
+ * readable until the next sync writes a new one.
+ */
+const reasonCodes = [
+  ...UNPUBLISHED_REASONS.map((reason) => reason.code),
+  ...RETIRED_REASON_CODES,
+] as [UnpublishedReasonCode, ...UnpublishedReasonCode[]];
 const noteCodes = NOTE_KINDS.map((kind) => kind.code) as [
   NoteCode,
   ...NoteCode[],
@@ -55,6 +60,8 @@ export const syncReportSchema = z.object({
       googleDocs: z.number().int().nonnegative(),
       pdfs: z.number().int().nonnegative(),
       sheets: z.number().int().nonnegative(),
+      /** Video and audio files (ADR-047); absent from an earlier report. */
+      media: z.number().int().nonnegative().default(0),
     }),
     /** How the Google Docs on the site were converted. */
     conversion: z.object({
