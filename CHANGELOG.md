@@ -2,7 +2,7 @@
 
 All three packages share a version and are released together.
 
-## Unreleased
+## 0.21.0
 
 Spreadsheets are published
 ([ADR-046](docs/ADR/046-publish-spreadsheets-as-tables.md), proposed): a
@@ -41,6 +41,20 @@ calculates.
   outside it is noted like a link to a Google Doc outside it.
 - **`.xls` and `.ods` files** are listed as "Spreadsheets in an older format",
   with the advice to save them as Google Sheets.
+
+### Upgrade note
+
+Bump the packages and the workflow pins, then run a sync. Every spreadsheet
+in the published folders gets a page on that sync, and every page's Markdown
+version is rewritten once for its tables, so the MCP server stores every
+document again on its next schedule.
+
+Spreadsheets are published to everyone their folder's rule names. Before the
+first sync, tell editors that a spreadsheet in a published folder is now on
+the site, and that hiding a sheet, a row or a column, or moving the file out
+of the published folders, keeps it off.
+
+A platform older than this cannot read a manifest that records a spreadsheet.
 
 ## 0.20.0
 
