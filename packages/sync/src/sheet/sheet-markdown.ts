@@ -188,6 +188,8 @@ interface SheetContext {
   grid: SheetGrid;
   labels: Map<number, CellLabel>;
   depth: 2 | 3;
+  /** The page's title, which a caption does not repeat. */
+  title: string;
   /** The header row of the first table, for a one-sheet description. */
   firstHeader?: string[];
   /** The first text the sheet shows, for a description. */
@@ -206,9 +208,14 @@ function renderBlock(block: SheetBlock, context: SheetContext): RootContent[] {
     caption.cell.kind === 'text' &&
     range.bottom > caption.range.bottom
   ) {
-    context.firstText ??= caption.cell.text;
+    const repeatsTitle =
+      caption.cell.text.toLocaleLowerCase('en') ===
+      context.title.toLocaleLowerCase('en');
+    if (!repeatsTitle) {
+      context.firstText ??= caption.cell.text;
+    }
     return [
-      heading(context.depth, caption.cell.text),
+      ...(repeatsTitle ? [] : [heading(context.depth, caption.cell.text)]),
       ...cutIntoBlocks(block.areas.filter((area) => area !== caption)).flatMap(
         (inner) => renderBlock(inner, context),
       ),
@@ -410,6 +417,8 @@ interface Namer {
   ): string | undefined;
   /** A range's label: the name it is defined as, or its column or row. */
   range(sheet: string, range: CellRange): string | undefined;
+  /** The defined names a formula uses, each with the cells it stands for. */
+  namesIn(formula: string, sheet: string): Array<[string, string]>;
 }
 
 function createNamer(
@@ -440,6 +449,12 @@ function createNamer(
     },
     part(sheet, row, column, part) {
       return label(sheet, row, column)?.[part];
+    },
+    namesIn(formula, sheet) {
+      return namesUsed(formula, workbook).map((name) => [
+        name.name,
+        `${name.sheet === sheet ? '' : `${name.sheet} › `}${rangeAddress(name.range)}`,
+      ]);
     },
     range(sheet, range) {
       const name = defined.get(`${sheet}!${rangeAddress(range)}`);
@@ -532,6 +547,9 @@ function formulaItem(
     if (referenceName !== undefined && !named.has(written)) {
       named.set(written, referenceName);
     }
+  }
+  for (const [name, cells] of namer.namesIn(formula, sheet)) {
+    named.set(name, cells);
   }
   return [
     ...(label
@@ -678,7 +696,12 @@ export function workbookToMarkdown(
     const grid = new SheetGrid(sheet);
     const sheetLabels = new Map<number, CellLabel>();
     labels.set(sheet.name, sheetLabels);
-    const context: SheetContext = { grid, labels: sheetLabels, depth };
+    const context: SheetContext = {
+      grid,
+      labels: sheetLabels,
+      depth,
+      title,
+    };
     const content = cutIntoBlocks(grid.areas).flatMap((block) =>
       renderBlock(block, context),
     );
