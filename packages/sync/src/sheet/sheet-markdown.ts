@@ -49,12 +49,14 @@ import type { SheetCell, WorkbookData } from './workbook.js';
  * The version of the page this module writes. A spreadsheet whose page an
  * earlier version wrote is read again, even when the file has not changed.
  */
-export const SHEET_VERSION = 1;
+export const SHEET_VERSION = 2;
 
 /** The most formulas, inputs and results one sheet's section lists. */
 const MAX_FORMULAS = 200;
 const MAX_INPUTS = 100;
 const MAX_RESULTS = 50;
+/** The longest line of text a sheet shows as a heading. */
+const MAX_CAPTION = 80;
 /** What a formula on the page names a hidden sheet. */
 const HIDDEN_SHEET = '[hidden sheet]';
 /** The longest formula a page quotes whole. */
@@ -127,35 +129,68 @@ function series(values: readonly string[]): string {
   return `${values.slice(0, -1).join(', ')} and ${values.at(-1) ?? ''}`;
 }
 
-/** The rows of a block, each the cells shown across its columns. */
+/**
+ * The rows of a block, each the cells shown across its columns, and those
+ * columns: the ones that hold a value, so an empty column a block spans, as
+ * one before its notes, is no column of its table.
+ */
 function blockRows(
   grid: SheetGrid,
   range: CellRange,
-): Array<Array<SheetCell | undefined>> {
+): { columns: number[]; rows: Array<Array<SheetCell | undefined>> } {
+  const columns: number[] = [];
+  for (let column = range.left; column <= range.right; column += 1) {
+    for (let row = range.top; row <= range.bottom; row += 1) {
+      if (grid.shown(row, column)) {
+        columns.push(column);
+        break;
+      }
+    }
+  }
   const rows: Array<Array<SheetCell | undefined>> = [];
   for (let row = range.top; row <= range.bottom; row += 1) {
-    const cells: Array<SheetCell | undefined> = [];
-    for (let column = range.left; column <= range.right; column += 1) {
-      cells.push(grid.shown(row, column));
-    }
+    const cells = columns.map((column) => grid.shown(row, column));
     if (cells.some((cell) => cell !== undefined)) {
       rows.push(cells);
     }
   }
-  return rows;
+  return { columns, rows };
 }
 
 /**
- * A block of two columns that reads as labels and their values, as a form
- * does: every row starts with text, and the first row's value is not text, so
- * it is no header.
+ * Whether a table's first row reads as data rather than a header: past its
+ * first column it holds a value a header would not, a number written with a
+ * currency, a percent, a fraction or more than four digits, or TRUE. A row of
+ * years reads as a header.
+ */
+function looksLikeData(row: ReadonlyArray<SheetCell | undefined>): boolean {
+  return row
+    .slice(1)
+    .some(
+      (cell) =>
+        cell?.kind === 'boolean' ||
+        (cell?.kind === 'number' && !/^\d{1,4}$/u.test(cell.text)),
+    );
+}
+
+/**
+ * A block that reads as labels and their values, as a form or a model's
+ * inputs do: every row starts with text, the first row's value is not text,
+ * so it is no header, and any further column holds notes in words.
  */
 function isLabelValueBlock(
   rows: ReadonlyArray<ReadonlyArray<SheetCell | undefined>>,
 ): boolean {
   return (
     rows.length >= 2 &&
-    rows.every((row) => row.length === 2 && row[0]?.kind === 'text') &&
+    rows.every(
+      (row) =>
+        row.length >= 2 &&
+        row[0]?.kind === 'text' &&
+        row
+          .slice(2)
+          .every((cell) => cell === undefined || cell.kind === 'text'),
+    ) &&
     rows[0]?.[1] !== undefined &&
     rows[0][1].kind !== 'text'
   );
@@ -193,6 +228,12 @@ interface SheetContext {
   depth: 2 | 3;
   /** The page's title, which a caption does not repeat. */
   title: string;
+  /**
+   * The header of the last table, by column: a table below it on the same
+   * columns whose own first row is data takes it, as a model splits one
+   * table into sections with empty rows.
+   */
+  lastHeader?: { columns: string; cells: Map<number, SheetCell> };
   /** The header row of the first table, for a one-sheet description. */
   firstHeader?: string[];
   /** The first text the sheet shows, for a description. */
@@ -229,13 +270,36 @@ function renderBlock(block: SheetBlock, context: SheetContext): RootContent[] {
     if (!repeatsTitle) {
       context.firstText ??= caption.cell.text;
     }
+    /*
+     * A heading is short and ends without a full stop; a sentence on its own
+     * line, as a model's note to the reader is, stays a paragraph.
+     */
+    const isHeading =
+      caption.cell.text.length <= MAX_CAPTION &&
+      !/[.!?…]["'»”’)]?$/u.test(caption.cell.text);
     return [
-      ...(repeatsTitle ? [] : [heading(context.depth, caption.cell.text)]),
+      ...(repeatsTitle
+        ? []
+        : [
+            isHeading
+              ? heading(context.depth, caption.cell.text)
+              : paragraph(cellContent(caption.cell)),
+          ]),
       ...cutIntoBlocks(rest).flatMap((inner) => renderBlock(inner, context)),
     ];
   }
 
-  labelBlock(grid, range, context.labels);
+  const { columns, rows } = blockRows(grid, range);
+  const columnKey = columns.join(',');
+  const inherited =
+    rows.length > 0 &&
+    columns.length >= 2 &&
+    range.top !== range.bottom &&
+    context.lastHeader?.columns === columnKey &&
+    looksLikeData(rows[0] ?? [])
+      ? context.lastHeader.cells
+      : undefined;
+  labelBlock(grid, range, context.labels, inherited);
   // Each value once, as a list or a line shows it; a table repeats merges.
   const anchors = block.areas.map((area) => area.cell);
   const firstText = anchors.find((cell) => cell.kind === 'text')?.text;
@@ -258,8 +322,7 @@ function renderBlock(block: SheetBlock, context: SheetContext): RootContent[] {
       ),
     ];
   }
-  const rows = blockRows(grid, range);
-  if (isLabelValueBlock(rows)) {
+  if (!inherited && isLabelValueBlock(rows)) {
     return [
       list(
         rows.map((row) => [
@@ -271,10 +334,27 @@ function renderBlock(block: SheetBlock, context: SheetContext): RootContent[] {
           },
           text(' '),
           ...cellContent(row[1]),
+          // A note beside the value follows it, so the two stay together.
+          ...row
+            .slice(2)
+            .filter((cell) => cell !== undefined)
+            .flatMap((cell) => [text(' — '), ...cellContent(cell)]),
         ]),
       ),
     ];
   }
+  if (inherited) {
+    return [tableOf([columns.map((column) => inherited.get(column)), ...rows])];
+  }
+  context.lastHeader = {
+    columns: columnKey,
+    cells: new Map(
+      columns.flatMap((column, index) => {
+        const cell = rows[0]?.[index];
+        return cell ? [[column, cell] as const] : [];
+      }),
+    ),
+  };
   context.firstHeader ??= (rows[0] ?? [])
     .map((cell) => cell?.text ?? '')
     .filter((value) => value !== '');

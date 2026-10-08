@@ -407,6 +407,120 @@ describe('workbookToMarkdown', () => {
     expect(result.body).not.toContain('## Owners');
   });
 
+  it('keeps a note beside an input with its value, across an empty column', () => {
+    const result = page({
+      sheets: [
+        {
+          name: 'Bakery',
+          cells: {
+            A1: 'Inputs',
+            A2: 'Flour per kilo ($)',
+            B2: { value: 1.2, format: '"$"0.00' },
+            D2: 'Wholesale price, checked in May.',
+            A3: 'Loaves per day',
+            B3: 400,
+            D3: 'Assumption.',
+          },
+        },
+      ],
+    });
+    expect(result.body).toBe(
+      [
+        '## Inputs',
+        '',
+        '- **Flour per kilo ($):** $1.20 — Wholesale price, checked in May.',
+        '- **Loaves per day:** 400 — Assumption.',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('gives a table the header of the one above it when its first row is data', () => {
+    const result = page({
+      sheets: [
+        {
+          name: 'Bakery',
+          cells: {
+            A1: 'Scenarios',
+            B1: 'Low',
+            C1: 'High',
+            A2: 'Loaves per day',
+            B2: 300,
+            C2: 600,
+            A4: 'Revenue per day ($)',
+            B4: { formula: 'B2*3', value: 900, format: '"$"#,##0' },
+            C4: { formula: 'C2*3', value: 1800, format: '"$"#,##0' },
+            A5: 'Cost per day ($)',
+            B5: { value: 400, format: '"$"#,##0' },
+            C5: { value: 700, format: '"$"#,##0' },
+          },
+        },
+      ],
+    });
+    expect(result.body).toContain(
+      [
+        '| Scenarios | Low | High |',
+        '| - | -: | -: |',
+        '| Revenue per day ($) | $900 | $1,800 |',
+        '| Cost per day ($) | $400 | $700 |',
+      ].join('\n'),
+    );
+    expect(result.body).toContain(
+      '- **Revenue per day ($)** (`B4:C4`): `=B2*3`, where `B2` is Loaves per day',
+    );
+    expect(result.body).toContain('- **Loaves per day, Low** (`B2`): 300');
+  });
+
+  it('keeps a header of years as the header it is', () => {
+    const result = page({
+      sheets: [
+        {
+          name: 'Plan',
+          cells: {
+            A1: 'Item',
+            B1: 'Low',
+            A2: 'Bread',
+            B2: 1,
+            A4: 'Item',
+            B4: 2025,
+            C4: 2026,
+            A5: 'Bread',
+            B5: 3,
+            C5: 4,
+          },
+        },
+      ],
+    });
+    expect(result.body).toContain('| Item | 2025 | 2026 |');
+  });
+
+  it('writes a sentence on its own line as a paragraph, not a heading', () => {
+    const result = page({
+      sheets: [
+        {
+          name: 'Week',
+          cells: {
+            A1: 'The low case assumes the shop opens five days a week.',
+            A2: 'Day',
+            B2: 'Loaves',
+            A3: 'Mon',
+            B3: 300,
+          },
+        },
+      ],
+    });
+    expect(result.body).toBe(
+      [
+        'The low case assumes the shop opens five days a week.',
+        '',
+        '| Day | Loaves |',
+        '| - | -: |',
+        '| Mon | 300 |',
+        '',
+      ].join('\n'),
+    );
+  });
+
   it('describes an empty spreadsheet with nothing', () => {
     const result = page({ sheets: [{ name: 'Empty' }] });
     expect(result.body).toBe('');
