@@ -91,7 +91,7 @@ export function truncateDescription(
   return `${truncated.trimEnd()}…`;
 }
 
-function isSafeUrl(value: string): boolean {
+export function isSafeUrl(value: string): boolean {
   const normalized = [...value.normalize('NFKC')]
     .filter((character) => {
       const codePoint = character.codePointAt(0) ?? 0;

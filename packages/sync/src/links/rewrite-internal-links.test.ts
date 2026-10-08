@@ -90,6 +90,10 @@ describe('internal Google link rewriting', () => {
     expect(
       outside('[Sheet](https://docs.google.com/spreadsheets/d/outside/edit)'),
     ).toEqual(['link:outside_site']);
+    // And a page for each Google Vids video (ADR-047).
+    expect(
+      outside('[Tour](https://docs.google.com/videos/d/outside/edit)'),
+    ).toEqual(['link:outside_site']);
     // The site does not publish folders, so there is nothing an editor could
     // move into the published folders; and `open?id=` does not say what the
     // file is, so it may be a presentation.

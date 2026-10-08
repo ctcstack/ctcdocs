@@ -83,6 +83,7 @@ export const collections = {
         media: z
           .object({
             kind: z.enum(['video', 'audio']),
+            vids: z.boolean(),
             seconds: z.number().int().positive().nullable(),
             width: z.number().int().positive().nullable(),
             height: z.number().int().positive().nullable(),

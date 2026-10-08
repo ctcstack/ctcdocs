@@ -15,6 +15,7 @@
 "tableOfContents": false
 "media":
   "kind": "video"
+  "vids": false
   "seconds": 312
   "width": 1920
   "height": 1080
