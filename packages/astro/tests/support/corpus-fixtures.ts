@@ -29,7 +29,7 @@ export interface CorpusFixture {
   title: string;
   folderPath: string[];
   /** Absent from an index written before PDF files were published. */
-  format?: 'google-doc' | 'pdf' | 'sheet';
+  format?: 'google-doc' | 'pdf' | 'sheet' | 'video' | 'audio';
 }
 
 /*
@@ -61,12 +61,20 @@ function readDocuments(): CorpusFixture[] {
 const allDocuments = readDocuments();
 /*
  * Google Docs: the samples below are about a document's page. A PDF's page is
- * a file and its text (ADR-027), and a spreadsheet's its tables (ADR-046),
- * each sampled on its own.
+ * a file and its text (ADR-027), a spreadsheet's its tables (ADR-046) and a
+ * recording's a link to where it plays (ADR-047), each sampled on its own.
  */
 const documents = allDocuments.filter(
-  (document) => document.format !== 'pdf' && document.format !== 'sheet',
+  (document) =>
+    document.format === undefined || document.format === 'google-doc',
 );
+
+/** The pages of video and audio files. */
+export function mediaDocuments(): CorpusFixture[] {
+  return allDocuments.filter(
+    (document) => document.format === 'video' || document.format === 'audio',
+  );
+}
 
 /** The pages that publish a spreadsheet. */
 export function sheetDocuments(): CorpusFixture[] {

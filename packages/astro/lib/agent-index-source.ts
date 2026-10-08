@@ -37,6 +37,7 @@ async function readAgentIndex(): Promise<AgentIndexSection[]> {
         description: data.description,
         pdf: data.sourceType === 'drive-pdf',
         sheet: data.sourceType === 'drive-sheet',
+        ...(data.media ? { media: data.media.kind } : {}),
         classId: classOfDocument(data.googleFileId),
       },
     ]),

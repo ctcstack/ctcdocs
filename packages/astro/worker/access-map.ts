@@ -55,15 +55,15 @@ export interface AgentDocument {
   /** The folders from the corpus root to the document (ADR-042). */
   readonly path: readonly string[];
   /**
-   * The Google Doc, PDF or spreadsheet in Drive it is published from
-   * (ADR-042).
+   * The Google Doc, PDF, spreadsheet or recording in Drive it is published
+   * from (ADR-042, ADR-047).
    */
   readonly source: string | null;
   /**
-   * Whether it is published from a Google Doc, a PDF (ADR-044) or a
-   * spreadsheet (ADR-046).
+   * Whether it is published from a Google Doc, a PDF (ADR-044), a
+   * spreadsheet (ADR-046), or a video or audio file (ADR-047).
    */
-  readonly format: 'doc' | 'pdf' | 'sheet';
+  readonly format: 'doc' | 'pdf' | 'sheet' | 'video' | 'audio';
   /** A PDF's pages, when the sync counted them. */
   readonly pages?: number;
   /** Characters of the stored text, which `fetch` returns (ADR-044). */

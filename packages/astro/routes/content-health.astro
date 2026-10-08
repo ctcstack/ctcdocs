@@ -547,9 +547,11 @@ const blocks = (groups: Group[]) => {
               Google's Markdown export, {state.summary.conversion.html} through
               its HTML export for images, tables or drawings,{' '}
               {plural(state.summary.published.pdfs, 'PDF')} published as files
-              with their text, and{' '}
+              with their text,{' '}
               {plural(state.summary.published.sheets ?? 0, 'spreadsheet')} as
-              tables.
+              tables, and{' '}
+              {plural(state.summary.published.media ?? 0, 'recording')} from
+              their description in Drive.
             </p>
           )}
           <p class="health-footer">

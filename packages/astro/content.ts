@@ -13,6 +13,7 @@ export const collections = {
             'google-doc',
             'drive-pdf',
             'drive-sheet',
+            'drive-media',
             'manual',
             'section-index',
           ])
@@ -73,6 +74,18 @@ export const collections = {
           .object({
             sheets: z.number().int().nonnegative(),
             formulas: z.number().int().nonnegative(),
+          })
+          .optional(),
+        /*
+         * The page of a video or audio file (ADR-047): its kind, and its
+         * length and frame size when Drive reports them.
+         */
+        media: z
+          .object({
+            kind: z.enum(['video', 'audio']),
+            seconds: z.number().int().positive().nullable(),
+            width: z.number().int().positive().nullable(),
+            height: z.number().int().positive().nullable(),
           })
           .optional(),
         pagefind: z.boolean().default(true),

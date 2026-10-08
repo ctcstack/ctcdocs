@@ -28,7 +28,10 @@ const documents = new Map<string, IndexedDocument>([
     { title: 'Leave *policy*', description: '', pdf: false },
   ],
   ['reference/api', { title: 'API', description: 'Endpoints.', pdf: true }],
-  ['orphan', { title: 'Orphan', description: undefined, pdf: false }],
+  [
+    'orphan',
+    { title: 'Orphan', description: undefined, pdf: false, media: 'video' },
+  ],
   [
     'another-orphan',
     { title: 'Another orphan', description: undefined, pdf: false },
@@ -127,7 +130,7 @@ Every document on this site, in the order its navigation shows them. Each link i
 ## Other documents
 
 - [Another orphan](/another-orphan/index.md)
-- [Orphan](/orphan/index.md)
+- [Orphan (video)](/orphan/index.md)
 `);
   });
 

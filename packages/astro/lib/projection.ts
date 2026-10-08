@@ -9,13 +9,14 @@
  */
 
 /**
- * A synchronized Google document, published PDF or published spreadsheet has
- * a Markdown version.
+ * A synchronized Google document, published PDF, published spreadsheet or
+ * recording's page has a Markdown version.
  */
 export function hasMarkdownProjection(sourceType: string | undefined): boolean {
   return (
     sourceType === 'google-doc' ||
     sourceType === 'drive-pdf' ||
-    sourceType === 'drive-sheet'
+    sourceType === 'drive-sheet' ||
+    sourceType === 'drive-media'
   );
 }
