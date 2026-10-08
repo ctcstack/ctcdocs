@@ -1,4 +1,4 @@
-import type { Root, RootContent } from 'mdast';
+import type { Parents, Root, RootContent, Table } from 'mdast';
 import * as cheerio from 'cheerio';
 import remarkGfm from 'remark-gfm';
 import remarkParse from 'remark-parse';
@@ -10,9 +10,13 @@ import {
   resolvePermanentLink,
 } from './project-layout.js';
 
+/*
+ * Tables are written without padding: one long cell would otherwise pad every
+ * row of its column, and an assistant would read the spaces (ADR-046).
+ */
 const processor = unified()
   .use(remarkParse)
-  .use(remarkGfm)
+  .use(remarkGfm, { tablePipeAlign: false })
   .use(remarkStringify, {
     bullet: '-',
     emphasis: '*',
@@ -83,12 +87,76 @@ function markdownUrl(
   return `${markdownProjectionPath(slug)}${url.search}${url.hash}`;
 }
 
-function rewriteInternalLinks(
+/** A table longer than this is split into parts (ADR-046). */
+const SPLIT_TABLE_CHARACTERS = 3_000;
+/** About as long as each part of a split table is, header included. */
+const TABLE_PART_CHARACTERS = 2_000;
+
+function textLength(node: Root | RootContent): number {
+  if ('value' in node) {
+    return node.value.length;
+  }
+  if ('children' in node) {
+    return node.children.reduce((sum, child) => sum + textLength(child), 0);
+  }
+  return 0;
+}
+
+/** About how many characters a table row takes, with its pipes. */
+function rowLength(row: Table['children'][number]): number {
+  return row.children.reduce((sum, cell) => sum + textLength(cell) + 3, 2);
+}
+
+/**
+ * Splits each long table into consecutive tables that repeat its header row,
+ * so that a passage search returns from the middle of one still says what each
+ * column is (ADR-046). A table that fits stays whole.
+ */
+function splitLongTables(node: Parents): void {
+  const children: RootContent[] = [];
+  for (const child of node.children) {
+    if ('children' in child && child.type !== 'table') {
+      splitLongTables(child);
+    }
+    if (child.type !== 'table') {
+      children.push(child);
+      continue;
+    }
+    const [header, ...rows] = child.children;
+    const lengths = child.children.map(rowLength);
+    const total = lengths.reduce((sum, length) => sum + length, 0);
+    if (!header || rows.length < 2 || total <= SPLIT_TABLE_CHARACTERS) {
+      children.push(child);
+      continue;
+    }
+    const headerLength = lengths[0] ?? 0;
+    let part: Table['children'] = [];
+    let partLength = headerLength;
+    const flush = () => {
+      children.push({ ...child, children: [header, ...part] });
+      part = [];
+      partLength = headerLength;
+    };
+    rows.forEach((row, index) => {
+      const length = lengths[index + 1] ?? 0;
+      if (part.length > 0 && partLength + length > TABLE_PART_CHARACTERS) {
+        flush();
+      }
+      part.push(row);
+      partLength += length;
+    });
+    flush();
+  }
+  node.children = children as Parents['children'];
+}
+
+function projectBody(
   body: string,
   stableSlugs: ReadonlySet<string>,
   permanentLinks: Readonly<Record<string, string>>,
 ): string {
   const tree = processor.parse(body) as Root;
+  splitLongTables(tree);
   walk(tree, (node) => {
     if (node.type === 'link') {
       node.url = markdownUrl(node.url, stableSlugs, permanentLinks) ?? node.url;
@@ -164,7 +232,7 @@ export function publishedMarkdownBody(
     'title' | 'ownershipHeader' | 'body' | 'stableSlugs' | 'permanentLinks'
   >,
 ): string {
-  const body = rewriteInternalLinks(
+  const body = projectBody(
     cleanBody(input.body, input.ownershipHeader),
     input.stableSlugs,
     input.permanentLinks,
