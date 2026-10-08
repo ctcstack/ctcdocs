@@ -40,10 +40,11 @@ downloaded.** The inventory also asks Drive for each file's `description` and
 `videoMediaMetadata`. The page opens with one sentence of facts, what it is,
 how long and at what size when Drive knows, and that it plays in Drive. Below
 come the paragraphs of the description as plain text: nothing in it becomes
-markup but the web addresses, which become links as in any page. The first
-paragraph is the page's summary. The page has a button that opens the
-recording in Drive or in Google Vids, where Drive's own sharing decides who
-may play it. The site does not embed a player.
+markup but its web and mail addresses, which become links by GFM's own rule
+before the text is serialized. The first paragraph is the page's summary. A
+card above the text links to the recording in Drive or in Google Vids, where
+Drive's own sharing decides who may play it, in place of the "Open in Google
+Drive" link other pages have. The site does not embed a player.
 
 **A recording without a description is noted.** The content health page lists
 it with the note `media-undescribed`, which says where the description is
@@ -53,18 +54,20 @@ what its editor says about it.
 **A page changes when what it shows changes.** The record's `sourceChecksum`
 for a recording is a digest of the metadata its page is written from and the
 version of the page's shape. A recording whose digest is unchanged is not
-written again; one whose description, length or name changed is, without
-waiting for Drive to report it modified.
+written again; one whose description or length changed is. Drive reports a
+file modified when its description changes, so the page's date moves with
+it; the digest also covers a change Drive does not report, at the cost of a
+page whose date stays behind its text.
 
-**Links follow it.** A link in a document to a recording's Drive address now
-opens its page, as a link to a published PDF does. A recording moved out of
+**Links follow it.** A link in a document to a recording, by its Drive or its
+Google Vids address, now opens its page, as a link to a published PDF does. A recording moved out of
 the published folders leaves its links pointing at Drive, as before.
 
 **The data records it.** The manifest's `exportMode` gains `video` and
 `audio`. The page's
 frontmatter says `sourceType: drive-media` and records the kind, `video` or
-`audio`, the length in seconds and the frame size, each `null` when Drive does
-not report it. `data/docs-index.json` and the MCP server's metadata give its
+`audio`, whether it is a Google Vids video, and the length in seconds and the
+frame size, each `null` when Drive does not report it. `data/docs-index.json` and the MCP server's metadata give its
 format as `video` or `audio`, and the sync report counts recordings apart.
 
 ## Consequences
@@ -86,8 +89,9 @@ format as `video` or `audio`, and the sync report counts recordings apart.
 - A recording becomes visible to every reader its folder's rule names. Drive's
   own sharing still decides who may play it, so a reader can find a recording
   they cannot open.
-- Drive reports the length and size of a video only once it has processed
-  it, and never for audio or for Google Vids; those pages say less.
+- Drive reports the length and size of an uploaded video only once it has
+  processed it, and not for audio; whether it reports them for a Google Vids
+  video is not documented. Pages without them say less.
 - A platform older than this cannot read a manifest that records a recording.
   Downgrading needs a run without them first.
 

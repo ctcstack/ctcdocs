@@ -54,18 +54,16 @@ const showMetadata =
   syncedAt;
 const showSectionLink = sourceType === 'section-index' && permanentPath;
 /*
- * A Google Sheet opens in Google Sheets and a Google Vids video in Google Vids;
- * a PDF, an uploaded spreadsheet or a recording is a file Drive stores
- * (ADR-046, ADR-047).
+ * A Google Sheet opens in Google Sheets; a PDF or an uploaded spreadsheet is a
+ * file Drive stores (ADR-046). A recording's page links to where it plays in
+ * its own card instead (ADR-047).
  */
 const sourceLabel =
-  !isPdf && !isSheet && !isMedia
+  !isPdf && !isSheet
     ? 'Open in Google Docs'
     : sourceUrl?.startsWith('https://docs.google.com/spreadsheets/')
       ? 'Open in Google Sheets'
-      : sourceUrl?.startsWith('https://docs.google.com/videos/')
-        ? 'Open in Google Vids'
-        : 'Open in Google Drive';
+      : 'Open in Google Drive';
 ---
 
 {
@@ -161,28 +159,30 @@ const sourceLabel =
         View as Markdown
       </a>
 
-      <a
-        class="doc-meta-action"
-        href={sourceUrl}
-        rel="noopener noreferrer"
-        target="_blank"
-      >
-        <svg
-          aria-hidden="true"
-          class="doc-meta-icon"
-          fill="none"
-          stroke="currentColor"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="1.5"
-          viewBox="0 0 16 16"
+      {!isMedia && (
+        <a
+          class="doc-meta-action"
+          href={sourceUrl}
+          rel="noopener noreferrer"
+          target="_blank"
         >
-          <path d="M9.5 3H13v3.5" />
-          <path d="M13 3 8 8" />
-          <path d="M12 9.5v3A1.5 1.5 0 0 1 10.5 14h-7A1.5 1.5 0 0 1 2 12.5v-7A1.5 1.5 0 0 1 3.5 4h3" />
-        </svg>
-        {sourceLabel}
-      </a>
+          <svg
+            aria-hidden="true"
+            class="doc-meta-icon"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="1.5"
+            viewBox="0 0 16 16"
+          >
+            <path d="M9.5 3H13v3.5" />
+            <path d="M13 3 8 8" />
+            <path d="M12 9.5v3A1.5 1.5 0 0 1 10.5 14h-7A1.5 1.5 0 0 1 2 12.5v-7A1.5 1.5 0 0 1 3.5 4h3" />
+          </svg>
+          {sourceLabel}
+        </a>
+      )}
     </div>
   )
 }

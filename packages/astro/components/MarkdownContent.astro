@@ -65,11 +65,7 @@ const sheet = sourceType === 'drive-sheet';
   {
     // A recording's page links to where it plays (ADR-047).
     media && typeof editUrl === 'string' && (
-      <MediaFile
-        kind={media.kind}
-        seconds={media.seconds}
-        sourceUrl={editUrl}
-      />
+      <MediaFile kind={media.kind} vids={media.vids} sourceUrl={editUrl} />
     )
   }
   {

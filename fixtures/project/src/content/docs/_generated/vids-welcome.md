@@ -14,6 +14,7 @@
 "tableOfContents": false
 "media":
   "kind": "video"
+  "vids": true
   "seconds": null
   "width": null
   "height": null

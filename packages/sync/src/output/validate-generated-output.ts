@@ -90,6 +90,7 @@ const frontmatterSchema = z.object({
   media: z
     .strictObject({
       kind: z.enum(['video', 'audio']),
+      vids: z.boolean(),
       seconds: z.number().int().positive().nullable(),
       width: z.number().int().positive().nullable(),
       height: z.number().int().positive().nullable(),

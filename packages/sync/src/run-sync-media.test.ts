@@ -75,7 +75,7 @@ const recordings = (description: string) => [
   }),
 ];
 const described =
-  'How to sign in and find the *first* report.\n\n1. Open the app\nSee https://docs.google.com/document/d/doc-alpha/edit for the steps.';
+  'How to sign in and find the *first* report.\n\n1. Open the app\nSee https://docs.google.com/document/d/doc-alpha/edit for the steps.\nSlides: https://example.com/deck*v2?a=1&b=2';
 
 function dependencies(
   extra: DriveItem[],
@@ -102,7 +102,7 @@ function dependencies(
       exportMarkdown: () =>
         Promise.resolve(
           new TextEncoder().encode(
-            'Watch [the lesson](https://drive.google.com/file/d/video-lesson/view).\n',
+            'Watch [the lesson](https://drive.google.com/file/d/video-lesson/view) and [the tour](https://docs.google.com/videos/d/vids-tour/edit?t=30#t=30).\n',
           ),
         ),
     },
@@ -189,6 +189,8 @@ describe('recordings', () => {
     expect(page).toContain('How to sign in and find the \\*first\\* report.');
     expect(page).toContain('1\\. Open the app');
     expect(page).toMatch(/See \[[^\]]+\]\(\/d\/[0-9a-f]+\/\) for the steps\./u);
+    // An address keeps its characters, `*` among them.
+    expect(page).toContain('Slides: <https://example.com/deck*v2?a=1&b=2>');
     expect(await pageOf(root, 'vids-tour')).toContain(
       'A Google Vids video. It plays in Google Vids.',
     );
@@ -200,6 +202,7 @@ describe('recordings', () => {
     // A document's link to the recording leads to its page.
     const alpha = await pageOf(root, 'doc-alpha');
     expect(alpha).toMatch(/\[the lesson\]\(\/d\/[0-9a-f]+\/\)/u);
+    expect(alpha).toMatch(/\[the tour\]\(\/d\/[0-9a-f]+\/\)/u);
 
     const sidebar = await readFile(
       resolve(root, 'src/generated/sidebar.ts'),

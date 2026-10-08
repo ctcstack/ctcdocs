@@ -29,6 +29,8 @@ export interface GeneratedDocumentInput {
  */
 export interface GeneratedMediaFacts {
   kind: 'video' | 'audio';
+  /** A Google Vids video, which plays in Google Vids rather than Drive. */
+  vids: boolean;
   seconds: number | null;
   width: number | null;
   height: number | null;

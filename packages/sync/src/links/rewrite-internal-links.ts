@@ -62,16 +62,18 @@ interface GoogleDocumentLink {
   fragment: string;
   /**
    * Whether the address says what the file is. `/document/` is a Google Doc,
-   * `/spreadsheets/` a Google Sheet and `/file/` a file Drive stores;
+   * `/spreadsheets/` a Google Sheet, `/videos/` a Google Vids video and
+   * `/file/` a file Drive stores;
    * `open?id=` could be anything, such as a presentation the site does not
    * publish.
    */
   typed: boolean;
   /**
-   * A Google Sheet's address names a tab, `#gid=0`, rather than a heading:
-   * the page has no such anchor, and dropping it shortens nothing.
+   * A Google Sheet's address names a tab, `#gid=0`, and a Google Vids
+   * video's a moment in it, rather than a heading: the page has no such
+   * anchor, and dropping it shortens nothing.
    */
-  sheet: boolean;
+  headingless: boolean;
 }
 
 /*
@@ -84,6 +86,9 @@ const GOOGLE_DOC_PATH =
 /** A Google Sheet the site publishes as a page (ADR-046). */
 const GOOGLE_SHEET_PATH =
   /^\/spreadsheets(?:\/u\/\d+)?\/d\/([^/]+)(?:\/(?:edit|view|preview|htmlview|pubhtml))?\/?$/u;
+/** A Google Vids video, whose page the site publishes (ADR-047). */
+const GOOGLE_VIDS_PATH =
+  /^\/videos(?:\/u\/\d+)?\/d\/([^/]+)(?:\/(?:edit|view|preview))?\/?$/u;
 const DRIVE_FILE_PATH = /^\/file\/d\/([^/]+)(?:\/(?:view|edit|preview))?\/?$/u;
 
 function parseGoogleDocumentLink(
@@ -98,13 +103,16 @@ function parseGoogleDocumentLink(
 
   let fileId: string | null = null;
   let typed = true;
-  let sheet = false;
+  let headingless = false;
   if (url.hostname === 'docs.google.com') {
     // `/u/<n>/` names the signed-in account a link was copied from.
     fileId = GOOGLE_DOC_PATH.exec(url.pathname)?.[1] ?? null;
     if (!fileId) {
-      fileId = GOOGLE_SHEET_PATH.exec(url.pathname)?.[1] ?? null;
-      sheet = fileId !== null;
+      fileId =
+        GOOGLE_SHEET_PATH.exec(url.pathname)?.[1] ??
+        GOOGLE_VIDS_PATH.exec(url.pathname)?.[1] ??
+        null;
+      headingless = fileId !== null;
     }
   } else if (url.hostname === 'drive.google.com') {
     // A Drive file, such as a PDF this site publishes (ADR-027).
@@ -118,7 +126,7 @@ function parseGoogleDocumentLink(
     return undefined;
   }
 
-  return { fileId, fragment: url.hash, typed, sheet };
+  return { fileId, fragment: url.hash, typed, headingless };
 }
 
 function safeFragment(fragment: string): {
@@ -216,7 +224,7 @@ function rewriteUrl(
     ? targets.shortIds.get(googleLink.fileId)
     : undefined;
   if (googleLink && shortId) {
-    const fragment = googleLink.sheet
+    const fragment = googleLink.headingless
       ? { fragment: '', removed: false }
       : safeFragment(googleLink.fragment);
     return {

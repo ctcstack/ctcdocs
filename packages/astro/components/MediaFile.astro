@@ -4,30 +4,18 @@
  *
  * The site does not host or play recordings: this links to the file where it
  * plays, in Google Drive or Google Vids, whose own sharing decides who may
- * play it. The page's text below says what Drive knows about it.
+ * play it. The text below the card says what Drive knows about the file,
+ * its length included, so the card does not repeat it.
  */
 interface Props {
   kind: 'video' | 'audio';
-  seconds: number | null;
+  /** A Google Vids video, which plays in Google Vids rather than Drive. */
+  vids: boolean;
   sourceUrl: string;
 }
 
-const { kind, seconds, sourceUrl } = Astro.props;
-const vids = sourceUrl.startsWith('https://docs.google.com/videos/');
+const { kind, vids, sourceUrl } = Astro.props;
 const action = `${kind === 'audio' ? 'Listen' : 'Watch'} in ${vids ? 'Google Vids' : 'Google Drive'}`;
-
-function formatDuration(value: number): string {
-  const minutes = Math.floor(value / 60);
-  const rest = String(value % 60).padStart(2, '0');
-  return minutes >= 60
-    ? `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}:${rest}`
-    : `${minutes}:${rest}`;
-}
-
-const facts = [
-  kind === 'audio' ? 'Audio' : 'Video',
-  ...(seconds === null ? [] : [formatDuration(seconds)]),
-].join(' · ');
 ---
 
 <section
@@ -48,15 +36,12 @@ const facts = [
     <circle cx="12" cy="12" r="10"></circle>
     <path d="M10 8.5v7l6-3.5z" fill="currentColor"></path>
   </svg>
-  <p class="media-body">
-    <a
-      class="media-action"
-      href={sourceUrl}
-      rel="noopener noreferrer"
-      target="_blank">{action}</a
-    >
-    <span class="media-facts">{facts}</span>
-  </p>
+  <a
+    class="media-action"
+    href={sourceUrl}
+    rel="noopener noreferrer"
+    target="_blank">{action}</a
+  >
 </section>
 
 <style>
@@ -78,21 +63,8 @@ const facts = [
       width: 2.5rem;
     }
 
-    .media-body {
-      align-items: baseline;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.25rem 1.25rem;
-      margin: 0;
-    }
-
     .media-action {
       font-weight: 600;
-    }
-
-    .media-facts {
-      color: var(--kb-gray-3);
-      font-size: var(--kb-text-sm);
     }
   }
 </style>

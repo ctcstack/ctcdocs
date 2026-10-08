@@ -5,7 +5,7 @@ import {
   formatDuration,
   mediaChecksum,
   mediaFacts,
-  mediaToMarkdown,
+  mediaPage,
 } from './media-page.js';
 
 function video(extra: Partial<DriveItem> = {}): DriveItem {
@@ -41,9 +41,16 @@ describe('mediaFacts', () => {
           videoMediaMetadata: { width: 1280, height: 720, durationMillis: 400 },
         }),
       ),
-    ).toEqual({ kind: 'video', seconds: 1, width: 1280, height: 720 });
+    ).toEqual({
+      kind: 'video',
+      vids: false,
+      seconds: 1,
+      width: 1280,
+      height: 720,
+    });
     expect(mediaFacts(video({ mimeType: 'audio/mpeg' }))).toEqual({
       kind: 'audio',
+      vids: false,
       seconds: null,
       width: null,
       height: null,
@@ -55,13 +62,26 @@ describe('mediaFacts', () => {
           videoMediaMetadata: { width: 0, height: 0, durationMillis: 0 },
         }),
       ),
-    ).toEqual({ kind: 'video', seconds: null, width: null, height: null });
+    ).toEqual({
+      kind: 'video',
+      vids: false,
+      seconds: null,
+      width: null,
+      height: null,
+    });
+    expect(
+      mediaFacts(video({ mimeType: 'application/vnd.google-apps.vid' })).vids,
+    ).toBe(true);
+  });
+
+  it('refuses a file that is not a recording', () => {
+    expect(() => mediaFacts(video({ mimeType: 'application/pdf' }))).toThrow();
   });
 });
 
-describe('mediaToMarkdown', () => {
+describe('mediaPage', () => {
   it('keeps a hostile description literal', () => {
-    const markdown = mediaToMarkdown(
+    const markdown = mediaPage(
       video({
         description:
           '<script>alert(1)</script>\n# Not a heading\n[click](javascript:alert(1))\n\n   ',
@@ -80,14 +100,31 @@ describe('mediaToMarkdown', () => {
       ].join('\n'),
     );
     expect(markdown.description).toBe('<script>alert(1)</script>');
-    expect(markdown.described).toBe(true);
+  });
+
+  it('links web and mail addresses as GFM finds them, and nothing else', () => {
+    expect(
+      mediaPage(
+        video({
+          description:
+            'See https://example.com/a*b_c?x=1 or www.example.com, ask team@example.com, not javascript:alert(1)',
+        }),
+      ).body,
+    ).toBe(
+      [
+        'A video. It plays in Google Drive.',
+        '',
+        'See <https://example.com/a*b_c?x=1> or [www.example.com](http://www.example.com), ask <team@example.com>, not javascript:alert(1)',
+        '',
+      ].join('\n'),
+    );
   });
 
   it('says nothing more than the facts without a description', () => {
-    expect(mediaToMarkdown(video({ description: ' \n ' }))).toEqual({
-      body: 'A video. It plays in Google Drive.\n',
-      described: false,
-    });
+    const page = mediaPage(video({ description: ' \n ' }));
+    expect(page.body).toBe('A video. It plays in Google Drive.\n');
+    expect(page.description).toBeUndefined();
+    expect(page.checksum).toBe(mediaChecksum(video({ description: ' \n ' })));
   });
 });
 

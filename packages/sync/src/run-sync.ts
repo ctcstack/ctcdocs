@@ -132,11 +132,7 @@ import {
   readPdfText,
 } from './pdf/read-pdf.js';
 import { validateGeneratedOutput } from './output/validate-generated-output.js';
-import {
-  mediaChecksum,
-  mediaFacts,
-  mediaToMarkdown,
-} from './media/media-page.js';
+import { mediaChecksum, mediaPage } from './media/media-page.js';
 import { readDelimited } from './sheet/read-delimited.js';
 import { readXlsx } from './sheet/read-xlsx.js';
 import { SHEET_VERSION, workbookToMarkdown } from './sheet/sheet-markdown.js';
@@ -1636,20 +1632,18 @@ async function synchronize(
    * rewritten as a document's are.
    */
   const convertMedia = (planned: PlannedDocument): ConvertedDocument => {
-    const { item } = planned.selected;
-    const facts = mediaFacts(item);
-    const markdown = mediaToMarkdown(item);
-    const rewritten = rewriteInternalGoogleLinks(markdown.body, linkTargets);
+    const page = mediaPage(planned.selected.item);
+    const rewritten = rewriteInternalGoogleLinks(page.body, linkTargets);
     return {
       body: rewritten.body,
-      ...(markdown.description ? { description: markdown.description } : {}),
+      ...(page.description ? { description: page.description } : {}),
       removedTitleHeading: false,
       assets: [],
-      exportMode: facts.kind,
+      exportMode: page.facts.kind,
       warnings: rewritten.warnings,
       titleFacts: null,
-      media: facts,
-      sourceChecksum: mediaChecksum(item),
+      media: page.facts,
+      sourceChecksum: page.checksum,
     };
   };
 
