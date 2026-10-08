@@ -3,21 +3,6 @@
   "generatedAt": "2026-02-10T06:00:00.000Z",
   "documents": [
     {
-      "id": "sheet-channel-model",
-      "title": "Channel model",
-      "slug": "handbook/channel-model",
-      "markdownPath": "src/content/docs/_generated/sheet-channel-model.md",
-      "sourceUrl": "https://drive.google.com/file/d/sheet-channel-model/view",
-      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
-      "syncedAt": "2026-02-10T06:00:00.000Z",
-      "contentHash": "sha256:d45959cd8cde6b3ead558c9f08c71c5436e6593e442a619174f16b7d54115919",
-      "folderPath": [
-        "Handbook"
-      ],
-      "language": "en",
-      "format": "sheet"
-    },
-    {
       "id": "doc-contacts",
       "title": "Contacts",
       "slug": "handbook/contacts",
@@ -48,11 +33,11 @@
       "format": "google-doc"
     },
     {
-      "id": "sheet-price-list",
-      "title": "Price list",
-      "slug": "handbook/price-list",
-      "markdownPath": "src/content/docs/_generated/sheet-price-list.md",
-      "sourceUrl": "https://drive.google.com/file/d/sheet-price-list/view",
+      "id": "sheet-plans",
+      "title": "Plans",
+      "slug": "handbook/plans",
+      "markdownPath": "src/content/docs/_generated/sheet-plans.md",
+      "sourceUrl": "https://drive.google.com/file/d/sheet-plans/view",
       "googleModifiedTime": "2026-01-05T09:00:00.000Z",
       "syncedAt": "2026-02-10T06:00:00.000Z",
       "contentHash": "sha256:b0b0b283dff91739574feb076e64945c31566d6578b02e420cdeb6dfea4faa46",
@@ -76,6 +61,21 @@
       ],
       "language": "en",
       "format": "pdf"
+    },
+    {
+      "id": "sheet-support-capacity",
+      "title": "Support capacity",
+      "slug": "handbook/support-capacity",
+      "markdownPath": "src/content/docs/_generated/sheet-support-capacity.md",
+      "sourceUrl": "https://drive.google.com/file/d/sheet-support-capacity/view",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "syncedAt": "2026-02-10T06:00:00.000Z",
+      "contentHash": "sha256:a799d6ea17eb5bf1ba036f393bd9e3c4e798a9a63985809fcc3c30aab629a0c9",
+      "folderPath": [
+        "Handbook"
+      ],
+      "language": "en",
+      "format": "sheet"
     },
     {
       "id": "doc-tables-and-code",

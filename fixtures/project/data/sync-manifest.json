@@ -358,34 +358,6 @@
         "folder-root"
       ]
     },
-    "sheet-channel-model": {
-      "googleFileId": "sheet-channel-model",
-      "googleParentId": "folder-handbook",
-      "googleName": "Channel model.xlsx",
-      "displayTitle": "Channel model",
-      "description": "A spreadsheet with the columns Metric, January, February and March.",
-      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
-      "googleCreatedTime": "2026-01-05T09:00:00.000Z",
-      "sourceUrl": "https://drive.google.com/file/d/sheet-channel-model/view",
-      "stableSlug": "handbook/channel-model",
-      "generatedMarkdownPath": "src/content/docs/_generated/sheet-channel-model.md",
-      "generatedAssetsDirectory": "src/assets/generated/sheet-channel-model",
-      "contentHash": "sha256:d45959cd8cde6b3ead558c9f08c71c5436e6593e442a619174f16b7d54115919",
-      "outputHash": "sha256:51ed191e0fb8161ecfeb378523573c894a121ab11f09cfb73dc54e3902c4580a",
-      "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
-      "exportMode": "sheet",
-      "warnings": [
-        "sheet:charts"
-      ],
-      "shortId": "db8b74",
-      "sourceChecksum": "sha256:d37f840ec2fdb9bb6633298d25a9e4df659890e110604f6190c9189cd1b5544c",
-      "sheetVersion": 1,
-      "publishedReaders": "*",
-      "publishedChain": [
-        "folder-handbook",
-        "folder-root"
-      ]
-    },
     "sheet-glossary": {
       "googleFileId": "sheet-glossary",
       "googleParentId": "folder-reference",
@@ -414,25 +386,53 @@
         "folder-root"
       ]
     },
-    "sheet-price-list": {
-      "googleFileId": "sheet-price-list",
+    "sheet-plans": {
+      "googleFileId": "sheet-plans",
       "googleParentId": "folder-handbook",
-      "googleName": "Price list.csv",
-      "displayTitle": "Price list",
+      "googleName": "Plans.csv",
+      "displayTitle": "Plans",
       "description": "A spreadsheet with the columns Plan, Seats and Price per month.",
       "googleModifiedTime": "2026-01-05T09:00:00.000Z",
       "googleCreatedTime": "2026-01-05T09:00:00.000Z",
-      "sourceUrl": "https://drive.google.com/file/d/sheet-price-list/view",
-      "stableSlug": "handbook/price-list",
-      "generatedMarkdownPath": "src/content/docs/_generated/sheet-price-list.md",
-      "generatedAssetsDirectory": "src/assets/generated/sheet-price-list",
+      "sourceUrl": "https://drive.google.com/file/d/sheet-plans/view",
+      "stableSlug": "handbook/plans",
+      "generatedMarkdownPath": "src/content/docs/_generated/sheet-plans.md",
+      "generatedAssetsDirectory": "src/assets/generated/sheet-plans",
       "contentHash": "sha256:b0b0b283dff91739574feb076e64945c31566d6578b02e420cdeb6dfea4faa46",
-      "outputHash": "sha256:c3df02dc65f76d89e426062949e61374c6be9ce706db19b40a1fae488d917000",
+      "outputHash": "sha256:6677238fc5d1eefc9415c92d1ea4f7e6f32a545642e6cf566c71cfaeb53a5259",
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "sheet",
       "warnings": [],
-      "shortId": "d4beb4",
+      "shortId": "70da01",
       "sourceChecksum": "sha256:f7d94818de586b0c13af038fa3939a92de7557d1d1ac1e6bfbd0099f38f6d6d5",
+      "sheetVersion": 1,
+      "publishedReaders": "*",
+      "publishedChain": [
+        "folder-handbook",
+        "folder-root"
+      ]
+    },
+    "sheet-support-capacity": {
+      "googleFileId": "sheet-support-capacity",
+      "googleParentId": "folder-handbook",
+      "googleName": "Support capacity.xlsx",
+      "displayTitle": "Support capacity",
+      "description": "A spreadsheet with the columns Metric, January, February and March.",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "googleCreatedTime": "2026-01-05T09:00:00.000Z",
+      "sourceUrl": "https://drive.google.com/file/d/sheet-support-capacity/view",
+      "stableSlug": "handbook/support-capacity",
+      "generatedMarkdownPath": "src/content/docs/_generated/sheet-support-capacity.md",
+      "generatedAssetsDirectory": "src/assets/generated/sheet-support-capacity",
+      "contentHash": "sha256:a799d6ea17eb5bf1ba036f393bd9e3c4e798a9a63985809fcc3c30aab629a0c9",
+      "outputHash": "sha256:cd9cb94e6e2bd9fe8041ed30a08a8060c0d955dab3104ee019296fbfc7351929",
+      "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
+      "exportMode": "sheet",
+      "warnings": [
+        "sheet:charts"
+      ],
+      "shortId": "845a78",
+      "sourceChecksum": "sha256:9a4a5ee791cad83d63a12f45448200cd6b8d502f0f46d7689f9c3c984f705f62",
       "sheetVersion": 1,
       "publishedReaders": "*",
       "publishedChain": [
