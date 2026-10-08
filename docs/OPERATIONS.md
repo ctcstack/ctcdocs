@@ -174,7 +174,7 @@ smoke test** workflow:
 Google Drive inventory dry-run passed.
 Items visible: <count>
 Folders selected: <count>
-Documents selected (Google Docs and PDF files): <count>
+Documents selected (Google Docs, PDF files and spreadsheets): <count>
 Unsupported items selected: <count>
 Ignored items: <count>
 Warnings: <count>
@@ -276,6 +276,40 @@ A PDF is downloaded when it is new or its content changed; Drive's checksum
 says which, so a full sync does not download the others again. Every published
 version of a PDF stays in the repository's history.
 
+## Spreadsheets
+
+A Google Sheet, an Excel workbook (`.xlsx`, `.xlsm`) or a CSV or
+tab-separated file in a published folder is published
+([ADR-046](ADR/046-publish-spreadsheets-as-tables.md)). Its title and address
+are its Drive name without the extension, and the sidebar marks it `Sheet`.
+The file itself is not published: its page links to it in Drive.
+
+Each visible sheet is a section of the page, cut into tables, lists and
+paragraphs at its empty rows and columns. Every value is shown as the workbook
+shows it, with the value a formula last computed. A sheet with formulas ends
+with "How it is calculated": each distinct formula once with the cells it
+fills, named by the labels around them, then the inputs it depends on and the
+results it produces. On the site a table of more than ten rows keeps its
+header in view, filters and sorts; the Markdown version splits a long table
+into parts that each repeat its header, for assistants.
+
+What editors control:
+
+- **Hide a sheet** to keep it off the site. A hidden sheet is not read.
+- **Move the file** out of the published folders to keep all of it off.
+- An `.xls` or `.ods` file is listed as not published, with the advice to save
+  it as a Google Sheet.
+
+A page stops at 2,000 rows of a sheet, 50,000 filled cells and 100 sheets, and
+says where. The content health page lists a spreadsheet cut short, and one
+with charts or images the page does not show, as "Incomplete on the site". A
+Google Sheet over 10 MB is held back like a document; an uploaded file over
+50 MB, or one that is not a workbook, is held back with the reason.
+
+An uploaded file is downloaded when it is new or its content changed, as a
+PDF is. A Google Sheet is exported again whenever Drive reports it changed, so
+a sheet with `NOW()` or `RAND()` changes its page on every full sync.
+
 ## Linking to a section
 
 Every folder below the publication root has an address of its own,
@@ -329,9 +363,11 @@ findings, under its priority:
   conversion left out; a code block never closed.
 - **Fix next**: files the site does not show
   ([ADR-025](ADR/025-name-every-file-left-off-the-site.md)), by kind — Word
-  and text files, presentations, archives, images, diagrams, spreadsheets,
-  video and audio, other files, shortcuts — and PDFs with no readable text or
-  too large for the site; files in one folder the site cannot tell apart; a
+  and text files, presentations, archives, images, diagrams, spreadsheets in
+  an older format, video and audio, other files, shortcuts — PDFs with no
+  readable text or too large for the site, and spreadsheets cut short
+  ([ADR-046](ADR/046-publish-spreadsheets-as-tables.md)); files in one folder
+  the site cannot tell apart; a
   merged cell split, formatting removed; a document longer than AI agents read,
   `mcp.fetchCharacters`
   ([ADR-043](ADR/043-content-health-names-documents-too-long-to-read-whole.md)).
@@ -344,7 +380,8 @@ findings, under its priority:
   earlier one ([ADR-034](ADR/034-check-headings-summaries-and-outside-links.md)),
   a second landing document, a document longer than
   `sync.largeDocumentCharacters` (40,000 characters unless the project sets
-  it), worth splitting, and a long PDF.
+  it), worth splitting, a long PDF or spreadsheet, and a spreadsheet with
+  charts or images the page does not show.
 - **Tidy up**: Drive names with "Copy of", a file extension, underscores or
   extra spaces; order numbers used twice or not read; an ignored folder that
   is no longer there.

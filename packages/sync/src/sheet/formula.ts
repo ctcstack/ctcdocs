@@ -35,8 +35,8 @@ export interface FormulaReference {
 }
 
 /** The largest row and column a workbook can have. */
-export const MAX_ROW = 1_048_575;
-export const MAX_COLUMN = 16_383;
+const MAX_ROW = 1_048_575;
+const MAX_COLUMN = 16_383;
 
 /** `A` → 0, `Z` → 25, `AA` → 26. */
 export function columnIndex(letters: string): number {
@@ -75,7 +75,7 @@ export function rangeAddress(range: CellRange): string {
 const CELL = /^(\$?)([A-Za-z]{1,3})(\$?)(\d{1,7})$/u;
 
 /** A cell address such as `B5` or `$B$5`, or `undefined`. */
-export function parseCellAddress(
+function parseCellAddress(
   value: string,
 ): { row: number; column: number } | undefined {
   const match = CELL.exec(value);

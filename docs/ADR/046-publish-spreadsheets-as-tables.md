@@ -79,20 +79,23 @@ column label, the header of its column, or a name the workbook defines for
 it. The section then lists the inputs, the constant cells formulas depend on,
 and the results, the formula cells nothing else uses, each with its label and
 value. A person sees what to change and what changes; an assistant can explain
-the model and recompute it under other inputs. Each list stops at 200 entries
-per sheet and says how many it left out.
+the model and recompute it under other inputs. Each list stops, at 200
+formulas, 100 inputs and 50 results per sheet, and says how many it left out.
 
-**Limits keep a page readable.** A sheet past 2,000 rows or a workbook past
-100,000 filled cells is published up to the limit, and the page says where it
-stops. Charts, images and drawings are not shown. The content health page
+**Limits keep a page readable.** A sheet past 2,000 rows, or a workbook past
+50,000 filled cells or 100 visible sheets, is published up to the limit, and
+the page says where it stops. An uploaded file over 50 MB is held back
+(ADR-026), as is a file that is not a workbook. Charts, images and drawings are not shown. The content health page
 lists both with the status `incomplete` (ADR-025), so the editor knows the
 page lacks them.
 
 **Long tables repeat their header for assistants.** In the Markdown version a
 table longer than about 3,000 characters is split into parts of about 2,000
 characters, each opening with the table's header row, so that a passage AI
-Search returns (ADR-042) still says what each column is. This applies to every
-page's tables, a Google Doc's included. The page keeps one table.
+Search returns (ADR-042) still says what each column is. Tables are written
+without padding, which one long cell would otherwise add to every row. This
+applies to every page's tables, a Google Doc's included. The page keeps one
+table.
 
 **The page is made for reading tables.** A spreadsheet's page shows each table
 with its header row held in view while it scrolls. A table of more than ten
