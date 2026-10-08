@@ -157,22 +157,6 @@
       "lastEditedBy": "Avery Example"
     },
     {
-      "id": "sheet-channel-model",
-      "name": "Channel model.xlsx",
-      "folderPath": [
-        "Handbook"
-      ],
-      "type": "Excel workbook",
-      "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "status": "incomplete",
-      "reason": "sheet-not-shown",
-      "detail": "It has charts.",
-      "sourceUrl": "https://drive.google.com/open?id=sheet-channel-model",
-      "lastEditedBy": "Robin Sample",
-      "slug": "handbook/channel-model",
-      "publishedVersion": "2026-01-05T09:00:00.000Z"
-    },
-    {
       "id": "word-onboarding",
       "name": "Onboarding checklist.docx",
       "folderPath": [
@@ -211,6 +195,22 @@
       "sourceUrl": "https://drive.google.com/open?id=pdf-scanned-form",
       "lastEditedBy": "Avery Example",
       "slug": "handbook/scanned-form",
+      "publishedVersion": "2026-01-05T09:00:00.000Z"
+    },
+    {
+      "id": "sheet-support-capacity",
+      "name": "Support capacity.xlsx",
+      "folderPath": [
+        "Handbook"
+      ],
+      "type": "Excel workbook",
+      "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "status": "incomplete",
+      "reason": "sheet-not-shown",
+      "detail": "It has charts.",
+      "sourceUrl": "https://drive.google.com/open?id=sheet-support-capacity",
+      "lastEditedBy": "Avery Example",
+      "slug": "handbook/support-capacity",
       "publishedVersion": "2026-01-05T09:00:00.000Z"
     },
     {

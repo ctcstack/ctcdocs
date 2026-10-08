@@ -8,8 +8,8 @@
 
 ## Context
 
-Teams keep spreadsheets next to their documents: price lists, channel
-budgets, unit economics, intake templates, request forms. ADR-025 lists each
+Teams keep spreadsheets next to their documents: lists, budgets, plans,
+templates and models of every size. ADR-025 lists each
 one as a file the site does not publish and asks its editor to link it from a
 document or paste a small table into one. The list keeps growing, and what
 the spreadsheets hold is exactly what people and their assistants ask about.
@@ -20,7 +20,7 @@ to each other. Any rule that publishes the easy ones and lists the rest would
 have to be tuned file by file, and would still leave the most valuable files
 off the site.
 
-Most of them are Excel workbooks uploaded to Drive, not Google Sheets. Both
+Many of them are Excel workbooks uploaded to Drive, not Google Sheets. Both
 are the same format to read: an `.xlsx` file stores each formula with the
 value it last computed and the number format it is shown with, and Drive
 exports a Google Sheet as one. AGENTS.md kept Sheets out of scope; this record

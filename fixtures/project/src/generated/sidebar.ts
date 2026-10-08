@@ -27,23 +27,23 @@ export const generatedSidebar = [
         "slug": "handbook/tables-and-code"
       },
       {
-        "label": "Channel model",
-        "slug": "handbook/channel-model",
-        "badge": "Sheet"
-      },
-      {
         "label": "Contacts",
         "slug": "handbook/contacts"
       },
       {
-        "label": "Price list",
-        "slug": "handbook/price-list",
+        "label": "Plans",
+        "slug": "handbook/plans",
         "badge": "Sheet"
       },
       {
         "label": "Scanned form",
         "slug": "handbook/scanned-form",
         "badge": "PDF"
+      },
+      {
+        "label": "Support capacity",
+        "slug": "handbook/support-capacity",
+        "badge": "Sheet"
       }
     ]
   },

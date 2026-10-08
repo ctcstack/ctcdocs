@@ -84,7 +84,7 @@ const budget = createXlsxFixture({
       cells: {
         A1: 'Item',
         B1: 'Cost',
-        A2: 'Ads',
+        A2: 'Hosting',
         B2: 100,
         A3: 'Total',
         B3: { formula: 'SUM(B2:B2)', value: 100 },
