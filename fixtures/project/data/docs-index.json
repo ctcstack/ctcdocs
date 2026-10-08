@@ -3,6 +3,21 @@
   "generatedAt": "2026-02-10T06:00:00.000Z",
   "documents": [
     {
+      "id": "sheet-channel-model",
+      "title": "Channel model",
+      "slug": "handbook/channel-model",
+      "markdownPath": "src/content/docs/_generated/sheet-channel-model.md",
+      "sourceUrl": "https://drive.google.com/file/d/sheet-channel-model/view",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "syncedAt": "2026-02-10T06:00:00.000Z",
+      "contentHash": "sha256:d45959cd8cde6b3ead558c9f08c71c5436e6593e442a619174f16b7d54115919",
+      "folderPath": [
+        "Handbook"
+      ],
+      "language": "en",
+      "format": "sheet"
+    },
+    {
       "id": "doc-contacts",
       "title": "Contacts",
       "slug": "handbook/contacts",
@@ -31,6 +46,21 @@
       ],
       "language": "en",
       "format": "google-doc"
+    },
+    {
+      "id": "sheet-price-list",
+      "title": "Price list",
+      "slug": "handbook/price-list",
+      "markdownPath": "src/content/docs/_generated/sheet-price-list.md",
+      "sourceUrl": "https://drive.google.com/file/d/sheet-price-list/view",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "syncedAt": "2026-02-10T06:00:00.000Z",
+      "contentHash": "sha256:b0b0b283dff91739574feb076e64945c31566d6578b02e420cdeb6dfea4faa46",
+      "folderPath": [
+        "Handbook"
+      ],
+      "language": "en",
+      "format": "sheet"
     },
     {
       "id": "pdf-scanned-form",
@@ -91,6 +121,21 @@
       ],
       "language": "en",
       "format": "google-doc"
+    },
+    {
+      "id": "sheet-glossary",
+      "title": "Glossary",
+      "slug": "reference/glossary",
+      "markdownPath": "src/content/docs/_generated/sheet-glossary.md",
+      "sourceUrl": "https://docs.google.com/spreadsheets/d/sheet-glossary/edit",
+      "googleModifiedTime": "2026-01-05T09:00:00.000Z",
+      "syncedAt": "2026-02-10T06:00:00.000Z",
+      "contentHash": "sha256:bb319d3c4db8acd7aaf20159e748b81f31df11e296bb661f8f16b856e4d6d244",
+      "folderPath": [
+        "Reference"
+      ],
+      "language": "en",
+      "format": "sheet"
     },
     {
       "id": "doc-style-guide",

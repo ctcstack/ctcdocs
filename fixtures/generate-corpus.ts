@@ -37,6 +37,7 @@ import {
 } from '@ctcstack/ctcdocs-sync';
 
 import { createPdfFixture } from '../packages/sync/src/test-support/create-pdf-fixture.ts';
+import { createXlsxFixture } from '../packages/sync/src/test-support/create-xlsx-fixture.ts';
 
 const FOLDER = 'application/vnd.google-apps.folder';
 const DOCUMENT = 'application/vnd.google-apps.document';
@@ -132,8 +133,8 @@ const items: DriveItem[] = [
    * document too large for Google to export, and an ignored folder.
    */
   {
-    ...document('sheet-glossary', 'Glossary', 'folder-reference'),
-    mimeType: 'application/vnd.google-apps.spreadsheet',
+    ...document('sheet-old-budget', 'Old budget.xls', 'folder-reference'),
+    mimeType: 'application/vnd.ms-excel',
   },
   {
     ...document('shortcut-policies', 'Policies', 'folder-handbook'),
@@ -206,6 +207,138 @@ function pdf(id: string, name: string, parent: string): DriveItem {
     sha256Checksum: createHash('sha256').update(bytes).digest('hex'),
   };
 }
+
+/*
+ * Spreadsheets (ADR-046): a Google Sheet long enough for its page to filter
+ * and sort, an uploaded workbook with a model of formulas and a chart the page
+ * does not show, and a CSV file.
+ */
+const GLOSSARY = [
+  ['Address', 'Where a page lives on the site, made from its name'],
+  ['Permanent link', 'A short link that keeps working through renames'],
+  ['Section page', 'The page of a folder, listing what it holds'],
+  ['Sync', 'The run that reads the Drive and writes the pages'],
+  ['Held back', 'Left at its last version until it can be read again'],
+  ['Landing document', 'The document a folder opens with'],
+  ['Projection', 'The Markdown version of a page'],
+  ['Content health', 'The page that lists what to fix'],
+  ['Access rule', 'Which groups may read a folder'],
+  ['Note', 'Something worth knowing about a page'],
+  ['Badge', 'The mark beside a PDF or a spreadsheet in the sidebar'],
+  ['Corpus', 'Everything the site publishes'],
+] as const;
+
+const spreadsheetFiles = new Map<string, Uint8Array>([
+  [
+    'sheet-glossary',
+    createXlsxFixture({
+      sheets: [
+        {
+          name: 'Terms',
+          cells: Object.fromEntries([
+            ['A1', 'Term'],
+            ['B1', 'Meaning'],
+            ...GLOSSARY.flatMap(([term, meaning], index) => [
+              [`A${index + 2}`, term],
+              [`B${index + 2}`, meaning],
+            ]),
+          ]),
+        },
+      ],
+    }),
+  ],
+  [
+    'sheet-channel-model',
+    createXlsxFixture({
+      sheets: [
+        {
+          name: 'Model',
+          merges: ['A1:D1'],
+          charts: 1,
+          cells: {
+            A1: 'Channel model',
+            A2: 'Metric',
+            B2: 'January',
+            C2: 'February',
+            D2: 'March',
+            A3: 'Budget',
+            B3: { value: 4000, format: '"$"#,##0' },
+            C3: { value: 5000, format: '"$"#,##0' },
+            D3: { value: 6000, format: '"$"#,##0' },
+            A4: 'Cost per lead',
+            B4: { value: 20, format: '"$"#,##0.00' },
+            C4: { value: 25, format: '"$"#,##0.00' },
+            D4: { value: 25, format: '"$"#,##0.00' },
+            A5: 'Leads',
+            B5: {
+              formula: 'B3/B4',
+              value: 200,
+              shared: { index: 0, ref: 'B5:D5' },
+            },
+            C5: { value: 200, shared: { index: 0 } },
+            D5: { value: 240, shared: { index: 0 } },
+            A6: 'Customers',
+            B6: { formula: 'B5*Conversion', value: 20 },
+            C6: { formula: 'C5*Conversion', value: 20 },
+            D6: { formula: 'D5*Conversion', value: 24 },
+            A8: 'Conversion',
+            B8: { value: 0.1, format: '0%' },
+            A9: 'Customers this quarter',
+            B9: { formula: 'SUM(B6:D6)', value: 64 },
+          },
+        },
+        { name: 'Scratch', hidden: true, cells: { A1: 'Working notes' } },
+      ],
+      names: { Conversion: 'Model!$B$8' },
+    }),
+  ],
+  [
+    'sheet-price-list',
+    new TextEncoder().encode(
+      'Plan,Seats,Price per month\nStarter,5,$49\nTeam,25,$199\nCompany,100,$599\n',
+    ),
+  ],
+]);
+
+function spreadsheet(
+  id: string,
+  name: string,
+  mimeType: string,
+  parent: string,
+): DriveItem {
+  const bytes = spreadsheetFiles.get(id) ?? new Uint8Array();
+  return {
+    ...document(id, name, parent),
+    mimeType,
+    ...(mimeType === 'application/vnd.google-apps.spreadsheet'
+      ? {}
+      : {
+          size: String(bytes.byteLength),
+          sha256Checksum: createHash('sha256').update(bytes).digest('hex'),
+        }),
+  };
+}
+
+items.push(
+  spreadsheet(
+    'sheet-glossary',
+    'Glossary',
+    'application/vnd.google-apps.spreadsheet',
+    'folder-reference',
+  ),
+  spreadsheet(
+    'sheet-channel-model',
+    'Channel model.xlsx',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'folder-handbook',
+  ),
+  spreadsheet(
+    'sheet-price-list',
+    'Price list.csv',
+    'text/csv',
+    'folder-handbook',
+  ),
+);
 
 items.push(
   pdf('pdf-release-checklist', 'Release checklist.pdf', 'folder-reference'),
@@ -727,12 +860,19 @@ const dependencies = {
       }
       return Promise.resolve(archive);
     },
+    exportXlsx: (fileId: string) => {
+      const bytes = spreadsheetFiles.get(fileId);
+      if (!bytes) {
+        throw new Error(`No synthetic spreadsheet for ${fileId}.`);
+      }
+      return Promise.resolve(bytes);
+    },
   },
   fileDownloader: {
     downloadFile: (fileId: string) => {
-      const bytes = pdfFiles.get(fileId);
+      const bytes = pdfFiles.get(fileId) ?? spreadsheetFiles.get(fileId);
       if (!bytes) {
-        throw new Error(`No synthetic PDF for ${fileId}.`);
+        throw new Error(`No synthetic file for ${fileId}.`);
       }
       return Promise.resolve(bytes);
     },
