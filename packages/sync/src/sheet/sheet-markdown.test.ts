@@ -374,6 +374,39 @@ describe('workbookToMarkdown', () => {
     expect(result.body).toContain('- **Year** (`D2:D3`): `=SUM(B2:C2)`\n');
   });
 
+  it('writes a column of single values as a list, however long', () => {
+    const short = page({
+      sheets: [
+        {
+          name: 'Keywords',
+          cells: { A1: 'Keywords', A2: 'alpha', A3: 'beta', A4: 'gamma' },
+        },
+      ],
+    });
+    expect(short.body).toBe('- Keywords\n- alpha\n- beta\n- gamma\n');
+
+    const cells = Object.fromEntries(
+      Array.from({ length: 2000 }, (_, row) => [`A${row + 1}`, `word ${row}`]),
+    );
+    const long = page({ sheets: [{ name: 'Words', cells }] });
+    expect(
+      long.body.split('\n').filter((line) => line.startsWith('- ')),
+    ).toHaveLength(2000);
+    expect(long.body).not.toContain('#');
+  });
+
+  it('takes a caption only above a row of a table', () => {
+    const result = page({
+      sheets: [
+        {
+          name: 'Notes',
+          cells: { A1: 'Owners', A2: 'Ada', A3: 'Grace', B3: 'Ops' },
+        },
+      ],
+    });
+    expect(result.body).not.toContain('## Owners');
+  });
+
   it('describes an empty spreadsheet with nothing', () => {
     const result = page({ sheets: [{ name: 'Empty' }] });
     expect(result.body).toBe('');

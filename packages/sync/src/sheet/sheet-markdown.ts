@@ -203,13 +203,25 @@ interface SheetContext {
 function renderBlock(block: SheetBlock, context: SheetContext): RootContent[] {
   const { grid } = context;
   const { range } = block;
+  /*
+   * A caption is a line of text on its own above a table, whose next row
+   * holds two values or more, or above a single note. A column of single
+   * values is a list, and its first line is one of them, not a heading over
+   * the rest.
+   */
   const firstRow = block.areas.filter((area) => area.range.top === range.top);
   const caption = firstRow.length === 1 ? firstRow[0] : undefined;
+  const rest = caption
+    ? block.areas.filter((area) => area !== caption)
+    : block.areas;
+  // The areas are in reading order, so the first left starts the next row.
+  const nextTop = rest[0]?.range.top;
+  const nextRow = rest.filter((area) => area.range.top === nextTop);
   if (
     caption &&
-    block.areas.length > 1 &&
     caption.cell.kind === 'text' &&
-    range.bottom > caption.range.bottom
+    range.bottom > caption.range.bottom &&
+    (nextRow.length >= 2 || rest.length === 1)
   ) {
     const repeatsTitle =
       caption.cell.text.toLocaleLowerCase('en') ===
@@ -219,9 +231,7 @@ function renderBlock(block: SheetBlock, context: SheetContext): RootContent[] {
     }
     return [
       ...(repeatsTitle ? [] : [heading(context.depth, caption.cell.text)]),
-      ...cutIntoBlocks(block.areas.filter((area) => area !== caption)).flatMap(
-        (inner) => renderBlock(inner, context),
-      ),
+      ...cutIntoBlocks(rest).flatMap((inner) => renderBlock(inner, context)),
     ];
   }
 
