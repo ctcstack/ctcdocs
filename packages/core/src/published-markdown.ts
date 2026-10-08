@@ -25,6 +25,14 @@ const processor = unified()
     strong: '*',
   });
 
+/**
+ * The version of the text `publishedMarkdownBody` writes. It moves whenever
+ * that text changes for the same page, as when 0.21.0 wrote tables without
+ * padding and split long ones (ADR-046), so a length the sync measured with
+ * an earlier version is known to describe other text (ADR-043).
+ */
+export const PUBLISHED_MARKDOWN_VERSION = 2;
+
 export interface PublishedMarkdownInput {
   title: string;
   /**
