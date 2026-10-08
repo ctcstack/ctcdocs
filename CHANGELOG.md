@@ -2,6 +2,44 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+Spreadsheets are published
+([ADR-046](docs/ADR/046-publish-spreadsheets-as-tables.md), proposed): a
+Google Sheet, an Excel workbook or a CSV file in a published folder gets a
+page with each visible sheet as tables, and a sheet with formulas says how it
+calculates.
+
+### Added
+
+- **Spreadsheet pages.** `sourceType: drive-sheet`, marked `Sheet` in the
+  sidebar, `sheet` in `data/docs-index.json`, `llms.txt` and the MCP server's
+  `format`. A Google Sheet is exported as `.xlsx`; an uploaded `.xlsx`,
+  `.xlsm`, `.csv` or `.tsv` file is downloaded, and not again while Drive's
+  checksum is unchanged. Hidden sheets are left out.
+- **"How it is calculated"** under a sheet with formulas: each distinct
+  formula once, the cells it uses named by their row and column labels or the
+  workbook's defined names, then its inputs and results.
+- **A spreadsheet's tables hold their header, filter and sort** on its page.
+- **Content health** lists a spreadsheet cut short (`sheet-truncated`), one
+  with charts or images the page does not show (`sheet-not-shown`), and a long
+  one (`sheet-long`). The sync report's `summary.published` gains `sheets`.
+- **The manifest** records `exportMode: sheet` and `sheetVersion`.
+- **`numfmt`** 3.2.6 is a dependency of the sync package, for Excel's number
+  formats.
+
+### Changed
+
+- **The Markdown version writes tables without padding, and splits a table
+  longer than about 3,000 characters** into parts that each repeat its header,
+  so a passage an assistant reads still says what each column is. Every
+  page's Markdown, and so each document's stored copy and its measured length,
+  changes once.
+- **A link to a Google Sheet** in the corpus leads to its page, and one
+  outside it is noted like a link to a Google Doc outside it.
+- **`.xls` and `.ods` files** are listed as "Spreadsheets in an older format",
+  with the advice to save them as Google Sheets.
+
 ## 0.20.0
 
 An assistant's search shows the chunks that match whole, never cut, and lists

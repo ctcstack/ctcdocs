@@ -61,9 +61,9 @@ function storedZip(
   return new Uint8Array(Buffer.concat([...locals, directory, end]));
 }
 
-export type XlsxFixtureValue = string | number | boolean;
+type XlsxFixtureValue = string | number | boolean;
 
-export interface XlsxFixtureCell {
+interface XlsxFixtureCell {
   /** The value shown, or the value the formula last computed. */
   value?: XlsxFixtureValue;
   /** A formula without `=`. */
@@ -78,7 +78,7 @@ export interface XlsxFixtureCell {
   link?: string;
 }
 
-export interface XlsxFixtureSheet {
+interface XlsxFixtureSheet {
   name: string;
   /** Cells by address, `B5`. */
   cells?: Readonly<Record<string, XlsxFixtureValue | XlsxFixtureCell>>;

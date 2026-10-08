@@ -58,7 +58,7 @@ export interface WorkbookData {
 /** The most rows of one sheet a page publishes. */
 export const MAX_SHEET_ROWS = 2_000;
 /** The most filled cells of one workbook a page publishes. */
-export const MAX_WORKBOOK_CELLS = 50_000;
+const MAX_WORKBOOK_CELLS = 50_000;
 /** The most visible sheets of one workbook a page publishes. */
 export const MAX_SHEETS = 100;
 /** The longest cell text a page publishes. */
