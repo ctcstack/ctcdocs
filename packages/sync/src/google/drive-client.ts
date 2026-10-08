@@ -5,6 +5,7 @@ import {
   driveFileListResponseSchema,
   rootFolderResponseSchema,
   sharedDriveResponseSchema,
+  XLSX_MIME_TYPE,
   type DriveItem,
 } from './drive-types.js';
 import {
@@ -154,6 +155,11 @@ export class GoogleDriveClient {
     return this.exportFile(fileId, 'application/zip');
   }
 
+  /** A Google Sheet as an Excel workbook, values and formulas (ADR-046). */
+  async exportXlsx(fileId: string): Promise<Uint8Array> {
+    return this.exportFile(fileId, XLSX_MIME_TYPE);
+  }
+
   /**
    * The content of a file stored in Drive, such as a PDF (ADR-027). This is a
    * download, not an export, so Google's 10 MB export limit does not apply;
@@ -182,7 +188,7 @@ export class GoogleDriveClient {
 
   private async exportFile(
     fileId: string,
-    mimeType: 'application/zip' | 'text/markdown',
+    mimeType: 'application/zip' | 'text/markdown' | typeof XLSX_MIME_TYPE,
   ): Promise<Uint8Array> {
     const response = await this.request(
       `files/${encodeURIComponent(fileId)}/export`,

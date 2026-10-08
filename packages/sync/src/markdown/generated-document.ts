@@ -17,6 +17,16 @@ export interface GeneratedDocumentInput {
   contentHash?: string;
   /** Present for a page that publishes a PDF (ADR-027). */
   pdf?: GeneratedPdfFacts;
+  /** Present for a page that publishes a spreadsheet (ADR-046). */
+  sheet?: GeneratedSheetFacts;
+}
+
+/** What the page of a spreadsheet says about it. */
+export interface GeneratedSheetFacts {
+  /** Sheets the page shows. */
+  sheets: number;
+  /** Cells with a formula the page shows. */
+  formulas: number;
 }
 
 /** What the page of a PDF says about the file. */
@@ -116,7 +126,11 @@ export function generateMarkdownDocument(
       slug: input.slug,
       shortId: input.shortId,
       editUrl: input.sourceUrl,
-      sourceType: input.pdf ? 'drive-pdf' : 'google-doc',
+      sourceType: input.pdf
+        ? 'drive-pdf'
+        : input.sheet
+          ? 'drive-sheet'
+          : 'google-doc',
       googleFileId: input.googleFileId,
       googleModifiedTime: input.googleModifiedTime,
       syncedAt: input.syncedAt,
@@ -128,6 +142,13 @@ export function generateMarkdownDocument(
        * contents as long as the document.
        */
       ...(input.pdf ? { tableOfContents: false, pdf: input.pdf } : {}),
+      // A spreadsheet's contents are its sheets, not every table's caption.
+      ...(input.sheet
+        ? {
+            tableOfContents: { minHeadingLevel: 2, maxHeadingLevel: 2 },
+            sheet: input.sheet,
+          }
+        : {}),
     },
     {
       defaultStringType: 'QUOTE_DOUBLE',

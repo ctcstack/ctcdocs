@@ -86,13 +86,16 @@ describe('internal Google link rewriting', () => {
         '<a href="https://docs.google.com/document/u/0/d/outside/edit">Doc</a>',
       ),
     ).toEqual(['link:outside_site']);
-    // The site does not publish spreadsheets or folders, so there is nothing
-    // an editor could move into the published folders; and `open?id=` does
-    // not say what the file is, so it may be either.
+    // The site publishes Google Sheets too (ADR-046).
+    expect(
+      outside('[Sheet](https://docs.google.com/spreadsheets/d/outside/edit)'),
+    ).toEqual(['link:outside_site']);
+    // The site does not publish folders, so there is nothing an editor could
+    // move into the published folders; and `open?id=` does not say what the
+    // file is, so it may be a presentation.
     expect(
       outside(
         [
-          '[Sheet](https://docs.google.com/spreadsheets/d/outside/edit)',
           '[Folder](https://drive.google.com/drive/folders/outside)',
           '[Open](https://drive.google.com/open?id=outside)',
           '[Copy](https://docs.google.com/document/d/outside/copy)',

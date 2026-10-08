@@ -25,7 +25,8 @@ import { parseOrderedLabel } from '../ordered-label.js';
  * - `out-of-date`: the site shows an earlier version, which it keeps until the
  *   current one can be published.
  * - `incomplete`: the file has a page, but part of it is missing: a PDF too
- *   large to serve, or one whose text cannot be read (ADR-027).
+ *   large to serve, or one whose text cannot be read (ADR-027); a spreadsheet
+ *   cut short, or one with charts or images the page does not show (ADR-046).
  */
 export type UnpublishedStatus = 'not-published' | 'out-of-date' | 'incomplete';
 
@@ -38,6 +39,8 @@ export type UnpublishedReasonCode =
   | 'pdf-no-text'
   | 'pdf-over-site-limit'
   | 'pdf-too-large'
+  | 'sheet-truncated'
+  | 'sheet-not-shown'
   | 'word-file'
   | 'presentation-file'
   | 'archive-file'
@@ -129,6 +132,20 @@ export const UNPUBLISHED_REASONS: readonly UnpublishedReason[] = [
       'The site does not download a PDF over 100 MB, so its page only links to Drive and search does not find its text. Save a smaller copy and replace this one.',
   },
   {
+    code: 'sheet-truncated',
+    title: 'Only part of the spreadsheet is on the site',
+    action: 'Split it or hide what is not needed',
+    instruction:
+      'The site publishes up to 2,000 rows of a sheet, 50,000 filled cells and 100 sheets of a spreadsheet, and its page says where it stops. Split the spreadsheet, or hide the sheets readers do not need: a hidden sheet is not published.',
+  },
+  {
+    code: 'sheet-not-shown',
+    title: 'The spreadsheet has charts or images the site does not show',
+    action: 'Nothing, or add them to a document',
+    instruction:
+      'The page shows the cells, and says that the sheet has charts or images readers will find only in the spreadsheet. If a chart matters to readers, copy it into the Google Doc that explains the numbers.',
+  },
+  {
     code: 'word-file',
     title: 'Word and text files',
     action: 'Save as Google Docs',
@@ -147,7 +164,7 @@ export const UNPUBLISHED_REASONS: readonly UnpublishedReason[] = [
     title: 'Archives',
     action: 'Unpack and upload the files',
     instruction:
-      'The site does not open archives. Unpack it and upload what it holds: Google Docs and PDF files are published, and anything else is listed here with its own advice. Then delete the archive.',
+      'The site does not open archives. Unpack it and upload what it holds: Google Docs, PDF files and spreadsheets are published, and anything else is listed here with its own advice. Then delete the archive.',
   },
   {
     code: 'image-file',
@@ -165,10 +182,10 @@ export const UNPUBLISHED_REASONS: readonly UnpublishedReason[] = [
   },
   {
     code: 'spreadsheet-file',
-    title: 'Spreadsheets',
-    action: 'Link from a document',
+    title: 'Spreadsheets in an older format',
+    action: 'Save as Google Sheets',
     instruction:
-      'The site does not publish spreadsheets. Link to each one from the document that explains it, or paste a small table into that document. Move the ones nobody needs out of the published folders.',
+      'The site publishes Google Sheets, Excel workbooks (.xlsx) and CSV files, not .xls or OpenDocument spreadsheets. Open each one in Drive, choose File → Save as Google Sheets, check the result and delete the original. The new spreadsheet is published on the next sync.',
   },
   {
     code: 'media-file',
@@ -182,7 +199,7 @@ export const UNPUBLISHED_REASONS: readonly UnpublishedReason[] = [
     title: 'Other files the site does not publish',
     action: 'Convert, link or move out',
     instruction:
-      'The site publishes Google Docs and PDF files. If this content belongs on the site, save it as one of those. Otherwise link to it from a document, or move it out of the published folders.',
+      'The site publishes Google Docs, PDF files and spreadsheets. If this content belongs on the site, save it as one of those. Otherwise link to it from a document, or move it out of the published folders.',
   },
   {
     code: 'shortcut',
@@ -335,7 +352,7 @@ const FILE_TYPES: Readonly<Record<string, string>> = {
   'application/msword': 'Word document',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
     'Word document',
-  'application/vnd.ms-excel': 'Excel workbook',
+  'application/vnd.ms-excel': 'Excel 97–2003 workbook',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
     'Excel workbook',
   'application/vnd.ms-powerpoint': 'PowerPoint presentation',

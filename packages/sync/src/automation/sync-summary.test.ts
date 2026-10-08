@@ -34,7 +34,7 @@ function syncReport(overrides: Partial<SyncReport> = {}): SyncReport {
       outOfDate: 9,
       incomplete: 11,
       ignored: 10,
-      published: { googleDocs: 40, pdfs: 2 },
+      published: { googleDocs: 40, pdfs: 2, sheets: 1 },
       conversion: { markdown: 25, html: 15 },
       notes: 0,
     },
@@ -49,10 +49,10 @@ function syncReport(overrides: Partial<SyncReport> = {}): SyncReport {
 
 const file = {
   id: 'file-one',
-  name: 'Budget.xlsx',
+  name: 'Budget.xls',
   folderPath: ['Team', 'Finance'],
-  type: 'Excel workbook',
-  mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  type: 'Excel 97–2003 workbook',
+  mimeType: 'application/vnd.ms-excel',
   status: 'not-published' as const,
   reason: 'spreadsheet-file' as const,
   sourceUrl: 'https://drive.google.com/open?id=file-one',
@@ -124,7 +124,7 @@ describe('renderSiteSummary', () => {
     const summary = renderSiteSummary(syncReport(), pageUrl);
 
     expect(summary).toContain(
-      '**On the site: 42 pages** — 40 Google Docs, 2 PDFs. **Not on the site: 8** · out of date: 9 · incomplete: 11 · notes: 0.',
+      '**On the site: 43 pages** — 40 Google Docs, 2 PDFs, 1 spreadsheet. **Not on the site: 8** · out of date: 9 · incomplete: 11 · notes: 0.',
     );
     expect(summary).toContain(`[content health page](${pageUrl})`);
     expect(summary).toContain(
@@ -156,17 +156,17 @@ describe('renderSiteSummary', () => {
     );
 
     expect(summary).toContain(
-      '| Spreadsheets | 3 | Team (2), General (1) | Link from a document |',
+      '| Spreadsheets in an older format | 3 | Team (2), General (1) | Save as Google Sheets |',
     );
     expect(summary).toContain(
       '| Video and audio | 1 | Team (1) | Link from a document |',
     );
     // Spreadsheets come after video in the catalog, and so in the summary.
-    expect(summary.indexOf('<b>Spreadsheets</b> — 3')).toBeGreaterThan(
-      summary.indexOf('| Video and audio |'),
-    );
+    expect(
+      summary.indexOf('<b>Spreadsheets in an older format</b> — 3'),
+    ).toBeGreaterThan(summary.indexOf('| Video and audio |'));
     expect(summary).toContain(
-      '| Team › Finance | [Budget\\.xlsx](https://drive.google.com/open?id=file-one) | Excel workbook | Not on the site | Editor One |',
+      '| Team › Finance | [Budget\\.xls](https://drive.google.com/open?id=file-one) | Excel 97–2003 workbook | Not on the site | Editor One |',
     );
   });
 

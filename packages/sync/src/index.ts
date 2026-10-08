@@ -17,6 +17,8 @@ export {
   GOOGLE_DRIVE_DOCUMENT_MIME_TYPE,
   GOOGLE_DRIVE_FOLDER_MIME_TYPE,
   GOOGLE_DRIVE_PDF_MIME_TYPE,
+  GOOGLE_SHEETS_MIME_TYPE,
+  XLSX_MIME_TYPE,
   driveItemSchema,
   type DriveItem,
 } from './google/drive-types.js';

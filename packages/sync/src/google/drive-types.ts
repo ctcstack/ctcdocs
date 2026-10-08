@@ -5,27 +5,61 @@ export const GOOGLE_DRIVE_FOLDER_MIME_TYPE =
 export const GOOGLE_DRIVE_DOCUMENT_MIME_TYPE =
   'application/vnd.google-apps.document';
 export const GOOGLE_DRIVE_PDF_MIME_TYPE = 'application/pdf';
+export const GOOGLE_SHEETS_MIME_TYPE =
+  'application/vnd.google-apps.spreadsheet';
+export const XLSX_MIME_TYPE =
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 /**
- * What the site publishes as a page: Google Docs, and PDF files (ADR-027).
- * Everything else under the root is listed as not on the site (ADR-025).
+ * The spreadsheets the site publishes (ADR-046), by how the sync reads each:
+ * a Google Sheet is exported as a workbook, an uploaded workbook is read as
+ * it is, and a CSV or tab-separated file is read as text.
+ */
+const SPREADSHEET_FORMATS: ReadonlyMap<string, SpreadsheetFormat> = new Map([
+  [GOOGLE_SHEETS_MIME_TYPE, 'google-sheets'],
+  [XLSX_MIME_TYPE, 'xlsx'],
+  ['application/vnd.ms-excel.sheet.macroEnabled.12', 'xlsx'],
+  ['text/csv', 'csv'],
+  ['text/tab-separated-values', 'tsv'],
+]);
+
+export type SpreadsheetFormat = 'google-sheets' | 'xlsx' | 'csv' | 'tsv';
+
+/** How the sync reads a spreadsheet, or `undefined` for anything else. */
+export function spreadsheetFormat(
+  mimeType: string,
+): SpreadsheetFormat | undefined {
+  return SPREADSHEET_FORMATS.get(mimeType);
+}
+
+/**
+ * What the site publishes as a page: Google Docs, PDF files (ADR-027) and
+ * spreadsheets (ADR-046). Everything else under the root is listed as not on
+ * the site (ADR-025).
  */
 export function isPublishedFileType(mimeType: string): boolean {
   return (
     mimeType === GOOGLE_DRIVE_DOCUMENT_MIME_TYPE ||
-    mimeType === GOOGLE_DRIVE_PDF_MIME_TYPE
+    mimeType === GOOGLE_DRIVE_PDF_MIME_TYPE ||
+    SPREADSHEET_FORMATS.has(mimeType)
   );
 }
 
+/** The extension an uploaded file carries from the computer it came from. */
+const UPLOADED_EXTENSION = /\.(?:pdf|xlsx|xlsm|csv|tsv)\s*$/iu;
+
 /**
  * The name a document is published under: its Drive name, without the
- * `.pdf` a PDF carries from the computer it was uploaded from.
+ * extension an uploaded PDF or spreadsheet carries.
  */
 export function documentName(item: { name: string; mimeType: string }): string {
-  if (item.mimeType !== GOOGLE_DRIVE_PDF_MIME_TYPE) {
+  if (
+    item.mimeType !== GOOGLE_DRIVE_PDF_MIME_TYPE &&
+    spreadsheetFormat(item.mimeType) === undefined
+  ) {
     return item.name;
   }
-  const stripped = item.name.replace(/\.pdf\s*$/iu, '').trimEnd();
+  const stripped = item.name.replace(UPLOADED_EXTENSION, '').trimEnd();
   return stripped || item.name;
 }
 

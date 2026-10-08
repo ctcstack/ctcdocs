@@ -21,7 +21,11 @@ import type {
   InventorySelection,
   SelectedInventoryItem,
 } from '../inventory/inventory-graph.js';
-import type { SyncedDocumentRecord, SyncManifest } from '../manifest.js';
+import {
+  isGoogleDocRecord,
+  type SyncedDocumentRecord,
+  type SyncManifest,
+} from '../manifest.js';
 import { plural } from '../plural.js';
 import { slugifySegment } from '../slug.js';
 import { describeFileType, driveUrl, folderLabels } from './unpublished.js';
@@ -44,6 +48,7 @@ export type NoteCode =
   | 'document-over-agent-limit'
   | 'document-long'
   | 'pdf-long'
+  | 'sheet-long'
   | 'image-undescribed'
   | 'image-large'
   | 'summary-missing';
@@ -148,6 +153,13 @@ export const NOTE_KINDS: readonly NoteKind[] = [
     action: 'Nothing, if it must stay a PDF',
     instruction:
       'The PDF holds more text than the length this site notes. The site publishes a PDF as it is, so this is a note rather than a task: an AI agent reads all of it to answer about one part, and past the length an agent is given at once it reads only the beginning. If the PDF was saved from a Google Doc, publishing the document instead, split into shorter ones, lets people and agents read the part they need.',
+  },
+  {
+    code: 'sheet-long',
+    title: 'A spreadsheet is long to read whole',
+    action: 'Hide or split what readers do not need',
+    instruction:
+      'The spreadsheet holds more than the length this site notes, so an AI agent reads all of it to answer about one table, and past the length an agent is given at once it reads only the beginning. Hide the sheets readers do not need, since a hidden sheet is not published, or split the spreadsheet into one per subject.',
   },
   {
     code: 'image-undescribed',
@@ -311,7 +323,8 @@ function largeImages(
 /**
  * A page longer than an AI agent reads, or than the line, gets one note: the
  * first that applies. A PDF's editor usually cannot split it, so its note
- * says how long it is and whether agents read it whole, and asks nothing.
+ * says how long it is and whether agents read it whole, and asks nothing; a
+ * spreadsheet's says what its editor can do instead of splitting a document.
  */
 function longDocument(
   record: SyncedDocumentRecord,
@@ -319,15 +332,20 @@ function longDocument(
 ): { code: NoteCode; detail: string } | undefined {
   const characters = lengths.characters.get(record.googleFileId) ?? 0;
   const pdf = record.exportMode === 'pdf';
+  const sheet = record.exportMode === 'sheet';
   if (characters > lengths.fetchCharacters) {
     return {
-      code: pdf ? 'pdf-long' : 'document-over-agent-limit',
+      code: pdf
+        ? 'pdf-long'
+        : sheet
+          ? 'sheet-long'
+          : 'document-over-agent-limit',
       detail: `${grouped(characters)} characters; AI agents read the first ${grouped(lengths.fetchCharacters)}`,
     };
   }
   if (characters > lengths.largeDocumentCharacters) {
     return {
-      code: pdf ? 'pdf-long' : 'document-long',
+      code: pdf ? 'pdf-long' : sheet ? 'sheet-long' : 'document-long',
       detail: `${grouped(characters)} characters, over ${grouped(lengths.largeDocumentCharacters)}`,
     };
   }
@@ -390,8 +408,11 @@ export function createNotes(
     if (long) {
       notes.push(noteFor(selected, long.code, record.stableSlug, long.detail));
     }
-    // A PDF's summary is its extracted text, which an editor cannot write.
-    if (record.exportMode !== 'pdf' && !record.description) {
+    /*
+     * A PDF's summary is its extracted text and a spreadsheet's is written
+     * from its sheets, neither of which an editor can write.
+     */
+    if (isGoogleDocRecord(record) && !record.description) {
       notes.push(noteFor(selected, 'summary-missing', record.stableSlug));
     }
   }

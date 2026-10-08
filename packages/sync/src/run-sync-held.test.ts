@@ -571,12 +571,7 @@ describe('documents held back', () => {
 describe('files not on the site', () => {
   const extra = [
     document('doc-alpha', 'Alpha'),
-    item(
-      'sheet-budget',
-      'Budget',
-      'application/vnd.google-apps.spreadsheet',
-      'team',
-    ),
+    item('sheet-budget', 'Budget.xls', 'application/vnd.ms-excel', 'team'),
     {
       ...item(
         'shortcut-plan',
@@ -618,7 +613,7 @@ describe('files not on the site', () => {
       ]),
     ).toEqual([
       ['shortcut-plan', 'Shortcut to Google Docs', 'shortcut', []],
-      ['sheet-budget', 'Google Sheets', 'spreadsheet-file', ['Team']],
+      ['sheet-budget', 'Excel 97–2003 workbook', 'spreadsheet-file', ['Team']],
     ]);
     expect(first.report.ignoredFolders).toEqual([
       { id: 'drafts', name: 'Drafts', folderPath: [], items: 2 },

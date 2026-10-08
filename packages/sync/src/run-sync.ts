@@ -64,6 +64,8 @@ import { GoogleDriveClient } from './google/drive-client.js';
 import {
   documentName,
   GOOGLE_DRIVE_PDF_MIME_TYPE,
+  GOOGLE_SHEETS_MIME_TYPE,
+  spreadsheetFormat,
 } from './google/drive-types.js';
 import { GoogleApiError } from './google/google-api-error.js';
 import {
@@ -86,6 +88,7 @@ import {
   generateMarkdownDocument,
   sha256,
   type GeneratedPdfFacts,
+  type GeneratedSheetFacts,
 } from './markdown/generated-document.js';
 import { detectMarkdownFallbackReasons } from './markdown/analyze-markdown.js';
 import {
@@ -98,6 +101,7 @@ import {
 } from './links/rewrite-internal-links.js';
 import {
   CONVERTER_VERSION,
+  isGoogleDocRecord,
   loadManifest,
   NORMALIZER_VERSION,
   serializeManifest,
@@ -118,6 +122,9 @@ import {
   readPdfText,
 } from './pdf/read-pdf.js';
 import { validateGeneratedOutput } from './output/validate-generated-output.js';
+import { readDelimited } from './sheet/read-delimited.js';
+import { readXlsx } from './sheet/read-xlsx.js';
+import { SHEET_VERSION, workbookToMarkdown } from './sheet/sheet-markdown.js';
 import { keepPreviousAddresses } from './redirect-history.js';
 import {
   createTitleReport,
@@ -139,6 +146,8 @@ const REDIRECTS_PATH = `${PROJECT_LAYOUT.generatedSourceDirectory}/redirects.ts`
 interface MarkdownExporter {
   exportMarkdown(fileId: string): Promise<Uint8Array>;
   exportHtmlZip?(fileId: string): Promise<Uint8Array>;
+  /** A Google Sheet as an Excel workbook (ADR-046). */
+  exportXlsx?(fileId: string): Promise<Uint8Array>;
 }
 
 interface DocumentInspector {
@@ -170,7 +179,7 @@ interface RunPage {
   id: string;
   title: string;
   slug: string;
-  format: 'google-doc' | 'pdf';
+  format: 'google-doc' | 'pdf' | 'sheet';
 }
 
 /** What one run changed on the site, for the run's own summary (ADR-028). */
@@ -285,10 +294,18 @@ async function readOptionalFile(path: string): Promise<string | undefined> {
 }
 
 function sourceUrl(fileId: string, mimeType: string): string {
-  return mimeType === GOOGLE_DRIVE_PDF_MIME_TYPE
-    ? `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/view`
-    : `https://docs.google.com/document/d/${encodeURIComponent(fileId)}/edit`;
+  const id = encodeURIComponent(fileId);
+  if (mimeType === GOOGLE_SHEETS_MIME_TYPE) {
+    return `https://docs.google.com/spreadsheets/d/${id}/edit`;
+  }
+  return mimeType === GOOGLE_DRIVE_PDF_MIME_TYPE ||
+    spreadsheetFormat(mimeType) !== undefined
+    ? `https://drive.google.com/file/d/${id}/view`
+    : `https://docs.google.com/document/d/${id}/edit`;
 }
+
+/** The largest spreadsheet file the sync reads (ADR-046). */
+const MAX_SHEET_BYTES = 50 * 1024 * 1024;
 
 /**
  * The published PDF's file name: its title in Latin letters and digits, so a
@@ -394,6 +411,45 @@ function incompletePdf(record: SyncedDocumentRecord): IncompleteDocument[] {
     });
   }
   return missing;
+}
+
+/** The parts of a spreadsheet's page that are missing (ADR-046). */
+function incompleteSheet(record: SyncedDocumentRecord): IncompleteDocument[] {
+  if (record.exportMode !== 'sheet') {
+    return [];
+  }
+  const missing: IncompleteDocument[] = [];
+  if (record.warnings.includes('sheet:truncated')) {
+    missing.push({ reason: 'sheet-truncated', record });
+  }
+  const notShown = [
+    ...(record.warnings.includes('sheet:charts') ? ['charts'] : []),
+    ...(record.warnings.includes('sheet:images') ? ['images'] : []),
+  ];
+  if (notShown.length > 0) {
+    missing.push({
+      reason: 'sheet-not-shown',
+      detail: `It has ${notShown.join(' and ')}.`,
+      record,
+    });
+  }
+  return missing;
+}
+
+/** The spreadsheet facts a page recorded in its frontmatter, if any. */
+function recordedSheetFacts(content: string): GeneratedSheetFacts | undefined {
+  const frontmatter = extractGeneratedFrontmatter(content);
+  const sheet =
+    typeof frontmatter === 'object' && frontmatter !== null
+      ? (frontmatter as { sheet?: unknown }).sheet
+      : undefined;
+  if (typeof sheet !== 'object' || sheet === null) {
+    return undefined;
+  }
+  const { sheets, formulas } = sheet as Record<string, unknown>;
+  return typeof sheets === 'number' && typeof formulas === 'number'
+    ? { sheets, formulas }
+    : undefined;
 }
 
 /** The PDF facts a page recorded in its frontmatter, when it has them. */
@@ -771,8 +827,10 @@ interface ConvertedDocument {
   warnings: string[];
   titleFacts: NonNullable<GoogleDocumentStructure['titleFacts']> | null;
   pdf?: GeneratedPdfFacts;
+  sheet?: GeneratedSheetFacts;
   sourceChecksum?: string;
   pdfTextVersion?: number;
+  sheetVersion?: number;
   undescribedImages?: number;
   croppedImages?: number;
   imageVersion?: number;
@@ -861,6 +919,7 @@ export async function runBasicMarkdownSync(
     throw new InventoryGraphError([targetedIssue]);
   }
   const exportHtmlZip = exporter.exportHtmlZip?.bind(exporter);
+  const exportXlsx = exporter.exportXlsx?.bind(exporter);
   const downloadFile = remember((fileId) =>
     downloader.downloadFile(fileId, MAX_READ_BYTES),
   );
@@ -874,6 +933,7 @@ export async function runBasicMarkdownSync(
       exporter: {
         exportMarkdown: remember((fileId) => exporter.exportMarkdown(fileId)),
         ...(exportHtmlZip ? { exportHtmlZip: remember(exportHtmlZip) } : {}),
+        ...(exportXlsx ? { exportXlsx: remember(exportXlsx) } : {}),
       },
       inspector: {
         inspectDocument: remember((fileId) =>
@@ -1204,6 +1264,9 @@ async function synchronize(
                 // A PDF read by an earlier text extraction is read again.
                 (selected.item.mimeType === GOOGLE_DRIVE_PDF_MIME_TYPE &&
                   existingRecord.pdfTextVersion !== PDF_TEXT_VERSION) ||
+                // A spreadsheet written by an earlier conversion (ADR-046).
+                (spreadsheetFormat(selected.item.mimeType) !== undefined &&
+                  existingRecord.sheetVersion !== SHEET_VERSION) ||
                 // Images converted before they were counted, or cropped
                 // before crops were applied (ADR-031).
                 (existingRecord.exportMode === 'hybrid' &&
@@ -1409,13 +1472,111 @@ async function synchronize(
     };
   };
 
+  /**
+   * A spreadsheet's page (ADR-046): its visible sheets as tables, and how its
+   * formulas calculate. A Google Sheet is exported as a workbook; an uploaded
+   * file Drive reports unchanged is not downloaded again, and its page is
+   * reused with its links brought up to date.
+   */
+  const convertSheet = async (
+    planned: PlannedDocument,
+    title: string,
+  ): Promise<ConvertedDocument> => {
+    const { item } = planned.selected;
+    const format = spreadsheetFormat(item.mimeType);
+    const sourceChecksum =
+      format !== 'google-sheets' && item.sha256Checksum
+        ? `sha256:${item.sha256Checksum}`
+        : undefined;
+    const common = {
+      removedTitleHeading: false,
+      assets: [],
+      exportMode: 'sheet' as const,
+      titleFacts: null,
+      ...(sourceChecksum ? { sourceChecksum } : {}),
+      sheetVersion: SHEET_VERSION,
+    };
+    const linked = (body: string, warnings: readonly string[]) => {
+      const rewritten = rewriteInternalGoogleLinks(body, linkTargets, {
+        compactTables: true,
+      });
+      return {
+        body: rewritten.body,
+        warnings: [...new Set([...warnings, ...rewritten.warnings])].sort(),
+      };
+    };
+
+    const recorded = planned.existingRecord;
+    if (
+      recorded?.exportMode === 'sheet' &&
+      sourceChecksum !== undefined &&
+      recorded.sourceChecksum === sourceChecksum &&
+      recorded.sheetVersion === SHEET_VERSION &&
+      !planned.existingOutputInvalid &&
+      planned.existingContent !== undefined
+    ) {
+      const facts = recordedSheetFacts(planned.existingContent);
+      const body = extractGeneratedDocumentBody(
+        planned.existingContent,
+        markdownHeader,
+      );
+      if (facts && body !== undefined) {
+        return {
+          ...common,
+          ...linked(
+            body,
+            recorded.warnings.filter((warning) => warning.startsWith('sheet:')),
+          ),
+          ...(recorded.description
+            ? { description: recorded.description }
+            : {}),
+          sheet: facts,
+        };
+      }
+    }
+
+    let bytes: Uint8Array;
+    if (format === 'google-sheets') {
+      if (!exporter.exportXlsx) {
+        throw new Error('Spreadsheet export is unavailable.');
+      }
+      bytes = await exporter.exportXlsx(item.id);
+    } else {
+      const size = item.size === undefined ? undefined : Number(item.size);
+      if (size !== undefined && size > MAX_SHEET_BYTES) {
+        throw new UnsafeAssetError(
+          'The spreadsheet is larger than the 50 MB the site reads.',
+        );
+      }
+      bytes = await downloader.downloadFile(item.id);
+      if (bytes.byteLength > MAX_SHEET_BYTES) {
+        throw new UnsafeAssetError(
+          'The spreadsheet is larger than the 50 MB the site reads.',
+        );
+      }
+    }
+    const workbook =
+      format === 'csv' || format === 'tsv'
+        ? readDelimited(bytes, title, format === 'tsv')
+        : readXlsx(bytes);
+    const markdown = workbookToMarkdown(workbook, title);
+    return {
+      ...common,
+      ...linked(markdown.body, markdown.warnings),
+      ...(markdown.description ? { description: markdown.description } : {}),
+      sheet: { sheets: markdown.sheets, formulas: markdown.formulas },
+    };
+  };
+
   const exportDocument = async (planned: PlannedDocument) => {
     const { item } = planned.selected;
     const title = parseOrderedLabel(documentName(item)).label;
     const converted =
       item.mimeType === GOOGLE_DRIVE_PDF_MIME_TYPE
         ? await convertPdf(planned, title)
-        : await convertGoogleDocument(planned, title);
+        : spreadsheetFormat(item.mimeType) !== undefined
+          ? await convertSheet(planned, title)
+          : await convertGoogleDocument(planned, title);
     const folderPath = planned.selected.path
       .slice(1, -1)
       .map((segment) => parseOrderedLabel(segment).label);
@@ -1433,7 +1594,8 @@ async function synchronize(
       planned.existingRecord.shortId === planned.shortId &&
       planned.existingRecord.contentHash === contentHash &&
       planned.existingRecord.sourceChecksum === converted.sourceChecksum &&
-      planned.existingRecord.pdfTextVersion === converted.pdfTextVersion
+      planned.existingRecord.pdfTextVersion === converted.pdfTextVersion &&
+      planned.existingRecord.sheetVersion === converted.sheetVersion
     ) {
       return {
         fileId: item.id,
@@ -1461,6 +1623,7 @@ async function synchronize(
         normalizedBody: converted.body,
         contentHash,
         ...(converted.pdf ? { pdf: converted.pdf } : {}),
+        ...(converted.sheet ? { sheet: converted.sheet } : {}),
       },
       markdownHeader,
     );
@@ -1487,6 +1650,9 @@ async function synchronize(
         : {}),
       ...(converted.pdfTextVersion
         ? { pdfTextVersion: converted.pdfTextVersion }
+        : {}),
+      ...(converted.sheetVersion
+        ? { sheetVersion: converted.sheetVersion }
         : {}),
       ...(converted.undescribedImages === undefined
         ? {}
@@ -1658,7 +1824,12 @@ async function synchronize(
     id: record.googleFileId,
     title: record.displayTitle,
     slug: record.stableSlug,
-    format: record.exportMode === 'pdf' ? 'pdf' : 'google-doc',
+    format:
+      record.exportMode === 'pdf'
+        ? 'pdf'
+        : record.exportMode === 'sheet'
+          ? 'sheet'
+          : 'google-doc',
   });
   const bySlug = (left: { slug: string }, right: { slug: string }) =>
     compareText(left.slug, right.slug);
@@ -1734,6 +1905,7 @@ async function synchronize(
     Object.values(candidateManifest.documents).flatMap((record) => {
       const missing: IncompleteDocument[] = [
         ...incompletePdf(record),
+        ...incompleteSheet(record),
         ...(widened.has(record.googleFileId)
           ? [{ reason: 'readers-widened' as const, record }]
           : []),
@@ -1794,6 +1966,9 @@ async function synchronize(
   const pdfs = publishedRecords.filter(
     (record) => record.exportMode === 'pdf',
   ).length;
+  const sheets = publishedRecords.filter(
+    (record) => record.exportMode === 'sheet',
+  ).length;
   const markdown = publishedRecords.filter(
     (record) => record.exportMode === 'markdown',
   ).length;
@@ -1818,10 +1993,14 @@ async function synchronize(
       incomplete: unpublished.filter((item) => item.status === 'incomplete')
         .length,
       ignored: selection.ignoredItemCount,
-      published: { googleDocs: publishedRecords.length - pdfs, pdfs },
+      published: {
+        googleDocs: publishedRecords.length - pdfs - sheets,
+        pdfs,
+        sheets,
+      },
       conversion: {
         markdown,
-        html: publishedRecords.length - pdfs - markdown,
+        html: publishedRecords.length - pdfs - sheets - markdown,
       },
       notes: notes.length,
     },
@@ -1914,10 +2093,13 @@ async function synchronize(
   const inventoryItems = new Map(
     selection.documents.map((document) => [document.item.id, document.item]),
   );
-  // A PDF has no paragraph styles to report on: the report covers Google Docs.
+  /*
+   * A PDF or a spreadsheet has no paragraph styles to report on: the report
+   * covers Google Docs.
+   */
   const titleReport = createTitleReport(
     Object.values(candidateManifest.documents)
-      .filter((record) => record.exportMode !== 'pdf')
+      .filter(isGoogleDocRecord)
       .map((record) => {
         const exported = exportedById.get(record.googleFileId);
         const recorded = recordedTitles.get(record.googleFileId);
