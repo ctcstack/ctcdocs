@@ -2,6 +2,16 @@
 
 All three packages share a version and are released together.
 
+## 0.21.2
+
+### Fixed
+
+- **The browser suite's spreadsheet test reads a real corpus.** It opens the
+  spreadsheet with the fewest table rows among those it can filter, rather
+  than the first, and audits accessibility with the first fifty rows of each
+  table left on the page: on a page of thousands of rows the audit outlasted
+  the test's thirty seconds and stopped a sync's build.
+
 ## 0.21.1
 
 ### Fixed
