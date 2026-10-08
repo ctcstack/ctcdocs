@@ -112,4 +112,45 @@ describe('published Markdown', () => {
       expect(kept).not.toContain('source_url');
     }
   });
+
+  it('writes tables without padding', () => {
+    const result = publishedMarkdownBody(
+      input('| Name | Note |\n| --- | --- |\n| A | A much longer note |\n'),
+    );
+
+    expect(result).toContain(
+      '| Name | Note |\n| - | - |\n| A | A much longer note |',
+    );
+  });
+
+  it('splits a long table into parts that repeat its header', () => {
+    const rows = Array.from(
+      { length: 120 },
+      (_, index) => `| Row ${index + 1} | ${'x'.repeat(40)} |`,
+    );
+    const result = publishedMarkdownBody(
+      input(['| Item | Detail |', '| --- | ---: |', ...rows].join('\n')),
+    );
+
+    const parts = result.split('| Item | Detail |\n| - | -: |\n');
+    // The title before the first table, then one entry per part.
+    expect(parts.length).toBeGreaterThan(3);
+    for (const part of parts.slice(1)) {
+      expect(part.length).toBeLessThan(2_200);
+    }
+    for (const row of rows) {
+      expect(result).toContain(row);
+    }
+    expect(result.indexOf('| Row 1 |')).toBeLessThan(
+      result.indexOf('| Row 120 |'),
+    );
+  });
+
+  it('keeps a table that fits whole', () => {
+    const result = publishedMarkdownBody(
+      input('| Item |\n| --- |\n| One |\n| Two |\n'),
+    );
+
+    expect(result.match(/\| Item \|/gu)).toHaveLength(1);
+  });
 });
