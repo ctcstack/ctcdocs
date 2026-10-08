@@ -23,6 +23,7 @@ import type {
 } from '../inventory/inventory-graph.js';
 import {
   isGoogleDocRecord,
+  isMediaRecord,
   type SyncedDocumentRecord,
   type SyncManifest,
 } from '../manifest.js';
@@ -51,7 +52,8 @@ export type NoteCode =
   | 'sheet-long'
   | 'image-undescribed'
   | 'image-large'
-  | 'summary-missing';
+  | 'summary-missing'
+  | 'media-undescribed';
 
 export interface NoteKind {
   code: NoteCode;
@@ -181,6 +183,13 @@ export const NOTE_KINDS: readonly NoteKind[] = [
     action: 'Add an opening sentence',
     instruction:
       "The site takes a page's summary from its first paragraph of plain text. This document has none, only headings, lists or tables, so search results, the section page and the index AI agents read show its title alone. Add a sentence under the title that says what the document is for.",
+  },
+  {
+    code: 'media-undescribed',
+    title: 'A recording has no description',
+    action: 'Describe it in Drive',
+    instruction:
+      "The site does not watch or listen to a recording: its page shows the recording's name and the description written in Drive, and that is all search and AI agents know of it. In Drive, right-click the file, choose File information → Details and fill in its description: what it shows, for whom, and the steps or topics in order. Rename it too if its name is what the recorder chose. The page changes on the next sync.",
   },
   {
     code: 'duplicate-order',
@@ -414,6 +423,10 @@ export function createNotes(
      */
     if (isGoogleDocRecord(record) && !record.description) {
       notes.push(noteFor(selected, 'summary-missing', record.stableSlug));
+    }
+    // A recording's summary is the description its editor writes in Drive.
+    if (isMediaRecord(record) && !record.description) {
+      notes.push(noteFor(selected, 'media-undescribed', record.stableSlug));
     }
   }
 

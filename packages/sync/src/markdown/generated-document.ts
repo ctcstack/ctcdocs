@@ -19,6 +19,19 @@ export interface GeneratedDocumentInput {
   pdf?: GeneratedPdfFacts;
   /** Present for a page that publishes a spreadsheet (ADR-046). */
   sheet?: GeneratedSheetFacts;
+  /** Present for the page of a video or audio file (ADR-047). */
+  media?: GeneratedMediaFacts;
+}
+
+/**
+ * What the page of a recording says about it, each fact `null` when Drive
+ * does not report it.
+ */
+export interface GeneratedMediaFacts {
+  kind: 'video' | 'audio';
+  seconds: number | null;
+  width: number | null;
+  height: number | null;
 }
 
 /** What the page of a spreadsheet says about it. */
@@ -130,7 +143,9 @@ export function generateMarkdownDocument(
         ? 'drive-pdf'
         : input.sheet
           ? 'drive-sheet'
-          : 'google-doc',
+          : input.media
+            ? 'drive-media'
+            : 'google-doc',
       googleFileId: input.googleFileId,
       googleModifiedTime: input.googleModifiedTime,
       syncedAt: input.syncedAt,
@@ -149,6 +164,8 @@ export function generateMarkdownDocument(
             sheet: input.sheet,
           }
         : {}),
+      // A recording's page is a few paragraphs, with no headings to list.
+      ...(input.media ? { tableOfContents: false, media: input.media } : {}),
     },
     {
       defaultStringType: 'QUOTE_DOUBLE',

@@ -1,6 +1,7 @@
 import {
   documentName,
   GOOGLE_DRIVE_PDF_MIME_TYPE,
+  mediaKind,
   spreadsheetFormat,
 } from '../google/drive-types.js';
 import type {
@@ -20,8 +21,8 @@ interface SidebarLink {
   label: string;
   slug: string;
   /**
-   * Marks a page that presents a PDF (ADR-027) or a spreadsheet (ADR-046)
-   * rather than a document.
+   * Marks a page that presents a PDF (ADR-027), a spreadsheet (ADR-046) or a
+   * recording (ADR-047) rather than a document.
    */
   badge?: string;
   /**
@@ -60,7 +61,11 @@ function documentLink(
       ? { badge: 'PDF' }
       : spreadsheetFormat(document.item.mimeType) !== undefined
         ? { badge: 'Sheet' }
-        : {}),
+        : mediaKind(document.item.mimeType) === 'video'
+          ? { badge: 'Video' }
+          : mediaKind(document.item.mimeType) === 'audio'
+            ? { badge: 'Audio' }
+            : {}),
   };
 }
 

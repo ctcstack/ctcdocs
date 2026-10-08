@@ -34,7 +34,7 @@ function syncReport(overrides: Partial<SyncReport> = {}): SyncReport {
       outOfDate: 9,
       incomplete: 11,
       ignored: 10,
-      published: { googleDocs: 40, pdfs: 2, sheets: 1 },
+      published: { googleDocs: 40, pdfs: 2, sheets: 1, media: 3 },
       conversion: { markdown: 25, html: 15 },
       notes: 0,
     },
@@ -124,7 +124,7 @@ describe('renderSiteSummary', () => {
     const summary = renderSiteSummary(syncReport(), pageUrl);
 
     expect(summary).toContain(
-      '**On the site: 43 pages** — 40 Google Docs, 2 PDFs, 1 spreadsheet. **Not on the site: 8** · out of date: 9 · incomplete: 11 · notes: 0.',
+      '**On the site: 46 pages** — 40 Google Docs, 2 PDFs, 1 spreadsheet, 3 recordings. **Not on the site: 8** · out of date: 9 · incomplete: 11 · notes: 0.',
     );
     expect(summary).toContain(`[content health page](${pageUrl})`);
     expect(summary).toContain(
@@ -145,10 +145,10 @@ describe('renderSiteSummary', () => {
           { ...file, id: 'file-three', folderPath: [] },
           {
             ...file,
-            id: 'video',
-            name: 'Demo.mp4',
-            type: 'Video (MP4)',
-            reason: 'media-file',
+            id: 'image',
+            name: 'Map.png',
+            type: 'Image (PNG)',
+            reason: 'image-file',
           },
         ],
       }),
@@ -159,12 +159,12 @@ describe('renderSiteSummary', () => {
       '| Spreadsheets in an older format | 3 | Team (2), General (1) | Save as Google Sheets |',
     );
     expect(summary).toContain(
-      '| Video and audio | 1 | Team (1) | Link from a document |',
+      '| Images | 1 | Team (1) | Insert into a document |',
     );
-    // Spreadsheets come after video in the catalog, and so in the summary.
+    // Spreadsheets come after images in the catalog, and so in the summary.
     expect(
       summary.indexOf('<b>Spreadsheets in an older format</b> — 3'),
-    ).toBeGreaterThan(summary.indexOf('| Video and audio |'));
+    ).toBeGreaterThan(summary.indexOf('| Images |'));
     expect(summary).toContain(
       '| Team › Finance | [Budget\\.xls](https://drive.google.com/open?id=file-one) | Excel 97–2003 workbook | Not on the site | Editor One |',
     );
