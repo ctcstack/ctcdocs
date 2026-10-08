@@ -103,6 +103,7 @@ const PRIORITY_BY_CODE: Readonly<Record<string, Priority>> = {
   'image-file': 'fix-next',
   'diagram-file': 'fix-next',
   'spreadsheet-file': 'fix-next',
+  // Retired by ADR-047; an earlier report may still name it.
   'media-file': 'fix-next',
   'unsupported-type': 'fix-next',
   shortcut: 'fix-next',
@@ -120,6 +121,7 @@ const PRIORITY_BY_CODE: Readonly<Record<string, Priority>> = {
   // Easier to find and to understand, for people, search and agents.
   'image-undescribed': 'improve',
   'summary-missing': 'improve',
+  'media-undescribed': 'improve',
   'image-large': 'improve',
   'link-outside-site': 'improve',
   'heading-link-shortened': 'improve',
@@ -409,7 +411,8 @@ export function buildHealthView(
   const published = state
     ? state.summary.published.googleDocs +
       state.summary.published.pdfs +
-      (state.summary.published.sheets ?? 0)
+      (state.summary.published.sheets ?? 0) +
+      (state.summary.published.media ?? 0)
     : undefined;
   /*
    * A file the site shows in an earlier version, or in part, is among the

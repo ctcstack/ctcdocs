@@ -234,7 +234,7 @@ function server(context: ToolContext): McpServer {
     'fetch',
     {
       title: `Read a document from ${site}`,
-      description: `Read one ${site} document by the id search, browse or recent returned: its link to cite; in its metadata the day it last changed, the folders it sits in, the Google Doc, PDF or spreadsheet it is published from (format, and a PDF's pages), its length in characters and whether the text was cut; then its whole Markdown text.`,
+      description: `Read one ${site} document by the id search, browse or recent returned: its link to cite; in its metadata the day it last changed, the folders it sits in, the Google Doc, PDF, spreadsheet, video or audio file it is published from (format, and a PDF's pages), its length in characters and whether the text was cut; then its whole Markdown text.`,
       inputSchema: z.object({
         id: z.string().describe('A document id from search'),
       }),

@@ -82,6 +82,10 @@ const jsonLd =
   )
 }
 {
+  /* Whether a recording is a video or audio, which assistants are told (ADR-047). */
+}
+{data.media && <meta name="ctcdocs:media" content={data.media.kind} />}
+{
   markdownPath && (
     <link rel="alternate" type="text/markdown" href={markdownPath} />
   )

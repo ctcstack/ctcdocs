@@ -118,7 +118,8 @@ export async function loadCorpus(): Promise<Corpus> {
     (doc) =>
       doc.data.sourceType === 'google-doc' ||
       doc.data.sourceType === 'drive-pdf' ||
-      doc.data.sourceType === 'drive-sheet',
+      doc.data.sourceType === 'drive-sheet' ||
+      doc.data.sourceType === 'drive-media',
   );
   const sections = await loadSectionHrefs();
 

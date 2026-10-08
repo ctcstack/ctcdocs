@@ -32,6 +32,8 @@ export interface BuiltPage {
   readonly source: string | undefined;
   /** `ctcdocs:pdf-pages` from the head, when a PDF's page carries it. */
   readonly pdfPages?: number | undefined;
+  /** `ctcdocs:media` from the head, on a recording's page (ADR-047). */
+  readonly media?: 'video' | 'audio' | undefined;
   /** A meta refresh page Astro writes for a redirect. */
   readonly redirect: boolean;
   /** Whether the page has a `data-pagefind-body` region. */
@@ -66,7 +68,12 @@ export interface AccessMap {
 
 const OPTIMIZED_IMAGE = /^\/_astro\/.+\.(?:avif|gif|jpe?g|png|svg|webp)$/iu;
 const PLATFORM_ASSET = /^\/_astro\/.+\.(?:css|js|mjs|woff2?|ttf|otf)$/iu;
-const DOCUMENT_SOURCES = new Set(['google-doc', 'drive-pdf', 'drive-sheet']);
+const DOCUMENT_SOURCES = new Set([
+  'google-doc',
+  'drive-pdf',
+  'drive-sheet',
+  'drive-media',
+]);
 
 /** The canonical site path of a file written at `relativePath` under `dist`. */
 export function canonicalSitePath(relativePath: string): string {

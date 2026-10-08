@@ -50,6 +50,8 @@ export interface IndexedDocument {
    * A published spreadsheet (ADR-046), which the link text names the same way.
    */
   sheet?: boolean;
+  /** A recording's page (ADR-047), which the link text names as video or audio. */
+  media?: 'video' | 'audio';
   /**
    * The document's access class (ADR-039). An index describes only documents
    * of its own class and lists the rest by title and address; without one, a
@@ -69,6 +71,7 @@ interface AgentIndexEntry {
   description: string | undefined;
   pdf: boolean;
   sheet: boolean;
+  media: 'video' | 'audio' | undefined;
   classId: string;
 }
 
@@ -143,6 +146,7 @@ export function buildAgentIndex(
       description: oneLine(document.description),
       pdf: document.pdf,
       sheet: document.sheet ?? false,
+      media: document.media,
       classId: document.classId ?? MEMBERS_CLASS,
     };
   }
@@ -212,6 +216,7 @@ export function buildAgentIndex(
       description: oneLine(document.description),
       pdf: document.pdf,
       sheet: document.sheet ?? false,
+      media: document.media,
       classId: document.classId ?? MEMBERS_CLASS,
     }))
     .sort(
@@ -237,7 +242,13 @@ export function buildAgentIndex(
  */
 function documentLine(document: AgentIndexEntry, indexClass: string): string {
   const title = inlineMarkdown(document.title);
-  const kind = document.pdf ? ' (PDF)' : document.sheet ? ' (spreadsheet)' : '';
+  const kind = document.pdf
+    ? ' (PDF)'
+    : document.sheet
+      ? ' (spreadsheet)'
+      : document.media
+        ? ` (${document.media})`
+        : '';
   const link = `- [${title}${kind}](${markdownProjectionPath(document.slug)})`;
   return document.description && document.classId === indexClass
     ? `${link}: ${inlineMarkdown(document.description)}`

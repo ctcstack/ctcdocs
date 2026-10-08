@@ -127,10 +127,16 @@ export function readBuiltPage(path: string, html: string): BuiltPage {
     path,
     source: $('meta[name="ctcdocs:source"]').attr('content'),
     pdfPages: pageCount($('meta[name="ctcdocs:pdf-pages"]').attr('content')),
+    media: mediaKind($('meta[name="ctcdocs:media"]').attr('content')),
     redirect: $('meta[http-equiv="refresh" i]').length > 0,
     searchable: $('[data-pagefind-body]').length > 0,
     images: [...images].sort(),
   };
+}
+
+/** A recording's kind from its page's head (ADR-047). */
+function mediaKind(content: string | undefined): 'video' | 'audio' | undefined {
+  return content === 'video' || content === 'audio' ? content : undefined;
 }
 
 /** A PDF's page count from its page's head, when it is a whole number. */
@@ -174,7 +180,12 @@ async function writeBundle(
   return written;
 }
 
-const DOCUMENT_SOURCES = new Set(['google-doc', 'drive-pdf', 'drive-sheet']);
+const DOCUMENT_SOURCES = new Set([
+  'google-doc',
+  'drive-pdf',
+  'drive-sheet',
+  'drive-media',
+]);
 
 /**
  * Reads every text file the build wrote, with the bodies of its documents and

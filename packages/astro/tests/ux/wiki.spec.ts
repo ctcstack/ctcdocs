@@ -25,6 +25,7 @@ import {
   documentWithPermanentLink,
   documentWithTable,
   folderPages,
+  mediaDocuments,
   pdfDocument,
   sectionWithSubfolder,
   sheetDocuments,
@@ -1073,5 +1074,34 @@ test('a spreadsheet has a page whose long tables filter and sort', async ({
       row.remove();
     }
   });
+  await expectNoAccessibilityViolations(page);
+});
+
+test('a recording has a page that links to where it plays', async ({
+  page,
+}) => {
+  const recordings = mediaDocuments();
+  test.skip(recordings.length === 0, 'The corpus has no video or audio.');
+
+  for (const recording of recordings) {
+    await page.goto(`/${recording.slug}/`);
+    await expect(
+      page.getByRole('heading', { level: 1, name: recording.title }),
+    ).toBeVisible();
+    const verb = recording.format === 'audio' ? 'Listen' : 'Watch';
+    await expect(
+      page.getByRole('link', {
+        name: new RegExp(`^${verb} in Google (?:Drive|Vids)$`, 'u'),
+      }),
+    ).toHaveAttribute(
+      'href',
+      /^https:\/\/(?:drive\.google\.com\/file\/d\/|docs\.google\.com\/videos\/d\/)/u,
+    );
+    // The site does not host or embed a recording.
+    await expect(page.locator('video, audio, iframe')).toHaveCount(0);
+    await expect(
+      page.getByText(/plays in Google (?:Drive|Vids)\.$/u).first(),
+    ).toBeVisible();
+  }
   await expectNoAccessibilityViolations(page);
 });

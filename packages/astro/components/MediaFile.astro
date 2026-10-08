@@ -1,0 +1,98 @@
+---
+/**
+ * The recording a video or audio file's page describes (ADR-047).
+ *
+ * The site does not host or play recordings: this links to the file where it
+ * plays, in Google Drive or Google Vids, whose own sharing decides who may
+ * play it. The page's text below says what Drive knows about it.
+ */
+interface Props {
+  kind: 'video' | 'audio';
+  seconds: number | null;
+  sourceUrl: string;
+}
+
+const { kind, seconds, sourceUrl } = Astro.props;
+const vids = sourceUrl.startsWith('https://docs.google.com/videos/');
+const action = `${kind === 'audio' ? 'Listen' : 'Watch'} in ${vids ? 'Google Vids' : 'Google Drive'}`;
+
+function formatDuration(value: number): string {
+  const minutes = Math.floor(value / 60);
+  const rest = String(value % 60).padStart(2, '0');
+  return minutes >= 60
+    ? `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}:${rest}`
+    : `${minutes}:${rest}`;
+}
+
+const facts = [
+  kind === 'audio' ? 'Audio' : 'Video',
+  ...(seconds === null ? [] : [formatDuration(seconds)]),
+].join(' · ');
+---
+
+<section
+  class="media-file"
+  aria-label={kind === 'audio' ? 'Audio recording' : 'Video'}
+  data-ctcdocs-unindexed="media-file"
+  data-pagefind-ignore
+>
+  <svg
+    aria-hidden="true"
+    class="media-icon"
+    fill="none"
+    stroke="currentColor"
+    stroke-linejoin="round"
+    stroke-width="1.5"
+    viewBox="0 0 24 24"
+  >
+    <circle cx="12" cy="12" r="10"></circle>
+    <path d="M10 8.5v7l6-3.5z" fill="currentColor"></path>
+  </svg>
+  <p class="media-body">
+    <a
+      class="media-action"
+      href={sourceUrl}
+      rel="noopener noreferrer"
+      target="_blank">{action}</a
+    >
+    <span class="media-facts">{facts}</span>
+  </p>
+</section>
+
+<style>
+  @layer starlight.components {
+    .media-file {
+      align-items: center;
+      border: 1px solid var(--kb-hairline);
+      border-radius: 0.5rem;
+      display: flex;
+      gap: 1rem;
+      margin-block: 1rem 1.5rem;
+      padding: 1rem 1.25rem;
+    }
+
+    .media-icon {
+      color: var(--kb-text-accent);
+      flex: none;
+      height: 2.5rem;
+      width: 2.5rem;
+    }
+
+    .media-body {
+      align-items: baseline;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem 1.25rem;
+      margin: 0;
+    }
+
+    .media-action {
+      font-weight: 600;
+    }
+
+    .media-facts {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-sm);
+    }
+  }
+</style>

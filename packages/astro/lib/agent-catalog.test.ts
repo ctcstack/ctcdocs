@@ -207,6 +207,26 @@ describe('agent catalog', () => {
     ]);
   });
 
+  it('says whether a recording is a video or audio', async () => {
+    const result = await buildAgentCatalog({
+      documents: [document('handbook', { shortId: 'aaaaaa' })],
+      folders: FOLDERS,
+      files: new Map([['/handbook/index.md', 'members']]),
+      pages: [
+        {
+          path: '/handbook/',
+          source: 'drive-media',
+          media: 'audio',
+          redirect: false,
+          searchable: true,
+          images: [],
+        },
+      ],
+      readMarkdown: (path) => Promise.resolve(PROJECTIONS[path]),
+    });
+    expect(result.documents[0]?.format).toBe('audio');
+  });
+
   it('falls back to the slug for a title and to null for a time or a source', async () => {
     const result = await catalog(
       [document('handbook', {}, ['title', 'modified', 'source'])],

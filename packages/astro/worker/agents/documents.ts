@@ -787,9 +787,10 @@ export interface FetchedDocument {
   readonly url: string;
   /**
    * The day it last changed, the folders it sits in, the source it is
-   * published from, whether that is a Google Doc, a PDF or a spreadsheet and
-   * a PDF's pages, its whole length in characters, and whether its text was
-   * cut (ADR-042, ADR-044). Before the text, so an assistant reads it first.
+   * published from, whether that is a Google Doc, a PDF, a spreadsheet, a
+   * video or audio, and a PDF's pages, its whole length in characters, and
+   * whether its text was cut (ADR-042, ADR-044, ADR-047). Before the text, so
+   * an assistant reads it first.
    */
   readonly metadata: Readonly<
     Record<string, string | number | boolean | readonly string[]>

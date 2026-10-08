@@ -46,22 +46,26 @@ function formatUtcDateTime(value: string): string {
 
 const isPdf = sourceType === 'drive-pdf';
 const isSheet = sourceType === 'drive-sheet';
+const isMedia = sourceType === 'drive-media';
 const showMetadata =
-  (sourceType === 'google-doc' || isPdf || isSheet) &&
+  (sourceType === 'google-doc' || isPdf || isSheet || isMedia) &&
   sourceUrl &&
   googleModifiedTime &&
   syncedAt;
 const showSectionLink = sourceType === 'section-index' && permanentPath;
 /*
- * A Google Sheet opens in Google Sheets; a PDF or an uploaded spreadsheet is a
- * file Drive stores (ADR-046).
+ * A Google Sheet opens in Google Sheets and a Google Vids video in Google Vids;
+ * a PDF, an uploaded spreadsheet or a recording is a file Drive stores
+ * (ADR-046, ADR-047).
  */
 const sourceLabel =
-  !isPdf && !isSheet
+  !isPdf && !isSheet && !isMedia
     ? 'Open in Google Docs'
     : sourceUrl?.startsWith('https://docs.google.com/spreadsheets/')
       ? 'Open in Google Sheets'
-      : 'Open in Google Drive';
+      : sourceUrl?.startsWith('https://docs.google.com/videos/')
+        ? 'Open in Google Vids'
+        : 'Open in Google Drive';
 ---
 
 {
