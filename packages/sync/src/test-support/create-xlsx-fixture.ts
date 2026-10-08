@@ -71,7 +71,7 @@ interface XlsxFixtureCell {
   /** Shares the formula of group `index`; the group's first cell names `ref`. */
   shared?: { index: number; ref?: string };
   /** The number format, by its code. */
-  format?: string;
+  format?: string | number;
   /** An error value, `#DIV/0!`. */
   error?: string;
   /** An external link. */
@@ -83,6 +83,11 @@ interface XlsxFixtureSheet {
   /** Cells by address, `B5`. */
   cells?: Readonly<Record<string, XlsxFixtureValue | XlsxFixtureCell>>;
   hidden?: boolean;
+  /** Rows, one-based, and columns, by letter, hidden in the sheet. */
+  hiddenRows?: readonly number[];
+  hiddenColumns?: readonly string[];
+  /** Links over a range, `A1:B2`, to their address. */
+  linkRanges?: Readonly<Record<string, string>>;
   /** A sheet that is only a chart. */
   chartSheet?: boolean;
   merges?: readonly string[];
@@ -132,8 +137,9 @@ export function createXlsxFixture(fixture: XlsxFixture): Uint8Array {
     strings.push(value);
     return strings.length - 1;
   };
-  const formats: string[] = [];
-  const styleOf = (code: string | undefined) => {
+  /** A format code, or the ID of a format Excel builds in. */
+  const formats: Array<string | number> = [];
+  const styleOf = (code: string | number | undefined) => {
     if (code === undefined) {
       return 0;
     }
@@ -210,6 +216,9 @@ export function createXlsxFixture(fixture: XlsxFixture): Uint8Array {
         links.push({ address, url: cell.link });
       }
     }
+    for (const [address, url] of Object.entries(sheet.linkRanges ?? {})) {
+      links.push({ address, url });
+    }
 
     const sheetRelationships: string[] = links.map(
       (link, linkIndex) =>
@@ -239,9 +248,20 @@ export function createXlsxFixture(fixture: XlsxFixture): Uint8Array {
       });
     }
 
+    const columns = sheet.hiddenColumns?.length
+      ? `<cols>${sheet.hiddenColumns
+          .map((letters) => {
+            const index = columnNumber(letters);
+            return `<col min="${index}" max="${index}" hidden="1"/>`;
+          })
+          .join('')}</cols>`
+      : '';
     const sheetData = [...rows]
       .sort(([left], [right]) => left - right)
-      .map(([row, cells]) => `<row r="${row}">${cells.join('')}</row>`)
+      .map(
+        ([row, cells]) =>
+          `<row r="${row}"${sheet.hiddenRows?.includes(row) ? ' hidden="1"' : ''}>${cells.join('')}</row>`,
+      )
       .join('');
     const merges = sheet.merges?.length
       ? `<mergeCells count="${sheet.merges.length}">${sheet.merges.map((ref) => `<mergeCell ref="${ref}"/>`).join('')}</mergeCells>`
@@ -251,7 +271,7 @@ export function createXlsxFixture(fixture: XlsxFixture): Uint8Array {
       : '';
     entries.push({
       path: `xl/worksheets/sheet${index + 1}.xml`,
-      bytes: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetData>${sheetData}</sheetData>${merges}${hyperlinks}${drawing}</worksheet>`,
+      bytes: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${columns}<sheetData>${sheetData}</sheetData>${merges}${hyperlinks}${drawing}</worksheet>`,
     });
     if (sheetRelationships.length > 0) {
       entries.push({
@@ -287,7 +307,7 @@ export function createXlsxFixture(fixture: XlsxFixture): Uint8Array {
     },
     {
       path: 'xl/styles.xml',
-      bytes: `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${formats.length ? `<numFmts count="${formats.length}">${formats.map((code, formatIndex) => `<numFmt numFmtId="${164 + formatIndex}" formatCode="${escapeXml(code)}"/>`).join('')}</numFmts>` : ''}<cellXfs count="${formats.length + 1}"><xf numFmtId="0"/>${formats.map((_, formatIndex) => `<xf numFmtId="${164 + formatIndex}" applyNumberFormat="1"/>`).join('')}</cellXfs></styleSheet>`,
+      bytes: `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${formats.some((code) => typeof code === 'string') ? `<numFmts>${formats.map((code, formatIndex) => (typeof code === 'string' ? `<numFmt numFmtId="${164 + formatIndex}" formatCode="${escapeXml(code)}"/>` : '')).join('')}</numFmts>` : ''}<cellXfs count="${formats.length + 1}"><xf numFmtId="0"/>${formats.map((code, formatIndex) => `<xf numFmtId="${typeof code === 'number' ? code : 164 + formatIndex}" applyNumberFormat="1"/>`).join('')}</cellXfs></styleSheet>`,
     },
   );
   return storedZip(

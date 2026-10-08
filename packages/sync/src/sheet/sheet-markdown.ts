@@ -28,6 +28,7 @@ import { unified } from 'unified';
 
 import { truncateDescription } from '../markdown/normalize-markdown.js';
 import {
+  formulaIdentifiers,
   formulaReferences,
   formulaShape,
   rangeAddress,
@@ -54,6 +55,8 @@ export const SHEET_VERSION = 1;
 const MAX_FORMULAS = 200;
 const MAX_INPUTS = 100;
 const MAX_RESULTS = 50;
+/** What a formula on the page names a hidden sheet. */
+const HIDDEN_SHEET = '[hidden sheet]';
 /** The longest formula a page quotes whole. */
 const MAX_FORMULA_CHARACTERS = 500;
 
@@ -276,19 +279,34 @@ interface ReferenceIndex {
   ranges: Map<string, CellRange[]>;
 }
 
-function namesUsed(
-  formula: string,
-  workbook: WorkbookData,
-): WorkbookData['names'] {
-  return workbook.names.filter((name) =>
-    new RegExp(
-      `(?<![\\p{L}\\p{N}_.])${name.name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}(?![\\p{L}\\p{N}_(])`,
-      'iu',
-    ).test(formula),
+/** The workbook's defined names, by the case-insensitive key Excel uses. */
+type NameTable = ReadonlyMap<string, WorkbookData['names'][number]>;
+
+function nameTable(workbook: WorkbookData): NameTable {
+  return new Map(
+    workbook.names.map((name) => [name.name.toLocaleLowerCase('en'), name]),
   );
 }
 
-function indexReferences(workbook: WorkbookData): ReferenceIndex {
+/** The defined names a formula uses, each once, in the order it uses them. */
+function namesUsed(formula: string, names: NameTable): WorkbookData['names'] {
+  if (names.size === 0) {
+    return [];
+  }
+  const used = new Set<WorkbookData['names'][number]>();
+  for (const word of formulaIdentifiers(formula)) {
+    const name = names.get(word.toLocaleLowerCase('en'));
+    if (name) {
+      used.add(name);
+    }
+  }
+  return [...used];
+}
+
+function indexReferences(
+  workbook: WorkbookData,
+  names: NameTable,
+): ReferenceIndex {
   const single = new Map<string, Set<number>>();
   const ranges = new Map<string, Map<string, CellRange>>();
   const add = (sheet: string, range: CellRange) => {
@@ -312,7 +330,7 @@ function indexReferences(workbook: WorkbookData): ReferenceIndex {
           add(reference.sheet ?? sheet.name, reference.range);
         }
       }
-      for (const name of namesUsed(cell.formula, workbook)) {
+      for (const name of namesUsed(cell.formula, names)) {
         add(name.sheet, name.range);
       }
     }
@@ -423,10 +441,13 @@ interface Namer {
   range(sheet: string, range: CellRange): string | undefined;
   /** The defined names a formula uses, each with the cells it stands for. */
   namesIn(formula: string, sheet: string): Array<[string, string]>;
+  /** The sheets the workbook hides, which the page never names. */
+  hiddenSheets: ReadonlySet<string>;
 }
 
 function createNamer(
   workbook: WorkbookData,
+  names: NameTable,
   labels: ReadonlyMap<string, ReadonlyMap<number, CellLabel>>,
 ): Namer {
   const defined = new Map(
@@ -438,6 +459,7 @@ function createNamer(
   const label = (sheet: string, row: number, column: number) =>
     labels.get(sheet)?.get(cellKey(row, column));
   return {
+    hiddenSheets: new Set(workbook.hiddenSheets),
     cell(sheet, row, column) {
       const name = defined.get(
         `${sheet}!${rangeAddress({ top: row, left: column, bottom: row, right: column })}`,
@@ -455,7 +477,7 @@ function createNamer(
       return label(sheet, row, column)?.[part];
     },
     namesIn(formula, sheet) {
-      return namesUsed(formula, workbook).map((name) => [
+      return namesUsed(formula, names).map((name) => [
         name.name,
         `${name.sheet === sheet ? '' : `${name.sheet} › `}${rangeAddress(name.range)}`,
       ]);
@@ -476,8 +498,26 @@ function createNamer(
   };
 }
 
-function quoteFormula(formula: string): string {
-  const quoted = `=${formula}`;
+/**
+ * A formula as the page quotes it: with `=`, cut when very long, and with the
+ * name of any hidden sheet it refers to replaced, since hiding a sheet keeps
+ * it off the site.
+ */
+function quoteFormula(formula: string, hidden: ReadonlySet<string>): string {
+  let shown = formula;
+  if (hidden.size > 0) {
+    shown = '';
+    let position = 0;
+    for (const reference of formulaReferences(formula)) {
+      if (reference.sheet === undefined || !hidden.has(reference.sheet)) {
+        continue;
+      }
+      shown += `${formula.slice(position, reference.start)}${HIDDEN_SHEET}!`;
+      position = reference.start + reference.prefix.length;
+    }
+    shown += formula.slice(position);
+  }
+  const quoted = `=${shown}`;
   return quoted.length > MAX_FORMULA_CHARACTERS
     ? `${quoted.slice(0, MAX_FORMULA_CHARACTERS - 1)}…`
     : quoted;
@@ -554,6 +594,12 @@ function formulaItem(
   const label = groupLabel(group, sheet, namer);
   const named = new Map<string, string>();
   for (const reference of formulaReferences(formula)) {
+    if (
+      reference.sheet !== undefined &&
+      namer.hiddenSheets.has(reference.sheet)
+    ) {
+      continue;
+    }
     const written = formula.slice(reference.start, reference.end);
     const referenceName = referenceLabel(reference, group, sheet, namer);
     if (referenceName !== undefined && !named.has(written)) {
@@ -572,7 +618,7 @@ function formulaItem(
       : []),
     { type: 'inlineCode', value: rangeAddress(group.range) },
     text(label ? '): ' : ': '),
-    { type: 'inlineCode', value: quoteFormula(formula) },
+    { type: 'inlineCode', value: quoteFormula(formula, namer.hiddenSheets) },
     ...(named.size > 0
       ? [
           text(', where '),
@@ -771,8 +817,9 @@ export function workbookToMarkdown(
     warnings.add('sheet:truncated');
   }
 
-  const index = indexReferences(workbook);
-  const namer = createNamer(workbook, labels);
+  const definedNames = nameTable(workbook);
+  const index = indexReferences(workbook, definedNames);
+  const namer = createNamer(workbook, definedNames, labels);
   const tree: Root = { type: 'root', children: [] };
   for (const [position, sheet] of workbook.sheets.entries()) {
     const { content } = rendered[position] ?? { content: [] };

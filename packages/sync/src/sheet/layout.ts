@@ -39,12 +39,30 @@ export class SheetGrid {
     for (const cell of sheet.cells) {
       this.cells.set(cellKey(cell.row, cell.column), cell);
     }
+    /*
+     * A merge is cut to the part of the sheet that holds values: one over a
+     * whole row, as selecting the row and merging makes, would otherwise make
+     * every block in it as wide as the sheet.
+     */
+    let lastRow = -1;
+    let lastColumn = -1;
+    for (const cell of sheet.cells) {
+      if (cell.kind !== 'empty') {
+        lastRow = Math.max(lastRow, cell.row);
+        lastColumn = Math.max(lastColumn, cell.column);
+      }
+    }
     const merged = new Map<number, CellRange>();
-    for (const range of sheet.merges) {
-      const anchor = this.cells.get(cellKey(range.top, range.left));
+    for (const whole of sheet.merges) {
+      const anchor = this.cells.get(cellKey(whole.top, whole.left));
       if (!anchor || anchor.kind === 'empty') {
         continue;
       }
+      const range = {
+        ...whole,
+        bottom: Math.max(whole.top, Math.min(whole.bottom, lastRow)),
+        right: Math.max(whole.left, Math.min(whole.right, lastColumn)),
+      };
       merged.set(cellKey(range.top, range.left), range);
       const area =
         (range.bottom - range.top + 1) * (range.right - range.left + 1);
@@ -97,13 +115,16 @@ export class SheetGrid {
   }
 }
 
+/** The rectangle the areas fill, found in one pass over tens of thousands. */
 function bounds(areas: readonly Area[]): CellRange {
-  return {
-    top: Math.min(...areas.map((area) => area.range.top)),
-    left: Math.min(...areas.map((area) => area.range.left)),
-    bottom: Math.max(...areas.map((area) => area.range.bottom)),
-    right: Math.max(...areas.map((area) => area.range.right)),
-  };
+  const result = { top: Infinity, left: Infinity, bottom: -1, right: -1 };
+  for (const { range } of areas) {
+    result.top = Math.min(result.top, range.top);
+    result.left = Math.min(result.left, range.left);
+    result.bottom = Math.max(result.bottom, range.bottom);
+    result.right = Math.max(result.right, range.right);
+  }
+  return result;
 }
 
 /** Groups of areas separated by at least one empty row, or column. */

@@ -137,6 +137,11 @@ const BUILT_IN_FORMATS: Readonly<Record<number, string>> = {
   2: '0.00',
   3: '#,##0',
   4: '#,##0.00',
+  // Currency in the en-US form ECMA-376 gives; other locales differ.
+  5: '"$"#,##0_);("$"#,##0)',
+  6: '"$"#,##0_);[Red]("$"#,##0)',
+  7: '"$"#,##0.00_);("$"#,##0.00)',
+  8: '"$"#,##0.00_);[Red]("$"#,##0.00)',
   9: '0%',
   10: '0.00%',
   11: '0.00E+00',
@@ -156,11 +161,27 @@ const BUILT_IN_FORMATS: Readonly<Record<number, string>> = {
   38: '#,##0 ;(#,##0)',
   39: '#,##0.00;(#,##0.00)',
   40: '#,##0.00;(#,##0.00)',
+  41: '_(* #,##0_);_(* (#,##0);_(* "-"_);_(@_)',
+  42: '_("$"* #,##0_);_("$"* (#,##0);_("$"* "-"_);_(@_)',
+  43: '_(* #,##0.00_);_(* (#,##0.00);_(* "-"??_);_(@_)',
+  44: '_("$"* #,##0.00_);_("$"* (#,##0.00);_("$"* "-"??_);_(@_)',
   45: 'mm:ss',
   46: '[h]:mm:ss',
   47: 'mm:ss.0',
   48: '##0.0E+0',
   49: '@',
+  /*
+   * Dates and times East Asian locales number 27 to 36 and 50 to 58, written
+   * the way the site writes every date.
+   */
+  ...Object.fromEntries(
+    [27, 28, 29, 30, 31, 36, 50, 51, 52, 53, 54, 57, 58].map((id) => [
+      id,
+      'yyyy-mm-dd',
+    ]),
+  ),
+  ...Object.fromEntries([32, 34, 55].map((id) => [id, 'h:mm'])),
+  ...Object.fromEntries([33, 35, 56].map((id) => [id, 'h:mm:ss'])),
 };
 
 /** The number format of each cell style, by the style's index. */
@@ -336,6 +357,10 @@ function cellValue(
 
 const CELL_ADDRESS = /^([A-Za-z]{1,3})(\d{1,7})$/u;
 
+function isTrue(value: string | undefined): boolean {
+  return value === '1' || value === 'true';
+}
+
 function readWorksheet(parts: Parts, context: WorksheetContext): WorksheetData {
   const bytes = parts.get(context.path);
   if (!bytes) {
@@ -357,9 +382,20 @@ function readWorksheet(parts: Parts, context: WorksheetContext): WorksheetData {
   let inInline = false;
   let lastAdmittedRow: number | undefined;
   let truncated = false;
+  /*
+   * Rows and columns hidden in the sheet are left out, as hidden sheets are:
+   * hiding is how an editor keeps a part of a spreadsheet off the site.
+   */
+  let rowHidden = false;
+  const hiddenColumns: Array<[number, number]> = [];
+  const columnHidden = (column: number) =>
+    hiddenColumns.some(([first, last]) => column >= first && column <= last);
   context.budget.nextSheet();
 
   const finishCell = (raw: RawCell) => {
+    if (rowHidden || columnHidden(raw.column)) {
+      return;
+    }
     let formula = raw.formula?.trim() ? raw.formula.trim() : undefined;
     if (raw.formulaType === 'shared' && raw.sharedIndex !== undefined) {
       const master = shared.get(raw.sharedIndex);
@@ -405,6 +441,19 @@ function readWorksheet(parts: Parts, context: WorksheetContext): WorksheetData {
               ? declared - 1
               : rowIndex + 1;
           columnIndex = -1;
+          rowHidden = isTrue(attribute(attributes, 'hidden'));
+          break;
+        }
+        case 'col': {
+          const first = Number(attribute(attributes, 'min'));
+          const last = Number(attribute(attributes, 'max'));
+          if (
+            isTrue(attribute(attributes, 'hidden')) &&
+            Number.isInteger(first) &&
+            Number.isInteger(last)
+          ) {
+            hiddenColumns.push([first - 1, last - 1]);
+          }
           break;
         }
         case 'c': {
@@ -505,15 +554,32 @@ function readWorksheet(parts: Parts, context: WorksheetContext): WorksheetData {
     },
   });
 
+  /*
+   * A link names the cells it covers, usually one: each is looked up, unless
+   * the range is larger than the sheet, which is then walked once instead.
+   */
+  const byPosition = new Map(
+    cells.map((cell) => [cell.row * 16_384 + cell.column, cell]),
+  );
   for (const link of hyperlinks) {
-    for (const target of cells) {
-      if (
-        target.row >= link.range.top &&
-        target.row <= link.range.bottom &&
-        target.column >= link.range.left &&
-        target.column <= link.range.right &&
-        target.kind !== 'empty'
-      ) {
+    const { top, left, bottom, right } = link.range;
+    const covered = (cell: SheetCell) =>
+      cell.row >= top &&
+      cell.row <= bottom &&
+      cell.column >= left &&
+      cell.column <= right;
+    const targets =
+      (bottom - top + 1) * (right - left + 1) > cells.length
+        ? cells.filter(covered)
+        : Array.from({ length: bottom - top + 1 }, (_, row) =>
+            Array.from({ length: right - left + 1 }, (_, column) =>
+              byPosition.get((top + row) * 16_384 + left + column),
+            ),
+          )
+            .flat()
+            .filter((cell) => cell !== undefined);
+    for (const target of targets) {
+      if (target.kind !== 'empty') {
         target.link = link.url;
       }
     }
@@ -613,7 +679,7 @@ export function readXlsx(bytes: Uint8Array): WorkbookData {
         });
       } else if (element === 'workbookPr') {
         const value = attribute(attributes, 'date1904');
-        date1904 = value === '1' || value === 'true';
+        date1904 = isTrue(value);
       } else if (element === 'definedName') {
         name = {
           name: attribute(attributes, 'name') ?? '',
@@ -680,14 +746,19 @@ export function readXlsx(bytes: Uint8Array): WorkbookData {
 
   return {
     sheets: worksheets,
-    hiddenSheets: sheets.filter((sheet) => sheet.hidden).length,
+    hiddenSheets: sheets
+      .filter((sheet) => sheet.hidden)
+      .map((sheet) => sheet.name),
     chartSheets: sheets.filter((sheet) => !sheet.hidden && sheet.chart).length,
     omittedSheets: Math.max(0, visible.length - MAX_SHEETS),
     names: definedNames(names, sheets),
   };
 }
 
-/** Names that point at one range of one sheet: the rest are left out. */
+/**
+ * Names that point at one range of one visible sheet. The rest are left out,
+ * a name into a hidden sheet among them, so a page never names that sheet.
+ */
 function definedNames(
   names: ReadonlyArray<{ name: string; value: string }>,
   sheets: readonly WorkbookSheet[],
@@ -703,7 +774,13 @@ function definedNames(
     }
     const sheet = (match[1] ?? match[2] ?? '').replaceAll("''", "'");
     const range = parseRangeAddress((match[3] ?? '').replaceAll('$', ''));
-    if (!range || !sheets.some((candidate) => candidate.name === sheet)) {
+    if (
+      !range ||
+      !sheets.some(
+        (candidate) =>
+          candidate.name === sheet && !candidate.hidden && !candidate.chart,
+      )
+    ) {
       continue;
     }
     defined.push({ name: entry.name, sheet, range });
