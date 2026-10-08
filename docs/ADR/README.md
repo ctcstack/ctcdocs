@@ -82,5 +82,7 @@ Rejected
   Proposed; supersedes ADR-037 and ADR-011 in part once accepted.
 - ADR-046: publish spreadsheets as tables. Proposed; supersedes ADR-025 in
   part once accepted.
+- ADR-047: publish a page for each video and audio file. Proposed;
+  supersedes ADR-025 in part once accepted.
 
 Create a new ADR by copying `000-template.md`.
