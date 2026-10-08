@@ -99,6 +99,11 @@ export const syncReportSchema = z.object({
     .object({
       largeDocumentCharacters: z.number().int().positive(),
       fetchCharacters: z.number().int().positive(),
+      /**
+       * The version of the Markdown the lengths were measured on; absent
+       * from a report written before it was recorded.
+       */
+      markdownVersion: z.number().int().positive().optional(),
     })
     .optional(),
   /** The kinds behind `notes`, in the order the page shows them (ADR-028). */

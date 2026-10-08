@@ -16,6 +16,7 @@ import {
   type Readers,
 } from '@ctcstack/ctcdocs-core';
 
+import { PUBLISHED_MARKDOWN_VERSION } from '@ctcstack/ctcdocs-core/published-markdown';
 import { extractSafeZipEntries, UnsafeZipError } from './archive/safe-zip.js';
 import { IMAGE_VERSION } from './assets/crop-png.js';
 import {
@@ -1994,6 +1995,7 @@ async function synchronize(
   const documentLengths = {
     largeDocumentCharacters: site.sync.largeDocumentCharacters,
     fetchCharacters: fetchCharacterLimit(site.mcp),
+    markdownVersion: PUBLISHED_MARKDOWN_VERSION,
   };
   const notes = createNotes(selection, candidateManifest, {
     images: {

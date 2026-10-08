@@ -21,6 +21,7 @@ import {
   markdownProjectionPath,
   PROJECT_LAYOUT,
 } from '@ctcstack/ctcdocs-core';
+import { PUBLISHED_MARKDOWN_VERSION } from '@ctcstack/ctcdocs-core/published-markdown';
 
 import {
   browseFolder,
@@ -454,11 +455,13 @@ async function verifyAgents({ map, projectRoot, distRoot, environment, keys }) {
 
 /**
  * The length notes of the sync report (ADR-043), by Markdown address, when
- * the report measured documents against the cut this build makes; otherwise
- * `undefined`, since a report written before the cut changed, or before
- * documents were measured, describes another cut until the next sync.
+ * the report measured documents against the cut this build makes, on the
+ * Markdown this build writes; otherwise `undefined`. A report written before
+ * the cut or the Markdown changed, as after an upgrade of the platform, or
+ * before documents were measured, describes other text until the next sync,
+ * and a deployment in between is not held to it.
  */
-async function lengthNotesAgainst(projectRoot, fetchCharacters) {
+export async function lengthNotesAgainst(projectRoot, fetchCharacters) {
   let report;
   try {
     report = JSON.parse(
@@ -470,7 +473,10 @@ async function lengthNotesAgainst(projectRoot, fetchCharacters) {
   } catch {
     return undefined;
   }
-  if (report?.documentLengths?.fetchCharacters !== fetchCharacters) {
+  if (
+    report?.documentLengths?.fetchCharacters !== fetchCharacters ||
+    report.documentLengths.markdownVersion !== PUBLISHED_MARKDOWN_VERSION
+  ) {
     return undefined;
   }
   return new Map(

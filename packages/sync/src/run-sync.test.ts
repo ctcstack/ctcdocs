@@ -1,4 +1,5 @@
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { PUBLISHED_MARKDOWN_VERSION } from '@ctcstack/ctcdocs-core/published-markdown';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
@@ -1041,6 +1042,7 @@ describe('basic Markdown sync', () => {
     expect(first.report.documentLengths).toEqual({
       largeDocumentCharacters: 4_000,
       fetchCharacters: 100_000,
+      markdownVersion: PUBLISHED_MARKDOWN_VERSION,
     });
 
     // A higher line reads on the next run, without exporting anything again.
