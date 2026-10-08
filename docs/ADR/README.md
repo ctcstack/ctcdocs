@@ -80,5 +80,7 @@ Rejected
   Proposed; supersedes ADR-042 in part once accepted.
 - ADR-045: an access review page shows admins who may read each folder.
   Proposed; supersedes ADR-037 and ADR-011 in part once accepted.
+- ADR-046: publish spreadsheets as tables. Proposed; supersedes ADR-025 in
+  part once accepted.
 
 Create a new ADR by copying `000-template.md`.

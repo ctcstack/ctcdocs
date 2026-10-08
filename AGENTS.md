@@ -50,7 +50,8 @@ library, the adapter and that step, and nothing else.
 
 ## Product invariants
 
-- Editorial source of truth: Google Docs, and PDF files, in a Shared Drive.
+- Editorial source of truth: Google Docs, PDF files and spreadsheets, in a
+  Shared Drive.
   Technical source of truth: the generated Markdown, assets, manifest, sidebar
   and index committed to the project repository.
 - Synchronization is one way: Drive → Markdown → static site.
@@ -75,8 +76,8 @@ library, the adapter and that step, and nothing else.
   document's Markdown in R2, which AI Search indexes, beside a marker of the
   build it holds. Neither the bucket nor the index decides access: the access
   map does, on every request.
-- Do not broaden scope to Sheets, Slides, comments, suggestions, webhooks, or
-  bidirectional editing.
+- Do not broaden scope to Slides, comments, suggestions, webhooks, or
+  bidirectional editing. Spreadsheets are published as tables (ADR-046).
 
 ## Priorities
 
