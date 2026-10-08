@@ -305,6 +305,10 @@ describe('workbookToMarkdown', () => {
     expect(result.body).toContain(
       '- **Total** (`D2:D3`): `=B2*C2`, where `B2` is Price and `C2` is Quantity',
     );
+    // Nothing uses the totals, so they are one result, not one per row.
+    expect(result.body).toContain(
+      '- **Total** (`D2:D3`): one for each row, in the table above',
+    );
   });
 
   it('says which cells a defined name in a formula stands for', () => {
@@ -343,6 +347,31 @@ describe('workbookToMarkdown', () => {
       'budget',
     );
     expect(result.body.startsWith('| Item | Cost |')).toBe(true);
+  });
+
+  it('does not name a range that moves with its formula by its first row', () => {
+    const result = page({
+      sheets: [
+        {
+          name: 'Sums',
+          cells: {
+            A1: 'Team',
+            B1: 'Q1',
+            C1: 'Q2',
+            D1: 'Year',
+            A2: 'North',
+            B2: 1,
+            C2: 2,
+            D2: { formula: 'SUM(B2:C2)', value: 3 },
+            A3: 'South',
+            B3: 3,
+            C3: 4,
+            D3: { formula: 'SUM(B3:C3)', value: 7 },
+          },
+        },
+      ],
+    });
+    expect(result.body).toContain('- **Year** (`D2:D3`): `=SUM(B2:C2)`\n');
   });
 
   it('describes an empty spreadsheet with nothing', () => {
