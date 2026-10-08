@@ -28,7 +28,7 @@ import { truncateDescription } from '../markdown/normalize-markdown.js';
  * The version of the page this module writes. A recording whose page was
  * written by an earlier version is written again.
  */
-export const MEDIA_VERSION = 1;
+const MEDIA_VERSION = 1;
 
 /** Description text beyond this is left out of the page. */
 const MAX_DESCRIPTION_CHARACTERS = 20_000;
