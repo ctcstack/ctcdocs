@@ -387,7 +387,10 @@ try {
     report(`ERROR [USAGE]: ${error.message}`);
     process.exitCode = 1;
   } else {
-    report('ERROR [UNEXPECTED]: The sync command failed.');
+    // The kind of error only: its message may quote what it was reading.
+    report(
+      `ERROR [UNEXPECTED]: The sync command failed (${error instanceof Error ? error.name : typeof error}).`,
+    );
     process.exitCode = 1;
   }
   /*

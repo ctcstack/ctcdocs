@@ -1581,11 +1581,28 @@ async function synchronize(
         );
       }
     }
-    const workbook =
-      format === 'csv' || format === 'tsv'
-        ? readDelimited(bytes, title, format === 'tsv')
-        : readXlsx(bytes);
-    const markdown = workbookToMarkdown(workbook, title);
+    let markdown;
+    try {
+      const workbook =
+        format === 'csv' || format === 'tsv'
+          ? readDelimited(bytes, title, format === 'tsv')
+          : readXlsx(bytes);
+      markdown = workbookToMarkdown(workbook, title);
+    } catch (error: unknown) {
+      if (error instanceof UnsafeAssetError) {
+        throw error;
+      }
+      /*
+       * Reading a spreadsheet is reading a file someone uploaded, in a shape
+       * no test foresaw. Whatever stops it holds back that one spreadsheet
+       * (ADR-026), named by the kind of error and never by its content, and
+       * the rest of the site is published.
+       */
+      throw new UnsafeAssetError(
+        `The spreadsheet could not be converted (${error instanceof Error ? error.name : 'unknown error'}).`,
+        { cause: error },
+      );
+    }
     return {
       ...common,
       ...linked(markdown.body, markdown.warnings),
