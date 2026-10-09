@@ -41,6 +41,34 @@ describe('Markdown normalization', () => {
     expect(result.body).toBe('## Different\n\n[Local](../guide)\n');
   });
 
+  it('drops bold that covers a whole heading, and keeps bold on part of one', () => {
+    const result = normalizeMarkdown(
+      [
+        '## **Team rules**',
+        '',
+        '### **1. Leadership** ',
+        '',
+        '### Who **owns** what',
+        '',
+        '#### *Notes*',
+        '',
+      ].join('\n'),
+      'Handbook',
+    );
+    expect(result.body).toBe(
+      [
+        '## Team rules',
+        '',
+        '### 1. Leadership',
+        '',
+        '### Who **owns** what',
+        '',
+        '#### *Notes*',
+        '',
+      ].join('\n'),
+    );
+  });
+
   it('returns no description for empty content and truncates long paragraphs', () => {
     expect(normalizeMarkdown('', 'Empty')).toEqual({
       body: '',

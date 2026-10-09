@@ -239,6 +239,15 @@
   text-wrap: balance;
 }
 
+/*
+ * A heading is already bold. Bold inside one steps up once, to 700, instead of
+ * to the heaviest weight `bolder` would reach, so a word an editor stressed
+ * still shows without turning the heading black.
+ */
+.sl-markdown-content :is(h1, h2, h3, h4, h5, h6) :is(strong, b) {
+  font-weight: 700;
+}
+
 .sl-markdown-content h2 {
   letter-spacing: -0.015em;
 }
