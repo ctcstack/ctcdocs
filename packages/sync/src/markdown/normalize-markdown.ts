@@ -194,19 +194,25 @@ function normalizeHeadings(tree: Root, title: string): boolean {
 }
 
 /**
- * A heading an editor also made bold in Google Docs arrives as `## **Title**`.
- * A heading is already bold, so the page drew it heavier than every other one
- * and assistants read the asterisks. Bold that covers the whole heading is
+ * A heading an editor also made bold in Google Docs arrives as `## **Title**`,
+ * or in several bold runs when the export splits the line. A heading is
+ * already bold, so the page drew it heavier than every other one and
+ * assistants read the asterisks. Bold that covers the whole heading is
  * dropped; bold on part of it, which says something, stays.
  */
 function unwrapBoldHeading(heading: Heading): void {
   const content = heading.children.filter(
     (child) => !(child.type === 'text' && child.value.trim() === ''),
   );
-  const [only] = content;
-  if (content.length === 1 && only?.type === 'strong') {
-    heading.children = only.children;
+  if (
+    content.length === 0 ||
+    !content.every((child) => child.type === 'strong')
+  ) {
+    return;
   }
+  heading.children = heading.children.flatMap((child) =>
+    child.type === 'strong' ? child.children : [child],
+  );
 }
 
 function findDescription(tree: Root): string | undefined {

@@ -2,6 +2,45 @@
 
 All three packages share a version and are released together.
 
+## 0.22.1
+
+A calmer reading interface, and one statement of the kinds of published page.
+
+### Changed
+
+- **The sidebar.** Folders are named at the size of the documents in them,
+  at weight 600 in the muted ink; the folders that hold the current page take
+  the strong ink. Rows are taller, with 0.4rem of inline padding, a thin
+  chevron and clearer hover and current-page fills. The sidebar is 20.75rem
+  wide.
+- **Format icons.** A PDF, spreadsheet, video or audio page carries a colored
+  tile of its format — the letters PDF, a grid, a play button, sound bars —
+  after its title in the sidebar, and before it in the section listing, the
+  full index, the recency band and the home page's folder cards, in place of
+  a badge or the outline of a page. The file-type colors are the one
+  exemption from the reserved accent in `DESIGN.md`.
+- **Breadcrumbs** are set at 0.8125rem and weight 500 with chevron
+  separators, and the title sits 1rem below them.
+- **Headings.** The sync drops bold that covers a whole heading, as editors
+  add it in Google Docs, and the page draws bold inside a heading at 700.
+- **A spreadsheet's page** records whether it is a Google Sheet, which the
+  source link's label reads instead of the address.
+
+### Internal
+
+- `@ctcstack/ctcdocs-core/document-format` names the kinds of page, their
+  `sourceType`, badges, nouns and MCP formats once. The sync, the site and
+  the Worker read them from there, and the PDF, spreadsheet and recording
+  facts a page records are one zod schema each.
+
+### Upgrade note
+
+Bump the packages and the workflow pins, then run a sync. `NORMALIZER_VERSION`
+and `SHEET_VERSION` moved, so that sync exports every Google Doc and reads
+every spreadsheet again once, and the MCP server stores every document again
+on its next schedule. Until it runs, headings keep their bold and a Google
+Sheet's label is read from its address, as before.
+
 ## 0.22.0
 
 Video and audio files get pages

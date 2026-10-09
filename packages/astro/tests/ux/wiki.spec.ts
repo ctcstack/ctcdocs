@@ -1,6 +1,7 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import {
   ACCESS_CLASSES_ROUTE,
+  DOCUMENT_FORMAT_BADGES,
   PLATFORM_ROUTE_HREFS,
 } from '@ctcstack/ctcdocs-core';
 import { expect, test, type Page } from '@playwright/test';
@@ -1159,11 +1160,7 @@ test('the sidebar marks a page that is not a Google Doc with an icon of its form
     await expect(icon).toHaveCount(1);
     // The format's name is announced, not shown: the icon stands in for it.
     await expect(icon).toHaveText(
-      document.format === 'sheet'
-        ? 'Sheet'
-        : document.format === 'audio'
-          ? 'Audio'
-          : 'Video',
+      DOCUMENT_FORMAT_BADGES[document.format ?? 'google-doc'] ?? '',
     );
     const box = await icon.boundingBox();
     expect(box?.width ?? 0).toBeGreaterThan(0);

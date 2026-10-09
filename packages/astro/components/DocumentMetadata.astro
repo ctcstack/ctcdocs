@@ -64,7 +64,9 @@ const showSectionLink = sourceType === 'section-index' && permanentPath;
 const sourceLabel =
   format === 'google-doc'
     ? 'Open in Google Docs'
-    : sheet?.googleSheet
+    : (sheet?.googleSheet ??
+        // A page written before 0.22.1 records no fact; its address says.
+        sourceUrl?.startsWith('https://docs.google.com/spreadsheets/'))
       ? 'Open in Google Sheets'
       : media?.vids
         ? 'Open in Google Vids'
