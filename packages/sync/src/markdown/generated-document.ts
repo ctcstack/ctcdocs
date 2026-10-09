@@ -51,6 +51,11 @@ export const sheetFactsSchema = z.strictObject({
   sheets: z.number().int().nonnegative(),
   /** Cells with a formula the page shows. */
   formulas: z.number().int().nonnegative(),
+  /**
+   * A Google Sheet, which opens in Google Sheets rather than Drive. Absent
+   * from a page written before 0.22.1, which the next sync writes again.
+   */
+  googleSheet: z.boolean().optional(),
 });
 
 /**

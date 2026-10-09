@@ -1596,7 +1596,11 @@ async function synchronize(
       ...common,
       ...linked(markdown.body, markdown.warnings),
       ...(markdown.description ? { description: markdown.description } : {}),
-      sheet: { sheets: markdown.sheets, formulas: markdown.formulas },
+      sheet: {
+        sheets: markdown.sheets,
+        formulas: markdown.formulas,
+        googleSheet: format === 'google-sheets',
+      },
     };
   };
 

@@ -1023,9 +1023,17 @@ test('a spreadsheet has a page whose long tables filter and sort', async ({
     await expect(
       page.getByRole('heading', { level: 1, name: sheet.title }),
     ).toBeVisible();
-    await expect(
-      page.getByRole('link', { name: /^Open in Google (?:Sheets|Drive)$/u }),
-    ).toBeVisible();
+    // A Google Sheet opens in Google Sheets, an uploaded file in Drive.
+    const source = page.getByRole('link', {
+      name: /^Open in Google (?:Sheets|Drive)$/u,
+    });
+    await expect(source).toBeVisible();
+    const native = (await source.getAttribute('href'))?.startsWith(
+      'https://docs.google.com/spreadsheets/',
+    );
+    await expect(source).toHaveText(
+      native ? 'Open in Google Sheets' : 'Open in Google Drive',
+    );
     if ((await page.locator('.kb-sheet-tall').count()) === 0) {
       continue;
     }

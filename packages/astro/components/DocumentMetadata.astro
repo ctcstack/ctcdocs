@@ -21,8 +21,15 @@ import {
 import { documentFormatOf } from '@ctcstack/ctcdocs-core/document-format';
 
 const { entry } = Astro.locals.starlightRoute;
-const { editUrl, googleModifiedTime, media, shortId, sourceType, syncedAt } =
-  entry.data;
+const {
+  editUrl,
+  googleModifiedTime,
+  media,
+  sheet,
+  shortId,
+  sourceType,
+  syncedAt,
+} = entry.data;
 const permanentPath = shortId ? permanentLinkPath(shortId) : undefined;
 
 const sourceUrl = typeof editUrl === 'string' ? editUrl : undefined;
@@ -57,7 +64,7 @@ const showSectionLink = sourceType === 'section-index' && permanentPath;
 const sourceLabel =
   format === 'google-doc'
     ? 'Open in Google Docs'
-    : sourceUrl?.startsWith('https://docs.google.com/spreadsheets/')
+    : sheet?.googleSheet
       ? 'Open in Google Sheets'
       : media?.vids
         ? 'Open in Google Vids'
