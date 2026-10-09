@@ -78,8 +78,9 @@ library, the adapter and that step, and nothing else.
   map does, on every request.
 - Do not broaden scope to Slides, comments, suggestions, webhooks, or
   bidirectional editing. Spreadsheets are published as tables (ADR-046);
-  a video or audio file gets a page from its Drive metadata, and is never
-  downloaded, transcribed or played on the site (ADR-047).
+  a video or audio file gets a page from its Drive metadata and plays in
+  Drive's own embedded player; it is never downloaded, hosted or transcribed
+  (ADR-047).
 
 ## Priorities
 

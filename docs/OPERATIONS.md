@@ -314,9 +314,13 @@ A video or audio file in a published folder, uploaded or made in Google Vids,
 gets a page
 ([ADR-047](ADR/047-publish-a-page-for-each-video-and-audio-file.md)). Its
 title and address are its Drive name without the extension, and the sidebar
-marks it `Video` or `Audio`. The file is never downloaded, and the site does
-not play it: the page links to it in Google Drive or Google Vids, whose
-sharing decides who may play it.
+marks it `Video` or `Audio`. The file is never downloaded or hosted: an
+uploaded recording plays on its page in Google Drive's own player, and every
+recording's page links to it in Google Drive or Google Vids. Drive's sharing
+decides who may play it. In Safari, or in any browser that blocks third-party
+cookies, the player asks to sign in; the link below it opens the file in
+Drive instead. Google Vids has no player to embed, so its page has the link
+alone.
 
 The page is written from what Drive says about the file: a sentence with its
 length and frame size when Drive reports them, then the description its editor
