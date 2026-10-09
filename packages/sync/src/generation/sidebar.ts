@@ -1,15 +1,12 @@
-import {
-  documentName,
-  GOOGLE_DRIVE_PDF_MIME_TYPE,
-  mediaKind,
-  spreadsheetFormat,
-} from '../google/drive-types.js';
+import { DOCUMENT_FORMAT_BADGES } from '@ctcstack/ctcdocs-core';
+
+import { documentName } from '../google/drive-types.js';
 import type {
   InventoryFolderNode,
   InventorySelection,
   SelectedInventoryItem,
 } from '../inventory/inventory-graph.js';
-import type { SyncManifest } from '../manifest.js';
+import { documentFormat, type SyncManifest } from '../manifest.js';
 import {
   compareNavigationSiblings,
   isLandingTitle,
@@ -54,18 +51,11 @@ function documentLink(
       'Sidebar generation is missing a document manifest record.',
     );
   }
+  const badge = DOCUMENT_FORMAT_BADGES[documentFormat(record)];
   return {
     label: parseOrderedLabel(documentName(document.item)).label,
     slug: record.stableSlug,
-    ...(document.item.mimeType === GOOGLE_DRIVE_PDF_MIME_TYPE
-      ? { badge: 'PDF' }
-      : spreadsheetFormat(document.item.mimeType) !== undefined
-        ? { badge: 'Sheet' }
-        : mediaKind(document.item.mimeType) === 'video'
-          ? { badge: 'Video' }
-          : mediaKind(document.item.mimeType) === 'audio'
-            ? { badge: 'Audio' }
-            : {}),
+    ...(badge ? { badge } : {}),
   };
 }
 

@@ -1,6 +1,7 @@
+import { DOCUMENT_FORMATS } from '@ctcstack/ctcdocs-core';
 import { z } from 'zod';
 
-import type { SyncManifest } from '../manifest.js';
+import { documentFormat, type SyncManifest } from '../manifest.js';
 
 export const aiDocsIndexSchema = z.object({
   schemaVersion: z.literal(1),
@@ -21,9 +22,7 @@ export const aiDocsIndexSchema = z.object({
        * What the page publishes: a Google Doc, a PDF file (ADR-027), a
        * spreadsheet (ADR-046) or a video or audio file (ADR-047).
        */
-      format: z
-        .enum(['google-doc', 'pdf', 'sheet', 'video', 'audio'])
-        .optional(),
+      format: z.enum(DOCUMENT_FORMATS).optional(),
     }),
   ),
 });
@@ -59,13 +58,7 @@ export function createAiDocsIndex(
         contentHash: record.contentHash,
         folderPath: folderPaths.get(record.googleFileId) ?? [],
         language: defaultLocale,
-        format:
-          record.exportMode === 'pdf' ||
-          record.exportMode === 'sheet' ||
-          record.exportMode === 'video' ||
-          record.exportMode === 'audio'
-            ? record.exportMode
-            : 'google-doc',
+        format: documentFormat(record),
       })),
   };
 }

@@ -2,6 +2,8 @@ import { readFile, readdir } from 'node:fs/promises';
 import { posix, relative, resolve } from 'node:path';
 
 import {
+  DOCUMENT_SOURCE_TYPES,
+  documentSourceType,
   PLATFORM_ROUTES,
   PROJECT_LAYOUT,
   RESERVED_SLUGS,
@@ -25,11 +27,15 @@ import { collectMarkdownImageUrls } from '../markdown/analyze-markdown.js';
 import {
   computeGeneratedContentHash,
   extractGeneratedDocumentBody,
+  mediaFactsSchema,
+  pageFormat,
+  pdfFactsSchema,
   sha256,
+  sheetFactsSchema,
 } from '../markdown/generated-document.js';
 import {
+  documentFormat,
   isGoogleDocRecord,
-  isMediaRecord,
   syncManifestSchema,
 } from '../manifest.js';
 import { titleReportSchema } from '../titles/title-report.js';
@@ -52,7 +58,7 @@ const frontmatterSchema = z.object({
   slug: z.string().min(1),
   shortId: z.string().regex(SHORT_ID_PATTERN),
   editUrl: z.url(),
-  sourceType: z.enum(['google-doc', 'drive-pdf', 'drive-sheet', 'drive-media']),
+  sourceType: z.enum(DOCUMENT_SOURCE_TYPES),
   googleFileId: z.string().min(1),
   googleModifiedTime: z.iso.datetime(),
   syncedAt: z.iso.datetime(),
@@ -69,33 +75,11 @@ const frontmatterSchema = z.object({
     ])
     .optional(),
   /** Present on the page of a PDF, and only there (ADR-027). */
-  pdf: z
-    .strictObject({
-      file: z
-        .string()
-        .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*\.pdf$/u)
-        .optional(),
-      bytes: z.number().int().nonnegative(),
-      pages: z.number().int().nonnegative().nullable(),
-    })
-    .optional(),
+  pdf: pdfFactsSchema.optional(),
   /** Present on the page of a spreadsheet, and only there (ADR-046). */
-  sheet: z
-    .strictObject({
-      sheets: z.number().int().nonnegative(),
-      formulas: z.number().int().nonnegative(),
-    })
-    .optional(),
+  sheet: sheetFactsSchema.optional(),
   /** Present on the page of a recording, and only there (ADR-047). */
-  media: z
-    .strictObject({
-      kind: z.enum(['video', 'audio']),
-      vids: z.boolean(),
-      seconds: z.number().int().positive().nullable(),
-      width: z.number().int().positive().nullable(),
-      height: z.number().int().positive().nullable(),
-    })
-    .optional(),
+  media: mediaFactsSchema.optional(),
 });
 
 /*
@@ -332,21 +316,17 @@ async function validateGeneratedOutputInternal(
     const frontmatter = frontmatterSchema.parse(
       parseFrontmatter(content, markdownHeader),
     );
-    const isPdf = record.exportMode === 'pdf';
-    const isSheet = record.exportMode === 'sheet';
-    const isMedia = isMediaRecord(record);
+    // The page records the facts of the format it publishes, and no other.
     if (
       frontmatter.googleFileId !== record.googleFileId ||
       frontmatter.slug !== record.stableSlug ||
       frontmatter.shortId !== record.shortId ||
       frontmatter.contentHash !== record.contentHash ||
-      (frontmatter.sourceType === 'drive-pdf') !== isPdf ||
-      (frontmatter.pdf !== undefined) !== isPdf ||
-      (frontmatter.sourceType === 'drive-sheet') !== isSheet ||
-      (frontmatter.sheet !== undefined) !== isSheet ||
-      (frontmatter.sourceType === 'drive-media') !== isMedia ||
-      (frontmatter.media !== undefined) !== isMedia ||
-      (isMedia && frontmatter.media?.kind !== record.exportMode)
+      pageFormat(frontmatter) !== documentFormat(record) ||
+      frontmatter.sourceType !== documentSourceType(documentFormat(record)) ||
+      [frontmatter.pdf, frontmatter.sheet, frontmatter.media].filter(
+        (facts) => facts !== undefined,
+      ).length > 1
     ) {
       throw new Error('Generated frontmatter does not match the manifest.');
     }
