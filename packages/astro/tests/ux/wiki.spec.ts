@@ -1186,3 +1186,22 @@ test('the sidebar marks a page that is not a Google Doc with an icon of its form
     ).toHaveCount(1);
   }
 });
+
+test('the header shows the mark the project configures as its icon', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const mark = page.locator('.site-title img');
+  await expect(mark).toHaveAttribute(
+    'src',
+    siteConfiguration.brand.faviconPath,
+  );
+  await expect(mark).toBeVisible();
+  // The file loaded, and it keeps its own shape at the header's height.
+  const size = await mark.evaluate((image: HTMLImageElement) => ({
+    natural: image.naturalWidth,
+    width: image.getBoundingClientRect().width,
+  }));
+  expect(size.natural).toBeGreaterThan(0);
+  expect(size.width).toBeGreaterThan(0);
+});
