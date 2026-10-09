@@ -425,8 +425,10 @@ the pointer takes the row-hover fill. The current page is marked by the
 row-current fill plus accent text at weight 600 — a neutral fill rather than a
 saturated one, because navigation must not be the loudest thing on a page
 meant for reading. A folder is named at the size of the documents in it, at
-weight 500 in the body ink, so the tree reads as one list rather than a stack
-of headings. A page that is not a Google Doc carries a small icon of its
+weight 500 in the muted ink, so the tree reads as one list rather than a stack
+of headings; the folders that hold the current page take the strong ink, so
+the way to it reads down the tree. Rows are 0.4em taller than Starlight's on
+each side, and a folder's caret is a thin chevron that turns down when open. A page that is not a Google Doc carries a small icon of its
 format after its title — a sheet of paper for a PDF, a grid for a spreadsheet,
 a play frame for a video, bars for audio — drawn in the row's own color; the
 format's name stays in the markup for screen readers. Folder labels are

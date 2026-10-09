@@ -298,6 +298,20 @@ header.header {
 }
 
 /*
+ * The caret is drawn as a thin chevron rather than Starlight's solid one. It
+ * keeps Starlight's turn: right while a folder is closed, down once open.
+ */
+#starlight__sidebar summary .caret {
+  background-color: currentColor;
+  mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='m9 6 6 6-6 6'/></svg>")
+    center / 1rem no-repeat;
+}
+
+#starlight__sidebar summary .caret > * {
+  display: none;
+}
+
+/*
  * Navigation is set below the prose it leads to. Starlight colors these links
  * gray-2, which this ramp defines as the text color itself, so a page of
  * document titles carried the same weight as the document. They take gray-3
@@ -354,8 +368,26 @@ header.header {
 }
 
 #starlight__sidebar summary .large {
-  color: var(--kb-text);
+  color: var(--kb-gray-3);
   font-weight: 500;
+}
+
+/*
+ * The folders that hold the current page are named in the ink color, so the
+ * way to it reads down the tree; every other folder stays muted, like the
+ * documents beside it.
+ */
+#starlight__sidebar details:has(a[aria-current='page']) > summary .large {
+  color: var(--kb-ink);
+}
+
+/* Rows a little taller than Starlight's, so a long tree is easier to scan. */
+#starlight__sidebar a {
+  padding-block: 0.4em;
+}
+
+#starlight__sidebar summary {
+  padding-block: 0.4em;
 }
 
 #starlight__sidebar a.large {
