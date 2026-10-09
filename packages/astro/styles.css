@@ -175,6 +175,12 @@
   --sl-font-mono: var(--kb-font-mono-family);
 
   --sl-content-width: var(--kb-content-width);
+  /*
+   * Two rem wider than Starlight's 18.75rem: document titles here are long,
+   * "Guide — …" and "Overview — …", and the extra width keeps most of them
+   * on one or two lines.
+   */
+  --sl-sidebar-width: 20.75rem;
 
   /* Read from brand.css and from Starlight. */
   --kb-accent: var(--sl-color-accent);
@@ -369,7 +375,7 @@ header.header {
 
 #starlight__sidebar summary .large {
   color: var(--kb-gray-3);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 /*

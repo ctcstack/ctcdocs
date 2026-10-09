@@ -419,14 +419,14 @@ home index, because Drive folders have no pages of their own.
 
 ### Navigation (sidebar)
 
-Framework list navigation on the page ground, divided from content by one
-hairline. Rows have a 0.4rem inline padding and a 0.375rem corner; a row under
+Framework list navigation on the page ground, 20.75rem wide, divided from
+content by one hairline. Rows have a 0.4rem inline padding and a 0.375rem corner; a row under
 the pointer takes the row-hover fill. The current page is marked by the
 row-current fill plus accent text at weight 600 — a neutral fill rather than a
 saturated one, because navigation must not be the loudest thing on a page
 meant for reading. A folder is named at the size of the documents in it, at
-weight 500 in the muted ink, so the tree reads as one list rather than a stack
-of headings; the folders that hold the current page take the strong ink, so
+weight 600 in the muted ink, so the tree reads as one list rather than a stack
+of headings while a folder still stands apart from a document; the folders that hold the current page take the strong ink, so
 the way to it reads down the tree. Rows are 0.4em taller than Starlight's on
 each side, and a folder's caret is a thin chevron that turns down when open. A page that is not a Google Doc carries a small icon of its
 format after its title — a sheet of paper for a PDF, a grid for a spreadsheet,
