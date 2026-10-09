@@ -280,6 +280,15 @@ describe('spreadsheets', () => {
         'utf8',
       ),
     ).resolves.toContain('| Plan | Price |\n| - | -: |\n| Basic | 10 |');
+    // The page records whether it opens in Google Sheets or in Drive.
+    const page = (id: string) =>
+      readFile(resolve(root, `src/content/docs/_generated/${id}.md`), 'utf8');
+    await expect(page('sheet-native')).resolves.toContain(
+      '"googleSheet": true',
+    );
+    await expect(page('sheet-prices')).resolves.toContain(
+      '"googleSheet": false',
+    );
     expect(downloads.sort()).toEqual(['sheet-native', 'sheet-prices']);
   });
 

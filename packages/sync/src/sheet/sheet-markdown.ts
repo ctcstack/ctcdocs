@@ -49,7 +49,7 @@ import type { SheetCell, WorkbookData } from './workbook.js';
  * The version of the page this module writes. A spreadsheet whose page an
  * earlier version wrote is read again, even when the file has not changed.
  */
-export const SHEET_VERSION = 2;
+export const SHEET_VERSION = 3;
 
 /** The most formulas, inputs and results one sheet's section lists. */
 const MAX_FORMULAS = 200;

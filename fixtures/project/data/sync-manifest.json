@@ -396,12 +396,12 @@
       "generatedMarkdownPath": "src/content/docs/_generated/sheet-glossary.md",
       "generatedAssetsDirectory": "src/assets/generated/sheet-glossary",
       "contentHash": "sha256:bb319d3c4db8acd7aaf20159e748b81f31df11e296bb661f8f16b856e4d6d244",
-      "outputHash": "sha256:fbf0d51f64af980ef6d3e20428c841fcb2418761c32bb7e3ca0400b8364c851f",
+      "outputHash": "sha256:9bfd86ab332bfd3f35f25278bad0335c679eb5554cb5d898599a41014eb1ec35",
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "sheet",
       "warnings": [],
       "shortId": "60c873",
-      "sheetVersion": 2,
+      "sheetVersion": 3,
       "publishedReaders": [
         "engineering@example.com",
         "writers@example.com"
@@ -424,13 +424,13 @@
       "generatedMarkdownPath": "src/content/docs/_generated/sheet-plans.md",
       "generatedAssetsDirectory": "src/assets/generated/sheet-plans",
       "contentHash": "sha256:b0b0b283dff91739574feb076e64945c31566d6578b02e420cdeb6dfea4faa46",
-      "outputHash": "sha256:6677238fc5d1eefc9415c92d1ea4f7e6f32a545642e6cf566c71cfaeb53a5259",
+      "outputHash": "sha256:e49ccb337c52bf53d755c8cb46dc257f41ba2085bf3759054a6cf0f581e3088d",
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "sheet",
       "warnings": [],
       "shortId": "70da01",
       "sourceChecksum": "sha256:f7d94818de586b0c13af038fa3939a92de7557d1d1ac1e6bfbd0099f38f6d6d5",
-      "sheetVersion": 2,
+      "sheetVersion": 3,
       "publishedReaders": "*",
       "publishedChain": [
         "folder-handbook",
@@ -450,7 +450,7 @@
       "generatedMarkdownPath": "src/content/docs/_generated/sheet-support-capacity.md",
       "generatedAssetsDirectory": "src/assets/generated/sheet-support-capacity",
       "contentHash": "sha256:a799d6ea17eb5bf1ba036f393bd9e3c4e798a9a63985809fcc3c30aab629a0c9",
-      "outputHash": "sha256:cd9cb94e6e2bd9fe8041ed30a08a8060c0d955dab3104ee019296fbfc7351929",
+      "outputHash": "sha256:7bf68c290f0e32e81fc11df3399f7e2055a78775b49c9b56678b9e0d4b43aece",
       "lastSuccessfulSyncAt": "2026-02-10T06:00:00.000Z",
       "exportMode": "sheet",
       "warnings": [
@@ -458,7 +458,7 @@
       ],
       "shortId": "845a78",
       "sourceChecksum": "sha256:d45fbb84e57e03a7e8bf7da1104e641ae4fb7eb1c0ae6b9235c66c64066a5a73",
-      "sheetVersion": 2,
+      "sheetVersion": 3,
       "publishedReaders": "*",
       "publishedChain": [
         "folder-handbook",

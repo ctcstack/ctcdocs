@@ -68,6 +68,8 @@ export const collections = {
           .object({
             sheets: z.number().int().nonnegative(),
             formulas: z.number().int().nonnegative(),
+            // A Google Sheet; absent from a page written before 0.22.1.
+            googleSheet: z.boolean().optional(),
           })
           .optional(),
         /*
