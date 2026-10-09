@@ -8,7 +8,7 @@
  * styles and fonts are cached for a year; anything that depends on who is
  * asking is not cached at all. Every HTML page carries a Content Security
  * Policy that admits the site's own scripts and the inline ones the build
- * hashed, and nothing else.
+ * hashed, and frames from Google Drive's player, and nothing else.
  */
 import type { AccessMapFile } from './access-map.js';
 
@@ -33,6 +33,11 @@ function contentSecurityPolicy(map: AccessMapFile): string {
     "connect-src 'self'",
     // A PDF's page shows the file in an <object> (ADR-027).
     "object-src 'self'",
+    /*
+     * A recording's page plays it in Drive's own player (ADR-047). Drive
+     * decides who may play it; nothing else is framed.
+     */
+    'frame-src https://drive.google.com',
     "base-uri 'none'",
     "frame-ancestors 'none'",
     "form-action 'self'",

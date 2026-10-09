@@ -2,20 +2,41 @@
 /**
  * The recording a video or audio file's page describes (ADR-047).
  *
- * The site does not host or play recordings: this links to the file where it
- * plays, in Google Drive or Google Vids, whose own sharing decides who may
- * play it. The text below the card says what Drive knows about the file,
- * its length included, so the card does not repeat it.
+ * An uploaded recording plays on the page in Google Drive's own player, framed
+ * from Drive: the site neither hosts nor streams it, and Drive decides who may
+ * play it, by the Google account the browser is signed in with. A browser that
+ * keeps Google's cookies from a framed page, as Safari does, shows Drive's
+ * request to sign in instead; the link below the player opens the file in
+ * Drive whatever the browser allows. Google Vids has no player to frame, so a
+ * Google Vids video's page has the link alone.
+ *
+ * The text below the card says what Drive knows about the file, its length
+ * included, so the card does not repeat it.
  */
 interface Props {
+  googleFileId: string;
+  title: string;
   kind: 'video' | 'audio';
   /** A Google Vids video, which plays in Google Vids rather than Drive. */
   vids: boolean;
+  width: number | null;
+  height: number | null;
   sourceUrl: string;
 }
 
-const { kind, vids, sourceUrl } = Astro.props;
+const { googleFileId, title, kind, vids, width, height, sourceUrl } =
+  Astro.props;
 const action = `${kind === 'audio' ? 'Listen' : 'Watch'} in ${vids ? 'Google Vids' : 'Google Drive'}`;
+const playerUrl = vids
+  ? undefined
+  : `https://drive.google.com/file/d/${encodeURIComponent(googleFileId)}/preview`;
+// A video keeps its own shape, a phone's upright recording included.
+const shape =
+  kind === 'audio'
+    ? undefined
+    : width !== null && height !== null
+      ? `aspect-ratio: ${width} / ${height}`
+      : 'aspect-ratio: 16 / 9';
 ---
 
 <section
@@ -24,47 +45,93 @@ const action = `${kind === 'audio' ? 'Listen' : 'Watch'} in ${vids ? 'Google Vid
   data-ctcdocs-unindexed="media-file"
   data-pagefind-ignore
 >
-  <svg
-    aria-hidden="true"
-    class="media-icon"
-    fill="none"
-    stroke="currentColor"
-    stroke-linejoin="round"
-    stroke-width="1.5"
-    viewBox="0 0 24 24"
-  >
-    <circle cx="12" cy="12" r="10"></circle>
-    <path d="M10 8.5v7l6-3.5z" fill="currentColor"></path>
-  </svg>
-  <a
-    class="media-action"
-    href={sourceUrl}
-    rel="noopener noreferrer"
-    target="_blank">{action}</a
-  >
+  {
+    playerUrl && (
+      <iframe
+        class:list={['media-player', { 'media-player-audio': !shape }]}
+        src={playerUrl}
+        style={shape}
+        title={title}
+        allow="autoplay; fullscreen; picture-in-picture"
+        allowfullscreen
+        loading="lazy"
+      />
+    )
+  }
+  <p class="media-actions">
+    <svg
+      aria-hidden="true"
+      class="media-icon"
+      fill="none"
+      stroke="currentColor"
+      stroke-linejoin="round"
+      stroke-width="1.5"
+      viewBox="0 0 24 24"
+    >
+      <circle cx="12" cy="12" r="10"></circle>
+      <path d="M10 8.5v7l6-3.5z" fill="currentColor"></path>
+    </svg>
+    <a
+      class="media-action"
+      href={sourceUrl}
+      rel="noopener noreferrer"
+      target="_blank">{action}</a
+    >
+    {
+      playerUrl && (
+        <span class="media-note">
+          If the player asks you to sign in, open it in Google Drive instead.
+        </span>
+      )
+    }
+  </p>
 </section>
 
 <style>
   @layer starlight.components {
     .media-file {
-      align-items: center;
       border: 1px solid var(--kb-hairline);
       border-radius: 0.5rem;
-      display: flex;
-      gap: 1rem;
       margin-block: 1rem 1.5rem;
+      overflow: hidden;
+    }
+
+    .media-player {
+      background: var(--kb-surface-sunken);
+      border: 0;
+      border-bottom: 1px solid var(--kb-hairline);
+      display: block;
+      max-height: 80vh;
+      width: 100%;
+    }
+
+    .media-player-audio {
+      height: 10rem;
+    }
+
+    .media-actions {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+      margin: 0;
       padding: 1rem 1.25rem;
     }
 
     .media-icon {
       color: var(--kb-text-accent);
       flex: none;
-      height: 2.5rem;
-      width: 2.5rem;
+      height: 2rem;
+      width: 2rem;
     }
 
     .media-action {
       font-weight: 600;
+    }
+
+    .media-note {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-sm);
     }
   }
 </style>
