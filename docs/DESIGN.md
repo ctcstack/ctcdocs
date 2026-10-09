@@ -16,6 +16,14 @@ colors:
   row-hover-light: '#f2f2f2'
   row-current-dark: '#282828'
   row-current-light: '#ebebeb'
+  format-pdf-dark: '#f28b82'
+  format-pdf-light: '#d93025'
+  format-sheet-dark: '#81c995'
+  format-sheet-light: '#188038'
+  format-video-dark: '#c58af9'
+  format-video-light: '#8430ce'
+  format-audio-dark: '#8ab4f8'
+  format-audio-light: '#1a73e8'
   ink-strong-dark: '#f5f5f5'
   ink-strong-light: '#171717'
   ink-body-dark: '#ededed'
@@ -226,6 +234,12 @@ current page, current section, hover target, focus ring, the wordmark, the one
 onboarding entry. It never decorates a border, a heading, a divider, or a
 background band.
 
+**The File-Type Exemption.** The format icons in the sidebar are the one other
+place color appears: red for a PDF, green for a spreadsheet, violet for a
+video, blue for audio — the colors readers already know each file type by.
+Each is a small tile, never text, and holds 3:1 against the ground and both
+row fills in its theme. No other element may borrow these colors.
+
 ## Typography
 
 **Body Font:** Inter Variable (with `system-ui`, `sans-serif`)
@@ -420,20 +434,22 @@ home index, because Drive folders have no pages of their own.
 ### Navigation (sidebar)
 
 Framework list navigation on the page ground, 20.75rem wide, divided from
-content by one hairline. Rows have a 0.4rem inline padding and a 0.375rem corner; a row under
-the pointer takes the row-hover fill. The current page is marked by the
-row-current fill plus accent text at weight 600 — a neutral fill rather than a
-saturated one, because navigation must not be the loudest thing on a page
-meant for reading. A folder is named at the size of the documents in it, at
-weight 600 in the muted ink, so the tree reads as one list rather than a stack
-of headings while a folder still stands apart from a document; the folders that hold the current page take the strong ink, so
-the way to it reads down the tree. Rows are 0.4em taller than Starlight's on
-each side, and a folder's caret is a thin chevron that turns down when open. A page that is not a Google Doc carries a small icon of its
-format after its title — a sheet of paper for a PDF, a grid for a spreadsheet,
-a play frame for a video, bars for audio — drawn in the row's own color; the
+content by one hairline. Rows have a 0.4rem inline padding and a 0.375rem
+corner; a row under the pointer takes the row-hover fill. The current page is
+marked by the row-current fill plus accent text at weight 600 — a neutral fill
+rather than a saturated one, because navigation must not be the loudest thing on
+a page meant for reading. A folder is named at the size of the documents in it,
+at weight 600 in the muted ink, so the tree reads as one list rather than a
+stack of headings while a folder still stands apart from a document; the folders
+that hold the current page take the strong ink, so the way to it reads down the
+tree. Rows are 0.4em taller than Starlight's on each side, and a folder's caret
+is a thin chevron that turns down when open. A page that is not a Google Doc
+carries a small icon of its format after its title: a 1.15em colored tile with
+the format's mark cut out — the letters PDF, a grid for a spreadsheet, a play
+button for a video, sound bars for audio — in the file-type colors above; the
 format's name stays in the markup for screen readers. Folder labels are
-normalized at the point of use in `astro.config.mjs` (trailing slashes stripped),
-never in the generated sidebar file, which is pipeline-owned.
+normalized at the point of use in `astro.config.mjs` (trailing slashes
+stripped), never in the generated sidebar file, which is pipeline-owned.
 
 ### Table of Contents Rail
 
