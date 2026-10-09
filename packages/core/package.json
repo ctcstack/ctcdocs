@@ -31,6 +31,10 @@
     "./published-markdown": {
       "types": "./dist/published-markdown.d.ts",
       "default": "./dist/published-markdown.js"
+    },
+    "./document-format": {
+      "types": "./dist/document-format.d.ts",
+      "default": "./dist/document-format.js"
     }
   },
   "files": [

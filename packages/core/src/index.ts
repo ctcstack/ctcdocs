@@ -87,3 +87,18 @@ export type {
   SiteConfiguration,
   SyncConfigurationDefaults,
 } from './site-configuration.js';
+export {
+  agentDocumentFormat,
+  DOCUMENT_FORMAT_BADGES,
+  DOCUMENT_FORMAT_NOUNS,
+  DOCUMENT_FORMATS,
+  DOCUMENT_SOURCE_TYPES,
+  documentFormatOf,
+  documentSourceType,
+  isDocumentSourceType,
+} from './document-format.js';
+export type {
+  AgentDocumentFormat,
+  DocumentFormat,
+  DocumentSourceType,
+} from './document-format.js';
