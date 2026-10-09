@@ -69,11 +69,11 @@ and where each key and ID goes, is in [Setting up a site](docs/NEW_PROJECT.md).
 
 ## Packages
 
-| Package                  | What it is                                                                                                                            |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `@ctcstack/ctcdocs`      | The site: an Astro configuration preset, Starlight component overrides, routes, styles, and the browser test suite a project runs.    |
-| `@ctcstack/ctcdocs-sync` | The pipeline: Google Drive → Markdown, plus the `ctcdocs-sync` command line.                                                          |
-| `@ctcstack/ctcdocs-core` | Configuration schema, project layout, and the generated-path allowlist. A transitive dependency; projects do not install it directly. |
+| Package                  | What it is                                                                                                                                                                                                                                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@ctcstack/ctcdocs`      | The site: an Astro configuration preset, Starlight component overrides, routes, styles, and the browser test suite a project runs.                                                                                                                                                                           |
+| `@ctcstack/ctcdocs-sync` | The pipeline: Google Drive → Markdown, plus the `ctcdocs-sync` command line.                                                                                                                                                                                                                                 |
+| `@ctcstack/ctcdocs-core` | Configuration schema, project layout, the generated-path allowlist, and the kinds of published page. A transitive dependency; projects do not install it directly. Its `document-format` and `published-markdown` subpaths import nothing that reads the file system, so components and the Worker use them. |
 
 They live in `packages/astro`, `packages/sync` and `packages/core`, share one
 version, and are released together.
