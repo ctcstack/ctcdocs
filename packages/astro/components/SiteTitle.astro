@@ -1,9 +1,18 @@
 ---
+/**
+ * The mark and the site's name in the header. The mark is the project's own
+ * icon, `brand.faviconPath` in its configuration, so one file names the site
+ * in the tab and in the header. Its shape is the file's own: the stylesheet
+ * sets its height and the width follows.
+ */
+import { siteConfiguration } from '../lib/project';
+
 const { siteTitle, siteTitleHref } = Astro.locals.starlightRoute;
+const mark = siteConfiguration.brand.faviconPath;
 ---
 
 <a href={siteTitleHref} class="site-title sl-flex">
-  <img src="/favicon.svg" alt="" width="32" height="30" />
+  <img src={mark} alt="" />
   <span translate="no">{siteTitle}</span>
 </a>
 

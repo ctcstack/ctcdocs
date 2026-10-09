@@ -25,6 +25,8 @@ A calmer reading interface, and one statement of the kinds of published page.
   add it in Google Docs, and the page draws bold inside a heading at 700.
 - **A spreadsheet's page** records whether it is a Google Sheet, which the
   source link's label reads instead of the address.
+- **The header's mark** is the project's `brand.faviconPath`, not a fixed
+  `/favicon.svg`, and keeps the file's own shape.
 
 ### Internal
 
