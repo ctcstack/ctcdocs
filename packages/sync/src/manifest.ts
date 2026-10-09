@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 const MANIFEST_SCHEMA_VERSION = 3 as const;
 export const CONVERTER_VERSION = 'hybrid-v4';
-export const NORMALIZER_VERSION = 'remark-html-v2';
+export const NORMALIZER_VERSION = 'remark-html-v3';
 
 const manifestDocumentSchema = z.object({
   googleFileId: z.string().min(1),

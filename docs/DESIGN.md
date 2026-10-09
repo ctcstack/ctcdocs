@@ -266,10 +266,13 @@ JetBrains Mono gives code a distinctly different texture without a second voice.
 - **Subtitle / h3** (600, 1.1rem, tracking −0.01em): subsections.
 - **h4 / h5** (600, 1rem / 0.9375rem): deep structure; separated from body by
   weight alone.
+- **Bold inside a heading** (700): one step above the heading's 600, so a
+  stressed word shows without the heading turning black. The sync drops bold
+  that covers a whole heading, which editors add in Google Docs.
 - **Body** (400, 1rem, line-height 1.75): prose, held to a 46rem measure
   (roughly 67 characters).
-- **Meta** (400, 0.875rem, muted, `tabular-nums`): dates, breadcrumbs, provenance
-  actions, pagination captions, the corpus band. Numerals are tabular so date
+- **Meta** (400, 0.875rem, muted, `tabular-nums`): dates, provenance actions,
+  pagination captions, the corpus band. Numerals are tabular so date
   columns align down the page.
 - **Label** (600, 0.875rem, uppercase, tracking 0.06em, muted): folder group
   headings on the corpus index.
@@ -431,11 +434,13 @@ listing. It is not a template for a card grid.
 
 ### Breadcrumbs
 
-A flat `/`-separated trail at 0.875rem, entirely at the muted tone, with the
-separator generated in `::before` so it is never selected, announced, or copied.
-There is no leaf segment: the title directly below is the current page. Only the
-top-level folder segment links, pointing at that folder's group anchor on the
-home index, because Drive folders have no pages of their own.
+A flat trail at 0.8125rem and weight 500, entirely at the muted tone: a step
+smaller than the provenance row and a step heavier than body text, so it reads
+as navigation, apart from the document, without losing its place. Segments are
+separated by a thin chevron generated in `::before`, so it is never selected,
+announced, or copied. The title sits 1rem below the trail. There is no leaf
+segment: the title directly below is the current page. A folder segment links
+to the folder's page, or to its group on the home index where it has none.
 
 ### Navigation (sidebar)
 

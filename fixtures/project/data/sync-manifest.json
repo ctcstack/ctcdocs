@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
   "converterVersion": "hybrid-v4",
-  "normalizerVersion": "remark-html-v2",
+  "normalizerVersion": "remark-html-v3",
   "driveId": "fixture-drive",
   "rootFolderId": "folder-root",
   "generatedAt": "2026-02-10T06:00:00.000Z",

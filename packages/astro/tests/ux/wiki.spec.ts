@@ -369,7 +369,7 @@ test('platform styles outrank the Starlight reset on every kind of page', async 
   await page.goto(`/${anyDocument().slug}/`);
   await expect(page.locator('h1#_top')).toHaveCSS(
     'margin-top',
-    await remInPixels(page, 0.5),
+    await remInPixels(page, 1),
   );
 });
 
