@@ -257,7 +257,8 @@ is served as `text/markdown; charset=utf-8` and `llms.txt` as
 endpoint set and a browser without a charset corrupts every non-ASCII
 character. Every HTML page carries a Content Security Policy admitting the
 site's own scripts, the inline scripts the build hashed, fonts inlined as
-`data:`, the PDF `<object>` of the site's own files, and nothing else.
+`data:`, the PDF `<object>` of the site's own files, frames from Google Drive's
+player for recordings (ADR-047), and nothing else.
 
 A page is checked with the Worker every time it is shown — usually a short
 `304` — so a page read before signing out is not shown from the browser's cache

@@ -99,9 +99,9 @@ format as `video` or `audio`, and the sync report counts recordings apart.
   they cannot open.
 - The player works only where the browser lets a framed Google page use the
   reader's Google sign-in. Safari, and other browsers that block third-party
-  cookies, show Drive's request to sign in or for access instead; so does a
-  browser whose default Google account is not the one with access. The card
-  says to open the recording in Drive then, and its link always works.
+  cookies, show an error or a request to sign in instead; so does a browser
+  whose default Google account is not the one with access. The card's link
+  opens the recording in Drive whatever the browser allows.
 - A recording's page loads Google's player when it is opened, and the site's
   Content Security Policy now admits one outside origin, in frames only.
 - Drive reports the length and size of an uploaded video only once it has
