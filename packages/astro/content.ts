@@ -2,6 +2,7 @@ import { docsLoader } from '@astrojs/starlight/loaders';
 import { docsSchema } from '@astrojs/starlight/schema';
 import { defineCollection } from 'astro:content';
 import { z } from 'astro/zod';
+import { DOCUMENT_SOURCE_TYPES } from '@ctcstack/ctcdocs-core/document-format';
 
 export const collections = {
   docs: defineCollection({
@@ -9,14 +10,7 @@ export const collections = {
     schema: docsSchema({
       extend: z.object({
         sourceType: z
-          .enum([
-            'google-doc',
-            'drive-pdf',
-            'drive-sheet',
-            'drive-media',
-            'manual',
-            'section-index',
-          ])
+          .enum([...DOCUMENT_SOURCE_TYPES, 'manual', 'section-index'])
           .default('manual'),
         googleFileId: z.string().min(1).optional(),
         /*

@@ -5,6 +5,7 @@
  * this module needs the content collection and the generated sidebar, and
  * both exist only inside a project's build.
  */
+import { documentFormatOf } from '@ctcstack/ctcdocs-core/document-format';
 import { getCollection } from 'astro:content';
 import navigation from 'virtual:ctcdocs/navigation';
 
@@ -35,9 +36,8 @@ async function readAgentIndex(): Promise<AgentIndexSection[]> {
       {
         title: data.title,
         description: data.description,
-        pdf: data.sourceType === 'drive-pdf',
-        sheet: data.sourceType === 'drive-sheet',
-        ...(data.media ? { media: data.media.kind } : {}),
+        format:
+          documentFormatOf(data.sourceType, data.media?.kind) ?? 'google-doc',
         classId: classOfDocument(data.googleFileId),
       },
     ]),

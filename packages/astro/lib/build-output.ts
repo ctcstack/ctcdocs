@@ -27,6 +27,7 @@ import {
   PROJECT_LAYOUT,
   readCorpusStructure,
 } from '@ctcstack/ctcdocs-core';
+import { isDocumentSourceType } from '@ctcstack/ctcdocs-core/document-format';
 import * as cheerio from 'cheerio';
 import { close, createIndex, type PagefindIndex } from 'pagefind';
 
@@ -180,13 +181,6 @@ async function writeBundle(
   return written;
 }
 
-const DOCUMENT_SOURCES = new Set([
-  'google-doc',
-  'drive-pdf',
-  'drive-sheet',
-  'drive-media',
-]);
-
 /**
  * Reads every text file the build wrote, with the bodies of its documents and
  * the strings that may appear anywhere — page titles, headings of a page's
@@ -215,7 +209,7 @@ async function readLeaks({
     const cls = files[page.path];
     if (
       page.source &&
-      DOCUMENT_SOURCES.has(page.source) &&
+      isDocumentSourceType(page.source) &&
       typeof cls === 'string'
     ) {
       documents.push({

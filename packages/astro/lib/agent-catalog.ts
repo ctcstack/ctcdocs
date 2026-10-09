@@ -19,36 +19,14 @@ import {
   type CorpusDocument,
   type CorpusFolder,
 } from '@ctcstack/ctcdocs-core';
+import {
+  agentDocumentFormat,
+  documentFormatOf,
+} from '@ctcstack/ctcdocs-core/document-format';
 
+import type { AgentDocument } from '../worker/access-map.js';
 import { documentText } from '../worker/agents/document-text.js';
 import type { BuiltPage, FileClass } from './access-map.js';
-
-interface AgentDocument {
-  /** The permanent short ID: the tool's `id` and the R2 object's name. */
-  readonly id: string;
-  readonly title: string;
-  /** The Markdown projection's address, as the access map lists it. */
-  readonly markdown: string;
-  readonly modified: string | null;
-  /** The folders from the corpus root to the document, as the site names them. */
-  readonly path: readonly string[];
-  /**
-   * The Google Doc, PDF, spreadsheet or recording in Drive, as the page links
-   * it.
-   */
-  readonly source: string | null;
-  /**
-   * Whether it is published from a Google Doc, a PDF (ADR-044), a
-   * spreadsheet (ADR-046), or a video or audio file (ADR-047).
-   */
-  readonly format: 'doc' | 'pdf' | 'sheet' | 'video' | 'audio';
-  /** A PDF's pages, when the sync counted them. */
-  readonly pages?: number;
-  /** Characters of the stored text, which `fetch` returns (ADR-044). */
-  readonly characters: number;
-  /** SHA-256 of the stored text, its class and its title. */
-  readonly hash: string;
-}
 
 export interface AgentCatalog {
   readonly digest: string;
@@ -110,9 +88,7 @@ export async function buildAgentCatalog({
     }
     const title = document.title ?? document.slug;
     const page = pageAt.get(`/${document.slug}/`);
-    const pdf = page?.source === 'drive-pdf';
-    const sheet = page?.source === 'drive-sheet';
-    const media = page?.source === 'drive-media' ? page.media : undefined;
+    const format = documentFormatOf(page?.source, page?.media) ?? 'google-doc';
     listed.push({
       id: document.shortId,
       title,
@@ -120,8 +96,10 @@ export async function buildAgentCatalog({
       modified: document.modified ?? null,
       path: folderPath(document, folders),
       source: document.source ?? null,
-      format: pdf ? 'pdf' : sheet ? 'sheet' : (media ?? 'doc'),
-      ...(pdf && page.pdfPages !== undefined ? { pages: page.pdfPages } : {}),
+      format: agentDocumentFormat(format),
+      ...(format === 'pdf' && page?.pdfPages !== undefined
+        ? { pages: page.pdfPages }
+        : {}),
       characters: text.length,
       hash: sha256(JSON.stringify([text, fileClass, title])),
     });
