@@ -397,8 +397,14 @@ the right-hand column ("Empty" in italics when there are none). A document row
 carries the document glyph, its name at ink weight, the date its source was last
 edited with the same freshness rank, and its description underneath in muted
 text, clamped to two lines and hung under the name. The glyph and the weight
-are two cues, neither of them color. The kind also reaches a screen reader as
-text. Hairlines between siblings only; hover and focus as on the index row.
+are two cues between a folder and a document, neither of them color. The kind
+also reaches a screen reader as text. Hairlines between siblings only; hover
+and focus as on the index row.
+
+The document glyph is the outline of a page for a Google Doc, and the format's
+colored tile, as in the sidebar, for a PDF, spreadsheet, video or audio page.
+The same glyph leads a document in every list: the section listing, the full
+index, the recency band and the folder cards on the home page.
 
 ### Provenance Row
 

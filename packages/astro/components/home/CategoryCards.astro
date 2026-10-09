@@ -24,6 +24,7 @@
  * so this copy is maintained in Google Docs alongside the content rather than
  * in this repository, where it would quietly go stale.
  */
+import DocumentIcon from '../DocumentIcon.astro';
 import { formatDate, type CorpusGroup } from '../../lib/corpus';
 
 type Props = { groups: CorpusGroup[] };
@@ -68,19 +69,10 @@ const PREVIEW_COUNT = 3;
                   <ul class="category-preview">
                     {group.documents.slice(0, PREVIEW_COUNT).map((doc) => (
                       <li>
-                        <svg
-                          aria-hidden="true"
+                        <DocumentIcon
                           class="category-preview-icon"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="1.5"
-                          viewBox="0 0 16 16"
-                        >
-                          <path d="M9 2H4.5A1.5 1.5 0 0 0 3 3.5v9A1.5 1.5 0 0 0 4.5 14h7a1.5 1.5 0 0 0 1.5-1.5V6z" />
-                          <path d="M9 2v4h4" />
-                        </svg>
+                          format={doc.format}
+                        />
                         <span class="category-preview-title">{doc.title}</span>
                       </li>
                     ))}

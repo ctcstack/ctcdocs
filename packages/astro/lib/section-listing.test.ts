@@ -48,10 +48,30 @@ describe('section listing rows', () => {
         kind: 'document',
         href: '/team/guide/',
         label: 'Guide',
+        format: 'google-doc',
         description: 'How the thing is done.',
         modified: new Date('2026-02-05T08:15:00.000Z'),
       },
     ]);
+  });
+
+  it('carries the format a document page publishes, for its glyph', () => {
+    const rows = sectionListingRows(
+      [{ kind: 'document', slug: 'team/guide' }],
+      new Map([
+        [
+          'team/guide',
+          {
+            sourceType: 'drive-media',
+            format: 'video',
+            title: 'Guide',
+            description: undefined,
+            googleModifiedTime: undefined,
+          },
+        ],
+      ]),
+    );
+    expect(rows?.[0]).toMatchObject({ kind: 'document', format: 'video' });
   });
 
   it('falls back to the Markdown list when there is nothing to draw', () => {
