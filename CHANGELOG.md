@@ -28,6 +28,13 @@ A calmer reading interface, and one statement of the kinds of published page.
 - **The header's mark** is the project's `brand.faviconPath`, not a fixed
   `/favicon.svg`, and keeps the file's own shape.
 
+### Added
+
+- **`brand.faviconDarkPath`**, optional: the mark drawn for a dark ground. The
+  header shows it under the dark theme the reader chose on the site, whatever
+  the system's setting, and a browser with a dark interface shows it in the
+  tab.
+
 ### Internal
 
 - `@ctcstack/ctcdocs-core/document-format` names the kinds of page, their

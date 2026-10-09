@@ -75,6 +75,20 @@ const jsonLd =
    */
 }
 <meta name="ctcdocs:source" content={data.sourceType} />
+{
+  /*
+   * The tab belongs to the browser, so its icon follows the browser's theme:
+   * the mark drawn for a dark ground where the project has one.
+   */
+  siteConfiguration.brand.faviconDarkPath && (
+    <link
+      rel="icon"
+      href={siteConfiguration.brand.faviconDarkPath}
+      type="image/svg+xml"
+      media="(prefers-color-scheme: dark)"
+    />
+  )
+}
 {/* How many pages a PDF has, which assistants are told (ADR-044). */}
 {
   typeof data.pdf?.pages === 'number' && (

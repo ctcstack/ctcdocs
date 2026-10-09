@@ -1187,21 +1187,43 @@ test('the sidebar marks a page that is not a Google Doc with an icon of its form
   }
 });
 
-test('the header shows the mark the project configures as its icon', async ({
+test('the header shows the mark the project configures, for the theme chosen on the site', async ({
   page,
 }) => {
-  await page.goto('/');
-  const mark = page.locator('.site-title img');
-  await expect(mark).toHaveAttribute(
-    'src',
-    siteConfiguration.brand.faviconPath,
-  );
-  await expect(mark).toBeVisible();
-  // The file loaded, and it keeps its own shape at the header's height.
-  const size = await mark.evaluate((image: HTMLImageElement) => ({
-    natural: image.naturalWidth,
-    width: image.getBoundingClientRect().width,
-  }));
-  expect(size.natural).toBeGreaterThan(0);
-  expect(size.width).toBeGreaterThan(0);
+  const { faviconPath, faviconDarkPath } = siteConfiguration.brand;
+  // The mark the header shows, after the reader chose a theme on the site.
+  const shown = async (theme: 'light' | 'dark') => {
+    await page.addInitScript((value) => {
+      localStorage.setItem('starlight-theme', value);
+    }, theme);
+    await page.goto('/');
+    const visible = page.locator('.site-title img').filter({ visible: true });
+    await expect(visible).toHaveCount(1);
+    const size = await visible.evaluate((image: HTMLImageElement) => ({
+      natural: image.naturalWidth,
+      width: image.getBoundingClientRect().width,
+    }));
+    // The file loaded, and it keeps its own shape at the header's height.
+    expect(size.natural).toBeGreaterThan(0);
+    expect(size.width).toBeGreaterThan(0);
+    return visible.getAttribute('src');
+  };
+
+  // The site's choice wins over the system's, either way round.
+  await page.emulateMedia({ colorScheme: 'dark' });
+  expect(await shown('light')).toBe(faviconPath);
+  await page.emulateMedia({ colorScheme: 'light' });
+  expect(await shown('dark')).toBe(faviconDarkPath ?? faviconPath);
+
+  // The tab follows the browser: the dark mark only under a dark interface.
+  const darkIcon = page.locator('link[rel="icon"][media]');
+  if (faviconDarkPath) {
+    await expect(darkIcon).toHaveAttribute('href', faviconDarkPath);
+    await expect(darkIcon).toHaveAttribute(
+      'media',
+      '(prefers-color-scheme: dark)',
+    );
+  } else {
+    await expect(darkIcon).toHaveCount(0);
+  }
 });

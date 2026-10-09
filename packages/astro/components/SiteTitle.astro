@@ -2,17 +2,29 @@
 /**
  * The mark and the site's name in the header. The mark is the project's own
  * icon, `brand.faviconPath` in its configuration, so one file names the site
- * in the tab and in the header. Its shape is the file's own: the stylesheet
- * sets its height and the width follows.
+ * in the tab and in the header. Where the project also draws it for a dark
+ * ground, `brand.faviconDarkPath`, the header shows that one under the dark
+ * theme the reader chose on the site, whatever their system's setting. Its
+ * shape is the file's own: the stylesheet sets its height and the width
+ * follows.
  */
 import { siteConfiguration } from '../lib/project';
 
 const { siteTitle, siteTitleHref } = Astro.locals.starlightRoute;
-const mark = siteConfiguration.brand.faviconPath;
+const { faviconPath, faviconDarkPath } = siteConfiguration.brand;
 ---
 
 <a href={siteTitleHref} class="site-title sl-flex">
-  <img src={mark} alt="" />
+  {
+    faviconDarkPath ? (
+      <>
+        <img class="mark-light" src={faviconPath} alt="" />
+        <img class="mark-dark" src={faviconDarkPath} alt="" />
+      </>
+    ) : (
+      <img src={faviconPath} alt="" />
+    )
+  }
   <span translate="no">{siteTitle}</span>
 </a>
 
@@ -38,6 +50,12 @@ const mark = siteConfiguration.brand.faviconPath;
     span {
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+
+    /* Starlight sets the theme on the root before the page paints. */
+    :global(:root[data-theme='dark']) .mark-light,
+    :global(:root:not([data-theme='dark'])) .mark-dark {
+      display: none;
     }
   }
 </style>

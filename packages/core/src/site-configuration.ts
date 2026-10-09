@@ -27,8 +27,17 @@ export interface BrandConfiguration {
   readonly siteTitle: string;
   /** One sentence, used as the site-wide meta description. */
   readonly siteDescription: string;
-  /** Site-root-relative path of the favicon served from `public/`. */
+  /**
+   * Site-root-relative path of the favicon served from `public/`, which is
+   * also the mark in the header.
+   */
   readonly faviconPath: string;
+  /**
+   * The same mark drawn for a dark ground, when the light one would not show
+   * on it: the header shows it under the dark theme, and a browser whose
+   * interface is dark shows it in the tab.
+   */
+  readonly faviconDarkPath?: string;
 }
 
 export interface HomeConfiguration {
@@ -737,8 +746,16 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
   if (!faviconPath.startsWith('/')) {
     fail('brand.faviconPath', 'must be a site-root-relative path');
   }
+  const faviconDarkPath =
+    brandSource.faviconDarkPath === undefined
+      ? undefined
+      : text(brandSource, 'faviconDarkPath', 'brand.faviconDarkPath');
+  if (faviconDarkPath !== undefined && !faviconDarkPath.startsWith('/')) {
+    fail('brand.faviconDarkPath', 'must be a site-root-relative path');
+  }
   const brand: BrandConfiguration = {
     faviconPath,
+    ...(faviconDarkPath === undefined ? {} : { faviconDarkPath }),
     name: text(brandSource, 'name', 'brand.name'),
     siteDescription: text(
       brandSource,

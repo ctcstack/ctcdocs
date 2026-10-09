@@ -524,6 +524,27 @@ describe('loadSiteConfiguration', () => {
 
     expect(() => loadSiteConfiguration(root)).toThrow(/brand\.faviconPath/u);
   });
+
+  it('takes an optional mark for a dark ground', () => {
+    const plain = validConfiguration();
+    expect(
+      loadSiteConfiguration(writeProject(plain)).brand.faviconDarkPath,
+    ).toBeUndefined();
+
+    const dark = validConfiguration();
+    (dark.brand as Record<string, unknown>).faviconDarkPath =
+      '/favicon-dark.svg';
+    expect(
+      loadSiteConfiguration(writeProject(dark)).brand.faviconDarkPath,
+    ).toBe('/favicon-dark.svg');
+
+    const relative = validConfiguration();
+    (relative.brand as Record<string, unknown>).faviconDarkPath =
+      'favicon-dark.svg';
+    expect(() => loadSiteConfiguration(writeProject(relative))).toThrow(
+      /brand\.faviconDarkPath/u,
+    );
+  });
 });
 
 describe('ownership markers', () => {
