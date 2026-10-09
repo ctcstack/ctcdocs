@@ -22,6 +22,7 @@ import type {
   SelectedInventoryItem,
 } from '../inventory/inventory-graph.js';
 import {
+  documentFormat,
   isGoogleDocRecord,
   isMediaRecord,
   type SyncedDocumentRecord,
@@ -340,8 +341,9 @@ function longDocument(
   lengths: PublishedDocumentLengths,
 ): { code: NoteCode; detail: string } | undefined {
   const characters = lengths.characters.get(record.googleFileId) ?? 0;
-  const pdf = record.exportMode === 'pdf';
-  const sheet = record.exportMode === 'sheet';
+  const format = documentFormat(record);
+  const pdf = format === 'pdf';
+  const sheet = format === 'sheet';
   if (characters > lengths.fetchCharacters) {
     return {
       code: pdf

@@ -12,7 +12,11 @@
  * and never becomes markup, a link or a new column. The catalog's own wording
  * is the platform's, and goes in as written.
  */
-import type { AccessFinding } from '@ctcstack/ctcdocs-core';
+import {
+  DOCUMENT_FORMAT_BADGES,
+  type AccessFinding,
+  type DocumentFormat,
+} from '@ctcstack/ctcdocs-core';
 
 import type { SyncReport } from '../generation/sync-report.js';
 import { UNPUBLISHED_STATUS_LABELS } from '../generation/unpublished.js';
@@ -25,12 +29,10 @@ import type { TitleReport } from '../titles/title-report.js';
 const MAX_ROWS_PER_GROUP = 100;
 
 /** How a page that is not a Google Doc is marked in a run's lists. */
-const FORMAT_LABELS: Readonly<Record<string, string>> = {
-  pdf: ' · PDF',
-  sheet: ' · Sheet',
-  video: ' · Video',
-  audio: ' · Audio',
-};
+function badge(format: DocumentFormat): string {
+  const label = DOCUMENT_FORMAT_BADGES[format];
+  return label ? ` · ${label}` : '';
+}
 
 /**
  * A Drive name or folder label as literal text in a table cell. Every ASCII
@@ -126,7 +128,7 @@ export function renderRunSummary(
             .slice(0, MAX_ROWS_PER_GROUP)
             .map(
               (page) =>
-                `- ${linked ? `[${cell(page.title)}](${pageUrl(siteUrl, page.slug)})` : cell(page.title)}${FORMAT_LABELS[page.format] ?? ''}`,
+                `- ${linked ? `[${cell(page.title)}](${pageUrl(siteUrl, page.slug)})` : cell(page.title)}${badge(page.format)}`,
             )
             .concat(
               pages.length > MAX_ROWS_PER_GROUP

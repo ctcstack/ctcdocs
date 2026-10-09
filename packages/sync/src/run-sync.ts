@@ -13,6 +13,7 @@ import {
   PROJECT_LAYOUT,
   widensReaders,
   type AccessConfiguration,
+  type DocumentFormat,
   type Readers,
 } from '@ctcstack/ctcdocs-core';
 
@@ -89,9 +90,11 @@ import {
   computeGeneratedContentHash,
   extractGeneratedDocumentBody,
   extractGeneratedFolderPath,
-  extractGeneratedFrontmatter,
   generateMarkdownDocument,
   sha256,
+  pdfFactsSchema,
+  recordedFacts,
+  sheetFactsSchema,
   type GeneratedMediaFacts,
   type GeneratedPdfFacts,
   type GeneratedSheetFacts,
@@ -110,8 +113,8 @@ import {
 } from './links/rewrite-internal-links.js';
 import {
   CONVERTER_VERSION,
+  documentFormat,
   isGoogleDocRecord,
-  isMediaRecord,
   loadManifest,
   NORMALIZER_VERSION,
   serializeManifest,
@@ -190,7 +193,7 @@ interface RunPage {
   id: string;
   title: string;
   slug: string;
-  format: 'google-doc' | 'pdf' | 'sheet' | 'video' | 'audio';
+  format: DocumentFormat;
 }
 
 /** What one run changed on the site, for the run's own summary (ADR-028). */
@@ -449,43 +452,6 @@ function incompleteSheet(record: SyncedDocumentRecord): IncompleteDocument[] {
     });
   }
   return missing;
-}
-
-/** The spreadsheet facts a page recorded in its frontmatter, if any. */
-function recordedSheetFacts(content: string): GeneratedSheetFacts | undefined {
-  const frontmatter = extractGeneratedFrontmatter(content);
-  const sheet =
-    typeof frontmatter === 'object' && frontmatter !== null
-      ? (frontmatter as { sheet?: unknown }).sheet
-      : undefined;
-  if (typeof sheet !== 'object' || sheet === null) {
-    return undefined;
-  }
-  const { sheets, formulas } = sheet as Record<string, unknown>;
-  return typeof sheets === 'number' && typeof formulas === 'number'
-    ? { sheets, formulas }
-    : undefined;
-}
-
-/** The PDF facts a page recorded in its frontmatter, when it has them. */
-function recordedPdfFacts(content: string): GeneratedPdfFacts | undefined {
-  const frontmatter = extractGeneratedFrontmatter(content);
-  const pdf =
-    typeof frontmatter === 'object' && frontmatter !== null
-      ? (frontmatter as { pdf?: unknown }).pdf
-      : undefined;
-  if (typeof pdf !== 'object' || pdf === null) {
-    return undefined;
-  }
-  const { file, bytes, pages } = pdf as Record<string, unknown>;
-  if (typeof bytes !== 'number') {
-    return undefined;
-  }
-  return {
-    ...(typeof file === 'string' ? { file } : {}),
-    bytes,
-    pages: typeof pages === 'number' ? pages : null,
-  };
 }
 
 function generatedMarkdownPath(fileId: string): string {
@@ -1425,7 +1391,11 @@ async function synchronize(
       !planned.existingOutputInvalid &&
       planned.existingContent !== undefined
     ) {
-      const facts = recordedPdfFacts(planned.existingContent);
+      const facts = recordedFacts(
+        planned.existingContent,
+        'pdf',
+        pdfFactsSchema,
+      );
       const body = extractGeneratedDocumentBody(
         planned.existingContent,
         markdownHeader,
@@ -1556,7 +1526,11 @@ async function synchronize(
       !planned.existingOutputInvalid &&
       planned.existingContent !== undefined
     ) {
-      const facts = recordedSheetFacts(planned.existingContent);
+      const facts = recordedFacts(
+        planned.existingContent,
+        'sheet',
+        sheetFactsSchema,
+      );
       const body = extractGeneratedDocumentBody(
         planned.existingContent,
         markdownHeader,
@@ -1906,13 +1880,7 @@ async function synchronize(
     id: record.googleFileId,
     title: record.displayTitle,
     slug: record.stableSlug,
-    format:
-      record.exportMode === 'pdf' ||
-      record.exportMode === 'sheet' ||
-      record.exportMode === 'video' ||
-      record.exportMode === 'audio'
-        ? record.exportMode
-        : 'google-doc',
+    format: documentFormat(record),
   });
   const bySlug = (left: { slug: string }, right: { slug: string }) =>
     compareText(left.slug, right.slug);
@@ -2047,13 +2015,13 @@ async function synchronize(
       characters: publishedLengths(output, candidateManifest, markdownHeader),
     },
   });
-  const pdfs = publishedRecords.filter(
-    (record) => record.exportMode === 'pdf',
-  ).length;
-  const sheets = publishedRecords.filter(
-    (record) => record.exportMode === 'sheet',
-  ).length;
-  const media = publishedRecords.filter(isMediaRecord).length;
+  const published = (...formats: DocumentFormat[]) =>
+    publishedRecords.filter((record) =>
+      formats.includes(documentFormat(record)),
+    ).length;
+  const pdfs = published('pdf');
+  const sheets = published('sheet');
+  const media = published('video', 'audio');
   const markdown = publishedRecords.filter(
     (record) => record.exportMode === 'markdown',
   ).length;

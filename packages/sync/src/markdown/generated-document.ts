@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
 
+import {
+  documentSourceType,
+  type DocumentFormat,
+} from '@ctcstack/ctcdocs-core';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import { z } from 'zod';
 
 export interface GeneratedDocumentInput {
   title: string;
@@ -23,33 +28,78 @@ export interface GeneratedDocumentInput {
   media?: GeneratedMediaFacts;
 }
 
-/**
- * What the page of a recording says about it, each fact `null` when Drive
- * does not report it.
+/*
+ * What a page that publishes a Drive file says about it in its frontmatter.
+ * The schemas are the one statement of each shape: the sync writes them, reads
+ * them back to reuse a page, and validates them before publishing.
  */
-export interface GeneratedMediaFacts {
-  kind: 'video' | 'audio';
-  /** A Google Vids video, which plays in Google Vids rather than Drive. */
-  vids: boolean;
-  seconds: number | null;
-  width: number | null;
-  height: number | null;
-}
 
-/** What the page of a spreadsheet says about it. */
-export interface GeneratedSheetFacts {
-  /** Sheets the page shows. */
-  sheets: number;
-  /** Cells with a formula the page shows. */
-  formulas: number;
-}
-
-/** What the page of a PDF says about the file. */
-export interface GeneratedPdfFacts {
+/** What the page of a PDF says about the file (ADR-027). */
+export const pdfFactsSchema = z.strictObject({
   /** The published file's name in the document's asset directory. */
-  file?: string;
-  bytes: number;
-  pages: number | null;
+  file: z
+    .string()
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*\.pdf$/u)
+    .optional(),
+  bytes: z.number().int().nonnegative(),
+  pages: z.number().int().nonnegative().nullable(),
+});
+
+/** What the page of a spreadsheet says about it (ADR-046). */
+export const sheetFactsSchema = z.strictObject({
+  /** Sheets the page shows. */
+  sheets: z.number().int().nonnegative(),
+  /** Cells with a formula the page shows. */
+  formulas: z.number().int().nonnegative(),
+});
+
+/**
+ * What the page of a recording says about it (ADR-047), each fact `null` when
+ * Drive does not report it.
+ */
+export const mediaFactsSchema = z.strictObject({
+  kind: z.enum(['video', 'audio']),
+  /** A Google Vids video, which plays in Google Vids rather than Drive. */
+  vids: z.boolean(),
+  seconds: z.number().int().positive().nullable(),
+  width: z.number().int().positive().nullable(),
+  height: z.number().int().positive().nullable(),
+});
+
+export type GeneratedPdfFacts = z.infer<typeof pdfFactsSchema>;
+export type GeneratedSheetFacts = z.infer<typeof sheetFactsSchema>;
+export type GeneratedMediaFacts = z.infer<typeof mediaFactsSchema>;
+
+/**
+ * The facts a generated page recorded in its frontmatter under `key`, when
+ * they are there in the shape `schema` describes.
+ */
+export function recordedFacts<T>(
+  content: string,
+  key: 'pdf' | 'sheet' | 'media',
+  schema: z.ZodType<T>,
+): T | undefined {
+  const frontmatter = extractGeneratedFrontmatter(content);
+  if (typeof frontmatter !== 'object' || frontmatter === null) {
+    return undefined;
+  }
+  const parsed = schema.safeParse(
+    (frontmatter as Record<string, unknown>)[key],
+  );
+  return parsed.success ? parsed.data : undefined;
+}
+
+/** What a page publishes, from the facts it records. */
+export function pageFormat(facts: {
+  pdf?: GeneratedPdfFacts | undefined;
+  sheet?: GeneratedSheetFacts | undefined;
+  media?: GeneratedMediaFacts | undefined;
+}): DocumentFormat {
+  return facts.pdf
+    ? 'pdf'
+    : facts.sheet
+      ? 'sheet'
+      : (facts.media?.kind ?? 'google-doc');
 }
 
 export interface GeneratedAssetContent {
@@ -141,13 +191,7 @@ export function generateMarkdownDocument(
       slug: input.slug,
       shortId: input.shortId,
       editUrl: input.sourceUrl,
-      sourceType: input.pdf
-        ? 'drive-pdf'
-        : input.sheet
-          ? 'drive-sheet'
-          : input.media
-            ? 'drive-media'
-            : 'google-doc',
+      sourceType: documentSourceType(pageFormat(input)),
       googleFileId: input.googleFileId,
       googleModifiedTime: input.googleModifiedTime,
       syncedAt: input.syncedAt,

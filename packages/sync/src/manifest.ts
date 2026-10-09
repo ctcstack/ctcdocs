@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 
-import { SHORT_ID_PATTERN } from '@ctcstack/ctcdocs-core';
+import { SHORT_ID_PATTERN, type DocumentFormat } from '@ctcstack/ctcdocs-core';
 import { z } from 'zod';
 
 const MANIFEST_SCHEMA_VERSION = 3 as const;
@@ -159,18 +159,30 @@ export type SyncedDocumentRecord = z.infer<typeof manifestDocumentSchema>;
 export type SyncedFolderRecord = z.infer<typeof manifestFolderSchema>;
 export type ManifestRedirect = z.infer<typeof manifestRedirectSchema>;
 
+/** What a record's page publishes, from how its file was converted. */
+export function documentFormat(record: SyncedDocumentRecord): DocumentFormat {
+  switch (record.exportMode) {
+    case 'pdf':
+    case 'sheet':
+    case 'video':
+    case 'audio':
+      return record.exportMode;
+    case 'markdown':
+    case 'html-zip':
+    case 'hybrid':
+      return 'google-doc';
+  }
+}
+
 /** A page published from a Google Doc, not a PDF, spreadsheet or recording. */
 export function isGoogleDocRecord(record: SyncedDocumentRecord): boolean {
-  return (
-    record.exportMode !== 'pdf' &&
-    record.exportMode !== 'sheet' &&
-    !isMediaRecord(record)
-  );
+  return documentFormat(record) === 'google-doc';
 }
 
 /** A page published from a video or audio file (ADR-047). */
 export function isMediaRecord(record: SyncedDocumentRecord): boolean {
-  return record.exportMode === 'video' || record.exportMode === 'audio';
+  const format = documentFormat(record);
+  return format === 'video' || format === 'audio';
 }
 
 export class ManifestError extends Error {
