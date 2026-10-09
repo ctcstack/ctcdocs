@@ -547,8 +547,12 @@ describe('the gate', () => {
     // Inlined fonts and a PDF's <object> are the site's own.
     expect(csp).toContain("font-src 'self' data:");
     expect(csp).toContain("object-src 'self'");
-    // A recording plays in Drive's player, and nothing else is framed.
-    expect(csp).toContain('frame-src https://drive.google.com;');
+    /*
+     * A PDF's <object> is framed from the site itself, and a recording plays
+     * in Drive's player; nothing else is framed. Dropping 'self' blocked
+     * every PDF in 0.22.0.
+     */
+    expect(csp).toContain("frame-src 'self' https://drive.google.com;");
     const markdown = await handle(
       get('/handbook/index.md', { Cookie: cookie }),
       context(),

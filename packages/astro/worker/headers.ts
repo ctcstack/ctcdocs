@@ -34,10 +34,13 @@ function contentSecurityPolicy(map: AccessMapFile): string {
     // A PDF's page shows the file in an <object> (ADR-027).
     "object-src 'self'",
     /*
-     * A recording's page plays it in Drive's own player (ADR-047). Drive
-     * decides who may play it; nothing else is framed.
+     * Frames: the site's own files, since a browser shows a PDF's <object>
+     * in a frame that this directive governs, and Drive's player on a
+     * recording's page (ADR-047), where Drive decides who may play it.
+     * Without 'self' here a PDF is blocked: the directive replaces
+     * default-src for frames rather than adding to it.
      */
-    'frame-src https://drive.google.com',
+    "frame-src 'self' https://drive.google.com",
     "base-uri 'none'",
     "frame-ancestors 'none'",
     "form-action 'self'",

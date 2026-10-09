@@ -546,5 +546,5 @@ date remains.
   the table element and the UX suite asserts that exact pair.
 - **Don't** load fonts, icons, or scripts from a third-party origin. Everything is
   self-hosted; a private site's Content Security Policy refuses anything else,
-  framing only Google Drive's player (ADR-047).
+  framing only its own files and Google Drive's player (ADR-047).
 - **Don't** hand-edit generated files to fix a presentation problem.
