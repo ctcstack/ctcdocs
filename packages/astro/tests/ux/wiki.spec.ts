@@ -1,5 +1,8 @@
 import { AxeBuilder } from '@axe-core/playwright';
-import { ACCESS_CLASSES_ROUTE } from '@ctcstack/ctcdocs-core';
+import {
+  ACCESS_CLASSES_ROUTE,
+  PLATFORM_ROUTE_HREFS,
+} from '@ctcstack/ctcdocs-core';
 import { expect, test, type Page } from '@playwright/test';
 import type { Root, RootContent } from 'mdast';
 import remarkParse from 'remark-parse';
@@ -1174,4 +1177,15 @@ test('the sidebar marks a page that is not a Google Doc with an icon of its form
     expect(iconColor).not.toBe('rgba(0, 0, 0, 0)');
   }
   await expectNoAccessibilityViolations(page);
+
+  // The full index draws the same tile before the title, not a page outline.
+  await page.goto(PLATFORM_ROUTE_HREFS.fullIndex);
+  for (const document of marked) {
+    const row = page.locator(`a[href="/${document.slug}/"]`).filter({
+      hasText: document.title,
+    });
+    await expect(
+      row.first().locator(`.kb-format-${document.format ?? 'google-doc'}`),
+    ).toHaveCount(1);
+  }
 });

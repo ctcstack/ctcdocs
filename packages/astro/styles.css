@@ -383,7 +383,7 @@ header.header {
  * without shouting over it.
  */
 #starlight__sidebar .large {
-  font-size: var(--sl-text-base);
+  font-size: var(--kb-text-base);
 }
 
 #starlight__sidebar summary .large {
@@ -415,7 +415,7 @@ header.header {
 
 @media (min-width: 50rem) {
   #starlight__sidebar .large {
-    font-size: var(--sl-text-sm);
+    font-size: var(--kb-text-sm);
   }
 }
 
@@ -440,14 +440,24 @@ header.header {
  * the color readers know each file type by. The badge's text stays for screen
  * readers and is moved out of view.
  */
-#starlight__sidebar .sl-badge.kb-format {
+/* The tile itself, wherever a format's glyph is drawn. */
+.kb-format {
   background-color: var(--kb-format-color);
+  display: inline-block;
+  flex: none;
+  /* Inside the content box, so a list's padding beside its glyph stays clear. */
+  mask: var(--kb-format-icon) center / contain no-repeat content-box;
+}
+
+/*
+ * In the sidebar the tile replaces Starlight's badge after the title: the
+ * badge keeps its text for screen readers, out of view.
+ */
+#starlight__sidebar .sl-badge.kb-format {
   border: 0;
   border-radius: 0;
-  display: inline-block;
   height: 1.15em;
   margin-inline-start: 0.15em;
-  mask: var(--kb-format-icon) center / contain no-repeat;
   overflow: hidden;
   padding: 0;
   text-indent: 100%;
@@ -456,22 +466,22 @@ header.header {
   width: 1.15em;
 }
 
-#starlight__sidebar .kb-format-pdf {
+.kb-format-pdf {
   --kb-format-color: var(--kb-format-pdf);
   --kb-format-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><defs><mask id='g'><rect width='24' height='24' fill='white'/><path d='M4.75 16V8h2.5a2.25 2.25 0 0 1 0 4.5h-2.5M10.25 16V8h1.5a3.5 4 0 0 1 0 8zM17.25 16V8h2.75M17.25 12h2.25' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/></mask></defs><rect x='1.5' y='1.5' width='21' height='21' rx='4.5' mask='url(%23g)'/></svg>");
 }
 
-#starlight__sidebar .kb-format-sheet {
+.kb-format-sheet {
   --kb-format-color: var(--kb-format-sheet);
   --kb-format-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><defs><mask id='g'><rect width='24' height='24' fill='white'/><path d='M6 6.5h12v11H6zM6 10.25h12M6 13.75h12M10.25 6.5v11' fill='none' stroke='black' stroke-width='1.6' stroke-linejoin='round'/></mask></defs><rect x='1.5' y='1.5' width='21' height='21' rx='4.5' mask='url(%23g)'/></svg>");
 }
 
-#starlight__sidebar .kb-format-video {
+.kb-format-video {
   --kb-format-color: var(--kb-format-video);
   --kb-format-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><defs><mask id='g'><rect width='24' height='24' fill='white'/><path d='M9.5 7.25v9.5l7.75-4.75z' fill='black' stroke='black' stroke-width='1' stroke-linejoin='round'/></mask></defs><rect x='1.5' y='1.5' width='21' height='21' rx='4.5' mask='url(%23g)'/></svg>");
 }
 
-#starlight__sidebar .kb-format-audio {
+.kb-format-audio {
   --kb-format-color: var(--kb-format-audio);
   --kb-format-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><defs><mask id='g'><rect width='24' height='24' fill='white'/><path d='M7.5 10.5v3M10.5 8v8M13.5 6.5v11M16.5 9.5v5' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'/></mask></defs><rect x='1.5' y='1.5' width='21' height='21' rx='4.5' mask='url(%23g)'/></svg>");
 }

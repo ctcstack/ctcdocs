@@ -10,7 +10,10 @@
  * order the sidebar uses. See docs/ADR/019-folders-before-documents.md.
  */
 import { oneLine } from './text.js';
-import { DOCUMENT_SOURCE_TYPES } from '@ctcstack/ctcdocs-core/document-format';
+import {
+  DOCUMENT_SOURCE_TYPES,
+  type DocumentFormat,
+} from '@ctcstack/ctcdocs-core/document-format';
 
 export type SectionEntry =
   | { kind: 'folder'; slug: string; documentCount: number }
@@ -19,6 +22,8 @@ export type SectionEntry =
 /** What the listing needs to know about a page in the collection. */
 export interface ListedPage {
   sourceType: string;
+  /** What a document's page publishes; absent for a folder's page. */
+  format?: DocumentFormat | undefined;
   title: string;
   description: string | undefined;
   googleModifiedTime: string | undefined;
@@ -30,6 +35,7 @@ export type SectionListingRow =
       kind: 'document';
       href: string;
       label: string;
+      format: DocumentFormat;
       description: string | undefined;
       modified: Date | undefined;
     };
@@ -74,6 +80,7 @@ export function sectionListingRows(
         kind: 'document',
         href,
         label: page.title,
+        format: page.format ?? 'google-doc',
         description: oneLine(page.description),
         modified: page.googleModifiedTime
           ? new Date(page.googleModifiedTime)

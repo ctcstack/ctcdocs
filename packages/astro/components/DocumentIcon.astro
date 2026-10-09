@@ -1,0 +1,42 @@
+---
+/**
+ * The glyph a list draws before a document's title: the outline of a page for
+ * a Google Doc, and for a PDF, spreadsheet, video or audio file the colored
+ * tile of its format, as the sidebar draws it after the title (ADR-047).
+ *
+ * It is decorative. Each list says what a row is in text, so a reader who
+ * never sees the picture loses nothing.
+ */
+import type { DocumentFormat } from '@ctcstack/ctcdocs-core/document-format';
+
+interface Props {
+  format: DocumentFormat | undefined;
+  /** The list's own class for its glyph, which sets its size and place. */
+  class: string;
+}
+
+const { format, class: className } = Astro.props;
+---
+
+{
+  format && format !== 'google-doc' ? (
+    <span
+      aria-hidden="true"
+      class:list={[className, 'kb-format', `kb-format-${format}`]}
+    />
+  ) : (
+    <svg
+      aria-hidden="true"
+      class={className}
+      fill="none"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="1.5"
+      viewBox="0 0 16 16"
+    >
+      <path d="M9 2H4.5A1.5 1.5 0 0 0 3 3.5v9A1.5 1.5 0 0 0 4.5 14h7a1.5 1.5 0 0 0 1.5-1.5V6z" />
+      <path d="M9 2v4h4" />
+    </svg>
+  )
+}

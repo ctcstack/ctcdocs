@@ -12,7 +12,11 @@
 import { isOpenToMembers } from './access-source.js';
 import { siteConfiguration } from './project.js';
 import { getCollection } from 'astro:content';
-import { isDocumentSourceType } from '@ctcstack/ctcdocs-core/document-format';
+import {
+  documentFormatOf,
+  isDocumentSourceType,
+  type DocumentFormat,
+} from '@ctcstack/ctcdocs-core/document-format';
 
 import { folderAnchorHref, folderAnchorId, folderTrail } from './folder-anchor';
 import { loadSectionHrefs, sectionHref } from './sections';
@@ -35,6 +39,8 @@ const DESCRIPTION_DOC_TITLES =
 export type CorpusDocument = {
   description: string | undefined;
   folder: string;
+  /** What the page publishes, for the glyph a list draws before it. */
+  format: DocumentFormat;
   href: string;
   modified: Date | undefined;
   /** Whether every signed-in member may read it (ADR-039). */
@@ -133,6 +139,9 @@ export async function loadCorpus(): Promise<Corpus> {
       description: description ? description : undefined,
       openToMembers: isOpenToMembers(doc.data.googleFileId),
       folder: label,
+      format:
+        documentFormatOf(doc.data.sourceType, doc.data.media?.kind) ??
+        'google-doc',
       href: `/${doc.id}/`,
       modified: modifiedRaw ? new Date(modifiedRaw) : undefined,
       // Deeper folders are shown on the row rather than as their own group,

@@ -12,6 +12,7 @@
  * Rows are the ruled record of the full index and the recency band, so the
  * three lists read as one system. See docs/ADR/019-folders-before-documents.md.
  */
+import DocumentIcon from './DocumentIcon.astro';
 import { formatDate } from '../lib/corpus';
 import {
   documentCountLabel,
@@ -50,19 +51,7 @@ const KIND_TEXT = { folder: ' (folder)', document: ' (document)' } as const;
                 <path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.38a1.5 1.5 0 0 1 1.06.44L8 4.5h4.5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z" />
               </svg>
             ) : (
-              <svg
-                aria-hidden="true"
-                class="section-entry-icon"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.5"
-                viewBox="0 0 16 16"
-              >
-                <path d="M9 2H4.5A1.5 1.5 0 0 0 3 3.5v9A1.5 1.5 0 0 0 4.5 14h7a1.5 1.5 0 0 0 1.5-1.5V6z" />
-                <path d="M9 2v4h4" />
-              </svg>
+              <DocumentIcon class="section-entry-icon" format={row.format} />
             )}
             {row.label}
             <span class="section-entry-kind">{KIND_TEXT[row.kind]}</span>

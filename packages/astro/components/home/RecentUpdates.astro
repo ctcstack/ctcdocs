@@ -10,6 +10,7 @@
  * component's, because it follows the corpus: the same six rows are a fortnight
  * on one deployment and an afternoon on another.
  */
+import DocumentIcon from '../DocumentIcon.astro';
 import { formatDate, type CorpusDocument } from '../../lib/corpus';
 
 type Props = { documents: CorpusDocument[]; limit: number };
@@ -39,19 +40,7 @@ const recent = documents
           <li>
             <a href={doc.href}>
               <span class="recent-title">
-                <svg
-                  aria-hidden="true"
-                  class="recent-icon"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="1.5"
-                  viewBox="0 0 16 16"
-                >
-                  <path d="M9 2H4.5A1.5 1.5 0 0 0 3 3.5v9A1.5 1.5 0 0 0 4.5 14h7a1.5 1.5 0 0 0 1.5-1.5V6z" />
-                  <path d="M9 2v4h4" />
-                </svg>
+                <DocumentIcon class="recent-icon" format={doc.format} />
                 {doc.title}
               </span>
               <span class="recent-folder">{doc.folder}</span>

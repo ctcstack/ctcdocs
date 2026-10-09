@@ -16,6 +16,7 @@ import { getCollection } from 'astro:content';
 import MediaFile from './MediaFile.astro';
 import PdfFile from './PdfFile.astro';
 import SectionListing from './SectionListing.astro';
+import { documentFormatOf } from '@ctcstack/ctcdocs-core/document-format';
 import { classOfDocument, classOfFolderSlug } from '../lib/access-source';
 import { sectionListingRows, type ListedPage } from '../lib/section-listing';
 
@@ -36,6 +37,7 @@ async function loadRows() {
       doc.id,
       {
         sourceType: doc.data.sourceType,
+        format: documentFormatOf(doc.data.sourceType, doc.data.media?.kind),
         title: doc.data.title,
         description:
           doc.data.sourceType === 'section-index' ||

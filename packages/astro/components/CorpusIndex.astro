@@ -13,6 +13,7 @@
  * names itself instead — the group headings below stay the same either way,
  * which is what keeps `/documents/#<folder>` a stable address for a folder.
  */
+import DocumentIcon from './DocumentIcon.astro';
 import { formatDate, type CorpusGroup } from '../lib/corpus';
 
 type Props = { groups: CorpusGroup[]; heading?: boolean };
@@ -89,19 +90,10 @@ const GroupHeading = heading ? 'h3' : 'h2';
               <li>
                 <a href={entry.href}>
                   <span class="corpus-entry-title">
-                    <svg
-                      aria-hidden="true"
+                    <DocumentIcon
                       class="corpus-entry-icon"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="1.5"
-                      viewBox="0 0 16 16"
-                    >
-                      <path d="M9 2H4.5A1.5 1.5 0 0 0 3 3.5v9A1.5 1.5 0 0 0 4.5 14h7a1.5 1.5 0 0 0 1.5-1.5V6z" />
-                      <path d="M9 2v4h4" />
-                    </svg>
+                      format={entry.format}
+                    />
                     {entry.title}
                   </span>
                   {entry.qualifier && (
