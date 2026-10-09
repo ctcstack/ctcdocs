@@ -18,6 +18,7 @@ import {
   markdownProjectionPath,
   permanentLinkPath,
 } from '@ctcstack/ctcdocs-core';
+import { documentFormatOf } from '@ctcstack/ctcdocs-core/document-format';
 
 const { entry } = Astro.locals.starlightRoute;
 const { editUrl, googleModifiedTime, media, shortId, sourceType, syncedAt } =
@@ -44,14 +45,9 @@ function formatUtcDateTime(value: string): string {
   });
 }
 
-const isPdf = sourceType === 'drive-pdf';
-const isSheet = sourceType === 'drive-sheet';
-const isMedia = sourceType === 'drive-media';
+const format = documentFormatOf(sourceType, media?.kind);
 const showMetadata =
-  (sourceType === 'google-doc' || isPdf || isSheet || isMedia) &&
-  sourceUrl &&
-  googleModifiedTime &&
-  syncedAt;
+  format !== undefined && sourceUrl && googleModifiedTime && syncedAt;
 const showSectionLink = sourceType === 'section-index' && permanentPath;
 /*
  * A Google Sheet opens in Google Sheets and a Google Vids video in Google Vids;
@@ -59,7 +55,7 @@ const showSectionLink = sourceType === 'section-index' && permanentPath;
  * (ADR-046, ADR-047).
  */
 const sourceLabel =
-  !isPdf && !isSheet && !isMedia
+  format === 'google-doc'
     ? 'Open in Google Docs'
     : sourceUrl?.startsWith('https://docs.google.com/spreadsheets/')
       ? 'Open in Google Sheets'

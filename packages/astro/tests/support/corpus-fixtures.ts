@@ -21,6 +21,7 @@ import {
   PROJECT_LAYOUT,
   readCorpusStructure,
 } from '@ctcstack/ctcdocs-core';
+import type { DocumentFormat } from '@ctcstack/ctcdocs-core/document-format';
 
 export interface CorpusFixture {
   /** Google file identifier, which is also the generated asset directory. */
@@ -29,7 +30,7 @@ export interface CorpusFixture {
   title: string;
   folderPath: string[];
   /** Absent from an index written before PDF files were published. */
-  format?: 'google-doc' | 'pdf' | 'sheet' | 'video' | 'audio';
+  format?: DocumentFormat;
 }
 
 /*

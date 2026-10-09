@@ -20,6 +20,7 @@ import {
   type AccessModel,
   type CorpusStructure,
 } from '@ctcstack/ctcdocs-core';
+import { isDocumentSourceType } from '@ctcstack/ctcdocs-core/document-format';
 
 /** Served to any signed-in reader: scripts, styles, fonts, public files. */
 export const PLATFORM_FILE = 'platform';
@@ -68,12 +69,6 @@ export interface AccessMap {
 
 const OPTIMIZED_IMAGE = /^\/_astro\/.+\.(?:avif|gif|jpe?g|png|svg|webp)$/iu;
 const PLATFORM_ASSET = /^\/_astro\/.+\.(?:css|js|mjs|woff2?|ttf|otf)$/iu;
-const DOCUMENT_SOURCES = new Set([
-  'google-doc',
-  'drive-pdf',
-  'drive-sheet',
-  'drive-media',
-]);
 
 /** The canonical site path of a file written at `relativePath` under `dist`. */
 export function canonicalSitePath(relativePath: string): string {
@@ -142,7 +137,7 @@ export function buildAccessMap(input: AccessMapInput): AccessMap {
       (page.redirect && page.source === undefined)
     ) {
       cls = MEMBERS_CLASS;
-    } else if (page.source && DOCUMENT_SOURCES.has(page.source)) {
+    } else if (page.source && isDocumentSourceType(page.source)) {
       const id = documentsBySlug.get(slugOf(page.path));
       cls = id === undefined ? undefined : documentClass(model, id);
       documentPage = cls !== undefined;

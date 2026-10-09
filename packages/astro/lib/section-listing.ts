@@ -10,6 +10,7 @@
  * order the sidebar uses. See docs/ADR/019-folders-before-documents.md.
  */
 import { oneLine } from './text.js';
+import { DOCUMENT_SOURCE_TYPES } from '@ctcstack/ctcdocs-core/document-format';
 
 export type SectionEntry =
   | { kind: 'folder'; slug: string; documentCount: number }
@@ -38,7 +39,7 @@ const EXPECTED_SOURCES: Readonly<
   Record<'folder' | 'document', readonly string[]>
 > = {
   folder: ['section-index'],
-  document: ['google-doc', 'drive-pdf', 'drive-sheet', 'drive-media'],
+  document: DOCUMENT_SOURCE_TYPES,
 };
 
 /**

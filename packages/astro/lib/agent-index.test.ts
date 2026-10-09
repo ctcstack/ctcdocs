@@ -14,28 +14,18 @@ const site = {
 };
 
 const documents = new Map<string, IndexedDocument>([
-  ['start-here', { title: 'Start here', description: undefined, pdf: false }],
+  ['start-here', { title: 'Start here', description: undefined }],
   [
     'handbook/overview',
     {
       title: 'Overview',
       description: '  How the\n handbook works. ',
-      pdf: false,
     },
   ],
-  [
-    'handbook/policies/leave',
-    { title: 'Leave *policy*', description: '', pdf: false },
-  ],
-  ['reference/api', { title: 'API', description: 'Endpoints.', pdf: true }],
-  [
-    'orphan',
-    { title: 'Orphan', description: undefined, pdf: false, media: 'video' },
-  ],
-  [
-    'another-orphan',
-    { title: 'Another orphan', description: undefined, pdf: false },
-  ],
+  ['handbook/policies/leave', { title: 'Leave *policy*', description: '' }],
+  ['reference/api', { title: 'API', description: 'Endpoints.', format: 'pdf' }],
+  ['orphan', { title: 'Orphan', description: undefined, format: 'video' }],
+  ['another-orphan', { title: 'Another orphan', description: undefined }],
 ]);
 
 const navigation: NavigationItem[] = [
@@ -196,16 +186,12 @@ The documents are in the order the navigation shows them. Each link is the docum
 
 describe('descriptions and access classes', () => {
   const classed = new Map<string, IndexedDocument>([
-    [
-      'handbook/overview',
-      { title: 'Overview', description: 'Open to all.', pdf: false },
-    ],
+    ['handbook/overview', { title: 'Overview', description: 'Open to all.' }],
     [
       'handbook/payroll',
       {
         title: 'Payroll',
         description: 'Only finance reads this.',
-        pdf: false,
         classId: '0a1b2c3d',
       },
     ],

@@ -4,8 +4,10 @@
  * The Worker is bundled with the map of the build it serves, so the two
  * always deploy and roll back together. It must not import the platform's
  * core, whose entry reads the file system; the few constants it shares with
- * the core are restated here, and a test keeps them equal.
+ * the core are restated here, and a test keeps them equal. A type from the
+ * core's dependency-free `document-format` is erased when bundled.
  */
+import type { AgentDocumentFormat } from '@ctcstack/ctcdocs-core/document-format';
 
 export const MEMBERS_CLASS = 'members';
 export const ADMINS_CLASS = 'admins';
@@ -48,8 +50,10 @@ export interface AgentSearchSettings {
 
 /** A document the MCP server publishes to R2 (ADR-041). */
 export interface AgentDocument {
+  /** The permanent short ID: the tool's `id` and the R2 object's name. */
   readonly id: string;
   readonly title: string;
+  /** The Markdown projection's address, as the access map lists it. */
   readonly markdown: string;
   readonly modified: string | null;
   /** The folders from the corpus root to the document (ADR-042). */
@@ -63,11 +67,12 @@ export interface AgentDocument {
    * Whether it is published from a Google Doc, a PDF (ADR-044), a
    * spreadsheet (ADR-046), or a video or audio file (ADR-047).
    */
-  readonly format: 'doc' | 'pdf' | 'sheet' | 'video' | 'audio';
+  readonly format: AgentDocumentFormat;
   /** A PDF's pages, when the sync counted them. */
   readonly pages?: number;
   /** Characters of the stored text, which `fetch` returns (ADR-044). */
   readonly characters: number;
+  /** SHA-256 of the stored text, its class and its title. */
   readonly hash: string;
 }
 

@@ -12,6 +12,7 @@
 import { isOpenToMembers } from './access-source.js';
 import { siteConfiguration } from './project.js';
 import { getCollection } from 'astro:content';
+import { isDocumentSourceType } from '@ctcstack/ctcdocs-core/document-format';
 
 import { folderAnchorHref, folderAnchorId, folderTrail } from './folder-anchor';
 import { loadSectionHrefs, sectionHref } from './sections';
@@ -114,12 +115,8 @@ function folderDescription(
 
 export async function loadCorpus(): Promise<Corpus> {
   const docs = await getCollection('docs');
-  const synced = docs.filter(
-    (doc) =>
-      doc.data.sourceType === 'google-doc' ||
-      doc.data.sourceType === 'drive-pdf' ||
-      doc.data.sourceType === 'drive-sheet' ||
-      doc.data.sourceType === 'drive-media',
+  const synced = docs.filter((doc) =>
+    isDocumentSourceType(doc.data.sourceType),
   );
   const sections = await loadSectionHrefs();
 

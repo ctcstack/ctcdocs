@@ -16,6 +16,10 @@
  * See docs/ADR/033-publish-llms-txt-indexes.md.
  */
 import { markdownProjectionPath, MEMBERS_CLASS } from '@ctcstack/ctcdocs-core';
+import {
+  DOCUMENT_FORMAT_NOUNS,
+  type DocumentFormat,
+} from '@ctcstack/ctcdocs-core/document-format';
 import { inlineMarkdown } from '@ctcstack/ctcdocs-core/published-markdown';
 
 import { normalizeFolderName } from './folder-anchor.js';
@@ -41,17 +45,11 @@ export interface IndexedDocument {
   title: string;
   description: string | undefined;
   /**
-   * A published PDF, whose Markdown version is the text extracted from it
-   * (ADR-027). The sidebar badges it; the index says it in the link text, which
-   * also tells apart a document and a PDF that share a name.
+   * What the page publishes, a Google Doc when absent. The sidebar badges any
+   * other kind; the index says it in the link text, `(PDF)`, `(spreadsheet)`,
+   * `(video)`, which also tells apart a document and a PDF that share a name.
    */
-  pdf: boolean;
-  /**
-   * A published spreadsheet (ADR-046), which the link text names the same way.
-   */
-  sheet?: boolean;
-  /** A recording's page (ADR-047), which the link text names as video or audio. */
-  media?: 'video' | 'audio';
+  format?: DocumentFormat;
   /**
    * The document's access class (ADR-039). An index describes only documents
    * of its own class and lists the rest by title and address; without one, a
@@ -69,9 +67,7 @@ interface AgentIndexEntry {
   slug: string;
   title: string;
   description: string | undefined;
-  pdf: boolean;
-  sheet: boolean;
-  media: 'video' | 'audio' | undefined;
+  format: DocumentFormat;
   classId: string;
 }
 
@@ -140,15 +136,7 @@ export function buildAgentIndex(
       return undefined;
     }
     listed.add(slug);
-    return {
-      slug,
-      title: document.title,
-      description: oneLine(document.description),
-      pdf: document.pdf,
-      sheet: document.sheet ?? false,
-      media: document.media,
-      classId: document.classId ?? MEMBERS_CLASS,
-    };
+    return entryOf(slug, document);
   }
 
   function section(
@@ -210,15 +198,7 @@ export function buildAgentIndex(
    */
   const unlisted = [...documents.entries()]
     .filter(([slug]) => !listed.has(slug))
-    .map(([slug, document]) => ({
-      slug,
-      title: document.title,
-      description: oneLine(document.description),
-      pdf: document.pdf,
-      sheet: document.sheet ?? false,
-      media: document.media,
-      classId: document.classId ?? MEMBERS_CLASS,
-    }))
+    .map(([slug, document]) => entryOf(slug, document))
     .sort(
       (a, b) =>
         a.title.localeCompare(b.title, 'en') ||
@@ -236,19 +216,24 @@ export function buildAgentIndex(
   return sections;
 }
 
+function entryOf(slug: string, document: IndexedDocument): AgentIndexEntry {
+  return {
+    slug,
+    title: document.title,
+    description: oneLine(document.description),
+    format: document.format ?? 'google-doc',
+    classId: document.classId ?? MEMBERS_CLASS,
+  };
+}
+
 /**
  * A description is a document's own text, so it is shown only in an index of
  * the document's class; elsewhere the document keeps its title and address.
  */
 function documentLine(document: AgentIndexEntry, indexClass: string): string {
   const title = inlineMarkdown(document.title);
-  const kind = document.pdf
-    ? ' (PDF)'
-    : document.sheet
-      ? ' (spreadsheet)'
-      : document.media
-        ? ` (${document.media})`
-        : '';
+  const noun = DOCUMENT_FORMAT_NOUNS[document.format];
+  const kind = noun ? ` (${noun})` : '';
   const link = `- [${title}${kind}](${markdownProjectionPath(document.slug)})`;
   return document.description && document.classId === indexClass
     ? `${link}: ${inlineMarkdown(document.description)}`
