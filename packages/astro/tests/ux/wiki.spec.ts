@@ -1165,12 +1165,13 @@ test('the sidebar marks a page that is not a Google Doc with an icon of its form
     const box = await icon.boundingBox();
     expect(box?.width ?? 0).toBeGreaterThan(0);
     expect(box?.width ?? 99).toBeLessThan(24);
-    // It takes the row's color, so it reads with the title.
+    // It is drawn in its format's own color, not the row's gray.
     const [iconColor, linkColor] = await Promise.all([
       icon.evaluate((element) => getComputedStyle(element).backgroundColor),
       link.evaluate((element) => getComputedStyle(element).color),
     ]);
-    expect(iconColor).toBe(linkColor);
+    expect(iconColor).not.toBe(linkColor);
+    expect(iconColor).not.toBe('rgba(0, 0, 0, 0)');
   }
   await expectNoAccessibilityViolations(page);
 });

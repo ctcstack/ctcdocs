@@ -67,6 +67,15 @@
   /* A sidebar row under the pointer, and the row of the current page. */
   --kb-surface-hover: #1f1f1f;
   --kb-surface-current: #282828;
+  /*
+   * File-type colors, used only for the format icons in the sidebar: the red
+   * of a PDF, the green of a spreadsheet, and a violet and a blue for video
+   * and audio. Each holds 3:1 against the ground and both row fills.
+   */
+  --kb-format-pdf: #f28b82;
+  --kb-format-sheet: #81c995;
+  --kb-format-video: #c58af9;
+  --kb-format-audio: #8ab4f8;
   --kb-border-strong: #4a4a4a;
   --kb-nav-bg-translucent: rgb(20 20 20 / 80%);
 
@@ -117,6 +126,10 @@
   --kb-surface-sunken: #f7f7f7;
   --kb-surface-hover: #f2f2f2;
   --kb-surface-current: #ebebeb;
+  --kb-format-pdf: #d93025;
+  --kb-format-sheet: #188038;
+  --kb-format-video: #8430ce;
+  --kb-format-audio: #1a73e8;
   --kb-border-strong: #d6d6d6;
   --kb-nav-bg-translucent: rgb(252 252 252 / 80%);
 }
@@ -421,41 +434,46 @@ header.header {
 }
 
 /*
- * A page that is not a Google Doc carries a small icon of its format after
- * its title, where Starlight would draw a badge. The badge's text stays for
- * screen readers and is moved out of view; the icon takes the row's color, so
- * it quiets and answers the pointer with the title.
+ * A page that is not a Google Doc carries an icon of its format after its
+ * title, where Starlight would draw a badge: a colored tile with the format's
+ * mark cut out of it — the letters PDF, a grid, a play button, sound bars — in
+ * the color readers know each file type by. The badge's text stays for screen
+ * readers and is moved out of view.
  */
 #starlight__sidebar .sl-badge.kb-format {
-  background-color: currentColor;
-  color: inherit;
+  background-color: var(--kb-format-color);
   border: 0;
   border-radius: 0;
   display: inline-block;
-  height: 0.95em;
+  height: 1.15em;
+  margin-inline-start: 0.15em;
   mask: var(--kb-format-icon) center / contain no-repeat;
   overflow: hidden;
   padding: 0;
   text-indent: 100%;
-  vertical-align: -0.1em;
+  vertical-align: -0.22em;
   white-space: nowrap;
-  width: 0.95em;
+  width: 1.15em;
 }
 
 #starlight__sidebar .kb-format-pdf {
-  --kb-format-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z'/><path d='M14 3v5h5M9 13h6M9 17h4'/></svg>");
+  --kb-format-color: var(--kb-format-pdf);
+  --kb-format-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><defs><mask id='g'><rect width='24' height='24' fill='white'/><path d='M4.75 16V8h2.5a2.25 2.25 0 0 1 0 4.5h-2.5M10.25 16V8h1.5a3.5 4 0 0 1 0 8zM17.25 16V8h2.75M17.25 12h2.25' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/></mask></defs><rect x='1.5' y='1.5' width='21' height='21' rx='4.5' mask='url(%23g)'/></svg>");
 }
 
 #starlight__sidebar .kb-format-sheet {
-  --kb-format-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='16' rx='2'/><path d='M3 10h18M3 15h18M9 4v16'/></svg>");
+  --kb-format-color: var(--kb-format-sheet);
+  --kb-format-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><defs><mask id='g'><rect width='24' height='24' fill='white'/><path d='M6 6.5h12v11H6zM6 10.25h12M6 13.75h12M10.25 6.5v11' fill='none' stroke='black' stroke-width='1.6' stroke-linejoin='round'/></mask></defs><rect x='1.5' y='1.5' width='21' height='21' rx='4.5' mask='url(%23g)'/></svg>");
 }
 
 #starlight__sidebar .kb-format-video {
-  --kb-format-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='5' width='18' height='14' rx='2'/><path d='M10 9.5v5l4.5-2.5z' fill='black'/></svg>");
+  --kb-format-color: var(--kb-format-video);
+  --kb-format-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><defs><mask id='g'><rect width='24' height='24' fill='white'/><path d='M9.5 7.25v9.5l7.75-4.75z' fill='black' stroke='black' stroke-width='1' stroke-linejoin='round'/></mask></defs><rect x='1.5' y='1.5' width='21' height='21' rx='4.5' mask='url(%23g)'/></svg>");
 }
 
 #starlight__sidebar .kb-format-audio {
-  --kb-format-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'><path d='M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4'/></svg>");
+  --kb-format-color: var(--kb-format-audio);
+  --kb-format-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><defs><mask id='g'><rect width='24' height='24' fill='white'/><path d='M7.5 10.5v3M10.5 8v8M13.5 6.5v11M16.5 9.5v5' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'/></mask></defs><rect x='1.5' y='1.5' width='21' height='21' rx='4.5' mask='url(%23g)'/></svg>");
 }
 
 /*
