@@ -318,8 +318,8 @@ marks it `Video` or `Audio`. The file is never downloaded or hosted: an
 uploaded recording plays on its page in Google Drive's own player, and every
 recording's page links to it in Google Drive or Google Vids. Drive's sharing
 decides who may play it. In Safari, or in any browser that blocks third-party
-cookies, the player asks to sign in; the link below it opens the file in
-Drive instead. Google Vids has no player to embed, so its page has the link
+cookies, the player shows an error or asks to sign in; the link below it
+opens the file in Drive instead. Google Vids has no player to embed, so its page has the link
 alone.
 
 The page is written from what Drive says about the file: a sentence with its

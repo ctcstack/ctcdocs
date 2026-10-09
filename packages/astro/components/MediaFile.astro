@@ -5,8 +5,8 @@
  * An uploaded recording plays on the page in Google Drive's own player, framed
  * from Drive: the site neither hosts nor streams it, and Drive decides who may
  * play it, by the Google account the browser is signed in with. A browser that
- * keeps Google's cookies from a framed page, as Safari does, shows Drive's
- * request to sign in instead; the link below the player opens the file in
+ * keeps Google's cookies from a framed page, as Safari does, shows an error or
+ * a request to sign in instead; the link below the player opens the file in
  * Drive whatever the browser allows. Google Vids has no player to frame, so a
  * Google Vids video's page has the link alone.
  *
@@ -52,7 +52,7 @@ const shape =
         src={playerUrl}
         style={shape}
         title={title}
-        allow="autoplay; fullscreen; picture-in-picture"
+        allow="fullscreen; picture-in-picture"
         allowfullscreen
         loading="lazy"
       />
@@ -80,7 +80,7 @@ const shape =
     {
       playerUrl && (
         <span class="media-note">
-          If the player asks you to sign in, open it in Google Drive instead.
+          If the player does not play it, this link always does.
         </span>
       )
     }
