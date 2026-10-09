@@ -1,6 +1,2 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Example documentation">
-  <rect width="32" height="32" rx="7" fill="#4d9bf5" />
-  <rect x="8" y="9" width="16" height="2.5" rx="1.25" fill="#0e2439" />
-  <rect x="8" y="15" width="16" height="2.5" rx="1.25" fill="#0e2439" />
-  <rect x="8" y="21" width="10" height="2.5" rx="1.25" fill="#0e2439" />
-</svg>
+<?xml version="1.0" encoding="utf-8" ?>
+<svg baseProfile="full" height="931" version="1.1" viewBox="0 0 943 931" width="943" xmlns="http://www.w3.org/2000/svg" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:xlink="http://www.w3.org/1999/xlink"><defs /><path d="M621,10 L621,224 L625,238 L633,249 L642,256 L655,261 L862,261 L861,240 L851,224 L640,19 L628,11 Z M89,237 L130,267 L176,305 L182,308 L182,136 L186,123 L198,109 L213,102 L224,101 L597,101 L597,9 L193,8 L176,10 L154,17 L128,33 L113,48 L100,68 L92,89 L88,114 Z" fill="#0F0E0F" fill-rule="evenodd" /><path d="M12,296 L10,308 L8,627 L10,645 L15,664 L23,682 L37,703 L65,730 L178,807 L203,820 L221,825 L254,826 L267,824 L293,815 L314,804 L621,593 L842,436 L845,437 L845,555 L841,568 L826,585 L550,758 L424,832 L397,844 L364,853 L349,855 L319,855 L304,853 L304,855 L358,888 L397,906 L421,914 L448,920 L498,922 L537,916 L571,904 L605,885 L883,711 L910,685 L927,656 L933,632 L933,358 L931,353 L926,355 L869,407 L866,406 L866,270 L864,263 L860,263 L462,554 L453,549 L318,428 L187,314 L90,239 L88,239 L87,359 L84,359 L15,294 Z M120,402 L132,410 L200,471 L365,624 L364,627 L316,657 L213,717 L157,743 L126,751 L121,750 L119,517 Z" fill="#FD5900" fill-rule="evenodd" /></svg>

@@ -36,7 +36,8 @@
     "name": "Example Corp",
     "siteTitle": "Example [DOCS]",
     "siteDescription": "Synthetic documentation used to test the CTCDocs platform",
-    "faviconPath": "/favicon.svg"
+    "faviconPath": "/favicon.svg",
+    "faviconDarkPath": "/favicon-dark.svg"
   },
   "deployment": {
     "workerName": "example-docs",
