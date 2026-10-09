@@ -1137,3 +1137,40 @@ test("a recording plays in Drive's player, with a link to where it plays", async
   }
   await expectNoAccessibilityViolations(page);
 });
+
+test('the sidebar marks a page that is not a Google Doc with an icon of its format', async ({
+  page,
+}) => {
+  const marked = [
+    ...sheetDocuments().slice(0, 1),
+    ...mediaDocuments().slice(0, 1),
+  ];
+  test.skip(marked.length === 0, 'The corpus has only Google Docs.');
+
+  for (const document of marked) {
+    await page.goto(`/${document.slug}/`);
+    const link = page.locator(
+      `#starlight__sidebar a[href="/${document.slug}/"]`,
+    );
+    const icon = link.locator('.kb-format');
+    await expect(icon).toHaveCount(1);
+    // The format's name is announced, not shown: the icon stands in for it.
+    await expect(icon).toHaveText(
+      document.format === 'sheet'
+        ? 'Sheet'
+        : document.format === 'audio'
+          ? 'Audio'
+          : 'Video',
+    );
+    const box = await icon.boundingBox();
+    expect(box?.width ?? 0).toBeGreaterThan(0);
+    expect(box?.width ?? 99).toBeLessThan(24);
+    // It takes the row's color, so it reads with the title.
+    const [iconColor, linkColor] = await Promise.all([
+      icon.evaluate((element) => getComputedStyle(element).backgroundColor),
+      link.evaluate((element) => getComputedStyle(element).color),
+    ]);
+    expect(iconColor).toBe(linkColor);
+  }
+  await expectNoAccessibilityViolations(page);
+});

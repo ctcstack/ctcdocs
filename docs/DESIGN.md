@@ -12,6 +12,10 @@ colors:
   ground-light: '#fcfcfc'
   sunken-dark: '#0f0f0f'
   sunken-light: '#f7f7f7'
+  row-hover-dark: '#1f1f1f'
+  row-hover-light: '#f2f2f2'
+  row-current-dark: '#282828'
+  row-current-light: '#ebebeb'
   ink-strong-dark: '#f5f5f5'
   ink-strong-light: '#171717'
   ink-body-dark: '#ededed'
@@ -112,7 +116,7 @@ components:
     typography: '{typography.body}'
     padding: '0.75rem 1rem'
   sidebar-link-current:
-    backgroundColor: '{colors.sunken-dark}'
+    backgroundColor: '{colors.row-current-dark}'
     textColor: '{colors.accent-ember}'
     typography: '{typography.meta}'
   toc-link-current:
@@ -183,7 +187,12 @@ is the only chromatic event on any screen.
 - **Ground** (`#141414` dark / `#fcfcfc` light): the page ground, and equally the
   header ground and the sidebar ground. Those three are the same sheet.
 - **Sunken** (`#0f0f0f` dark / `#f7f7f7` light): the one recessed surface — code
-  frame interiors, the current sidebar item, keyboard keys. It replaces elevation.
+  frame interiors, keyboard keys. It replaces elevation.
+- **Row hover** (`#1f1f1f` dark / `#f2f2f2` light) and **Row current**
+  (`#282828` dark / `#ebebeb` light): the fill of a sidebar row under the
+  pointer, and of the current page's row. Both are neutral steps toward the
+  ink, so muted text keeps 4.5:1 on the hover fill and accent text on the
+  current one.
 - **Ink Strong** (`#f5f5f5` dark / `#171717` light): titles, index entry titles,
   the leading fact in a provenance row, the count in the corpus band.
 - **Ink Body** (`#ededed` dark / `#181818` light): running prose.
@@ -411,9 +420,16 @@ home index, because Drive folders have no pages of their own.
 ### Navigation (sidebar)
 
 Framework list navigation on the page ground, divided from content by one
-hairline. The current page is marked by the sunken surface plus accent text at
-weight 600 — a quiet surface rather than a saturated fill, because navigation
-must not be the loudest thing on a page meant for reading. Folder labels are
+hairline. Rows have a 0.4rem inline padding and a 0.375rem corner; a row under
+the pointer takes the row-hover fill. The current page is marked by the
+row-current fill plus accent text at weight 600 — a neutral fill rather than a
+saturated one, because navigation must not be the loudest thing on a page
+meant for reading. A folder is named at the size of the documents in it, at
+weight 500 in the body ink, so the tree reads as one list rather than a stack
+of headings. A page that is not a Google Doc carries a small icon of its
+format after its title — a sheet of paper for a PDF, a grid for a spreadsheet,
+a play frame for a video, bars for audio — drawn in the row's own color; the
+format's name stays in the markup for screen readers. Folder labels are
 normalized at the point of use in `astro.config.mjs` (trailing slashes stripped),
 never in the generated sidebar file, which is pipeline-owned.
 
