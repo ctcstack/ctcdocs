@@ -49,7 +49,8 @@ player Drive offers for embedding, in the video's own shape, and links to the
 recording in Drive below it. The site neither hosts nor streams the file:
 Drive decides who may play it, by the Google account the browser is signed in
 with, as it does when the file is opened in Drive. The Content Security
-Policy admits frames from `https://drive.google.com` and from nowhere else.
+Policy admits frames from `https://drive.google.com` beside the site's own,
+which a PDF's `<object>` needs, and from nowhere else.
 Google Vids has no player to frame, so a Google Vids video's card has the link
 alone. The row under the title keeps its "Open in Google Drive" link, or "Open
 in Google Vids", as on every page, so readers find it where they always do.

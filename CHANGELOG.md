@@ -2,6 +2,20 @@
 
 All three packages share a version and are released together.
 
+## 0.22.2
+
+### Fixed
+
+- **A PDF shows on its page again.** 0.22.0 gave the private deployment's
+  Content Security Policy a `frame-src` for Google Drive's player, which
+  replaced the default for frames rather than adding to it, and browsers
+  frame a PDF's `<object>`: every PDF was blocked. `frame-src` now admits the
+  site's own files beside Drive, and the Worker's test asserts both.
+
+### Upgrade note
+
+Bump the packages and the workflow pins. No sync is needed.
+
 ## 0.22.1
 
 A calmer reading interface, and one statement of the kinds of published page.
