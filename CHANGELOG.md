@@ -2,6 +2,53 @@
 
 All three packages share a version and are released together.
 
+## 0.22.0
+
+Video and audio files get pages
+([ADR-047](docs/ADR/047-publish-a-page-for-each-video-and-audio-file.md),
+proposed): every video or audio file, and every Google Vids video, in a
+published folder gets a page written from its Drive metadata, and an uploaded
+one plays on it in Google Drive's own player. Nothing is downloaded, hosted
+or transcribed.
+
+### Added
+
+- **Recording pages.** `sourceType: drive-media`, marked `Video` or `Audio` in
+  the sidebar, `video` or `audio` in `data/docs-index.json`, `llms.txt` and the
+  MCP server's `format`. The title is the Drive name without its extension.
+  The page opens with a sentence of facts, its length and frame size when
+  Drive reports them, then the description written in Drive, whose first line
+  is its summary; its web and mail addresses become links.
+- **Drive's player on the page.** An uploaded recording's card frames
+  `drive.google.com/file/d/<id>/preview` in the video's own shape, with a link
+  to it in Drive below. Drive's sharing decides who may play it. Google Vids
+  has no player to frame, so its card has the link alone.
+- **Content health** notes a recording with no description in Drive
+  (`media-undescribed`). The sync report's `summary.published` gains `media`.
+- **The manifest** records `exportMode: video` or `audio`, and for a recording
+  a `sourceChecksum` of the metadata its page is written from, so a page is
+  written again when its description or length changes.
+- The inventory asks Drive for each file's `description` and
+  `videoMediaMetadata`.
+
+### Changed
+
+- **The private deployment's Content Security Policy** admits frames from
+  `https://drive.google.com`, and from nowhere else.
+- **A link to a recording**, by its Drive or Google Vids address, leads to its
+  page, as a link to a published PDF does.
+- **Video and audio are no longer listed as not on the site.** The
+  `media-file` reason is retired; a report that names it still validates until
+  the next sync replaces it.
+
+### Upgrade note
+
+Bump the packages and the workflow pins, then run a sync: every recording in
+the published folders gets a page on it. No existing page changes. In Safari,
+or any browser that blocks third-party cookies, Drive's player cannot use the
+reader's Google sign-in and shows an error or a sign-in request; the link
+below it always opens the recording in Drive.
+
 ## 0.21.4
 
 ### Fixed
