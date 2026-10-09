@@ -16,6 +16,8 @@ import { unified } from '@astrojs/markdown-remark';
 import starlight from '@astrojs/starlight';
 import type { StarlightUserConfig } from '@astrojs/starlight/types';
 import {
+  DOCUMENT_FORMAT_BADGES,
+  DOCUMENT_FORMATS,
   PLATFORM_ROUTE_HREFS,
   parseSiteConfiguration,
 } from '@ctcstack/ctcdocs-core';
@@ -69,6 +71,47 @@ function normalizeSidebarLabels(
         }
       : item,
   ) as SidebarConfiguration;
+}
+
+/** The format each badge the sync writes stands for. */
+const FORMAT_OF_BADGE = new Map(
+  DOCUMENT_FORMATS.flatMap((format) => {
+    const badge = DOCUMENT_FORMAT_BADGES[format];
+    return badge ? [[badge, format] as const] : [];
+  }),
+);
+
+/**
+ * The sync marks a page that is not a Google Doc with its format's badge,
+ * `PDF` or `Video`. The sidebar shows it as an icon of the format: the badge
+ * keeps its text, which screen readers announce and the stylesheet hides, and
+ * gains a class the stylesheet draws the icon for.
+ */
+function formatIcons(items: SidebarConfiguration): SidebarConfiguration {
+  return items.map((item) => {
+    if (typeof item !== 'object' || item === null) {
+      return item;
+    }
+    if ('items' in item) {
+      return {
+        ...item,
+        items: formatIcons(item.items as SidebarConfiguration),
+      };
+    }
+    const format =
+      'badge' in item && typeof item.badge === 'string'
+        ? FORMAT_OF_BADGE.get(item.badge)
+        : undefined;
+    return format
+      ? {
+          ...item,
+          badge: {
+            text: String(item.badge),
+            class: `kb-format kb-format-${format}`,
+          },
+        }
+      : item;
+  }) as SidebarConfiguration;
 }
 
 export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
@@ -164,7 +207,7 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
     // The platform serves its own 404, which searches for the missing address.
     disable404Route: true,
     pagination: true,
-    sidebar: [...sidebarPrefix, ...generatedSidebar],
+    sidebar: [...sidebarPrefix, ...formatIcons(generatedSidebar)],
     /*
      * A private deployment asks not to be indexed; a public one must not.
      * The built site is one artifact deployed to every environment, so the tag
