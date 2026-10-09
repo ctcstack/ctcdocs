@@ -1097,6 +1097,10 @@ test('a recording has a page that links to where it plays', async ({
       'href',
       /^https:\/\/(?:drive\.google\.com\/file\/d\/|docs\.google\.com\/videos\/d\/)/u,
     );
+    // The row under the title keeps its link to the source, as on every page.
+    await expect(
+      page.getByRole('link', { name: /^Open in Google (?:Drive|Vids)$/u }),
+    ).toBeVisible();
     // The site does not host or embed a recording.
     await expect(page.locator('video, audio, iframe')).toHaveCount(0);
     await expect(

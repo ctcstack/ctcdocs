@@ -43,8 +43,9 @@ come the paragraphs of the description as plain text: nothing in it becomes
 markup but its web and mail addresses, which become links by GFM's own rule
 before the text is serialized. The first paragraph is the page's summary. A
 card above the text links to the recording in Drive or in Google Vids, where
-Drive's own sharing decides who may play it, in place of the "Open in Google
-Drive" link other pages have. The site does not embed a player.
+Drive's own sharing decides who may play it. The row under the title keeps
+its "Open in Google Drive" link, or "Open in Google Vids", as on every page,
+so readers find it where they always do. The site does not embed a player.
 
 **A recording without a description is noted.** The content health page lists
 it with the note `media-undescribed`, which says where the description is
