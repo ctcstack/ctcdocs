@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import type { AccessMapFile, AgentDocument } from '../access-map.js';
+import type {
+  AccessMapFile,
+  AgentDocument,
+  AgentDocumentFormat,
+} from '../access-map.js';
 import type { Reader } from '../decide.js';
 import {
   browseFolder,
@@ -23,13 +27,34 @@ import {
 } from './test-support.js';
 
 /**
+ * A document: its id, title, folders, class, Drive time and, when it is not
+ * a Google Doc, its format.
+ */
+type Row = [
+  string,
+  string,
+  string[],
+  string,
+  string | null,
+  AgentDocumentFormat?,
+];
+
+/**
  * A corpus where what a member may not open is newer than what they may,
  * and sits beside it: a team folder at the top, and a team folder inside a
- * folder members read.
+ * folder members read. Some are not Google Docs, and of those, some only
+ * the team may open.
  */
-const DOCUMENTS: [string, string, string[], string, string | null][] = [
+const DOCUMENTS: Row[] = [
   ['aaaaaa', 'Handbook', [], 'members', '2026-10-01T00:00:00.000Z'],
-  ['bbbbbb', 'Team plan', ['Team'], 'team0001', '2026-10-03T00:00:00.000Z'],
+  [
+    'bbbbbb',
+    'Team plan',
+    ['Team'],
+    'team0001',
+    '2026-10-03T00:00:00.000Z',
+    'pdf',
+  ],
   [
     'cccccc',
     'Unruled notes',
@@ -50,6 +75,7 @@ const DOCUMENTS: [string, string, string[], string, string | null][] = [
     ['Tools', 'Mailer'],
     'members',
     '2026-09-15T12:00:00.000Z',
+    'sheet',
   ],
   [
     'ffffff',
@@ -57,22 +83,21 @@ const DOCUMENTS: [string, string, string[], string, string | null][] = [
     ['Tools', 'Hidden'],
     'team0001',
     '2026-10-04T00:00:00.000Z',
+    'video',
   ],
-  ['gggggg', 'Undated', ['Tools'], 'members', null],
+  ['gggggg', 'Undated', ['Tools'], 'members', null, 'video'],
 ];
 
-function catalogMap(
-  documents: readonly [string, string, string[], string, string | null][],
-): AccessMapFile {
+function catalogMap(documents: readonly Row[]): AccessMapFile {
   const entries: AgentDocument[] = documents.map(
-    ([id, title, path, , modified]) => ({
+    ([id, title, path, , modified, format = 'doc']) => ({
       id,
       title,
       markdown: `/${id}/index.md`,
       modified,
       path,
       source: null,
-      format: 'doc',
+      format,
       characters: 1_000,
       hash: `h-${id}`,
     }),
@@ -109,9 +134,7 @@ function withSettings(
 }
 
 /** An index that returns a chunk of every document, whatever it is asked. */
-function everything(
-  documents: readonly [string, string, string[], string, string | null][],
-) {
+function everything(documents: readonly Row[]) {
   return new FixedIndex(
     documents.map(([id, title, , cls]): IndexedChunk => ({
       key: `docs/${id}.md`,
@@ -144,6 +167,9 @@ describe('browse', () => {
   it('lists the whole tree a member may see, and no other folder', () => {
     expect(browseFolder(access(readers.member))).toEqual({
       folder: [],
+      count: 4,
+      formats: { doc: 2, sheet: 1, video: 1 },
+      links,
       documents: [
         {
           id: 'aaaaaa',
@@ -156,11 +182,20 @@ describe('browse', () => {
         {
           name: 'Tools',
           count: 3,
-          documents: [{ id: 'gggggg', title: 'Undated', characters: 1_000 }],
+          formats: { doc: 1, sheet: 1, video: 1 },
+          documents: [
+            {
+              id: 'gggggg',
+              title: 'Undated',
+              format: 'video',
+              characters: 1_000,
+            },
+          ],
           folders: [
             {
               name: 'Mailer',
               count: 2,
+              formats: { doc: 1, sheet: 1 },
               documents: [
                 {
                   id: 'dddddd',
@@ -171,6 +206,7 @@ describe('browse', () => {
                 {
                   id: 'eeeeee',
                   title: 'Returns',
+                  format: 'sheet',
                   modified: '2026-09-15',
                   characters: 1_000,
                 },
@@ -179,13 +215,15 @@ describe('browse', () => {
           ],
         },
       ],
-      links,
     });
   });
 
   it('lists only the levels asked for, the rest collapsed', () => {
     expect(browseFolder(access(readers.member), undefined, 1)).toEqual({
       folder: [],
+      count: 4,
+      formats: { doc: 2, sheet: 1, video: 1 },
+      links,
       documents: [
         {
           id: 'aaaaaa',
@@ -194,19 +232,37 @@ describe('browse', () => {
           characters: 1_000,
         },
       ],
-      folders: [{ name: 'Tools', count: 3, collapsed: true }],
-      links,
+      folders: [
+        {
+          name: 'Tools',
+          count: 3,
+          formats: { doc: 1, sheet: 1, video: 1 },
+          collapsed: true,
+        },
+      ],
     });
     expect(
       browseFolder(access(readers.member), undefined, 2)?.folders[0]?.folders,
-    ).toEqual([{ name: 'Mailer', count: 2, collapsed: true }]);
+    ).toEqual([
+      {
+        name: 'Mailer',
+        count: 2,
+        formats: { doc: 1, sheet: 1 },
+        collapsed: true,
+      },
+    ]);
   });
 
   it('lists a folder, its folders counted by what the reader may open', () => {
     const tools = browseFolder(access(readers.member), 'Tools', 1);
     expect(tools?.folder).toEqual(['Tools']);
     expect(tools?.folders).toEqual([
-      { name: 'Mailer', count: 2, collapsed: true },
+      {
+        name: 'Mailer',
+        count: 2,
+        formats: { doc: 1, sheet: 1 },
+        collapsed: true,
+      },
     ]);
     expect(ids(tools?.documents)).toEqual(['gggggg']);
     expect(
@@ -289,12 +345,96 @@ describe('browse', () => {
     expect(browseFolder(stale)).toEqual(browseFolder(access(readers.member)));
   });
 
+  it('counts by format only what the reader may open, collapsed folders included', () => {
+    const member = browseFolder(access(readers.member), undefined, 1);
+    const team = browseFolder(access(readers.team), undefined, 1);
+    expect(member?.formats).toEqual({ doc: 2, sheet: 1, video: 1 });
+    expect(team).toMatchObject({
+      count: 6,
+      formats: { doc: 2, pdf: 1, sheet: 1, video: 2 },
+      folders: [
+        {
+          name: 'Team',
+          count: 1,
+          formats: { pdf: 1 },
+          collapsed: true,
+        },
+        {
+          name: 'Tools',
+          count: 4,
+          formats: { doc: 1, sheet: 1, video: 2 },
+          collapsed: true,
+        },
+      ],
+    });
+    expect(browseFolder(access(readers.admin))?.formats).toEqual({
+      doc: 3,
+      pdf: 1,
+      sheet: 1,
+      video: 2,
+    });
+    // Every count is the sum of its folder's documents, by format.
+    for (const reader of [readers.member, readers.team, readers.admin]) {
+      const tree = browseFolder(access(reader));
+      const total = Object.values(tree?.formats ?? {}).reduce(
+        (sum, count) => sum + count,
+        0,
+      );
+      expect(total).toBe(tree?.count);
+    }
+  });
+
+  it('lists and counts only the format asked for', () => {
+    const member = access(readers.member);
+    expect(browseFolder(member, undefined, undefined, 'video')).toEqual({
+      folder: [],
+      count: 1,
+      formats: { video: 1 },
+      links,
+      documents: [],
+      folders: [
+        {
+          name: 'Tools',
+          count: 1,
+          formats: { video: 1 },
+          documents: [
+            {
+              id: 'gggggg',
+              title: 'Undated',
+              format: 'video',
+              characters: 1_000,
+            },
+          ],
+        },
+      ],
+    });
+    expect(
+      browseFolder(access(readers.team), 'Tools', undefined, 'video')?.formats,
+    ).toEqual({ video: 2 });
+    // A folder with none of the format is there, and empty.
+    expect(browseFolder(member, 'Tools / Mailer', undefined, 'video')).toEqual({
+      folder: ['Tools', 'Mailer'],
+      count: 0,
+      formats: {},
+      links,
+      documents: [],
+      folders: [],
+    });
+    // The team's PDF is neither listed nor counted for a member.
+    expect(browseFolder(member, undefined, undefined, 'pdf')).toMatchObject({
+      count: 0,
+      formats: {},
+      documents: [],
+      folders: [],
+    });
+    expect(browseFolder(member, 'Team', undefined, 'pdf')).toBe(undefined);
+    expect(browseFolder(member, 'Tools / Hidden', undefined, 'video')).toBe(
+      undefined,
+    );
+  });
+
   /** `count` documents with long titles in the folder at `path`. */
-  const filled = (
-    prefix: string,
-    count: number,
-    path: string[],
-  ): [string, string, string[], string, string | null][] =>
+  const filled = (prefix: string, count: number, path: string[]): Row[] =>
     Array.from({ length: count }, (_, n) => [
       `${prefix}${n}`.padStart(6, '0'),
       `A document with a long enough title, number ${n}`,
@@ -344,7 +484,7 @@ describe('browse', () => {
     expect(JSON.stringify(tree).length).toBeLessThanOrEqual(BUDGET);
     // Its folders first, collapsed, then as many documents as fit.
     expect(tree?.folders).toEqual([
-      { name: 'Inner', count: 2, collapsed: true },
+      { name: 'Inner', count: 2, formats: { doc: 2 }, collapsed: true },
     ]);
     const listed = tree?.documents.length ?? 0;
     expect(listed).toBeGreaterThan(100);
@@ -426,6 +566,28 @@ describe('browse through the MCP server', () => {
       folders: [],
       note: expect.stringContaining('No folder by that path'),
     });
+    expect(
+      (await browse(readers.member, { format: 'pdf' })).result
+        ?.structuredContent,
+    ).toMatchObject({
+      count: 0,
+      formats: {},
+      note: expect.stringContaining('no document of that format'),
+    });
+  });
+
+  it('answers a format by its count, and refuses one it does not know', async () => {
+    const { result } = await browse(readers.team, { format: 'video' });
+    expect(result?.structuredContent).toEqual(
+      browseFolder(access(readers.team), undefined, undefined, 'video'),
+    );
+    expect(result?.structuredContent).toMatchObject({
+      count: 2,
+      formats: { video: 2 },
+    });
+    expect(
+      (await browse(readers.team, { format: 'google-doc' })).result?.isError,
+    ).toBe(true);
   });
 });
 
@@ -458,6 +620,15 @@ describe('recent', () => {
       'dddddd',
     ]);
     expect(ids(recentDocuments(member, {}, 1))).toEqual(['aaaaaa']);
+    expect(ids(recentDocuments(member, { format: 'sheet' }))).toEqual([
+      'eeeeee',
+    ]);
+    // An undated video is not recent; the team's is, and the PDF is theirs.
+    expect(
+      ids(recentDocuments(access(readers.team), { format: 'video' })),
+    ).toEqual(['ffffff']);
+    expect(recentDocuments(member, { format: 'pdf' })).toEqual([]);
+    expect(recentDocuments(member)[0]?.format).toBe('doc');
     expect(recentDocuments(member, {}, 0)).toHaveLength(1);
     expect(
       recentDocuments(access(readers.team), {}, 999).length,
@@ -515,6 +686,31 @@ describe('a narrowed search', () => {
     });
   });
 
+  it('keeps to one format, and asks the index only for those documents', async () => {
+    const index = everything(DOCUMENTS);
+    const member = await searchDocuments(
+      access(readers.member, { index }),
+      'x',
+      { format: 'video' },
+    );
+    expect(ids(member)).toEqual(['gggggg']);
+    expect(member[0]?.format).toBe('video');
+    expect(index.queries[0]?.restriction).toEqual({ in: ['gggggg'] });
+    expect(
+      ids(
+        await searchDocuments(access(readers.team), 'x', { format: 'video' }),
+      ).sort(),
+    ).toEqual(['ffffff', 'gggggg']);
+    // The team's PDF is not asked for on a member's behalf.
+    const none = everything(DOCUMENTS);
+    expect(
+      await searchDocuments(access(readers.member, { index: none }), 'x', {
+        format: 'pdf',
+      }),
+    ).toEqual([]);
+    expect(none.queries).toEqual([]);
+  });
+
   it('keeps to documents changed since a date', async () => {
     const results = await searchDocuments(access(readers.member), 'x', {
       changedSince: '2026-09-10',
@@ -538,6 +734,12 @@ describe('a narrowed search', () => {
       for (const folder of ['Tools', 'Team', 'Unruled', 'Tools / Hidden']) {
         const narrowed = ids(
           await searchDocuments(access(reader), 'x', { folder }),
+        );
+        expect(narrowed.every((id) => plain.includes(id))).toBe(true);
+      }
+      for (const format of ['doc', 'pdf', 'sheet', 'video', 'audio'] as const) {
+        const narrowed = ids(
+          await searchDocuments(access(reader), 'x', { format }),
         );
         expect(narrowed.every((id) => plain.includes(id))).toBe(true);
       }

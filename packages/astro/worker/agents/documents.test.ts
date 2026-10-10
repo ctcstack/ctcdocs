@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 import type { AccessMapFile } from '../access-map.js';
 import type { Reader } from '../decide.js';
 import {
+  browseFolder,
   fetchDocument,
   readableClasses,
+  recentDocuments,
   searchDocuments,
   type DocumentAccess,
 } from './documents.js';
@@ -75,6 +77,7 @@ describe('search', () => {
         url: `${ORIGIN}/d/aaaaaa/`,
         text: 'A passage of Handbook.',
         path: [],
+        format: 'doc',
         modified: '2026-10-01',
         characters: 11,
       },
@@ -84,6 +87,7 @@ describe('search', () => {
         url: `${ORIGIN}/d/bbbbbb/`,
         text: 'A passage of Team plan.',
         path: ['Team'],
+        format: 'pdf',
         characters: 12,
       },
     ]);
@@ -144,6 +148,7 @@ describe('search', () => {
         url: `${ORIGIN}/d/bbbbbb/`,
         text: 'A passage of Team plan.',
         path: ['Team'],
+        format: 'pdf',
         characters: 12,
       },
     ]);
@@ -517,6 +522,38 @@ describe('fetch', () => {
     expect(
       (await fetchDocument(access(readers.team), 'bbbbbb'))?.metadata,
     ).toEqual({ path: ['Team'], format: 'pdf', pages: 3, characters: 12 });
+  });
+
+  it('says the format that browse counts and search and recent list', async () => {
+    const catalog = (agentMap.agents?.documents ?? []).map(({ id }) => id);
+    for (const [reader, stale] of [
+      [readers.member, false],
+      [readers.team, false],
+      [readers.admin, false],
+      [readers.admin, true],
+    ] as const) {
+      const reading = access(reader, { stale });
+      const fetched = new Map<string, unknown>();
+      for (const id of catalog) {
+        const document = await fetchDocument(reading, id);
+        if (document) {
+          fetched.set(id, document.metadata.format);
+        }
+      }
+      const counts: Record<string, number> = {};
+      for (const format of fetched.values()) {
+        counts[String(format)] = (counts[String(format)] ?? 0) + 1;
+      }
+      const tree = browseFolder(reading);
+      expect(tree?.formats).toEqual(counts);
+      expect(tree?.count).toBe(fetched.size);
+      for (const result of [
+        ...(await searchDocuments(reading, 'x')),
+        ...recentDocuments(reading, {}, 50),
+      ]) {
+        expect(result.format).toBe(fetched.get(result.id));
+      }
+    }
   });
 
   it.each([
