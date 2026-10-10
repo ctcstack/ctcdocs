@@ -2,7 +2,7 @@
 
 All three packages share a version and are released together.
 
-## 0.23.3
+## 0.22.3
 
 ### Added
 
