@@ -432,7 +432,7 @@ interface FolderNode {
   readonly path: readonly string[];
   readonly documents: AgentDocument[];
   readonly folders: Map<string, FolderNode>;
-  count: number;
+  /** Documents under it by format; their sum is its count. */
   readonly formats: Map<AgentDocumentFormat, number>;
 }
 
@@ -441,6 +441,10 @@ const length = (value: unknown) => JSON.stringify(value).length;
 /** The folders in a node, by name. */
 const foldersOf = (node: FolderNode) =>
   [...node.folders.values()].sort((a, b) => collator.compare(a.name, b.name));
+
+/** Documents under a node, of every format. */
+const countOf = (node: FolderNode) =>
+  [...node.formats.values()].reduce((sum, count) => sum + count, 0);
 
 /** Counts by format, in the order the formats are named. */
 function formatCounts(
@@ -482,11 +486,9 @@ function folderTree(
     path: [],
     documents: [],
     folders: new Map(),
-    count: 0,
     formats: new Map(),
   };
   const tally = (node: FolderNode, format: AgentDocumentFormat) => {
-    node.count += 1;
     node.formats.set(format, (node.formats.get(format) ?? 0) + 1);
   };
   for (const document of documents) {
@@ -505,7 +507,6 @@ function folderTree(
           path: document.path.slice(0, level + 1),
           documents: [],
           folders: new Map(),
-          count: 0,
           formats: new Map(),
         };
         node.folders.set(fold(label), next);
@@ -521,7 +522,7 @@ function folderTree(
 /** A folder's name and counts, which every folder of a tree carries. */
 const counted = (node: FolderNode) => ({
   name: node.name,
-  count: node.count,
+  count: countOf(node),
   formats: formatCounts(node.formats),
 });
 
@@ -600,7 +601,7 @@ export function browseFolder(
   const root = folderTree(under, segments);
   const head = {
     folder: labels,
-    count: root.count,
+    count: countOf(root),
     formats: formatCounts(root.formats),
     links,
   };
@@ -611,42 +612,50 @@ export function browseFolder(
   const budget = access.map.agents?.browseCharacters ?? 0;
 
   // What is directly in the folder: its folders first, then its documents,
-  // each while it fits, with room kept for counting what does not.
+  // each while it fits after `reserved` characters.
   const children = foldersOf(root);
   const here = documentsOf(root);
-  const reserve = length({
-    omitted: { documents: here.length, folders: children.length },
-  });
-  let used = length({ ...head, documents: [], folders: [] }) + reserve;
-  const fitting = <T>(items: readonly T[]): T[] => {
-    const kept: T[] = [];
-    for (const item of items) {
-      const cost = length(item) + (kept.length > 0 ? 1 : 0);
-      if (used + cost > budget) {
-        break;
+  const empty = length({ ...head, documents: [], folders: [] });
+  const listing = (reserved: number) => {
+    let used = empty + reserved;
+    const fitting = <T>(items: readonly T[]): T[] => {
+      const kept: T[] = [];
+      for (const item of items) {
+        const cost = length(item) + (kept.length > 0 ? 1 : 0);
+        if (used + cost > budget) {
+          break;
+        }
+        kept.push(item);
+        used += cost;
       }
-      kept.push(item);
-      used += cost;
-    }
-    return kept;
+      return kept;
+    };
+    const folders = fitting(children.map(collapsed));
+    const documents = fitting(here);
+    const complete =
+      folders.length === children.length && documents.length === here.length;
+    return { folders, documents, complete, used };
   };
-  const shownFolders = fitting(children.map(collapsed));
-  const shownDocuments = fitting(here);
-  if (
-    shownFolders.length < children.length ||
-    shownDocuments.length < here.length
-  ) {
+  const whole = listing(0);
+  if (!whole.complete) {
+    // What is left out is counted, so the count takes room of its own: as
+    // much as the largest it could be, less the braces a field does not have.
+    const shown = listing(
+      length({
+        omitted: { documents: here.length, folders: children.length },
+      }) - 1,
+    );
     return {
       ...head,
-      documents: shownDocuments,
-      folders: shownFolders,
+      documents: shown.documents,
+      folders: shown.folders,
       omitted: {
-        documents: here.length - shownDocuments.length,
-        folders: children.length - shownFolders.length,
+        documents: here.length - shown.documents.length,
+        folders: children.length - shown.folders.length,
       },
     };
   }
-  used -= reserve;
+  let { used } = whole;
 
   // Then level by level, the folders that take the fewest characters first:
   // opening one replaces its collapsed entry with its listing.

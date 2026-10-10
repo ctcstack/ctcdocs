@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import type {
-  AccessMapFile,
-  AgentDocument,
-  AgentDocumentFormat,
+import {
+  AGENT_DOCUMENT_FORMATS,
+  type AccessMapFile,
+  type AgentDocument,
+  type AgentDocumentFormat,
 } from '../access-map.js';
 import type { Reader } from '../decide.js';
 import {
@@ -475,6 +476,21 @@ describe('browse', () => {
     expect(collapsedFolders(tree?.folders ?? [])).toBe(0);
   });
 
+  it('lists a folder whole when it fits exactly, with no room kept for a count it does not need', () => {
+    const map = catalogMap([
+      ...filled('d', 20, ['Exact']),
+      ...filled('i', 2, ['Exact', 'Inner']),
+    ]);
+    const whole = browseFolder(access(readers.member, { map }), 'Exact', 1);
+    const exact = withSettings(map, {
+      browseCharacters: JSON.stringify(whole).length,
+    });
+    expect(
+      browseFolder(access(readers.member, { map: exact }), 'Exact', 1),
+    ).toEqual(whole);
+    expect(whole?.omitted).toBe(undefined);
+  });
+
   it('lists a folder too large to fit as far as it fits, and counts the rest', () => {
     const map = catalogMap([
       ...filled('b', 600, ['Big']),
@@ -572,7 +588,7 @@ describe('browse through the MCP server', () => {
     ).toMatchObject({
       count: 0,
       formats: {},
-      note: expect.stringContaining('no document of that format'),
+      note: expect.stringContaining('is of that format'),
     });
   });
 
@@ -737,7 +753,7 @@ describe('a narrowed search', () => {
         );
         expect(narrowed.every((id) => plain.includes(id))).toBe(true);
       }
-      for (const format of ['doc', 'pdf', 'sheet', 'video', 'audio'] as const) {
+      for (const format of AGENT_DOCUMENT_FORMATS) {
         const narrowed = ids(
           await searchDocuments(access(reader), 'x', { format }),
         );
