@@ -9,6 +9,8 @@
  */
 import type { AgentDocumentFormat } from '@ctcstack/ctcdocs-core/document-format';
 
+export type { AgentDocumentFormat };
+
 export const MEMBERS_CLASS = 'members';
 export const ADMINS_CLASS = 'admins';
 /** Served to any signed-in reader: scripts, styles, fonts, public files. */
@@ -47,6 +49,18 @@ export interface AgentSearchSettings {
   readonly passagesPerResult: number;
   readonly passageCharacters: number;
 }
+
+/**
+ * The formats the MCP server reports, in the order it counts them (ADR-044):
+ * the core's formats, a Google Doc called `doc`.
+ */
+export const AGENT_DOCUMENT_FORMATS = [
+  'doc',
+  'pdf',
+  'sheet',
+  'video',
+  'audio',
+] as const satisfies readonly AgentDocumentFormat[];
 
 /** A document the MCP server publishes to R2 (ADR-041). */
 export interface AgentDocument {

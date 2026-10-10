@@ -675,6 +675,7 @@ describe('an assistant reading', () => {
           url: `${ORIGIN}/d/aaaaaa/`,
           text: 'A passage of Handbook.',
           path: [],
+          format: 'doc',
           modified: '2026-10-01',
           characters: 11,
         },
@@ -688,8 +689,12 @@ describe('an assistant reading', () => {
     // explicit request for it reads as one that does not exist.
     const top = await tool(token, 'browse', {});
     // The whole tree, which passes the tool's declared output schema.
+    // Counted by format, the team's PDF not among them.
     expect(top.body.result?.structuredContent).toEqual({
       folder: [],
+      count: 1,
+      formats: { doc: 1 },
+      links: `${ORIGIN}/d/{id}/`,
       documents: [
         {
           id: 'aaaaaa',
@@ -699,11 +704,18 @@ describe('an assistant reading', () => {
         },
       ],
       folders: [],
-      links: `${ORIGIN}/d/{id}/`,
     });
+    expect(
+      (await tool(token, 'browse', { format: 'pdf' })).body.result
+        ?.structuredContent,
+    ).toMatchObject({ count: 0, formats: {}, documents: [], folders: [] });
     const team = await tool(token, 'browse', { folder: 'Team' });
     const missing = await tool(token, 'browse', { folder: 'No such folder' });
     expect(team.body.result).toEqual(missing.body.result);
+    expect(
+      (await tool(token, 'browse', { folder: 'Team', format: 'pdf' })).body
+        .result,
+    ).toEqual(missing.body.result);
     expect(
       (await tool(token, 'recent', {})).body.result?.structuredContent,
     ).toEqual({
@@ -713,6 +725,7 @@ describe('an assistant reading', () => {
           title: 'Handbook',
           url: `${ORIGIN}/d/aaaaaa/`,
           path: [],
+          format: 'doc',
           modified: '2026-10-01T00:00Z',
           characters: 11,
         },
@@ -806,6 +819,7 @@ describe('an assistant reading', () => {
           title: 'Handbook',
           url: `${ORIGIN}/d/aaaaaa/`,
           path: [],
+          format: 'doc',
           modified: '2026-10-01',
           characters: 11,
         },
@@ -842,6 +856,7 @@ describe('an assistant reading', () => {
           url: `${ORIGIN}/d/aaaaaa/`,
           text: 'A passage of Handbook.',
           path: [],
+          format: 'doc',
           modified: '2026-10-01',
           characters: 11,
         },

@@ -2,6 +2,31 @@
 
 All three packages share a version and are released together.
 
+## 0.22.3
+
+### Added
+
+- **Documents by format, for assistants.** The MCP server's `search` and
+  `recent` give each document its `format` — `doc`, `pdf`, `sheet`, `video`
+  or `audio`, the value `fetch` reports — and `browse` gives it to each
+  document that is not a Google Doc. Every folder of a `browse` tree, and the
+  answer itself, counts its documents by format in `formats` beside `count`,
+  collapsed folders included, so one `browse` without a folder says how many
+  documents of each format a reader may open, without reading any. All three
+  tools take an optional `format` to keep to one, and the descriptions and
+  the server's instructions say so (ADR-044).
+
+### Fixed
+
+- **A `browse` tree that leaves documents out keeps to its budget.** The
+  `omitted` count was added after the budget was spent, and could take the
+  answer a few dozen characters past `mcp.browseCharacters`.
+
+### Upgrade note
+
+Bump the packages and the workflow pins, and deploy. No sync is needed: the
+build already records each document's format.
+
 ## 0.22.2
 
 ### Fixed

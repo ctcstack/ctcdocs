@@ -33,6 +33,11 @@ for everything of a kind, or for what is new, is not a question of meaning:
   under one held documents of a kind. Each folder repeated its parents' path
   and each document its whole link and a time to the millisecond, which a
   tree and one pattern for the links say once.
+- **Nothing counts documents by format.** Asked how many spreadsheets and
+  videos a knowledge base holds, an assistant read every document with
+  `fetch`, the one tool that said a document's format, at the cost of the
+  whole corpus in context. Titles do not tell: a video's page may be named
+  as a guide, and a spreadsheet's as a model.
 - **Clients give the model different parts of an answer.** Claude Desktop
   gives the model a tool result's text and drops its structured content;
   Claude Code, when both are present, gives it the structured content alone
@@ -87,17 +92,22 @@ document against the reader with it.
   6,000 tokens, the budget a search's passages take. Without a
   folder it lists the corpus root, so a small corpus is listed whole in one
   call. Each folder carries the number of documents under it the reader may
-  open, and is either listed, with its documents and folders, or collapsed,
-  with its name and count alone.
+  open, `count`, and the same documents by format, `formats`, and is either
+  listed, with its documents and folders, or collapsed, with its name and
+  counts alone. The answer carries both for the folder it lists, so one call
+  without a folder says how many documents of each format the reader may
+  open, whatever the budget collapsed.
 - **`recent`** lists the documents most recently changed in Drive, newest
   first: `mcp.recent.defaultResults` unless the call asks for up to
   `mcp.recent.results`, twenty and fifty unless the project sets others,
   optionally since a
   date and under a folder.
 
-`recent` lists each document with `id`, `title`, `url`, `path` and
-`modified`, as a search result does without its passages, so `fetch` reads
-it. `browse` lists each with `id`, `title` and the day it last changed: its
+`recent` lists each document with `id`, `title`, `url`, `path`, `format`
+and `modified`, as a search result does without its passages, so `fetch`
+reads it. `browse` lists each with `id`, `title` and the day it last
+changed, and `format` when it is not a Google Doc: most documents are, and
+`"format":"doc"` on each would cost a tree a sixth of its budget. Its
 folders are where it sits in the tree, and its link is the answer's `links`
 pattern, with its id in place of `{id}`. Both are read-only and annotated so.
 
@@ -105,7 +115,9 @@ Neither calls AI Search. Both read the catalog in the access map and keep only
 the documents the reader may open, by the rule `fetch` uses, stale directory
 included. A folder exists for a reader only when it holds, directly or below,
 a document they may open: neither tool names any other, and a folder no one
-may read under looks as absent as one that does not exist.
+may read under looks as absent as one that does not exist. A count, in all or
+by format, counts only those documents, so it tells no one of a document they
+may not open.
 
 ### A tree is listed level by level
 
@@ -161,15 +173,19 @@ are one folder to an assistant.
 
 ### `search` may be narrowed
 
-`search` takes two optional parameters besides `query`: `folder`, which keeps
-documents under that folder, and `changedSince`, which keeps documents changed
-in Drive on or after a date (`YYYY-MM-DD`, or a date and time in UTC). A
-date the calendar does not have, such as 30 February, is refused rather than
-rolled into the next month. A document without a Drive time does not match
-`changedSince`.
+`search` takes three optional parameters besides `query`: `folder`, which
+keeps documents under that folder, `changedSince`, which keeps documents
+changed in Drive on or after a date (`YYYY-MM-DD`, or a date and time in
+UTC), and `format`, which keeps documents of one format. A date the calendar
+does not have, such as 30 February, is refused rather than rolled into the
+next month. A document without a Drive time does not match `changedSince`.
+`recent` takes `format` as well, and `browse` takes it to list and count only
+documents of that format; a folder holding none of them is listed empty, not
+as one that does not exist, since the folder is there whatever the format.
 
 The Worker turns them into a filter AI Search applies before retrieval,
-without a new metadata field and without reindexing. From the catalog it
+without a new metadata field and without reindexing: the format, like the
+folder, comes from the build's catalog. From the catalog it
 takes the documents the reader may open that match. When none do, the search
 returns nothing. When few do, it asks only for them, by `short_id` with
 `$in`; when few do not, it excludes those, with `$nin`; at most 40 short IDs
@@ -272,9 +288,11 @@ The four tools describe a document with the same fields, in the same form:
   assistant pays to read, so it can tell a short document it should read
   whole from a long one it should search within, and what reading ten of
   them costs. The build counts them from the text it publishes.
-- **`format`**, `doc` or `pdf`, and a PDF's `pages` when the sync counted
-  them, in `fetch`'s metadata, which the build reads from each document's
-  page.
+- **`format`**: `doc`, `pdf`, `sheet`, `video` or `audio` (ADR-046,
+  ADR-047), which the build reads from each document's page, in `fetch`'s
+  metadata with a PDF's `pages` when the sync counted them, and on every
+  document `search` and `recent` list. `browse` says it of a document that
+  is not a Google Doc, and counts every folder's documents by it.
 - **A link on every entry** of `search`, `recent` and `fetch`, as ChatGPT's
   shape asks of the first and the last and as `recent` lists what a compact
   search does; `browse`, the one long list, gives a pattern once.
@@ -313,6 +331,8 @@ Each tool's description says what it returns; `search` names the project's
 asking for every document of a kind, or for what is new, is answered by
 `browse`, which lists a tree, and `recent`, that a search can be kept to a folder or a date, and
 that a compact search shows which documents match without their passages.
+They name the formats, and say that `browse` counts documents by format, so
+that counting them needs no document read.
 
 ## Consequences
 
@@ -330,6 +350,8 @@ that a compact search shows which documents match without their passages.
 - An answer's note reaches the model in every client.
 - An assistant knows what a document costs to read before it reads it, and
   reads the same date in the same form from every tool.
+- How many documents of each format a reader may open is one `browse`, and
+  a list of the videos, or a search among the spreadsheets, one call more.
 - A question about which documents exist costs a compact search, a few
   hundred characters a document, instead of the whole passage budget.
 - A passage is a whole chunk: an answer at its edge is not cut away, and
@@ -358,6 +380,10 @@ that a compact search shows which documents match without their passages.
   may get wrong; `fetch` and `search` still return each link whole.
 - Which folders a tree collapses depends on how long their titles are, not
   on which matter more to the question.
+- Counts by format take a tree's budget too, a few dozen characters a
+  folder, so a large corpus collapses a few more folders than before.
+- A Google Doc in `browse` is a document without `format`: an assistant
+  that misses the description may read the absence as unknown.
 
 ### Follow-up
 

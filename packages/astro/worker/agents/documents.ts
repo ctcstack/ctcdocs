@@ -26,17 +26,20 @@
  * found by its title, with how many of its chunks matched unshown. It may ask
  * for fewer documents, or for none of their text (ADR-044).
  *
- * A search may be kept to a folder or to documents changed since a date, and
- * `browse` and `recent` list documents without searching (ADR-044). All three
- * start from the documents the build lists and the reader may open, so a
- * folder no document the reader may open sits under is never named.
+ * A search may be kept to a folder, to documents changed since a date or to
+ * one format, and `browse` and `recent` list documents without searching
+ * (ADR-044). All three start from the documents the build lists and the
+ * reader may open, so a folder no document the reader may open sits under is
+ * never named, and a count by format counts only what the reader may open.
  *
  * Web-standard code only: the bucket and the index are handed in.
  */
 import {
+  AGENT_DOCUMENT_FORMATS,
   PERMANENT_LINK_PREFIX,
   type AccessMapFile,
   type AgentDocument,
+  type AgentDocumentFormat,
   type AgentSearchSettings,
 } from '../access-map.js';
 import { mayRead, type Reader } from '../decide.js';
@@ -192,6 +195,8 @@ export interface Narrowing {
   readonly folder?: FolderName | undefined;
   /** `YYYY-MM-DD`, or a date and time in UTC. */
   readonly changedSince?: string | undefined;
+  /** What the documents are published from: a Google Doc, a PDF, ... */
+  readonly format?: AgentDocumentFormat | undefined;
 }
 
 /** A folder an assistant names: a path string, or its labels. */
@@ -298,13 +303,22 @@ function narrowed(
     (document) =>
       isUnder(document.path, segments) &&
       (since === undefined ||
-        (document.modified !== null && Date.parse(document.modified) >= since)),
+        (document.modified !== null &&
+          Date.parse(document.modified) >= since)) &&
+      ofFormat(document, narrowing.format),
   );
 }
+
+/** Whether a document is of the format asked for, or none was. */
+const ofFormat = (
+  document: AgentDocument,
+  format: AgentDocumentFormat | undefined,
+) => format === undefined || document.format === format;
 
 /** Whether a narrowing asks for anything. */
 const narrows = (narrowing: Narrowing) =>
   narrowing.changedSince !== undefined ||
+  narrowing.format !== undefined ||
   folderReadings(narrowing.folder)[0]?.length !== 0;
 
 /** A Drive time in UTC, whatever offset it was written with. */
@@ -334,6 +348,8 @@ export interface ListedDocument {
   readonly title: string;
   readonly url: string;
   readonly path: readonly string[];
+  /** What it is published from, as `fetch` reports it. */
+  readonly format: AgentDocumentFormat;
   readonly modified?: string;
   /** Characters of its text, which `fetch` returns (ADR-044). */
   readonly characters: number;
@@ -349,6 +365,7 @@ function listed(
     title: document.title,
     url: permanentLink(origin, document.id),
     path: document.path,
+    format: document.format,
     ...modifiedAs(document, when),
     characters: document.characters,
   };
@@ -359,24 +376,34 @@ const collator = new Intl.Collator('en', {
   sensitivity: 'base',
 });
 
-/** A document as `browse` lists it: its link follows the tree's pattern. */
+/**
+ * A document as `browse` lists it: its link follows the tree's pattern, and
+ * its format is said only when it is not a Google Doc, which most are, so the
+ * tree keeps its budget for documents and folders.
+ */
 interface BrowsedDocument {
   readonly id: string;
   readonly title: string;
+  readonly format?: Exclude<AgentDocumentFormat, 'doc'>;
   /** The day it last changed in Drive, `YYYY-MM-DD`, when known. */
   readonly modified?: string;
   /** Characters of its text, which `fetch` returns. */
   readonly characters: number;
 }
 
+/** Documents by format, the formats none is of left out. */
+type FormatCounts = Readonly<Partial<Record<AgentDocumentFormat, number>>>;
+
 /**
  * A folder in a tree: listed, with its documents and folders, or collapsed,
- * with only its name and count.
+ * with only its name and counts.
  */
 export interface BrowsedFolder {
   readonly name: string;
   /** Documents under it the reader may open, at any depth. */
   readonly count: number;
+  /** The same documents by format. */
+  readonly formats: FormatCounts;
   readonly collapsed?: true;
   readonly documents?: readonly BrowsedDocument[];
   readonly folders?: readonly BrowsedFolder[];
@@ -385,6 +412,10 @@ export interface BrowsedFolder {
 export interface FolderTree {
   /** The folder's labels, as its documents carry them; none for the root. */
   readonly folder: readonly string[];
+  /** Documents under it the reader may open, at any depth, listed or not. */
+  readonly count: number;
+  /** The same documents by format. */
+  readonly formats: FormatCounts;
   /** The documents directly in it, by title. */
   readonly documents: readonly BrowsedDocument[];
   /** The folders directly in it, by name, listed as deep as the budget allows. */
@@ -401,7 +432,8 @@ interface FolderNode {
   readonly path: readonly string[];
   readonly documents: AgentDocument[];
   readonly folders: Map<string, FolderNode>;
-  count: number;
+  /** Documents under it by format; their sum is its count. */
+  readonly formats: Map<AgentDocumentFormat, number>;
 }
 
 const length = (value: unknown) => JSON.stringify(value).length;
@@ -410,10 +442,27 @@ const length = (value: unknown) => JSON.stringify(value).length;
 const foldersOf = (node: FolderNode) =>
   [...node.folders.values()].sort((a, b) => collator.compare(a.name, b.name));
 
+/** Documents under a node, of every format. */
+const countOf = (node: FolderNode) =>
+  [...node.formats.values()].reduce((sum, count) => sum + count, 0);
+
+/** Counts by format, in the order the formats are named. */
+function formatCounts(
+  counts: ReadonlyMap<AgentDocumentFormat, number>,
+): FormatCounts {
+  return Object.fromEntries(
+    AGENT_DOCUMENT_FORMATS.flatMap((format) => {
+      const count = counts.get(format) ?? 0;
+      return count > 0 ? [[format, count]] : [];
+    }),
+  );
+}
+
 function browsed(document: AgentDocument): BrowsedDocument {
   return {
     id: document.id,
     title: document.title,
+    ...(document.format === 'doc' ? {} : { format: document.format }),
     ...modifiedAs(document, dayOf),
     characters: document.characters,
   };
@@ -437,11 +486,14 @@ function folderTree(
     path: [],
     documents: [],
     folders: new Map(),
-    count: 0,
+    formats: new Map(),
+  };
+  const tally = (node: FolderNode, format: AgentDocumentFormat) => {
+    node.formats.set(format, (node.formats.get(format) ?? 0) + 1);
   };
   for (const document of documents) {
     let node = root;
-    node.count += 1;
+    tally(node, document.format);
     for (
       let level = segments.length;
       level < document.path.length;
@@ -455,11 +507,11 @@ function folderTree(
           path: document.path.slice(0, level + 1),
           documents: [],
           folders: new Map(),
-          count: 0,
+          formats: new Map(),
         };
         node.folders.set(fold(label), next);
       }
-      next.count += 1;
+      tally(next, document.format);
       node = next;
     }
     node.documents.push(document);
@@ -467,10 +519,16 @@ function folderTree(
   return root;
 }
 
-/** A folder with only its name and count. */
-const collapsed = (node: FolderNode): BrowsedFolder => ({
+/** A folder's name and counts, which every folder of a tree carries. */
+const counted = (node: FolderNode) => ({
   name: node.name,
-  count: node.count,
+  count: countOf(node),
+  formats: formatCounts(node.formats),
+});
+
+/** A folder with only its name and counts. */
+const collapsed = (node: FolderNode): BrowsedFolder => ({
+  ...counted(node),
   collapsed: true,
 });
 
@@ -479,8 +537,7 @@ function opened(node: FolderNode): BrowsedFolder {
   const documents = documentsOf(node);
   const folders = foldersOf(node).map(collapsed);
   return {
-    name: node.name,
-    count: node.count,
+    ...counted(node),
     ...(documents.length > 0 ? { documents } : {}),
     ...(folders.length > 0 ? { folders } : {}),
   };
@@ -497,8 +554,7 @@ function rendered(
   const documents = documentsOf(node);
   const folders = foldersOf(node).map((child) => rendered(child, open));
   return {
-    name: node.name,
-    count: node.count,
+    ...counted(node),
     ...(documents.length > 0 ? { documents } : {}),
     ...(folders.length > 0 ? { folders } : {}),
   };
@@ -510,9 +566,13 @@ function rendered(
  * directly in the folder, with its folders collapsed. Each level after lists
  * more of the folders the level before listed, those taking the fewest
  * characters first, each whole or not at all; a folder left out stays
- * collapsed, with its name and count. When what is directly in the folder
+ * collapsed, with its name and counts. When what is directly in the folder
  * does not fit, its folders are listed first, then as many documents as fit,
- * and the rest are counted.
+ * and the rest are counted. The tree and each of its folders count the
+ * documents under them, in all and by format, whatever is listed.
+ *
+ * With a format, only documents of that format are listed and counted; a
+ * folder holding none of them is an empty tree, not a missing folder.
  *
  * `undefined` when no document the reader may open sits under the folder,
  * which a folder that does not exist shares.
@@ -521,58 +581,81 @@ export function browseFolder(
   access: DocumentAccess,
   folder?: FolderName,
   depth = Number.POSITIVE_INFINITY,
+  format?: AgentDocumentFormat,
 ): FolderTree | undefined {
   const readable = readableDocuments(access);
   const segments = resolveFolder(readable, folder);
   if (segments === undefined) {
     return undefined;
   }
-  const under = readable.filter((document) => isUnder(document.path, segments));
+  const inFolder = readable.filter((document) =>
+    isUnder(document.path, segments),
+  );
   const links = linkPattern(access.origin);
-  const [first] = under;
-  if (!first) {
-    return segments.length === 0
-      ? { folder: [], documents: [], folders: [], links }
-      : undefined;
+  const [first] = inFolder;
+  if (!first && segments.length > 0) {
+    return undefined;
   }
+  const labels = first ? first.path.slice(0, segments.length) : [];
+  const under = inFolder.filter((document) => ofFormat(document, format));
   const root = folderTree(under, segments);
+  const head = {
+    folder: labels,
+    count: countOf(root),
+    formats: formatCounts(root.formats),
+    links,
+  };
+  if (under.length === 0) {
+    return { ...head, documents: [], folders: [] };
+  }
   // The project's budget (ADR-044); a map without one lists nothing.
   const budget = access.map.agents?.browseCharacters ?? 0;
-  const head = { folder: first.path.slice(0, segments.length), links };
 
   // What is directly in the folder: its folders first, then its documents,
-  // each while it fits.
+  // each while it fits after `reserved` characters.
   const children = foldersOf(root);
   const here = documentsOf(root);
-  let used = length({ ...head, documents: [], folders: [] });
-  const fitting = <T>(items: readonly T[]): T[] => {
-    const kept: T[] = [];
-    for (const item of items) {
-      const cost = length(item) + (kept.length > 0 ? 1 : 0);
-      if (used + cost > budget) {
-        break;
+  const empty = length({ ...head, documents: [], folders: [] });
+  const listing = (reserved: number) => {
+    let used = empty + reserved;
+    const fitting = <T>(items: readonly T[]): T[] => {
+      const kept: T[] = [];
+      for (const item of items) {
+        const cost = length(item) + (kept.length > 0 ? 1 : 0);
+        if (used + cost > budget) {
+          break;
+        }
+        kept.push(item);
+        used += cost;
       }
-      kept.push(item);
-      used += cost;
-    }
-    return kept;
+      return kept;
+    };
+    const folders = fitting(children.map(collapsed));
+    const documents = fitting(here);
+    const complete =
+      folders.length === children.length && documents.length === here.length;
+    return { folders, documents, complete, used };
   };
-  const shownFolders = fitting(children.map(collapsed));
-  const shownDocuments = fitting(here);
-  if (
-    shownFolders.length < children.length ||
-    shownDocuments.length < here.length
-  ) {
+  const whole = listing(0);
+  if (!whole.complete) {
+    // What is left out is counted, so the count takes room of its own: as
+    // much as the largest it could be, less the braces a field does not have.
+    const shown = listing(
+      length({
+        omitted: { documents: here.length, folders: children.length },
+      }) - 1,
+    );
     return {
       ...head,
-      documents: shownDocuments,
-      folders: shownFolders,
+      documents: shown.documents,
+      folders: shown.folders,
       omitted: {
-        documents: here.length - shownDocuments.length,
-        folders: children.length - shownFolders.length,
+        documents: here.length - shown.documents.length,
+        folders: children.length - shown.folders.length,
       },
     };
   }
+  let { used } = whole;
 
   // Then level by level, the folders that take the fewest characters first:
   // opening one replaces its collapsed entry with its listing.

@@ -1,6 +1,8 @@
 import {
   ACCESS_CLASSES_ROUTE,
   ADMINS_CLASS as CORE_ADMINS,
+  agentDocumentFormat,
+  DOCUMENT_FORMATS,
   MEMBERS_CLASS as CORE_MEMBERS,
   permanentLinkPath,
 } from '@ctcstack/ctcdocs-core';
@@ -8,6 +10,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import {
   ADMINS_CLASS,
+  AGENT_DOCUMENT_FORMATS,
   CLASSES_ROUTE,
   MEMBERS_CLASS,
   PERMANENT_LINK_PREFIX,
@@ -161,6 +164,9 @@ describe('shared constants', () => {
     expect(MEMBERS_CLASS).toBe(CORE_MEMBERS);
     expect(ADMINS_CLASS).toBe(CORE_ADMINS);
     expect(`${PERMANENT_LINK_PREFIX}a1b2c3/`).toBe(permanentLinkPath('a1b2c3'));
+    expect(AGENT_DOCUMENT_FORMATS).toEqual(
+      DOCUMENT_FORMATS.map(agentDocumentFormat),
+    );
   });
 });
 
