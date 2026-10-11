@@ -46,6 +46,7 @@ const map: AccessMapFile = {
     },
     workspaceDomains: ['example.com', 'example.org'],
     title: 'Example [DOCS]',
+    insights: { enabled: false, retentionDays: 90 },
   },
   csp: { scriptHashes: ['sha256-abc'] },
   enabled: true,

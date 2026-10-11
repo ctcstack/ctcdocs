@@ -105,10 +105,15 @@ export interface AccessMapFile {
     /** Whether the Worker serves the MCP server and its OAuth routes. */
     readonly mcp?: boolean;
     /**
-     * Present when the Worker records what is asked (ADR-051): how many
-     * days its schedule keeps a record of use.
+     * Whether the Worker records what is asked (ADR-051), and how many days
+     * its schedule keeps a record of use. The retention holds whenever the
+     * database is bound, recording or not, so that turning insights off
+     * never leaves records kept for good.
      */
-    readonly insights?: { readonly retentionDays: number };
+    readonly insights: {
+      readonly enabled: boolean;
+      readonly retentionDays: number;
+    };
   };
   readonly csp: { readonly scriptHashes: readonly string[] };
   readonly enabled: boolean;

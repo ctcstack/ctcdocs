@@ -68,3 +68,38 @@ export async function expireRecords({
     });
   }
 }
+
+/**
+ * What the Worker's schedule asks of the database. Retention follows the
+ * database, not the recording: whenever one is bound, what is past its line
+ * is deleted, so turning insights off stops new records and still lets the
+ * old ones go. Recording with no database bound is logged, since nothing is
+ * kept.
+ */
+export function expireOnSchedule({
+  insights,
+  database,
+  now,
+  log,
+}: {
+  readonly insights: {
+    readonly enabled: boolean;
+    readonly retentionDays: number;
+  };
+  readonly database: StateDatabase | undefined;
+  readonly now: number;
+  readonly log: (event: Readonly<Record<string, unknown>>) => void;
+}): Promise<void> | undefined {
+  if (!database) {
+    if (insights.enabled) {
+      log({ event: 'state-unbound' });
+    }
+    return undefined;
+  }
+  return expireRecords({
+    database,
+    retentionDays: insights.retentionDays,
+    now,
+    log,
+  });
+}

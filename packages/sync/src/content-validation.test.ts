@@ -603,6 +603,48 @@ describe('a deployment anyone may read', () => {
     );
   });
 
+  it('keeps the schedule that empties a bound database, with insights or MCP off', async () => {
+    const root = await createProject();
+    const path = join(root, PROJECT_LAYOUT.wranglerConfigurationFile);
+    const wrangler = JSON.parse(await readFile(path, 'utf8')) as {
+      env: { production: Record<string, unknown> };
+    } & Record<string, unknown>;
+    const withDatabase = (triggers: unknown) =>
+      writeFile(
+        path,
+        JSON.stringify({
+          ...wrangler,
+          ...(triggers === undefined ? {} : { triggers }),
+          env: {
+            production: {
+              ...wrangler.env.production,
+              d1_databases: [
+                {
+                  binding: PLATFORM_WORKERS.stateDatabaseBinding,
+                  database_name: 'example-state',
+                  database_id: '00000000-0000-0000-0000-000000000000',
+                  migrations_dir: PLATFORM_WORKERS.stateMigrations,
+                },
+              ],
+            },
+          },
+        }),
+      );
+    const errorsFor = async () =>
+      (await validateRepositoryContent(testSyncContext(root))).errors.join(
+        '\n',
+      );
+
+    await withDatabase(undefined);
+    expect(await errorsFor()).toContain(
+      `the environment production binds the ${PLATFORM_WORKERS.stateDatabaseBinding} database, which needs the cron ${PLATFORM_WORKERS.publishSchedule}`,
+    );
+    await withDatabase({ crons: ['0 * * * *'] });
+    expect(await errorsFor()).toContain(PLATFORM_WORKERS.publishSchedule);
+    await withDatabase({ crons: [PLATFORM_WORKERS.publishSchedule] });
+    expect(await errorsFor()).toBe('');
+  });
+
   it('requires the database, with the platform migrations, once insights are on', async () => {
     const configuration = (insights: Record<string, unknown> | undefined) =>
       parseSiteConfiguration({

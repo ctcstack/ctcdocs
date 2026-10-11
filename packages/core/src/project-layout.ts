@@ -95,7 +95,10 @@ export const PLATFORM_WORKERS = {
   documentsBinding: 'KB_DOCUMENTS',
   /** The AI Search instance that indexes that bucket. */
   searchBinding: 'KB_SEARCH',
-  /** How often the site's Worker checks that the bucket matches its build. */
+  /**
+   * How often the site's Worker checks that the bucket matches its build,
+   * and deletes the records of use past their retention (ADR-050).
+   */
   publishSchedule: '*/5 * * * *',
   /**
    * The database of operational state (ADR-050): records of use, and

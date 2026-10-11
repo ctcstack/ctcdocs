@@ -22,6 +22,7 @@ import { dirname, relative, resolve, sep } from 'node:path';
 import {
   computeAccessModel,
   fetchCharacterLimit,
+  INSIGHTS_DEFAULTS,
   loadSiteConfiguration,
   MEMBERS_CLASS,
   PROJECT_LAYOUT,
@@ -503,9 +504,11 @@ export async function writeBuildOutput({
         ? languageName(site.mcp.language)
         : undefined,
       mcp,
-      ...(mcp && site.insights?.enabled === true
-        ? { insights: { retentionDays: site.insights.retentionDays } }
-        : {}),
+      insights: {
+        enabled: mcp && site.insights?.enabled === true,
+        retentionDays:
+          site.insights?.retentionDays ?? INSIGHTS_DEFAULTS.retentionDays,
+      },
     },
     csp: { scriptHashes: [...scriptHashes].sort() },
     enabled: model.enabled,
