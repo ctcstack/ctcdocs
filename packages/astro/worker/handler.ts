@@ -14,8 +14,10 @@
  * fetched by that canonical path.
  */
 import {
+  ADMINS_CLASS,
   CLASSES_ROUTE,
   environmentOf,
+  INSIGHTS_ROUTE,
   STATUS_ROUTE,
   type AccessMapFile,
 } from './access-map.js';
@@ -30,6 +32,7 @@ import {
 } from './agents/authorize.js';
 import type { DocumentIndex, DocumentStore } from './agents/documents.js';
 import { serveMcp } from './agents/tools.js';
+import { insightsAnswer } from './insights/route.js';
 import {
   groupsFor,
   isAdmin,
@@ -655,6 +658,21 @@ async function route(
           now,
         ),
       ),
+    );
+  }
+
+  if (url.pathname === INSIGHTS_ROUTE) {
+    // Decided as an admins page is: never while the snapshot is stale.
+    if (!mayRead(map, reader, ADMINS_CLASS, stale)) {
+      context.log({ event: 'refused', reader: reader.kind, stale });
+      return noStore(new Response('Forbidden', { status: 403 }));
+    }
+    return noStore(
+      await insightsAnswer({
+        map,
+        database: context.state?.database,
+        log: context.log,
+      }),
     );
   }
 

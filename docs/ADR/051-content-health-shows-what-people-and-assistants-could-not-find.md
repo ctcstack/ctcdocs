@@ -166,6 +166,14 @@ address.
   section is absent from the built page unless the feature is on, and empty
   unless the JSON loads.
 
+The route answers as the admins class is read: not while the snapshot is
+stale, and never to a machine key. Off, the feature answers an admin 404;
+unbound, the database 503; with no week reported yet, a report of `null`.
+Its answer names each document the report names by its title and permanent
+link, from the build the Worker serves, so the stored report keeps no
+title. The page sets every query as text, never as markup. Since only
+admins read the report, `insights.enabled` needs `access.admins`.
+
 A CLI, `ctcdocs-insights`, prints the same report from the database for
 maintainers, and can write the week's misses as candidate questions for a
 deployment's evaluation set. It reads through the project's Wrangler, as

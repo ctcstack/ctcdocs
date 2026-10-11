@@ -33,6 +33,7 @@ import {
 import { MemoryStore } from '../dist-node/worker/agents/memory-store.js';
 import { publishDocuments } from '../dist-node/worker/agents/publish.js';
 import { handle, SESSION_COOKIE } from '../dist-node/worker/handler.js';
+import { RecordLimit } from '../dist-node/worker/state/limit.js';
 import { sitePath } from '../dist-node/worker/paths.js';
 import { GoogleKeys } from '../dist-node/worker/oidc.js';
 import { randomToken, seal, sealKeys } from '../dist-node/worker/seal.js';
@@ -157,9 +158,38 @@ export async function verifyGate({ projectRoot, distRoot }) {
       ? { [adminGroup]: { id: 'admin-group', members: ['verify-admin'] } }
       : {},
   };
+  // A kept report, so that a refusal is a refusal and not an empty answer.
+  const insightsQuery = 'a query only admins may read';
+  const keptReport = JSON.stringify({
+    version: 1,
+    week: '2026-10-05',
+    notFound: [{ label: insightsQuery, count: 1, queries: [], documents: [] }],
+    askedMost: [],
+    foundNotRead: [],
+  });
+  const state = {
+    database: {
+      prepare: (query) => {
+        const statement = {
+          bind: () => statement,
+          all: async () => ({
+            results: query.includes('FROM reports')
+              ? [{ report: keptReport }]
+              : [],
+          }),
+          run: async () => ({ meta: { changes: 0 } }),
+        };
+        return statement;
+      },
+      batch: async () => [],
+    },
+    schedule: () => {},
+    limit: new RecordLimit(),
+  };
   const context = {
     map,
     assets: assetsFrom(distRoot),
+    state,
     snapshot: async () => snapshot,
     machineKeys: async () => records,
     secrets: {
@@ -248,6 +278,38 @@ export async function verifyGate({ projectRoot, distRoot }) {
       );
     }
   }
+
+  /*
+   * The insights report (ADR-051): an admin reads it, and no one else, not
+   * any key whatever its groups, nor anyone signed out.
+   */
+  const insights = '/_kb/insights.json';
+  const signedOut = await ask(insights);
+  assert.equal(signedOut.status, 401, 'An anonymous reader got the insights.');
+  for (const { name, key } of keys) {
+    const refused = await ask(insights, { Authorization: `Bearer ${key}` });
+    assert.equal(
+      refused.status,
+      403,
+      `A key for ${name} got ${refused.status} for the insights report.`,
+    );
+    assert.ok(!(await refused.text()).includes(insightsQuery));
+  }
+  if (adminGroup) {
+    const admin = await ask(insights, { Cookie: adminCookie });
+    assert.equal(
+      admin.status,
+      map.site.insights.enabled ? 200 : 404,
+      `An admin got ${admin.status} for the insights report.`,
+    );
+    if (map.site.insights.enabled) {
+      assert.ok(
+        (await admin.text()).includes(insightsQuery),
+        'An admin was not given the kept insights report.',
+      );
+    }
+  }
+  requests += keys.length + 2;
 
   const page = await ask('/', { 'Sec-Fetch-Mode': 'navigate' });
   assert.equal(page.status, 302);

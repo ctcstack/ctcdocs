@@ -26,8 +26,10 @@ import { Icon } from '@astrojs/starlight/components';
 import { PLATFORM_ROUTE_HREFS } from '@ctcstack/ctcdocs-core';
 
 import HealthBreakdown from '../components/HealthBreakdown.astro';
+import InsightsReport from '../components/InsightsReport.astro';
 import HealthGroup from '../components/HealthGroup.astro';
 import { folderAccessFindings, rootFolderId } from '../lib/access-source';
+import { siteConfiguration } from '../lib/project';
 import {
   loadHealthReport,
   loadSyncState,
@@ -87,6 +89,10 @@ function describeAccess(finding: (typeof folderAccessFindings)[number]): {
 
 const report = loadHealthReport();
 const state = loadSyncState();
+/** The section on what people could not find is built only with insights on. */
+const insights =
+  siteConfiguration.mcp?.enabled === true &&
+  siteConfiguration.insights?.enabled === true;
 const view = buildHealthView(report, state);
 
 /** A group this long starts folded, even under "Fix now". */
@@ -177,10 +183,13 @@ const blocks = (groups: Group[]) => {
   <content-health class="not-content" data-pagefind-ignore>
     {
       !report && !state ? (
-        <p class="health-intro">
-          The next sync writes the report this page is built from. Check back
-          after it has run.
-        </p>
+        <>
+          <p class="health-intro">
+            The next sync writes the report this page is built from. Check back
+            after it has run.
+          </p>
+          {insights && <InsightsReport />}
+        </>
       ) : (
         <>
           <p class="health-intro">
@@ -465,6 +474,8 @@ const blocks = (groups: Group[]) => {
               )}
             </section>
           ))}
+
+          {insights && <InsightsReport />}
 
           {folderAccessFindings.length > 0 && (
             <section class="health-tier" id="folder-access" data-tier>

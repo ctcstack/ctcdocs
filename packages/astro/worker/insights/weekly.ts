@@ -183,6 +183,23 @@ export async function makeReport({
   });
 }
 
+/** The latest kept report, if there is one. */
+export async function latestReport(
+  database: StateDatabase,
+): Promise<WeeklyReport | undefined> {
+  const { results } = await database
+    .prepare('SELECT report FROM reports ORDER BY week DESC LIMIT 1')
+    .all();
+  return reportOf(results[0]);
+}
+
+function reportOf(row: unknown): WeeklyReport | undefined {
+  const report = (row as { report?: unknown } | undefined)?.report;
+  return typeof report === 'string'
+    ? (JSON.parse(report) as WeeklyReport)
+    : undefined;
+}
+
 /** The kept report of a week, if there is one, as JSON text parsed. */
 export async function keptReport(
   database: StateDatabase,
@@ -192,10 +209,7 @@ export async function keptReport(
     .prepare('SELECT report FROM reports WHERE week = ?')
     .bind(week)
     .all();
-  const row = results[0] as { report?: unknown } | undefined;
-  return typeof row?.report === 'string'
-    ? (JSON.parse(row.report) as WeeklyReport)
-    : undefined;
+  return reportOf(results[0]);
 }
 
 /**
