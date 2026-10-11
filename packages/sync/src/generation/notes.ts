@@ -579,11 +579,27 @@ function reviewMonths(
   return review.months;
 }
 
-/** The day `months` calendar months before `now`, in UTC. */
+/**
+ * The same time `months` calendar months before `now`, in UTC, on the last day
+ * of that month when it is shorter: a month before 30 March is 28 February,
+ * not 2 March.
+ */
 function monthsBefore(now: Date, months: number): Date {
-  const line = new Date(now.getTime());
-  line.setUTCMonth(line.getUTCMonth() - months);
-  return line;
+  const total = now.getUTCFullYear() * 12 + now.getUTCMonth() - months;
+  const year = Math.floor(total / 12);
+  const month = total - year * 12;
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return new Date(
+    Date.UTC(
+      year,
+      month,
+      Math.min(now.getUTCDate(), lastDay),
+      now.getUTCHours(),
+      now.getUTCMinutes(),
+      now.getUTCSeconds(),
+      now.getUTCMilliseconds(),
+    ),
+  );
 }
 
 /**

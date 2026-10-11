@@ -21,6 +21,7 @@
  * taken in the order of their IDs, so it does not depend on the order they
  * arrive in.
  */
+import { Parser } from 'htmlparser2';
 import type { Nodes, Root } from 'mdast';
 import remarkGfm from 'remark-gfm';
 import remarkParse from 'remark-parse';
@@ -48,10 +49,40 @@ export interface NearDuplicate {
 const parser = unified().use(remarkParse).use(remarkGfm);
 
 /**
+ * The words of raw HTML the converter kept, such as a table Markdown cannot
+ * hold: its text, link targets and image descriptions, read with a parser.
+ */
+function collectHtml(html: string, into: string[]): void {
+  const parser = new Parser({
+    onopentag(name, attributes) {
+      into.push(' ');
+      if (name === 'a' && attributes.href) {
+        into.push(` ${attributes.href} `);
+      }
+      if (name === 'img' && attributes.alt) {
+        into.push(` ${attributes.alt} `);
+      }
+    },
+    ontext(text) {
+      into.push(text);
+    },
+    onclosetag() {
+      into.push(' ');
+    },
+  });
+  parser.write(html);
+  parser.end();
+}
+
+/**
  * The words of a node: its text, code, image descriptions and link targets.
  * A directory of links differs from another of the same shape by its targets.
  */
 function collectText(node: Nodes, into: string[]): void {
+  if (node.type === 'html') {
+    collectHtml(node.value, into);
+    return;
+  }
   if (node.type === 'text' || node.type === 'inlineCode') {
     into.push(node.value);
     return;

@@ -39,7 +39,8 @@ the manifest.
 - **`document-near-duplicate`, under Fix next.** The sync compares the text
   of every published document with every other. A document's text is its
   words and link targets, read from its Markdown with the parser the sync
-  already uses; markup and image addresses are not part of it, and link
+  already uses, and from the HTML it keeps for a table Markdown cannot hold
+  with an HTML parser; markup and image addresses are not part of it, and link
   targets are, since a directory of links differs from another of the same
   shape by where they lead. It becomes a
   set of five-word shingles, and two documents are near duplicates when
@@ -52,7 +53,8 @@ the manifest.
   the text of". The action: keep the text in one document and link to it.
 
 - **`document-stale`, under Improve.** A document Drive last saw edited longer
-  ago than the line it is held to is noted with the day of that edit. The
+  ago than the line it is held to is noted with the day of that edit. Months
+  are calendar months, a month before 30 March being 28 February. The
   line is `sync.staleAfterMonths`, 12 months unless the project sets another,
   and 0 notes nothing. A folder listed in `sync.staleFolders` holds everything
   below it to its own line, 0 included, the nearest listed folder winning.

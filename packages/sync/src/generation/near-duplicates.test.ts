@@ -98,6 +98,24 @@ describe('findNearDuplicates', () => {
     expect(found.get('copy-00')).toHaveLength(39);
   });
 
+  it('reads tables the converter kept as HTML', () => {
+    const table = (seed: number) =>
+      `<table><tr><td>${prose(seed, 300)}</td><td><a href="https://example.com/${seed}">${prose(seed + 50, 300)}</a></td></tr></table>`;
+    const intro = prose(20, 100);
+    const found = findNearDuplicates(
+      new Map([
+        ['report-a', `${intro}\n\n${table(21)}\n`],
+        ['report-b', `${intro}\n\n${table(22)}\n`],
+        ['only-table', `${table(23)}\n`],
+        ['only-table-copy', `${table(23)}\n`],
+      ]),
+    );
+    expect(found.has('report-a')).toBe(false);
+    expect(found.get('only-table')?.map((entry) => entry.id)).toEqual([
+      'only-table-copy',
+    ]);
+  });
+
   it('leaves documents too short to judge', () => {
     const short = prose(10, 30);
     expect(

@@ -370,6 +370,54 @@ describe('createNotes', () => {
     ]);
   });
 
+  it.each([
+    [
+      'a month before 30 March is 28 February',
+      '2026-03-30T12:00:00.000Z',
+      1,
+      '2026-03-01T09:00:00.000Z',
+      false,
+    ],
+    [
+      'and a day before it is stale',
+      '2026-03-30T12:00:00.000Z',
+      1,
+      '2026-02-27T09:00:00.000Z',
+      true,
+    ],
+    [
+      'a month before 31 March of a leap year is 29 February',
+      '2028-03-31T12:00:00.000Z',
+      1,
+      '2028-02-29T13:00:00.000Z',
+      false,
+    ],
+    [
+      'and earlier that day is stale',
+      '2028-03-31T12:00:00.000Z',
+      1,
+      '2028-02-29T11:00:00.000Z',
+      true,
+    ],
+    [
+      'a year before 29 February is 28 February',
+      '2028-02-29T12:00:00.000Z',
+      12,
+      '2027-02-28T13:00:00.000Z',
+      false,
+    ],
+  ])('counts calendar months: %s', (_case, now, months, modified, stale) => {
+    const notes = createNotes(
+      corpus([item('doc', 'Doc', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team')]),
+      manifestOf([
+        { ...record('doc', 'team/doc'), googleModifiedTime: modified },
+      ]),
+      {},
+      { now: new Date(now), months, folders: new Map() },
+    );
+    expect(notes.some((note) => note.note === 'document-stale')).toBe(stale);
+  });
+
   it('names a near duplicate the run did not select from the manifest', () => {
     const notes = createNotes(
       corpus([
