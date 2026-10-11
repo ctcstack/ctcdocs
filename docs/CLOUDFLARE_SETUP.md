@@ -200,8 +200,9 @@ decision or a reader's identity. Each environment needs its own:
 pnpm exec wrangler d1 create example-docs-production-state
 ```
 
-Add it to that environment in `wrangler.jsonc`, naming the platform's
-migrations, so that `wrangler d1 migrations apply` finds them:
+If Wrangler offers to add the binding for you, decline: add it to that
+environment in `wrangler.jsonc` by hand, naming the platform's migrations, so
+that `wrangler d1 migrations apply` finds them:
 
 ```jsonc
 {
@@ -236,8 +237,9 @@ migrations, so that `wrangler d1 migrations apply` finds them:
   pnpm exec wrangler d1 migrations apply KB_STATE_DB --env production --remote
   ```
 
-- D1 keeps deleted rows 30 days in Time Travel; the documented retention of a
-  record is `insights.retentionDays` plus those 30 days.
+- D1 keeps deleted rows 30 days in Time Travel on Workers Paid; the
+  documented retention of a record is `insights.retentionDays` plus those 30
+  days.
 
 Nothing else reads the database: the Worker writes it and answers admins from
 it, and `ctcdocs-insights` reads it with a maintainer's own Wrangler login.

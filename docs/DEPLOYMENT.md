@@ -62,7 +62,8 @@ Each private environment needs, once:
 2. **A KV namespace**, its ID in both `wrangler.jsonc` and
    `wrangler.directory.jsonc`, following
    [Cloudflare setup](CLOUDFLARE_SETUP.md#the-kv-namespace).
-3. **A deploy API token** without KV permissions, following
+3. **A deploy API token** without KV permissions, and with D1 Edit if the
+   project turns insights on, following
    [Cloudflare setup](CLOUDFLARE_SETUP.md#deploy-api-token). Do not reuse one
    token across environments.
 4. **A smoke machine key**, issued with `ctcdocs-machine-key`, its record added
@@ -231,8 +232,9 @@ requiring `production` to exist. Whatever `site.config.json` declares,
 disagree.
 
 The workflow deploys, from the same build and therefore with the same access
-map, the directory Worker when `wrangler.directory.jsonc` exists, then the site
-Worker. The directory Worker goes first: it only reads more groups, so the site
+map, the directory Worker when `wrangler.directory.jsonc` exists, then, with
+insights on, the state database's migrations, then the site Worker. The
+directory Worker goes first: it only reads more groups, so the site
 is never ahead of the groups it names, and if it cannot be deployed the site is
 left as it was. Every version of a gated deployment — any environment private
 — is tagged `ctcdocs-gate-v1`.
@@ -437,13 +439,15 @@ and any test-corpus environment do not flow into it.
 
 ### Deployment stops at the state database migrations
 
-With insights on, **Apply the state database migrations** runs before the
-site Worker is deployed, and nothing is deployed when it fails. An
-authentication or permission error means the deploy token lacks D1 Edit: add
-it to the token, whose value stays the same
+With insights on, **Apply the state database migrations** runs after the
+directory Worker and before the site Worker, and the site Worker is not
+deployed when it fails. An authentication or permission error means the
+deploy token lacks D1 Edit: add it to the token, whose value stays the same
 ([Deploy API token](CLOUDFLARE_SETUP.md#deploy-api-token)), and run the
-deployment again. "Couldn't find a D1 DB" means the environment's
-`d1_databases` entry names a database that does not exist in the account
+deployment again. "Couldn't find a D1 DB named … in the API" means the
+environment's `d1_databases` entry names a database the account does not
+have; "Couldn't find a D1 DB with name or binding" means the environment has
+no `KB_STATE_DB` entry at all
 ([the state database](CLOUDFLARE_SETUP.md#the-state-database)).
 
 ### Custom domain already belongs to another Worker

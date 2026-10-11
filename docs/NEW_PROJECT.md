@@ -371,6 +371,7 @@ directly, never a group inside a group.
 5. **My Profile → API Tokens → Create Token → Edit Cloudflare Workers →
    Use template**. Under **Account Resources** pick your account; under
    **Zone Resources** pick your domain. **Delete the Workers KV Storage line.**
+   If you will turn insights on (Step 17), add **Account → D1 → Edit**.
    Create it; the token is row 13.
 6. **Storage & databases → Workers KV → Create**: name it
    `example-docs-production-state`. Its ID (row 14) is shown in the list.
@@ -755,9 +756,13 @@ before turning it on.
 4. Commit and push. The deployment applies the database's migrations before
    it deploys the Worker.
 5. Ask an assistant something, then search the site. The first report comes
-   the Monday after; until then, `pnpm exec ctcdocs-insights --compute --week
-<this Monday>` shows the week so far
-   ([Operations](OPERATIONS.md#insights)).
+   on the Monday after, in UTC; until then, this shows the week so far, given
+   the date of this week's Monday
+   ([Operations](OPERATIONS.md#insights)):
+
+   ```bash
+   pnpm exec ctcdocs-insights --compute --week 2026-10-05
+   ```
 
 ## Moving an existing site off Cloudflare Access
 

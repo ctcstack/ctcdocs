@@ -832,7 +832,8 @@ judged against the directory. To end connections themselves:
 With `insights.enabled`
 ([configuration](CONFIGURATION.md#what-people-and-assistants-could-not-find)),
 the Worker records each MCP call and each settled search on the site, and
-every Monday reports the week before
+on the first run of its schedule each Monday, in UTC, reports the week before,
+Monday to Monday
 ([ADR-051](ADR/051-content-health-shows-what-people-and-assistants-could-not-find.md)).
 
 ### Reading the report
@@ -857,7 +858,8 @@ pnpm exec ctcdocs-insights --week 2026-10-05 --env production --json
 pnpm exec ctcdocs-insights --compute
 ```
 
-It prints the kept report of last week, or of the Monday `--week` names, and
+It reads the `production` environment unless `--env` names another. It
+prints the kept report of last week, or of the Monday `--week` names, and
 makes one from the records when none is kept, or when `--compute` asks with
 the project's settings now. It only reads. `--local` reads the development
 database of `wrangler dev`.
@@ -876,23 +878,24 @@ means the corpus has no answer. The command never writes the set itself.
 
 ### What it logs
 
-| Event                    | Means                                                                                   |
-| ------------------------ | --------------------------------------------------------------------------------------- |
-| `insights-reported`      | A week was reported: its counts, and how many records it could not read.                |
-| `insights-report-failed` | The report could not be made; the next run of the schedule tries again.                 |
-| `insights-read-failed`   | An admin's request for the report could not read the database.                          |
-| `state-expired`          | What was past its retention was deleted, by table; every five minutes.                  |
-| `state-expiry-failed`    | The deletion failed; the next run deletes what this one did not.                        |
-| `state-write-failed`     | A record was dropped: "no such table" means the migrations were not applied.            |
-| `state-record-limited`   | One person passed the 60 calls or 30 site searches a minute recorded; the rest are not. |
-| `state-unbound`          | Insights are on and the database is not bound: nothing is recorded.                     |
+| Event                    | Means                                                                           |
+| ------------------------ | ------------------------------------------------------------------------------- |
+| `insights-reported`      | A week was reported: its counts, and how many records it could not read.        |
+| `insights-report-failed` | The report could not be made; the next run of the schedule tries again.         |
+| `insights-read-failed`   | An admin's request for the report could not read the database.                  |
+| `state-expired`          | What was past its retention was deleted, by table; every five minutes.          |
+| `state-expiry-failed`    | The deletion failed; the next run deletes what this one did not.                |
+| `state-record-failed`    | A call's record could not be made; the answer went as it was.                   |
+| `state-write-failed`     | A record was dropped: "no such table" means the migrations were not applied.    |
+| `state-record-limited`   | One person passed the 60 calls or 30 site searches a minute an isolate records. |
+| `state-unbound`          | Insights are on and the database is not bound: nothing is recorded.             |
 
 None names a person, a query or a document.
 
 ### Deleting records
 
 Records go on their own after `insights.retentionDays`, and 30 days later from
-Time Travel. To delete a query sooner, as when it holds what it should not,
+Time Travel, on Workers Paid. To delete a query sooner, as when it holds what it should not,
 delete it with a maintainer's login and drop the reports that may quote it;
 the next run of the schedule makes last week's report again, without it, and
 earlier weeks stay unreported:
@@ -906,8 +909,11 @@ pnpm exec wrangler d1 execute KB_STATE_DB --env production --remote \
   --command "DELETE FROM reports"
 ```
 
-Time Travel still holds the deleted rows for 30 days; restoring the database
-to an earlier point brings them back.
+`LIKE` matches ASCII letters in either case and others as written, and `%`
+and `_` in the words match any text: keep the words exact and narrow, and
+double a quote in them. Last week's report is made again only if last week
+still holds a record. Time Travel still holds the deleted rows for 30 days;
+restoring the database to an earlier point brings them back.
 
 ## Failure handling
 
