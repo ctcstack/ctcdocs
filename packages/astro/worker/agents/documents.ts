@@ -154,7 +154,7 @@ export function readableClasses(
 }
 
 /** The build's static assets, which hold every page's Markdown version. */
-export interface BuiltAssets {
+interface BuiltAssets {
   fetch(request: Request): Promise<Response>;
 }
 

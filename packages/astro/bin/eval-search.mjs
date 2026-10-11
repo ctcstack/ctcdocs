@@ -217,7 +217,8 @@ export async function evaluate({ map, questions, index, origin }) {
           reader: readers[view],
           stale: false,
           origin,
-          store: undefined,
+          // Search alone: nothing here reads a document whole.
+          assets: undefined,
           index: {
             search: async (...args) => {
               const found = await index.search(...args);
