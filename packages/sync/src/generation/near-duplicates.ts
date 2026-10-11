@@ -21,11 +21,11 @@ import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 
 /** Shared shingles over all of either document's, at which two are alike. */
-export const SIMILAR = 0.8;
+const SIMILAR = 0.8;
 /** Shared shingles over the shorter document's, at which it is inside. */
-export const CONTAINED = 0.95;
+const CONTAINED = 0.95;
 /** Fewer shingles than this, and a document is too short to compare. */
-export const SHORTEST = 50;
+const SHORTEST = 50;
 const SHINGLE_WORDS = 5;
 /** A shingle in more documents than this proves nothing about two of them. */
 const COMMON = 32;
