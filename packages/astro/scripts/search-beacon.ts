@@ -2,9 +2,14 @@
  * Settled site searches, as the page reports them to the Worker (ADR-051).
  *
  * A search is settled 1.5 seconds after the last keystroke, or when a result
- * is opened. A settled search is sent once, when what follows it is known:
- * the next search, a result opened, the search closed or the page left. So
- * a search followed by a result opened is one report, with the page.
+ * is opened, and counted once its results are shown. A settled search is
+ * sent once, when what follows it is known: the next search, a result
+ * opened, the search closed or the page left. So a search followed by a
+ * result opened is one report, with the page.
+ *
+ * What is in the box is read again when a search settles: Pagefind clears
+ * it on Escape or its clear button without telling anyone, and a search
+ * cleared, or one closed before it settled, is no search to report.
  *
  * Browser code: it must not import the platform's core. The route is
  * restated here and a test keeps it equal to the Worker's. Nothing here
@@ -16,6 +21,10 @@ export const SEARCH_REPORT_ROUTE = '/_kb/insights/search';
 
 /** Milliseconds without typing after which a search is settled. */
 export const SETTLE_MS = 1_500;
+/** How often a settled search looks again for results still loading. */
+const RETRY_MS = 500;
+/** How long it waits for them at most; past that, it is not reported. */
+const WAIT_MS = 10_000;
 
 export interface SearchReport {
   readonly query: string;
@@ -26,8 +35,10 @@ export interface SearchReport {
 export interface SearchReporterOptions {
   /** Sends one report; with `sendBeacon`, it outlives the page. */
   readonly send: (report: SearchReport) => void;
-  /** How many results the search shows now. */
-  readonly results: () => number;
+  /** What the search box holds now. */
+  readonly query: () => string;
+  /** How many results the search shows now; none while they load. */
+  readonly results: () => number | undefined;
   readonly setTimer?: (callback: () => void, ms: number) => unknown;
   readonly clearTimer?: (timer: unknown) => void;
 }
@@ -36,6 +47,7 @@ export class SearchReporter {
   private timer: unknown;
   private typing: string | undefined;
   private settled: SearchReport | undefined;
+  private waited = 0;
   private readonly setTimer: (callback: () => void, ms: number) => unknown;
   private readonly clearTimer: (timer: unknown) => void;
 
@@ -55,21 +67,39 @@ export class SearchReporter {
       this.flush();
     }
     this.typing = text.length > 0 ? text : undefined;
+    this.waited = 0;
     if (this.typing) {
       this.timer = this.setTimer(() => this.settle(), SETTLE_MS);
     }
   }
 
-  /** A result was opened: the search is settled, and sent with the page. */
+  /**
+   * A result was opened: the search is settled, and sent with the page. A
+   * result opened is one shown, so a count still loading is at least one.
+   */
   opened(path: string): void {
-    this.settle();
+    this.stopTimer();
+    if (this.typing && this.options.query().trim() === this.typing) {
+      this.settled = {
+        query: this.typing,
+        results: this.options.results() ?? 1,
+      };
+    }
+    this.typing = undefined;
     if (this.settled) {
       this.settled = { ...this.settled, opened: path };
     }
     this.flush();
   }
 
-  /** The search was closed, or the page is left: what is settled goes. */
+  /** The search was closed: what was not settled is dropped, the rest goes. */
+  abandon(): void {
+    this.stopTimer();
+    this.typing = undefined;
+    this.flush();
+  }
+
+  /** The page is left, or hidden: what is settled goes. */
   flush(): void {
     const report = this.settled;
     this.settled = undefined;
@@ -80,10 +110,27 @@ export class SearchReporter {
 
   private settle(): void {
     this.stopTimer();
-    if (this.typing) {
-      this.settled = { query: this.typing, results: this.options.results() };
-      this.typing = undefined;
+    const typing = this.typing;
+    if (!typing) {
+      return;
     }
+    // Cleared or changed without a keystroke: not this search any more.
+    if (this.options.query().trim() !== typing) {
+      this.typing = undefined;
+      return;
+    }
+    const results = this.options.results();
+    if (results === undefined) {
+      this.waited += RETRY_MS;
+      if (this.waited > WAIT_MS) {
+        this.typing = undefined;
+      } else {
+        this.timer = this.setTimer(() => this.settle(), RETRY_MS);
+      }
+      return;
+    }
+    this.settled = { query: typing, results };
+    this.typing = undefined;
   }
 
   private stopTimer(): void {

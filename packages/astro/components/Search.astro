@@ -184,7 +184,12 @@ if (
         if (!frame || !input) return;
         const reporter = new SearchReporter({
           send: beacon,
-          results: () => frame.querySelectorAll('.pagefind-ui__result').length,
+          query: () => input.value,
+          // Pagefind lists results only once they have loaded.
+          results: () =>
+            frame
+              .querySelector('.pagefind-ui__results')
+              ?.querySelectorAll('.pagefind-ui__result').length,
         });
         input.addEventListener('input', () => reporter.typed(input.value));
         frame.addEventListener('click', (event) => {
@@ -193,8 +198,11 @@ if (
             reporter.opened(new URL(link.href, location.href).pathname);
           }
         });
-        dialog.addEventListener('close', () => reporter.flush());
+        dialog.addEventListener('close', () => reporter.abandon());
         window.addEventListener('pagehide', () => reporter.flush());
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'hidden') reporter.flush();
+        });
       };
 
       window.addEventListener('DOMContentLoaded', () => {

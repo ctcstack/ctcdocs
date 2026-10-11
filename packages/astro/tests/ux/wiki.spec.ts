@@ -1067,15 +1067,31 @@ test('a settled site search is reported once, with the result opened', async ({
     await route.fulfill({ status: 204 });
   });
   const { title } = anyDocument();
-  await page.goto('/');
-  await page
-    .locator('header')
-    .getByRole('button', { name: 'Search', exact: true })
-    .click();
-  await page.getByPlaceholder('Search').fill(title);
+  const openSearch = () =>
+    page
+      .locator('header')
+      .getByRole('button', { name: 'Search', exact: true })
+      .click();
+  const box = page.getByPlaceholder('Search');
   const first = page.locator('.pagefind-ui__result a').first();
+  await page.goto('/');
+
+  // A search closed with Escape before it settles is none: Escape also
+  // clears Pagefind's box without a keystroke. Nothing is sent of it.
+  await openSearch();
+  await box.fill(title);
   await expect(first).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(1_700);
+  await page.evaluate(() =>
+    window.dispatchEvent(new PageTransitionEvent('pagehide')),
+  );
+  expect(reports).toEqual([]);
+
   // Settled, but not sent until what follows it is known.
+  await openSearch();
+  await box.fill(title);
+  await expect(first).toBeVisible();
   await page.waitForTimeout(1_700);
   expect(reports).toEqual([]);
 

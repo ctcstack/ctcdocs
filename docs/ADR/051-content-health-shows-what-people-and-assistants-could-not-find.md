@@ -87,7 +87,11 @@ A search is settled after 1.5 seconds without typing, or when a result is
 opened. The page sends it with `navigator.sendBeacon` to
 `POST /_kb/insights/search` once what follows it is known: the next search,
 a result opened, the search closed or the page left. So a search and the
-result opened from it are one record. The Worker:
+result opened from it are one record. Its results are counted once
+Pagefind shows them, waiting up to ten seconds for them to load. A search
+cleared, as Escape or Pagefind's clear button does without a keystroke, or
+closed before it settled, is no search and is not sent. The Worker reads at
+most 4 KB of a report, and refuses one it cannot read. The Worker:
 
 - accepts it only from a person signed in, on a page of this site: never
   signed out, from a machine key, or from another site;

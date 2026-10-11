@@ -269,6 +269,49 @@ describe('a site search reported', () => {
     expect(await rows(recording)).toEqual([]);
   });
 
+  it('reads where it was sent from by either header, and needs one', async () => {
+    const recording = gate();
+    const body = { query: 'q', results: 0 };
+    const sentWith = async (headers: Record<string, string>) =>
+      (
+        await handle(
+          new Request(`${ORIGIN}${INSIGHTS_SEARCH_ROUTE}`, {
+            method: 'POST',
+            headers: { Cookie: await cookie('user-member'), ...headers },
+            body: JSON.stringify(body),
+          }),
+          recording.context,
+        )
+      ).status;
+    // A browser that sends no Fetch Metadata still names its origin.
+    expect(await sentWith({ Origin: ORIGIN })).toBe(204);
+    expect(await sentWith({})).toBe(403);
+    expect(await sentWith({ Origin: 'null' })).toBe(403);
+    expect(await sentWith({ 'Sec-Fetch-Site': 'same-site' })).toBe(403);
+    expect(await sentWith({ 'Sec-Fetch-Site': 'none' })).toBe(403);
+    expect(await rows(recording)).toHaveLength(1);
+  });
+
+  it('keeps no page opened that the stale directory closes', async () => {
+    const stale = gate({ snapshot: async () => snapshot(3 * 60 * 60_000) });
+    await report(
+      stale.context,
+      { query: 'q', results: 1, opened: '/team/plan/' },
+      { sub: 'user-team' },
+    );
+    await report(
+      stale.context,
+      { query: 'q', results: 1, opened: '/handbook/' },
+      { sub: 'user-team' },
+    );
+    expect((await rows(stale)).map((row) => [row.classes, row.opened])).toEqual(
+      [
+        ['["members"]', null],
+        ['["members"]', '/handbook/'],
+      ],
+    );
+  });
+
   it('refuses a body it cannot read', async () => {
     const recording = gate();
     for (const body of [
