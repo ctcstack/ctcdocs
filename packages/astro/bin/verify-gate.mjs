@@ -153,7 +153,7 @@ export async function verifyGate({ projectRoot, distRoot }) {
   const snapshot = {
     schemaVersion: 1,
     takenAt: new Date(now).toISOString(),
-    users: { 'verify-admin': true },
+    users: { 'verify-admin': true, 'verify-member': true },
     groups: adminGroup
       ? { [adminGroup]: { id: 'admin-group', members: ['verify-admin'] } }
       : {},
@@ -206,16 +206,15 @@ export async function verifyGate({ projectRoot, distRoot }) {
     ),
     log: () => {},
   };
-  const adminCookie = `${SESSION_COOKIE}=${await seal(
-    await sealKeys('session', secret),
-    {
+  const cookieFor = async (sub) =>
+    `${SESSION_COOKIE}=${await seal(await sealKeys('session', secret), {
       aud: environment.origin,
       exp: Math.floor(now / 1000) + 3600,
       iat: Math.floor(now / 1000),
-      sub: 'verify-admin',
+      sub,
       email: '',
-    },
-  )}`;
+    })}`;
+  const adminCookie = await cookieFor('verify-admin');
 
   const ask = (path, headers = {}) =>
     handle(
@@ -286,15 +285,39 @@ export async function verifyGate({ projectRoot, distRoot }) {
   const insights = '/_kb/insights.json';
   const signedOut = await ask(insights);
   assert.equal(signedOut.status, 401, 'An anonymous reader got the insights.');
-  for (const { name, key } of keys) {
-    const refused = await ask(insights, { Authorization: `Bearer ${key}` });
+  const refusedTo = async (who, response) => {
     assert.equal(
-      refused.status,
+      response.status,
       403,
-      `A key for ${name} got ${refused.status} for the insights report.`,
+      `${who} got ${response.status} for the insights report.`,
     );
-    assert.ok(!(await refused.text()).includes(insightsQuery));
+    assert.ok(!(await response.text()).includes(insightsQuery));
+  };
+  for (const { name, key } of keys) {
+    await refusedTo(
+      `A key for ${name}`,
+      await ask(insights, { Authorization: `Bearer ${key}` }),
+    );
   }
+  // A person signed in, in no admin group.
+  await refusedTo(
+    'A member',
+    await ask(insights, { Cookie: await cookieFor('verify-member') }),
+  );
+  // An admin, while the directory is three hours old.
+  const staleSnapshot = {
+    ...snapshot,
+    takenAt: new Date(now - 3 * 60 * 60 * 1000).toISOString(),
+  };
+  await refusedTo(
+    'An admin with a stale directory',
+    await handle(
+      new Request(new URL(insights, environment.origin), {
+        headers: { Cookie: adminCookie },
+      }),
+      { ...context, snapshot: async () => staleSnapshot },
+    ),
+  );
   if (adminGroup) {
     const admin = await ask(insights, { Cookie: adminCookie });
     assert.equal(
@@ -309,7 +332,7 @@ export async function verifyGate({ projectRoot, distRoot }) {
       );
     }
   }
-  requests += keys.length + 2;
+  requests += keys.length + 4;
 
   const page = await ask('/', { 'Sec-Fetch-Mode': 'navigate' });
   assert.equal(page.status, 302);
