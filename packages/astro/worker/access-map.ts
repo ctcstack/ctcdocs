@@ -93,8 +93,8 @@ export interface AgentDocument {
    */
   readonly outline?: readonly AgentHeading[];
   /**
-   * SHA-256 of the text, its class, its title, its folders and the shape of
-   * the indexed copy: everything that changes the object in R2.
+   * SHA-256 of the text, its class, its title, its folders, its outline and
+   * the shape of the indexed copy: everything that changes the object in R2.
    */
   readonly hash: string;
 }

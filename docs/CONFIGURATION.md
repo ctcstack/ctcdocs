@@ -224,6 +224,7 @@ Every setting is optional, and the defaults are the values shown:
 | `mcp.browseCharacters`           | Characters of JSON a `browse` tree takes at most, 1,000 or more: as many levels of folders are listed as fit, and the rest collapsed.                                                                                                                                   |
 | `mcp.recent.defaultResults`      | Documents `recent` lists when a call does not ask for a number: no more than `recent.results`, which is also the default when it is under 20.                                                                                                                           |
 | `mcp.recent.results`             | Documents a call to `recent` may ask for at most.                                                                                                                                                                                                                       |
+| `mcp.language`                   | Optional. The language the documents are written in, a language tag such as `en`. The server tells assistants to search in it, which the index stems and reranks best (ADR-048); unset, it says nothing of the language.                                                |
 
 The build writes the resolved values into the access map, so a change takes
 effect with the project's next deploy. ADR-042 records what each setting did

@@ -37,9 +37,11 @@ the manifest.
 **Two notes join the catalog.**
 
 - **`document-near-duplicate`, under Fix next.** The sync compares the text
-  of every published document with every other. A document's text is what a
-  reader sees, read from its Markdown with the parser the sync already uses:
-  link targets, image addresses and markup are not part of it. It becomes a
+  of every published document with every other. A document's text is its
+  words and link targets, read from its Markdown with the parser the sync
+  already uses; markup and image addresses are not part of it, and link
+  targets are, since a directory of links differs from another of the same
+  shape by where they lead. It becomes a
   set of five-word shingles, and two documents are near duplicates when
   - their Jaccard similarity is at least 0.8, or
   - at least 95% of the shorter one's shingles are in the other.
@@ -56,13 +58,14 @@ the manifest.
   below it to its own line, 0 included, the nearest listed folder winning.
   The action is a review, not a fix: an old document may be right.
 
-**Candidates come from an index, every result from a whole comparison.** The
-sync indexes shingles by document and pairs only documents that share a
-shingle found in at most 32 documents, the phrases a template or a footer
-repeats proving nothing about two of them. Each candidate pair is then
-compared over all its shingles, so the result is exact, and documents are
-taken in the order of their IDs, so it does not depend on the order they
-arrive in.
+**Candidates come from a sketch, every result from a whole comparison.** The
+sync indexes shingles by document and pairs each document with every other
+that holds one of its 16 lowest-hashed shingles. Two documents of which one
+has 80% of its text in the other share one of those all but certainly,
+however many copies there are, while a phrase every template repeats is
+rarely among a document's sixteen. Each candidate pair is then compared over
+all its shingles, so the result is exact, and documents are taken in the
+order of their IDs, so it does not depend on the order they arrive in.
 
 **The notes say the same thing on every run until something changes.** The
 stale note gives the date of the last edit, not an age, so it changes only

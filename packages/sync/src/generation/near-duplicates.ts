@@ -6,14 +6,20 @@
  * answers from either. The names can differ, so `duplicate-name` does not see
  * them: the text does.
  *
- * Each document's text, without its Markdown syntax or link targets, becomes
- * a set of five-word shingles. Two documents are near duplicates when most of
+ * Each document's words, without its Markdown syntax but with its link
+ * targets, become a set of five-word shingles. Two documents are near duplicates when most of
  * their shingles are shared (Jaccard similarity at least `SIMILAR`), or when
  * nearly all of the shorter one's are in the other (containment at least
- * `CONTAINED`). A document too short to judge is left out. Candidates come
- * from an index of shingles that skips those in many documents, the phrases a
- * template or a footer repeats, and every candidate is then compared whole,
- * so the result is exact and does not depend on the order documents arrive in.
+ * `CONTAINED`). A document too short to judge is left out.
+ *
+ * Comparing every pair whole costs the square of the corpus, so candidates
+ * come first: each document is paired with every other that holds one of its
+ * `SKETCH` lowest-hashed shingles. A document with at least 80% of its text in
+ * another shares one of those with it all but certainly, however many copies
+ * there are, while a phrase every template repeats rarely is among them. Every
+ * candidate is then compared whole, so the result is exact, and documents are
+ * taken in the order of their IDs, so it does not depend on the order they
+ * arrive in.
  */
 import type { Nodes, Root } from 'mdast';
 import remarkGfm from 'remark-gfm';
@@ -27,8 +33,8 @@ const CONTAINED = 0.95;
 /** Fewer shingles than this, and a document is too short to compare. */
 const SHORTEST = 50;
 const SHINGLE_WORDS = 5;
-/** A shingle in more documents than this proves nothing about two of them. */
-const COMMON = 32;
+/** A document's lowest-hashed shingles, through which it finds candidates. */
+const SKETCH = 16;
 
 export interface NearDuplicate {
   /** The other document. */
@@ -41,7 +47,10 @@ export interface NearDuplicate {
 
 const parser = unified().use(remarkParse).use(remarkGfm);
 
-/** The words of a node: its text, code and image descriptions, not its URLs. */
+/**
+ * The words of a node: its text, code, image descriptions and link targets.
+ * A directory of links differs from another of the same shape by its targets.
+ */
 function collectText(node: Nodes, into: string[]): void {
   if (node.type === 'text' || node.type === 'inlineCode') {
     into.push(node.value);
@@ -54,6 +63,9 @@ function collectText(node: Nodes, into: string[]): void {
   if (node.type === 'image' && node.alt) {
     into.push(node.alt);
     return;
+  }
+  if (node.type === 'link' || node.type === 'definition') {
+    into.push(` ${node.url} `);
   }
   if ('children' in node) {
     for (const child of node.children) {
@@ -128,15 +140,15 @@ export function findNearDuplicates(
       }
     }
   }
-  // Pairs sharing at least one uncommon shingle, each counted once.
+  // Each document with every other that holds one of its sketch, once a pair.
   const candidates = new Set<string>();
-  for (const ids of postings.values()) {
-    if (ids.length < 2 || ids.length > COMMON) {
-      continue;
-    }
-    for (let left = 0; left < ids.length; left += 1) {
-      for (let right = left + 1; right < ids.length; right += 1) {
-        candidates.add(`${ids[left]}\n${ids[right]}`);
+  for (const [id, set] of sets) {
+    const sketch = [...set].sort((a, b) => a - b).slice(0, SKETCH);
+    for (const shingle of sketch) {
+      for (const other of postings.get(shingle) ?? []) {
+        if (other !== id) {
+          candidates.add(id < other ? `${id}\n${other}` : `${other}\n${id}`);
+        }
       }
     }
   }

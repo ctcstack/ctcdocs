@@ -499,6 +499,25 @@ describe('parseSiteConfiguration', () => {
     expect(fetchCharacterLimit(parsed.mcp)).toBe(100_000);
   });
 
+  it("names the documents' language only when the project does", () => {
+    const raw: Record<string, unknown> = {
+      ...validConfiguration(),
+      signIn: { workspaceDomains: ['example.com'] },
+      mcp: { enabled: true },
+    };
+    expect(parseSiteConfiguration(raw).mcp).not.toHaveProperty('language');
+
+    raw.mcp = { enabled: true, language: 'en-gb' };
+    expect(parseSiteConfiguration(raw).mcp?.language).toBe('en-GB');
+
+    for (const language of ['', 'not a tag', 7]) {
+      raw.mcp = { enabled: true, language };
+      expect(() => parseSiteConfiguration(raw)).toThrow(
+        /mcp\.language must be a language tag such as "en"/u,
+      );
+    }
+  });
+
   it('lets a project keep the index off its home page', () => {
     const raw = validConfiguration();
     (raw.home as Record<string, unknown>).corpusIndex = false;

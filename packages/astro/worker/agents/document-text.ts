@@ -11,6 +11,8 @@
  *
  * Web-standard code only.
  */
+import type { AgentHeading } from '../access-map.js';
+
 const OPENING = '---\n';
 const CLOSING = '\n---\n';
 
@@ -29,8 +31,9 @@ export function documentText(projection: string): string | undefined {
 }
 
 /**
- * The shape of the indexed copy, in every document's hash: a change here
- * rewrites every object in R2 once.
+ * The shape of the lines `indexedText` writes, in every document's hash with
+ * the outline it writes them from: change the lines, raise this, and every
+ * object in R2 is rewritten once.
  */
 export const INDEXED_COPY_VERSION = 1;
 
@@ -40,7 +43,7 @@ export interface IndexedDocument {
   /** Its folders, outermost first. */
   readonly path: readonly string[];
   /** Its headings: where each line ends in the text, depth and words. */
-  readonly outline?: readonly (readonly [number, number, string])[];
+  readonly outline?: readonly AgentHeading[];
 }
 
 const TRAIL = ' › ';
