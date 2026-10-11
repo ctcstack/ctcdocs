@@ -93,6 +93,8 @@ export interface WeeklyReport extends ReportWeek {
     readonly siteSearches: number;
     /** Whether the week held more records than the report read. */
     readonly truncated: boolean;
+    /** Records the report could not read, and left out. */
+    readonly unreadable: number;
   };
   /** The configured weak line, or the score the week's lowest fifth ends at. */
   readonly weakLine: {
@@ -340,11 +342,16 @@ function weakSearches(
   const sorted = [...scored].sort(
     (a, b) => (a.topScore ?? 0) - (b.topScore ?? 0) || a.id - b.id,
   );
-  const lowest = sorted.slice(0, Math.floor(sorted.length / 5));
-  return {
-    weak: new Set(lowest),
-    relative: lowest.at(-1)?.topScore ?? null,
-  };
+  const line = sorted[Math.floor(sorted.length / 5) - 1]?.topScore;
+  // A search scoring as the fifth's last does is as weak as it is.
+  return line === undefined || line === null
+    ? { weak: new Set(), relative: null }
+    : {
+        weak: new Set(
+          sorted.filter((search) => (search.topScore ?? 0) <= line),
+        ),
+        relative: line,
+      };
 }
 
 export function weeklyReport({
@@ -353,6 +360,7 @@ export function weeklyReport({
   calls,
   siteSearches,
   truncated,
+  unreadable = 0,
   settings,
 }: {
   readonly week: ReportWeek;
@@ -360,6 +368,7 @@ export function weeklyReport({
   readonly calls: readonly CallRow[];
   readonly siteSearches: readonly SiteSearchRow[];
   readonly truncated: boolean;
+  readonly unreadable?: number;
   readonly settings: ReportSettings;
 }): WeeklyReport {
   const words = (query: string) => queryWords(query, settings.stopWords);
@@ -442,6 +451,7 @@ export function weeklyReport({
       mcpCalls: calls.length,
       siteSearches: siteSearches.length,
       truncated,
+      unreadable,
     },
     weakLine: { configured: settings.weakScore ?? null, relative },
     notFound: groupSearches(missed, true).slice(0, NOT_FOUND_GROUPS),

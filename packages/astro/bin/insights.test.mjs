@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import {
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  symlink,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -145,12 +152,22 @@ test('writes misses as candidate questions, never into the evaluation set', asyn
   const directory = await mkdtemp(join(tmpdir(), 'ctcdocs-insights-'));
   try {
     const target = join(directory, 'candidates.json');
-    await runInsights(['--questions', target], {
+    let printed = '';
+    let noted = '';
+    await runInsights(['--json', '--questions', target], {
       cwd: PROJECT,
       now: NOW,
       execute,
-      write: () => undefined,
+      write: (text) => {
+        printed += text;
+      },
+      note: (text) => {
+        noted += text;
+      },
     });
+    // The report alone on the output, one JSON document; the note beside it.
+    assert.equal(JSON.parse(printed).week, '2026-10-05');
+    assert.match(noted, /Wrote 1 candidate questions/u);
     const written = JSON.parse(await readFile(target, 'utf8'));
     assert.equal(written.week, '2026-10-05');
     assert.deepEqual(written.questions, [
@@ -165,13 +182,37 @@ test('writes misses as candidate questions, never into the evaluation set', asyn
         variants: ['Parking permit?'],
       },
     ]);
-    await assert.rejects(
-      runInsights(
-        ['--questions', join(PROJECT, 'evaluation', 'search-questions.json')],
-        { cwd: PROJECT, now: NOW, execute, write: () => undefined },
-      ),
-      /never into evaluation\/search-questions\.json/u,
+    // However the path names the set, and before anything is read: a
+    // project of its own holds an evaluation set, and a link to its folder.
+    const project = join(directory, 'project');
+    await mkdir(join(project, 'evaluation'), { recursive: true });
+    await copyFile(
+      join(PROJECT, 'site.config.json'),
+      join(project, 'site.config.json'),
     );
+    const link = join(directory, 'evaluation-link');
+    await symlink(join(project, 'evaluation'), link);
+    const reads = [];
+    for (const path of [
+      join(project, 'evaluation', 'search-questions.json'),
+      join(project, 'Evaluation', 'Search-Questions.json'),
+      join(project, 'evaluation', '..', 'evaluation', 'search-questions.json'),
+      join(link, 'search-questions.json'),
+    ]) {
+      await assert.rejects(
+        runInsights(['--questions', path], {
+          cwd: project,
+          now: NOW,
+          execute: async (command) => {
+            reads.push(command);
+            return [];
+          },
+          write: () => undefined,
+        }),
+        /never into evaluation\/search-questions\.json/u,
+      );
+    }
+    assert.deepEqual(reads, []);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -180,6 +221,7 @@ test('writes misses as candidate questions, never into the evaluation set', asyn
 test('says so for a week with no record, and refuses an unknown environment', async () => {
   const { execute } = database();
   let printed = '';
+  let noted = '';
   const report = await runInsights([], {
     cwd: PROJECT,
     now: NOW,
@@ -187,12 +229,37 @@ test('says so for a week with no record, and refuses an unknown environment', as
     write: (text) => {
       printed += text;
     },
+    note: (text) => {
+      noted += text;
+    },
   });
   assert.equal(report, undefined);
-  assert.match(printed, /No record of use in the week of 2026-10-05/u);
+  assert.equal(printed, '');
+  assert.match(noted, /No record of use in the week of 2026-10-05/u);
   await assert.rejects(
     runInsights(['--env', 'staging'], { cwd: PROJECT, now: NOW, execute }),
     /--env names an environment/u,
+  );
+});
+
+test('prints no control character a query holds', async () => {
+  const { sqlite, execute } = database();
+  insertCall(sqlite, { query: 'clip\u001b]52;c;cGF5bG9hZA==\u0007board' });
+  let printed = '';
+  await runInsights(['--compute'], {
+    cwd: PROJECT,
+    now: NOW,
+    execute,
+    write: (text) => {
+      printed += text;
+    },
+  });
+  assert.ok(printed.includes('1× clip ]52;c;cGF5bG9hZA== board'));
+  // Line ends only.
+  assert.ok(
+    [...printed].every(
+      (character) => character === '\n' || !/\p{Cc}/u.test(character),
+    ),
   );
 });
 
