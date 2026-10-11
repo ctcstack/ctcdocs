@@ -6,8 +6,8 @@ All three packages share a version and are released together.
 
 ### Added
 
-- **Assistants search in the documents' language.** The access map carries
-  the language of `sync.defaultLocale`, and the MCP server's instructions, the
+- **Assistants search in the documents' language.** A project that sets
+  `mcp.language`, such as `en`, has the MCP server's instructions, the
   `search` description and its query field tell an assistant that the
   documents are written in it and that a query in it finds more (ADR-048).
 - **The indexed copy says where each section sits.** The copy of each
@@ -33,7 +33,8 @@ All three packages share a version and are released together.
 
 ### Upgrade note
 
-Bump the packages and the workflow pins, and deploy. Every document's hash
+Bump the packages and the workflow pins, set `mcp.language` if the documents
+are in one language, and deploy. Every document's hash
 changes, so the Worker rewrites every object in R2 once and AI Search
 reindexes the corpus: about one full corpus of ingestion tokens. The two
 notes appear after the next sync.

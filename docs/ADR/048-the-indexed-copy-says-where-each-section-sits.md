@@ -55,9 +55,10 @@ its headings in the catalog: where each heading's line ends in the text, its
 depth and its words, at most 120 characters. The Worker, which has no parser,
 writes the lines from that list when it publishes, and ignores a list that does
 not fit the text. A document's hash covers its folders and a version of the
-copy's shape as well as its text, class and title, so moving a document or
-changing the shape rewrites the objects that change, once, through the same
-comparison of hashes as today.
+copy's shape as well as its text, class, title and outline, so moving a
+document, a change in how headings are listed, or a new shape of the lines
+rewrites the objects that change, once, through the same comparison of hashes
+as today.
 
 **`fetch` reads the build, not the bucket.** It reads a document's Markdown
 version from the build's static assets, the same file the publication reads,
@@ -66,11 +67,13 @@ index's alone. A rollback or a publication that lags a deploy can no longer
 make `fetch` refuse a document: the text is always the build's own, and the
 reader is judged by the build's classes as before.
 
-**Assistants are told the documents' language.** The access map carries the
-language of `sync.defaultLocale` by its English name, and the server's
-instructions, the `search` description and its query field say that the
-documents are written in it and that a query in it finds more. No language
-can be named, and nothing is said.
+**Assistants are told the documents' language, when the project names it.**
+`mcp.language` is a language tag such as `en`. The access map carries it by
+its English name, and the server's instructions, the `search` description and
+its query field say that the documents are written in it and that a query in
+it finds more. Unset, nothing is said: `sync.defaultLocale` is only the
+fallback for a document whose language cannot be determined, and the sync
+detects no language, so it cannot stand for the corpus's.
 
 ## Consequences
 

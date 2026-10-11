@@ -467,7 +467,7 @@ export function createNotes(
           selected,
           'document-near-duplicate',
           record.stableSlug,
-          nearDuplicateDetail(duplicates, itemsById),
+          nearDuplicateDetail(duplicates, itemsById, manifest),
         ),
       );
     }
@@ -535,11 +535,16 @@ export function createNotes(
 function nearDuplicateDetail(
   duplicates: readonly NearDuplicate[],
   itemsById: ReadonlyMap<string, SelectedInventoryItem>,
+  manifest: SyncManifest,
 ): string {
   const NAMED = 3;
   const named = duplicates.slice(0, NAMED).map((duplicate) => {
-    const other = itemsById.get(duplicate.id);
-    const name = quoted(other ? other.item.name : duplicate.id);
+    // A targeted run selects one file; the manifest still names the rest.
+    const name = quoted(
+      itemsById.get(duplicate.id)?.item.name ??
+        manifest.documents[duplicate.id]?.googleName ??
+        duplicate.id,
+    );
     return duplicate.relation === 'inside'
       ? `Its text is also in ${name}`
       : duplicate.relation === 'holds'

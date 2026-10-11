@@ -111,7 +111,14 @@ export async function buildAgentCatalog({
       characters: text.length,
       ...(outline.length > 0 ? { outline } : {}),
       hash: sha256(
-        JSON.stringify([text, fileClass, title, path, INDEXED_COPY_VERSION]),
+        JSON.stringify([
+          text,
+          fileClass,
+          title,
+          path,
+          outline,
+          INDEXED_COPY_VERSION,
+        ]),
       ),
     });
   }

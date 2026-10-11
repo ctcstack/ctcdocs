@@ -30,7 +30,8 @@
   "mcp": {
     "enabled": true,
     "fetchCharacters": 3000,
-    "browseCharacters": 1000
+    "browseCharacters": 1000,
+    "language": "en"
   },
   "brand": {
     "name": "Example Corp",

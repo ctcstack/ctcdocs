@@ -370,6 +370,26 @@ describe('createNotes', () => {
     ]);
   });
 
+  it('names a near duplicate the run did not select from the manifest', () => {
+    const notes = createNotes(
+      corpus([
+        item('copy', 'Checklist copy', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+      ]),
+      manifestOf([
+        record('copy', 'team/checklist-copy'),
+        { ...record('first', 'team/checklist'), googleName: 'Checklist' },
+      ]),
+      {
+        nearDuplicates: new Map([
+          ['copy', [{ id: 'first', similarPercent: 97, relation: 'alike' }]],
+        ]),
+      },
+    );
+    expect(notes.map((note) => note.detail)).toEqual([
+      'Nearly the same text as “Checklist” (97% shared)',
+    ]);
+  });
+
   it('asks for the review of a document not edited within its line', () => {
     const edited = (id: string, modified: string) => ({
       ...record(id, `team/${id}`),

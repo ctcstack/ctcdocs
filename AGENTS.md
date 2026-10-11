@@ -72,10 +72,12 @@ library, the adapter and that step, and nothing else.
   transformation. The Worker decides who may read a file; it serves pages and
   files as built and never changes one. Its state is the directory snapshot,
   the groups' pins and the machine keys in KV and, when the MCP server is on
-  (ADR-041), the OAuth library's own KV namespace and a copy of each
-  document's Markdown in R2, which AI Search indexes, beside a marker of the
-  build it holds. Neither the bucket nor the index decides access: the access
-  map does, on every request.
+  (ADR-041), the OAuth library's own KV namespace and, in R2, a copy of each
+  document's Markdown for AI Search to index, with where each section sits
+  written in from the build's outline (ADR-048), beside a marker of the build
+  it holds. `fetch` reads the build's own Markdown, never the bucket. Neither
+  the bucket nor the index decides access: the access map does, on every
+  request.
 - Do not broaden scope to Slides, comments, suggestions, webhooks, or
   bidirectional editing. Spreadsheets are published as tables (ADR-046);
   a video or audio file gets a page from its Drive metadata and plays in

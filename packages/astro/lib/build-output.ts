@@ -499,7 +499,9 @@ export async function writeBuildOutput({
       workspaceDomains: site.signIn?.workspaceDomains ?? [],
       title: site.brand.siteTitle,
       description: site.brand.siteDescription,
-      language: languageName(site.sync.defaultLocale),
+      language: site.mcp?.language
+        ? languageName(site.mcp.language)
+        : undefined,
       mcp,
     },
     csp: { scriptHashes: [...scriptHashes].sort() },

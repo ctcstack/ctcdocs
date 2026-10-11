@@ -29,12 +29,14 @@ function prose(seed: number, count: number): string {
 }
 
 describe('shingles', () => {
-  it('reads the words a reader sees, not link targets or markup', () => {
+  it('reads the words and link targets, not the markup', () => {
     const plain = shingles('one two three four five six');
-    const marked = shingles(
-      '# One two\n\n**three** [four](https://example.com/a/b/c) five _six_',
-    );
+    const marked = shingles('# One two\n\n**three** four five _six_');
     expect([...marked].sort()).toEqual([...plain].sort());
+    const linked = shingles(
+      'one two [three](https://a.example/x) four five six',
+    );
+    expect(linked.size).toBeGreaterThan(plain.size);
   });
 });
 
@@ -81,6 +83,19 @@ describe('findNearDuplicates', () => {
       ]),
     );
     expect(found.size).toBe(0);
+  });
+
+  it('finds every copy when many documents hold the same text', () => {
+    const body = prose(14, 300);
+    const copies = new Map(
+      Array.from({ length: 40 }, (_, index) => [
+        `copy-${String(index).padStart(2, '0')}`,
+        `# Copy ${index}\n\n${body}`,
+      ]),
+    );
+    const found = findNearDuplicates(copies);
+    expect(found.size).toBe(40);
+    expect(found.get('copy-00')).toHaveLength(39);
   });
 
   it('leaves documents too short to judge', () => {

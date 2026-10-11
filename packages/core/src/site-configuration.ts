@@ -265,6 +265,12 @@ export interface McpConfiguration {
   /** Characters of JSON a `browse` tree takes at most (ADR-044). */
   readonly browseCharacters: number;
   readonly recent: McpRecentConfiguration;
+  /**
+   * The language the documents are written in, as a language tag such as
+   * `en`. The MCP server tells assistants to search in it (ADR-048); unset,
+   * it says nothing of the language.
+   */
+  readonly language?: string;
 }
 
 /** What `mcp` holds when a project sets only `enabled` (ADR-042). */
@@ -888,8 +894,10 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
       'fetchCharacters',
       'browseCharacters',
       'recent',
+      'language',
     ]);
     const enabled = flag(source, 'enabled', 'mcp.enabled');
+    const language = optionalLanguage(source.language);
     if (enabled) {
       if (!signIn) {
         fail('mcp', 'needs signIn: assistants sign in as the site does');
@@ -919,6 +927,7 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
         { min: 1_000, whole: true },
       ),
       recent: mcpRecent(source.recent),
+      ...(language ? { language } : {}),
     };
   }
   const fetchLimit = fetchCharacterLimit(mcp);
@@ -994,6 +1003,21 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
       staleFolders: optionalStaleFolders(syncSource.staleFolders),
     },
   };
+}
+
+/** A language tag Intl can read, such as `en` or `uk`. */
+function optionalLanguage(value: unknown): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  try {
+    if (typeof value === 'string') {
+      return new Intl.Locale(value).toString();
+    }
+  } catch {
+    // Reported below.
+  }
+  return fail('mcp.language', 'must be a language tag such as "en"');
 }
 
 /** The range a line of months without an edit may take. */
