@@ -736,6 +736,29 @@ other assistants, each seeing what they may open here.
    [Operations](OPERATIONS.md#connecting-an-assistant) describes, and ask it
    something the site answers.
 
+## Step 17. Learn what people could not find (optional)
+
+With the MCP server on (Step 16) and admins named in `access.admins`
+(Step 15), the Worker can
+record what people and assistants ask, and show admins every Monday what the
+documentation did not answer. Query text is kept 90 days and read by admins
+only; read [what is recorded](CONFIGURATION.md#what-people-and-assistants-could-not-find)
+before turning it on.
+
+1. Add D1 Edit to each environment's deploy token
+   ([Deploy API token](CLOUDFLARE_SETUP.md#deploy-api-token)).
+2. Create each environment's database and add its binding to
+   `wrangler.jsonc`, as
+   [Cloudflare setup](CLOUDFLARE_SETUP.md#the-state-database) shows.
+3. Add `"insights": { "enabled": true }` to `site.config.json`, and run
+   `pnpm validate`.
+4. Commit and push. The deployment applies the database's migrations before
+   it deploys the Worker.
+5. Ask an assistant something, then search the site. The first report comes
+   the Monday after; until then, `pnpm exec ctcdocs-insights --compute --week
+<this Monday>` shows the week so far
+   ([Operations](OPERATIONS.md#insights)).
+
 ## Moving an existing site off Cloudflare Access
 
 If the site already runs behind a Cloudflare Access application, do not detach

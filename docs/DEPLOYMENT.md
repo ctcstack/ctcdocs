@@ -435,6 +435,17 @@ Missing production-sync variable: GCP_PROJECT_ID
 Populate all required `production-sync` environment variables. A local `.env`
 and any test-corpus environment do not flow into it.
 
+### Deployment stops at the state database migrations
+
+With insights on, **Apply the state database migrations** runs before the
+site Worker is deployed, and nothing is deployed when it fails. An
+authentication or permission error means the deploy token lacks D1 Edit: add
+it to the token, whose value stays the same
+([Deploy API token](CLOUDFLARE_SETUP.md#deploy-api-token)), and run the
+deployment again. "Couldn't find a D1 DB" means the environment's
+`d1_databases` entry names a database that does not exist in the account
+([the state database](CLOUDFLARE_SETUP.md#the-state-database)).
+
 ### Custom domain already belongs to another Worker
 
 Remove only the obsolete Worker's custom-domain binding, deploy the intended

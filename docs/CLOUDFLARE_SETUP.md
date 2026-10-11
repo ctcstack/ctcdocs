@@ -187,6 +187,61 @@ The Google client needs nothing new: a connection signs in through the
 existing `/auth/callback`. The deploy token needs nothing new either: deploying
 a Worker with these bindings needs only the Worker permission it has.
 
+## The state database
+
+With `insights.enabled` in `site.config.json`
+([ADR-051](ADR/051-content-health-shows-what-people-and-assistants-could-not-find.md)),
+the site Worker records what is asked in a D1 database of its own
+([ADR-050](ADR/050-the-worker-keeps-operational-state-in-one-d1-database.md)).
+It holds records of use and the weekly reports, never a document, an access
+decision or a reader's identity. Each environment needs its own:
+
+```bash
+pnpm exec wrangler d1 create example-docs-production-state
+```
+
+Add it to that environment in `wrangler.jsonc`, naming the platform's
+migrations, so that `wrangler d1 migrations apply` finds them:
+
+```jsonc
+{
+  "env": {
+    "production": {
+      "d1_databases": [
+        {
+          "binding": "KB_STATE_DB",
+          "database_name": "example-docs-production-state",
+          "database_id": "<ID wrangler d1 create printed>",
+          "migrations_dir": "node_modules/@ctcstack/ctcdocs/worker/state/migrations",
+        },
+      ],
+    },
+  },
+}
+```
+
+- Validation refuses insights without the database in every environment,
+  two environments that share one, a binding that names other migrations,
+  and a bound database without the site Worker's five-minute cron, which
+  deletes what is past its retention and makes the weekly report.
+- The deploy workflow applies the migrations to the environment's database
+  before it deploys the Worker, so the tables exist before anything writes
+  to them. The deploy token needs D1 Edit for it
+  ([below](#deploy-api-token)). Migrations are append-only: a rollback of
+  the Worker runs on the newer schema.
+- Without the migrations every record is dropped, and the Worker logs
+  `state-write-failed` with "no such table". To apply them by hand:
+
+  ```bash
+  pnpm exec wrangler d1 migrations apply KB_STATE_DB --env production --remote
+  ```
+
+- D1 keeps deleted rows 30 days in Time Travel; the documented retention of a
+  record is `insights.retentionDays` plus those 30 days.
+
+Nothing else reads the database: the Worker writes it and answers admins from
+it, and `ctcdocs-insights` reads it with a maintainer's own Wrangler login.
+
 ## The directory Worker
 
 `wrangler.directory.jsonc` deploys the scheduled Worker that keeps the
