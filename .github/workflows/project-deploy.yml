@@ -367,7 +367,7 @@ jobs:
             fi
 
             if [[ "${attempt}" == "3" ]]; then
-              echo "::error::The state database migrations failed after ${attempt} attempts; nothing was deployed."
+              echo "::error::The state database migrations failed after ${attempt} attempts; the site Worker was not deployed."
               exit 1
             fi
 

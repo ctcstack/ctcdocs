@@ -260,9 +260,9 @@ A record names the classes a reader may read, never the reader: no address,
 account or group. In a small organization a rare set of classes, with a time
 and a query, can still point to a person, which is why only admins read the
 report. Query text may hold a name or a sensitive word; it is kept for
-`retentionDays` and 30 days more in D1's Time Travel.
+`retentionDays` and 30 days more in D1's Time Travel on Workers Paid.
 
-Every Monday the Worker reports the week before: what was not found, grouped
+Every Monday, in UTC, the Worker reports the week before: what was not found, grouped
 by its words, what is asked most, what is found and not opened, and how the
 server is used. Admins see the latest report under **What people could not
 find** on the content health page; maintainers print it with
@@ -274,9 +274,10 @@ database in every environment, each its own, with the platform's migrations,
 and the site Worker's five-minute cron, as
 [Cloudflare setup](CLOUDFLARE_SETUP.md#the-state-database) shows. The deploy
 token then needs D1 Edit
-([Deploy API token](CLOUDFLARE_SETUP.md#deploy-api-token)). Turned off, the
-Worker records nothing new, and still deletes what is past its retention for
-as long as the database stays bound.
+([Deploy API token](CLOUDFLARE_SETUP.md#deploy-api-token)). Turned off with
+`"enabled": false`, the Worker records nothing new, and still deletes what is
+past its retention for as long as the database stays bound; keep the block,
+since without it the retention falls back to 90 days.
 
 ```json
 "insights": {

@@ -16,7 +16,7 @@ All three packages share a version and are released together.
 - **What people and assistants could not find.** With `insights.enabled`,
   the Worker records each MCP call and each settled search on the site in a
   D1 database of its own, by the access classes the reader may read and
-  never the reader, and every Monday reports the week before: what was not
+  never the reader, and every Monday, in UTC, reports the week before: what was not
   found, grouped by its words, what is asked most, what is found and not
   opened, and how the server is used. Admins read it on the content health
   page, under What people could not find; `ctcdocs-insights` prints it for
