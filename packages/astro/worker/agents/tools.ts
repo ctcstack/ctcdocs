@@ -15,12 +15,9 @@ import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 
 import { AGENT_DOCUMENT_FORMATS } from '../access-map.js';
-import {
-  clientLabel,
-  recordedClasses,
-  type McpCall,
-  type McpCallRecorder,
-} from '../state/mcp-calls.js';
+import { recordedClasses } from '../decide.js';
+import type { McpCall, McpCallRecorder } from '../state/mcp-calls.js';
+import { clientLabel } from './client-label.js';
 import {
   browseFolder,
   collapsedFolders,
@@ -211,27 +208,32 @@ type Answer = ReturnType<typeof result>;
 
 /** What a tool knows of its call; the rest comes from the context. */
 type Call = Pick<McpCall, 'tool' | 'results' | 'documents'> &
-  Partial<Pick<McpCall, 'query' | 'topScore' | 'fetched'>>;
+  Partial<Pick<McpCall, 'query' | 'narrowed' | 'topScore' | 'fetched'>>;
+
+/** Whether a call kept itself to a folder, a date or a format. */
+const narrowedBy = (narrowing: Readonly<Record<string, unknown>>) =>
+  Object.values(narrowing).some((value) => value !== undefined);
 
 /**
  * Hands the record of an answered call to the recorder, once the answer is
- * made. The answer is never changed and never waits: whatever recording
- * does, the assistant gets the same reply. The classes come from the access
- * decision the answer was made under, never from the request.
+ * made, and returns the answer as it was. The answer never waits: whatever
+ * recording does, the assistant gets the same reply. The classes come from
+ * the access decision the answer was made under, never from the request.
  */
-function recordCall(
+function recordCall<T extends Answer | undefined>(
   context: ToolContext,
   started: number,
   call: Call,
-  answer: Answer | undefined,
-): void {
+  answer: T,
+): T {
   const { record } = context;
   if (!record) {
-    return;
+    return answer;
   }
   try {
     record({
       query: null,
+      narrowed: false,
       topScore: null,
       fetched: null,
       ...call,
@@ -244,12 +246,14 @@ function recordCall(
       stale: context.stale,
     });
   } catch (error: unknown) {
+    // The record could not be made; the recorder logs a write that fails.
     context.log({
-      event: 'state-write-failed',
+      event: 'state-record-failed',
       table: 'mcp_calls',
       error: error instanceof Error ? error.name : 'unknown',
     });
   }
+  return answer;
 }
 
 /** The documents a tree lists, in the order its answer lists them. */
@@ -361,23 +365,22 @@ function server(context: ToolContext): McpServer {
         ),
       );
       log({ event: 'tool', tool: 'search', results: found.length });
-      const answer = result(
-        { results: found },
-        found.length === 0 ? NOTHING_FOUND : undefined,
-      );
-      recordCall(
+      return recordCall(
         context,
         started,
         {
           tool: 'search',
           query,
+          narrowed: narrowedBy({ folder, changedSince, format }),
           results: found.length,
           topScore: topScore ?? null,
           documents: found.map((entry) => entry.id),
         },
-        answer,
+        result(
+          { results: found },
+          found.length === 0 ? NOTHING_FOUND : undefined,
+        ),
       );
-      return answer;
     },
   );
 
@@ -410,8 +413,7 @@ function server(context: ToolContext): McpServer {
           'No document with that id for this person. Find a document’s id with search, browse or recent.',
         );
       }
-      const answer = result({ ...document });
-      recordCall(
+      return recordCall(
         context,
         started,
         {
@@ -420,9 +422,8 @@ function server(context: ToolContext): McpServer {
           documents: [document.id],
           fetched: document.id,
         },
-        answer,
+        result({ ...document }),
       );
-      return answer;
     },
   );
 
@@ -450,20 +451,19 @@ function server(context: ToolContext): McpServer {
       const started = context.now();
       const tree = browseFolder(context, folder, depth, format);
       log({ event: 'tool', tool: 'browse', found: tree !== undefined });
-      const answer = browsed(context.origin, tree, format);
       // A tree counts what it collapses, so a browse that lists nothing
       // directly may still have answered with every count.
-      recordCall(
+      return recordCall(
         context,
         started,
         {
           tool: 'browse',
+          narrowed: narrowedBy({ folder, format }),
           results: tree?.count ?? 0,
           documents: tree ? listedDocuments(tree) : [],
         },
-        answer,
+        browsed(context.origin, tree, format),
       );
-      return answer;
     },
   );
 
@@ -489,21 +489,17 @@ function server(context: ToolContext): McpServer {
         limit,
       );
       log({ event: 'tool', tool: 'recent', results: results.length });
-      const answer = result(
-        { results },
-        results.length === 0 ? NOTHING_RECENT : undefined,
-      );
-      recordCall(
+      return recordCall(
         context,
         started,
         {
           tool: 'recent',
+          narrowed: narrowedBy({ changedSince, folder, format }),
           results: results.length,
           documents: results.map((entry) => entry.id),
         },
-        answer,
+        result({ results }, results.length === 0 ? NOTHING_RECENT : undefined),
       );
-      return answer;
     },
   );
   return mcp;

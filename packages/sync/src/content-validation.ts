@@ -145,15 +145,13 @@ function agentResourceErrors(
         environment.ai_search[0]?.instance_name ?? '',
       ],
       [`the ${PLATFORM_WORKERS.oauthBinding} namespace`, oauth],
-      ...(environment.d1_databases
-        ? [
-            [
-              `the ${PLATFORM_WORKERS.stateDatabaseBinding} database`,
-              environment.d1_databases[0]?.database_id ?? '',
-            ] satisfies [string, string],
-          ]
-        : []),
     ];
+    if (environment.d1_databases) {
+      resources.push([
+        `the ${PLATFORM_WORKERS.stateDatabaseBinding} database`,
+        environment.d1_databases[0]?.database_id ?? '',
+      ]);
+    }
     for (const [resource, value] of resources) {
       const key = JSON.stringify([resource, value]);
       const owner = owners.get(key);
@@ -185,11 +183,16 @@ function stateScheduleErrors(wrangler: unknown): string[] {
     .map(([name]) => name)
     .sort();
   const crons = Array.isArray(triggers?.crons) ? triggers.crons : [];
-  return bound.length > 0 && !crons.includes(PLATFORM_WORKERS.publishSchedule)
-    ? [
-        `${PROJECT_LAYOUT.wranglerConfigurationFile}: ${bound.length === 1 ? 'the environment' : 'the environments'} ${bound.join(', ')} ${bound.length === 1 ? 'binds' : 'bind'} the ${PLATFORM_WORKERS.stateDatabaseBinding} database, which needs the cron ${PLATFORM_WORKERS.publishSchedule} to delete expired records`,
-      ]
-    : [];
+  if (bound.length === 0 || crons.includes(PLATFORM_WORKERS.publishSchedule)) {
+    return [];
+  }
+  const environments =
+    bound.length === 1
+      ? `the environment ${bound.join(', ')} binds`
+      : `the environments ${bound.join(', ')} bind`;
+  return [
+    `${PROJECT_LAYOUT.wranglerConfigurationFile}: ${environments} the ${PLATFORM_WORKERS.stateDatabaseBinding} database, which needs the cron ${PLATFORM_WORKERS.publishSchedule} to delete expired records`,
+  ];
 }
 
 function protectedEnvironmentSchema(

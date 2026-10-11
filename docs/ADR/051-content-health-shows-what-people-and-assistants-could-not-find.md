@@ -38,6 +38,7 @@ The product decisions behind this record:
 | `at`         | Time, ISO 8601 UTC                                                               |
 | `tool`       | `search`, `fetch`, `browse` or `recent`                                          |
 | `query`      | `search`'s query, at most 200 characters; null for the others                    |
+| `narrowed`   | Whether the call kept itself to a folder, a date or a format                     |
 | `classes`    | JSON array of the access classes the reader may read, sorted; never the reader   |
 | `client`     | The name the client gave when it connected, as letters, digits, spaces and `.-_` |
 | `results`    | Documents returned; for `browse`, those under the folder, as its count says      |
@@ -59,6 +60,12 @@ only readers of some folders have. Its cost is under Consequences.
 **The client** is the name the assistant gave when it connected, kept in its
 grant. It is the client's own claim: it labels the report and decides
 nothing. A grant from before this record has none.
+
+**At most 60 calls a minute per person are recorded,** counted in memory in
+each isolate. An assistant in a loop is answered as ever; its records past
+the line are dropped, and the first dropped in a minute is logged, without
+the person. Without the line one loop could fill the database, and its
+bill, with copies of one call.
 
 A call is recorded once its answer is made. A failed lookup, or a narrowing
 the server could not read, is not an answer and is not recorded; `fetch` of
@@ -85,7 +92,10 @@ opened. The page sends it with `navigator.sendBeacon` to
 - keeps at most 30 a minute per session in memory.
 
 **Both are kept 90 days.** The five-minute cron deletes older rows (ADR-050:
-Time Travel keeps them 30 days more).
+Time Travel keeps them 30 days more). It does so whenever the database is
+bound, insights on or off, so turning them off never keeps records for good.
+A weekly report quotes queries, so it goes when the first day it aggregates
+does: it is kept a week less than the records.
 
 ### The weekly report
 
@@ -134,7 +144,8 @@ deployment's evaluation set.
 `insights.enabled` turns it on, and needs `mcp.enabled` and the `KB_STATE_DB`
 binding. Optional settings:
 
-- `insights.retentionDays`: 90 by default, at most 365;
+- `insights.retentionDays`: 90 by default, from 14 to 365, so that a report
+  is kept at least the week after it is made;
 - `insights.weakScore`: 0 to 1, unset by default;
 - `insights.siteSearch`: whether site searches are recorded, `true` by
   default once the second step ships.

@@ -1,21 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
+import { clientLabel } from '../agents/client-label.js';
 import { agentMap, readers } from '../agents/test-support.js';
+import { recordedClasses } from '../decide.js';
 import type { StateDatabase } from './database.js';
-import {
-  clientLabel,
-  insertMcpCall,
-  mcpCallRecorder,
-  recordedClasses,
-  recordedQuery,
-  type McpCall,
-} from './mcp-calls.js';
-import { MemoryDatabase } from './memory-database.js';
+import { insertMcpCall, mcpCallRecorder, type McpCall } from './mcp-calls.js';
+import { recordedQuery } from './record.js';
+import { MemoryDatabase, rowsOf } from './test-support.js';
 
 const CALL: McpCall = {
   at: '2026-10-12T09:30:00.000Z',
   tool: 'search',
   query: 'leave policy',
+  narrowed: false,
   classes: ['members', 'team0001'],
   client: 'Example Assistant',
   results: 2,
@@ -26,12 +23,6 @@ const CALL: McpCall = {
   latencyMs: 420.4,
   stale: false,
 };
-
-function rows(database: MemoryDatabase): Record<string, unknown>[] {
-  return database.sqlite
-    .prepare('SELECT * FROM mcp_calls ORDER BY id')
-    .all() as Record<string, unknown>[];
-}
 
 describe('recordedClasses', () => {
   it('names what the access decision lets the reader read', () => {
@@ -84,15 +75,17 @@ describe('insertMcpCall', () => {
     await insertMcpCall(database, {
       ...CALL,
       query: 'q'.repeat(250),
+      narrowed: true,
       classes: ['team0001', 'members'],
       documents: ['aaaaaa', 'bbbbbb', 'cccccc', 'dddddd', 'eeeeee', 'ffffff'],
     });
-    expect(rows(database)).toEqual([
+    expect(rowsOf(database, 'mcp_calls')).toEqual([
       {
         id: 1,
         at: CALL.at,
         tool: 'search',
         query: 'q'.repeat(200),
+        narrowed: 1,
         classes: '["members","team0001"]',
         client: 'Example Assistant',
         results: 2,
@@ -111,7 +104,7 @@ describe('insertMcpCall', () => {
     for (const topScore of [null, Number.NaN, Number.POSITIVE_INFINITY]) {
       await insertMcpCall(database, { ...CALL, topScore });
     }
-    expect(rows(database).map((row) => row.top_score)).toEqual([
+    expect(rowsOf(database, 'mcp_calls').map((row) => row.top_score)).toEqual([
       null,
       null,
       null,
@@ -131,7 +124,7 @@ describe('mcpCallRecorder', () => {
     record(CALL);
     expect(writes).toHaveLength(1);
     await Promise.all(writes);
-    expect(rows(database)).toHaveLength(1);
+    expect(rowsOf(database, 'mcp_calls')).toHaveLength(1);
   });
 
   it('drops and logs a write that fails, however it fails', async () => {

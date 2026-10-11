@@ -514,10 +514,10 @@ describe('parseSiteConfiguration', () => {
     raw.insights = { enabled: true, retentionDays: 30 };
     expect(parseSiteConfiguration(raw).insights?.retentionDays).toBe(30);
 
-    for (const retentionDays of [6, 366, 30.5, '90']) {
+    for (const retentionDays of [7, 13, 366, 30.5, '90']) {
       raw.insights = { enabled: true, retentionDays };
       expect(() => parseSiteConfiguration(raw)).toThrow(
-        /insights\.retentionDays must be a whole number from 7 to 365/u,
+        /insights\.retentionDays must be a whole number from 14 to 365/u,
       );
     }
 

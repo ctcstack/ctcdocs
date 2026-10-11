@@ -960,13 +960,16 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
     }
     insights = {
       enabled,
-      // At least the week one report aggregates (ADR-051).
+      /*
+       * A weekly report goes when the first day it aggregates does, a week
+       * after it is made (ADR-051): two weeks keep it readable for one.
+       */
       retentionDays: optionalNumber(
         source,
         'retentionDays',
         'insights.retentionDays',
         INSIGHTS_DEFAULTS.retentionDays,
-        { min: 7, max: 365, whole: true },
+        { min: 14, max: 365, whole: true },
       ),
     };
   }

@@ -71,7 +71,9 @@ import {
   isStale,
   type DirectorySnapshot,
 } from './snapshot.js';
-import type { McpCallRecorder } from './state/mcp-calls.js';
+import type { StateDatabase } from './state/database.js';
+import type { RecordLimit } from './state/limit.js';
+import { mcpCallRecorder, type McpCallRecorder } from './state/mcp-calls.js';
 import { directoryStatus } from './status.js';
 
 export const SESSION_COOKIE = '__Host-kb-session';
@@ -96,11 +98,18 @@ export interface AgentContext {
   readonly oauth: (origin: string) => AgentOAuth;
   readonly store: DocumentStore;
   readonly index: DocumentIndex;
-  /**
-   * Records each tool call (ADR-051): present while insights are on and the
-   * database is bound.
-   */
-  readonly calls?: McpCallRecorder | undefined;
+}
+
+/**
+ * The database of operational state (ADR-050), when one is bound. What is
+ * written to it, and when, is decided here, by the access map.
+ */
+export interface StateContext {
+  readonly database: StateDatabase;
+  /** Lets a write finish after the response, as `waitUntil` does. */
+  readonly schedule: (write: Promise<void>) => void;
+  /** Bounds the records one person's calls write; one per isolate. */
+  readonly limit: RecordLimit;
 }
 
 /** The metadata of the one protected resource, `/mcp` (RFC 9728). */
@@ -136,6 +145,7 @@ export interface WorkerContext {
   readonly log: (event: Readonly<Record<string, unknown>>) => void;
   /** Present when the deployment runs the MCP server and has its bindings. */
   readonly agents?: AgentContext | undefined;
+  readonly state?: StateContext | undefined;
 }
 
 function cookies(request: Request): Map<string, string> {
@@ -338,6 +348,34 @@ function authorizeContext(gate: Gate, oauth: AgentOAuth, request: Request) {
   } satisfies AuthorizeContext;
 }
 
+/**
+ * What records a person's tool calls (ADR-051): nothing unless insights are
+ * on and the database bound. Past the limit a call is answered as ever and
+ * not recorded, and the first such call of a minute is logged.
+ */
+function callRecorder(
+  context: WorkerContext,
+  sub: string,
+): McpCallRecorder | undefined {
+  const { state, map, log } = context;
+  if (!state || !map.site.insights.enabled) {
+    return undefined;
+  }
+  const write = mcpCallRecorder({
+    database: state.database,
+    schedule: state.schedule,
+    log,
+  });
+  return (call) => {
+    const { record, dropped } = state.limit.take(sub, context.now());
+    if (record) {
+      write(call);
+    } else if (dropped === 1) {
+      log({ event: 'state-record-limited', table: 'mcp_calls' });
+    }
+  };
+}
+
 /** The MCP server for the person a token belongs to. */
 async function serveAgent(
   gate: Gate,
@@ -367,7 +405,7 @@ async function serveAgent(
     log: context.log,
     now: context.now,
     client,
-    record: agents.calls,
+    record: callRecorder(context, sub),
   });
 }
 

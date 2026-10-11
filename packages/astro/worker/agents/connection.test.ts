@@ -7,14 +7,19 @@ import { createHash } from 'node:crypto';
 
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { handle, SESSION_COOKIE, type WorkerContext } from '../handler.js';
+import {
+  handle,
+  SESSION_COOKIE,
+  type StateContext,
+  type WorkerContext,
+} from '../handler.js';
 import { GoogleKeys } from '../oidc.js';
 import { fakeGoogle, type FakeGoogle } from '../google-test-support.js';
 import { seal, sealKeys } from '../seal.js';
 import type { DirectorySnapshot } from '../snapshot.js';
 import type { StateDatabase } from '../state/database.js';
-import { MemoryDatabase } from '../state/memory-database.js';
-import { mcpCallRecorder, type McpCallRecorder } from '../state/mcp-calls.js';
+import { RecordLimit } from '../state/limit.js';
+import { MemoryDatabase, rowsOf } from '../state/test-support.js';
 import type { DocumentIndex } from './documents.js';
 import { agentOAuth } from './oauth.js';
 import {
@@ -135,12 +140,19 @@ let kv: MemoryKv;
 let snapshot: DirectorySnapshot | undefined;
 let googlePerson: { sub: string; nonce: string };
 let events: Record<string, unknown>[];
-/** The record of calls, when a test turns insights on. */
-let calls: McpCallRecorder | undefined;
+/** The database, when a test binds one, and whether insights are on. */
+let state: StateContext | undefined;
+let insights: boolean;
 /** Milliseconds the clock has moved past `NOW`, for a test that times a call. */
 let elapsed: number;
 
-function context(map = agentMap): WorkerContext {
+function context(built = agentMap): WorkerContext {
+  const map: typeof built = insights
+    ? {
+        ...built,
+        site: { ...built.site, insights: { enabled: true, retentionDays: 90 } },
+      }
+    : built;
   const fetcher = google(() => googlePerson);
   return {
     map,
@@ -157,6 +169,7 @@ function context(map = agentMap): WorkerContext {
     now: () => NOW + elapsed,
     googleKeys: new GoogleKeys(fetcher, () => NOW),
     log: (event) => events.push(event),
+    state,
     agents: {
       oauth: (origin) =>
         agentOAuth({
@@ -171,7 +184,6 @@ function context(map = agentMap): WorkerContext {
         }),
       store: publishedStore(),
       index,
-      calls,
     },
   };
 }
@@ -192,7 +204,8 @@ beforeEach(() => {
   snapshot = snapshotWith(['user-member']);
   googlePerson = { sub: 'user-member', nonce: '' };
   events = [];
-  calls = undefined;
+  state = undefined;
+  insights = false;
   elapsed = 0;
 });
 
@@ -1033,21 +1046,23 @@ describe('an assistant reading', () => {
 });
 
 describe('recording what assistants ask', () => {
-  /** Turns insights on over `database`; returns the writes to wait for. */
-  function recordInto(database: StateDatabase): Promise<void>[] {
+  /**
+   * Binds `database` and, unless told otherwise, turns insights on; returns
+   * the writes to wait for.
+   */
+  function recordInto(
+    database: StateDatabase,
+    { on = true, limit = new RecordLimit() } = {},
+  ): Promise<void>[] {
     const writes: Promise<void>[] = [];
-    calls = mcpCallRecorder({
+    state = {
       database,
       schedule: (write) => writes.push(write),
-      log: (event) => events.push(event),
-    });
+      limit,
+    };
+    insights = on;
     return writes;
   }
-
-  const rowsOf = (database: MemoryDatabase) =>
-    database.sqlite
-      .prepare('SELECT * FROM mcp_calls ORDER BY id')
-      .all() as Record<string, unknown>[];
 
   it('records each answered call by the classes read, never the person', async () => {
     const database = new MemoryDatabase();
@@ -1067,7 +1082,7 @@ describe('recording what assistants ask', () => {
     await tool(token, 'recent', {});
     await Promise.all(writes);
 
-    const rows = rowsOf(database);
+    const rows = rowsOf(database, 'mcp_calls');
     expect(
       rows.map((row) => {
         const kept: Record<string, unknown> = { ...row };
@@ -1080,6 +1095,7 @@ describe('recording what assistants ask', () => {
       {
         tool: 'search',
         query: 'secret plans',
+        narrowed: 0,
         classes: '["members"]',
         client: 'Example Assistant',
         results: 1,
@@ -1093,6 +1109,7 @@ describe('recording what assistants ask', () => {
       {
         tool: 'fetch',
         query: null,
+        narrowed: 0,
         classes: '["members"]',
         client: 'Example Assistant',
         results: 1,
@@ -1106,6 +1123,7 @@ describe('recording what assistants ask', () => {
       {
         tool: 'fetch',
         query: null,
+        narrowed: 0,
         classes: '["members"]',
         client: 'Example Assistant',
         results: 0,
@@ -1119,6 +1137,7 @@ describe('recording what assistants ask', () => {
       {
         tool: 'browse',
         query: null,
+        narrowed: 0,
         classes: '["members"]',
         client: 'Example Assistant',
         results: 1,
@@ -1132,6 +1151,7 @@ describe('recording what assistants ask', () => {
       {
         tool: 'recent',
         query: null,
+        narrowed: 0,
         classes: '["members"]',
         client: 'Example Assistant',
         results: 1,
@@ -1176,7 +1196,7 @@ describe('recording what assistants ask', () => {
     await Promise.all(writes);
 
     expect(
-      rowsOf(database).map(({ classes, documents, stale }) => ({
+      rowsOf(database, 'mcp_calls').map(({ classes, documents, stale }) => ({
         classes,
         documents,
         stale,
@@ -1208,7 +1228,7 @@ describe('recording what assistants ask', () => {
     const writes = recordInto(working);
     expect(await ask()).toEqual(expected);
     await Promise.all(writes);
-    expect(rowsOf(working)).toHaveLength(1);
+    expect(rowsOf(working, 'mcp_calls')).toHaveLength(1);
 
     const failing: StateDatabase = {
       prepare: () => {
@@ -1248,7 +1268,7 @@ describe('recording what assistants ask', () => {
       await tool(tokens.access_token, 'recent', {});
     }
     await Promise.all(writes);
-    expect(rowsOf(database).map((row) => row.client)).toEqual([
+    expect(rowsOf(database, 'mcp_calls').map((row) => row.client)).toEqual([
       'Claude Desktop',
       null,
       null,
@@ -1269,15 +1289,81 @@ describe('recording what assistants ask', () => {
     };
     await tool(tokens.access_token, 'search', { query: 'plan' });
     await Promise.all(writes);
-    expect(rowsOf(database).map((row) => [row.at, row.latency_ms])).toEqual([
-      [new Date(NOW).toISOString(), 250],
+    expect(
+      rowsOf(database, 'mcp_calls').map((row) => [row.at, row.latency_ms]),
+    ).toEqual([[new Date(NOW).toISOString(), 250]]);
+  });
+
+  it('names an admin by the admins class, and says what a call narrowed', async () => {
+    const database = new MemoryDatabase();
+    const writes = recordInto(database);
+    snapshot = {
+      ...snapshotWith(['user-admin']),
+      groups: {
+        ...snapshotWith(['user-admin']).groups,
+        'admins@example.com': { id: 'g2', members: ['user-admin'] },
+      },
+    };
+    const { tokens } = await connect('user-admin');
+    const token = tokens.access_token;
+    await tool(token, 'search', { query: 'plan' });
+    await tool(token, 'search', { query: 'plan', folder: 'Team' });
+    await tool(token, 'recent', { format: 'pdf' });
+    await tool(token, 'browse', { folder: 'Team' });
+    await Promise.all(writes);
+    expect(
+      rowsOf(database, 'mcp_calls').map(({ tool: name, classes, narrowed }) => [
+        name,
+        classes,
+        narrowed,
+      ]),
+    ).toEqual([
+      ['search', '["admins"]', 0],
+      ['search', '["admins"]', 1],
+      ['recent', '["admins"]', 1],
+      ['browse', '["admins"]', 1],
     ]);
   });
 
-  it('records nothing while insights are off', async () => {
+  it('records no more than the limit a minute for one person, answering all', async () => {
+    const database = new MemoryDatabase();
+    const writes = recordInto(database, { limit: new RecordLimit(2) });
+    const { tokens } = await connect('user-member');
+    const answers = [];
+    for (let index = 0; index < 4; index += 1) {
+      answers.push(
+        (await tool(tokens.access_token, 'search', { query: 'plan' })).body
+          .result,
+      );
+    }
+    await Promise.all(writes);
+    expect(rowsOf(database, 'mcp_calls')).toHaveLength(2);
+    expect(new Set(answers.map((answer) => JSON.stringify(answer))).size).toBe(
+      1,
+    );
+    // Logged once, without the person.
+    expect(
+      events.filter((event) => event.event === 'state-record-limited'),
+    ).toEqual([{ event: 'state-record-limited', table: 'mcp_calls' }]);
+
+    // A minute on, the person is recorded again.
+    elapsed += 60_000;
+    await tool(tokens.access_token, 'search', { query: 'plan' });
+    await Promise.all(writes);
+    expect(rowsOf(database, 'mcp_calls')).toHaveLength(3);
+  });
+
+  it('records nothing while insights are off, the database bound or not', async () => {
     const { tokens } = await connect('user-member');
     const answer = await tool(tokens.access_token, 'search', { query: 'x' });
     expect(answer.status).toBe(200);
+
+    const database = new MemoryDatabase();
+    const writes = recordInto(database, { on: false });
+    await tool(tokens.access_token, 'search', { query: 'x' });
+    await Promise.all(writes);
+    expect(writes).toEqual([]);
+    expect(rowsOf(database, 'mcp_calls')).toEqual([]);
     expect(JSON.stringify(events)).not.toContain('state-');
   });
 });

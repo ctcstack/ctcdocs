@@ -17,6 +17,8 @@ CREATE TABLE mcp_calls (
   at TEXT NOT NULL CHECK (at IS strftime('%Y-%m-%dT%H:%M:%fZ', at)),
   tool TEXT NOT NULL CHECK (tool IN ('search', 'fetch', 'browse', 'recent')),
   query TEXT CHECK (length(query) <= 200),
+  -- Whether the call kept itself to a folder, a date or a format.
+  narrowed INTEGER NOT NULL CHECK (narrowed IN (0, 1)),
   -- The access classes the reader may read, as a sorted JSON array of the
   -- access map's names, which are lowercase letters and digits.
   classes TEXT NOT NULL CHECK (
@@ -72,8 +74,7 @@ CREATE TABLE site_searches (
   id INTEGER PRIMARY KEY,
   at TEXT NOT NULL CHECK (at IS strftime('%Y-%m-%dT%H:%M:%fZ', at)),
   query TEXT NOT NULL CHECK (length(query) <= 200),
-  -- The access classes the reader may read, as a sorted JSON array of the
-  -- access map's names, which are lowercase letters and digits.
+  -- As in mcp_calls: SQLite has no domains, so the two checks stay alike.
   classes TEXT NOT NULL CHECK (
     json_valid(classes)
     AND json_type(classes) = 'array'

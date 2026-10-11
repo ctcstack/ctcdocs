@@ -71,9 +71,9 @@ Deleted rows stay recoverable through D1's Time Travel for 30 days; the
 documented retention of a record is its own line plus those 30 days.
 
 **Cloudflare stays at the edge of the code.** The database is reached through
-a small interface the Worker's entry files implement with the D1 binding, as
-the bucket and the index are, so the rest of the Worker is web-standard and
-testable with an in-memory implementation.
+a small interface the D1 binding satisfies as it stands. The Worker's entry
+hands the binding in, as it does the bucket and the index, so the rest of the
+Worker is web-standard and testable with an in-memory implementation.
 
 ## Consequences
 

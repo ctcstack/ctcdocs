@@ -63,7 +63,8 @@
     "tests",
     "worker",
     "!**/*.test.ts",
-    "!**/*.test.mjs"
+    "!**/*.test.mjs",
+    "!**/*test-support.ts"
   ],
   "engines": {
     "node": ">=22.12.0"
