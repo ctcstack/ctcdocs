@@ -314,6 +314,11 @@ export interface InsightsConfiguration {
   readonly enabled: boolean;
   /** Days a record of use is kept before the Worker's schedule deletes it. */
   readonly retentionDays: number;
+  /**
+   * The reranker score, 0 to 1, below which a search's best result counts
+   * as not found. Unset, the weekly report takes the week's lowest fifth.
+   */
+  readonly weakScore?: number;
 }
 
 /** What `insights` holds when a project sets only `enabled` (ADR-051). */
@@ -953,7 +958,7 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
   let insights: InsightsConfiguration | undefined;
   if (root.insights !== undefined) {
     const source = record(root.insights, 'insights');
-    knownKeys(source, 'insights', ['enabled', 'retentionDays']);
+    knownKeys(source, 'insights', ['enabled', 'retentionDays', 'weakScore']);
     const enabled = flag(source, 'enabled', 'insights.enabled');
     if (enabled && mcp?.enabled !== true) {
       fail('insights', 'needs mcp.enabled: it records what assistants ask');
@@ -971,6 +976,17 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
         INSIGHTS_DEFAULTS.retentionDays,
         { min: 14, max: 365, whole: true },
       ),
+      ...(source.weakScore === undefined
+        ? {}
+        : {
+            weakScore: optionalNumber(
+              source,
+              'weakScore',
+              'insights.weakScore',
+              0,
+              { min: 0, max: 1, whole: false },
+            ),
+          }),
     };
   }
 

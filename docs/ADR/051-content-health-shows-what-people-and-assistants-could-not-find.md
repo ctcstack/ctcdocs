@@ -122,6 +122,33 @@ The report holds:
   - median characters per answer;
   - share of searches not found (the C6 number).
 
+**How it is made.** The choices the record above leaves open:
+
+- **Once a week, made up if missed.** Each run of the schedule reports the
+  week before, from Monday to Monday in UTC, unless that report is kept. A
+  run that fails is made up by the next; two at once keep the first. A week
+  with no record is not reported. The report is made before retention
+  deletes anything.
+- **What is never a gap.** A search kept to a folder, a date or a format,
+  and one with no word to group by, count in the use but never as not
+  found, nor in the share: what it missed may be there.
+- **Words.** English stop words are always dropped, since assistants often
+  ask in English whatever the documents' language, and the documents'
+  language's when the platform has a list for it (English and Russian
+  first). Without one, a query groups by all its words.
+- **Merging.** Word sets merge at a Jaccard similarity of one half. The
+  same best document merges groups of what was not found only: among all
+  searches it would join every question a popular document answers.
+- **The relative weak line** is the lowest fifth of the week's scored
+  searches, so a week with fewer than five has none.
+- **Bounds.** Fifty groups of what was not found, the twenty asked most,
+  ten queries and five documents a group, twenty documents found and not
+  read, each returned at least five times. At most 50,000 records of each
+  table are read, and the report says when a week held more.
+- **Names.** Documents by short ID, classes by the access map's names,
+  clients by their labels: the queries are its only text. `ctcdocs-insights`
+  and the content health page show titles from the build.
+
 ### How editors see it
 
 The Worker serves the latest report at `/_kb/insights.json` to admins only.
@@ -137,7 +164,11 @@ address.
 
 A CLI, `ctcdocs-insights`, prints the same report from the database for
 maintainers, and can write the week's misses as candidate questions for a
-deployment's evaluation set.
+deployment's evaluation set. It reads through the project's Wrangler, as
+the maintainer is signed in, and only reads: the kept report, or one made
+from the week's records with `--compute` or when none is kept. Candidates
+go to a file of their own, never into the evaluation set, since each needs
+an editor to say which documents answer it.
 
 ### Configuration
 

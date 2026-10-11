@@ -21,7 +21,9 @@
     "lib/project.ts",
     "tests/**/*.ts",
     "worker/*.ts",
-    "worker/agents/*.ts"
+    "worker/agents/*.ts",
+    "worker/insights/*.ts",
+    "worker/state/*.ts"
   ],
   "exclude": [
     "node_modules",
@@ -32,6 +34,7 @@
     "worker/agents/oauth.ts",
     "worker/agents/cloudflare-workers.stub.ts",
     "worker/agents/test-support.ts",
+    "worker/state/test-support.ts",
     "worker/google-test-support.ts"
   ]
 }

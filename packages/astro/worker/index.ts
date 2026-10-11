@@ -7,8 +7,8 @@
  * secrets; and, for the MCP server (ADR-041), the OAuth library with its own
  * namespace, the bucket of documents and the AI Search instance; and, for
  * insights (ADR-051), the database of operational state (ADR-050). Its
- * schedule keeps that bucket in step with the build and deletes the records
- * the database no longer keeps.
+ * schedule keeps that bucket in step with the build, reports last week and
+ * deletes the records the database no longer keeps.
  */
 import builtMap from 'ctcdocs-access-map';
 
@@ -18,6 +18,7 @@ import type { DocumentIndex, DocumentStore } from './agents/documents.js';
 import { searchFilter, type SearchFilter } from './agents/search-filter.js';
 import { publishDocuments } from './agents/publish.js';
 import { handle, type AgentContext } from './handler.js';
+import { maintainState } from './insights/schedule.js';
 import { MACHINE_KEYS_KEY } from './machine-keys.js';
 import { GoogleKeys } from './oidc.js';
 import {
@@ -27,7 +28,6 @@ import {
 } from './snapshot.js';
 import type { StateDatabase } from './state/database.js';
 import { RecordLimit } from './state/limit.js';
-import { expireOnSchedule } from './state/retention.js';
 
 /** The part of an AI Search instance binding the Worker uses. */
 interface AiSearch {
@@ -204,23 +204,22 @@ export default {
   },
 
   /**
-   * Deletes the records of use past their retention, and publishes the
-   * build's documents for the MCP server when it has changed.
+   * Reports last week, deletes the records of use past their retention, and
+   * publishes the build's documents for the MCP server when it has changed.
    */
   async scheduled(
     _controller: unknown,
     env: Env,
     ctx: ExecutionContextLike,
   ): Promise<void> {
-    const expiring = expireOnSchedule({
-      insights: accessMap.site.insights,
-      database: env.KB_STATE_DB,
-      now: Date.now(),
-      log,
-    });
-    if (expiring) {
-      ctx.waitUntil(expiring);
-    }
+    ctx.waitUntil(
+      maintainState({
+        insights: accessMap.site.insights,
+        database: env.KB_STATE_DB,
+        now: Date.now(),
+        log,
+      }),
+    );
     const origin = Object.values(accessMap.site.environments)[0]?.origin;
     if (
       accessMap.site.mcp !== true ||

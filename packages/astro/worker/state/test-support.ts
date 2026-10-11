@@ -42,6 +42,12 @@ class MemoryStatement implements StateStatement {
   async run(): Promise<StateResult> {
     return this.runNow();
   }
+
+  async all(): Promise<{ results: unknown[] }> {
+    return {
+      results: this.database.prepare(this.query).all(...this.values),
+    };
+  }
 }
 
 export class MemoryDatabase implements StateDatabase {

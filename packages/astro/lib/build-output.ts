@@ -510,6 +510,10 @@ export async function writeBuildOutput({
         enabled: mcp && site.insights?.enabled === true,
         retentionDays:
           site.insights?.retentionDays ?? INSIGHTS_DEFAULTS.retentionDays,
+        ...(site.insights?.weakScore === undefined
+          ? {}
+          : { weakScore: site.insights.weakScore }),
+        ...(site.mcp?.language ? { language: site.mcp.language } : {}),
       },
     },
     csp: { scriptHashes: [...scriptHashes].sort() },

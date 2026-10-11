@@ -521,6 +521,19 @@ describe('parseSiteConfiguration', () => {
       );
     }
 
+    raw.insights = { enabled: true, weakScore: 0.25 };
+    expect(parseSiteConfiguration(raw).insights).toEqual({
+      enabled: true,
+      retentionDays: 90,
+      weakScore: 0.25,
+    });
+    for (const weakScore of [-0.1, 1.5, '0.2']) {
+      raw.insights = { enabled: true, weakScore };
+      expect(() => parseSiteConfiguration(raw)).toThrow(
+        /insights\.weakScore must be a number from 0 to 1/u,
+      );
+    }
+
     raw.insights = { enabled: true, siteSearches: true };
     expect(() => parseSiteConfiguration(raw)).toThrow(
       /insights\.siteSearches is not a known setting/u,
