@@ -13,6 +13,19 @@ All three packages share a version and are released together.
 - **Content health names near-duplicate documents.** A document whose text is
   at least 80% the same as another's, or stands 95% inside a longer one, is
   noted under Fix next with the other named (ADR-049).
+- **What people and assistants could not find.** With `insights.enabled`,
+  the Worker records each MCP call and each settled search on the site in a
+  D1 database of its own, by the access classes the reader may read and
+  never the reader, and every Monday reports the week before: what was not
+  found, grouped by its words, what is asked most, what is found and not
+  opened, and how the server is used. Admins read it on the content health
+  page, under What people could not find; `ctcdocs-insights` prints it for
+  maintainers and writes the week's misses as candidate evaluation
+  questions. Records are kept `insights.retentionDays`, 90 unless set
+  (ADR-050, ADR-051).
+- **The deploy workflow migrates the state database.** With insights on,
+  `project-deploy.yml` applies the platform's migrations to the
+  environment's database before it deploys the Worker.
 - **Content health asks for the review of stale documents.** A document not
   edited in Drive for `sync.staleAfterMonths`, 12 by default, is noted under
   Improve with the day of its last edit; `sync.staleFolders` gives a folder
@@ -23,6 +36,14 @@ All three packages share a version and are released together.
 Bump the packages and the workflow pins, set `mcp.language` if the documents
 are in one language, and deploy. Nothing in R2 or the search index changes.
 The two notes appear after the next sync.
+
+Insights are off unless a project turns them on, and need nothing until
+then. To turn them on: add D1 Edit to each environment's deploy token, create
+each environment's database and bind it as `KB_STATE_DB` with the platform's
+`migrations_dir`, then set `insights.enabled`; it needs `mcp.enabled` and
+`access.admins`. The next deployment applies the migrations
+([Cloudflare setup](docs/CLOUDFLARE_SETUP.md#the-state-database)). Running
+the platform's tests now needs Node 22.13 or newer.
 
 ## 0.22.3
 

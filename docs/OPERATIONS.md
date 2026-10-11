@@ -540,8 +540,9 @@ Every push to `main` starts `.github/workflows/deploy.yml`:
 3. prove that production anonymous requests are denied and its separate smoke
    key is admitted;
 4. rebuild from the exact commit without transferring build artifacts;
-5. deploy the site Worker, tagged `ctcdocs-gate-v1`, and the directory Worker
-   through Wrangler;
+5. deploy the directory Worker; with insights on, apply the state database's
+   migrations; then deploy the site Worker, tagged `ctcdocs-gate-v1`, through
+   Wrangler;
 6. verify protected HTML, raw Markdown and its headers, Pagefind, the agent
    index, `robots.txt`, and the 404 response.
 
@@ -826,6 +827,88 @@ judged against the directory. To end connections themselves:
   answering; turning it back on revives the grants that have not expired, so
   pair it with a new namespace if that is not wanted.
 
+## Insights
+
+With `insights.enabled`
+([configuration](CONFIGURATION.md#what-people-and-assistants-could-not-find)),
+the Worker records each MCP call and each settled search on the site, and
+every Monday reports the week before
+([ADR-051](ADR/051-content-health-shows-what-people-and-assistants-could-not-find.md)).
+
+### Reading the report
+
+Admins find it on the content health page, under **What people could not
+find**: each thing asked and not found, most asked first, how else it was
+asked, through which assistants, and the documents its searches nearly found;
+then documents searches return often and assistants seldom open. The page
+asks the Worker for it at `/_kb/insights.json`, which answers admins only,
+and never while the directory is stale. Anyone else sees nothing of it.
+
+Each gap asks an editor for one of two things: a document that answers it,
+or words in the document that has the answer, as people ask it. A report
+that could not read its whole week says so; its figures are of what it read.
+
+Maintainers print the same report from the database with the project's own
+Wrangler login:
+
+```bash
+pnpm exec ctcdocs-insights
+pnpm exec ctcdocs-insights --week 2026-10-05 --env production --json
+pnpm exec ctcdocs-insights --compute
+```
+
+It prints the kept report of last week, or of the Monday `--week` names, and
+makes one from the records when none is kept, or when `--compute` asks with
+the project's settings now. It only reads. `--local` reads the development
+database of `wrangler dev`.
+
+### Real misses as evaluation questions
+
+```bash
+pnpm exec ctcdocs-insights --questions evaluation/candidates-2026-10-05.json
+```
+
+writes the week's misses as candidate questions in the evaluation set's
+shape, each with the other ways it was asked, and with no `expected`
+documents. Review each: say which documents answer it and its language, then
+move it into `evaluation/search-questions.json`, where an empty `expected`
+means the corpus has no answer. The command never writes the set itself.
+
+### What it logs
+
+| Event                    | Means                                                                                   |
+| ------------------------ | --------------------------------------------------------------------------------------- |
+| `insights-reported`      | A week was reported: its counts, and how many records it could not read.                |
+| `insights-report-failed` | The report could not be made; the next run of the schedule tries again.                 |
+| `insights-read-failed`   | An admin's request for the report could not read the database.                          |
+| `state-expired`          | What was past its retention was deleted, by table; every five minutes.                  |
+| `state-expiry-failed`    | The deletion failed; the next run deletes what this one did not.                        |
+| `state-write-failed`     | A record was dropped: "no such table" means the migrations were not applied.            |
+| `state-record-limited`   | One person passed the 60 calls or 30 site searches a minute recorded; the rest are not. |
+| `state-unbound`          | Insights are on and the database is not bound: nothing is recorded.                     |
+
+None names a person, a query or a document.
+
+### Deleting records
+
+Records go on their own after `insights.retentionDays`, and 30 days later from
+Time Travel. To delete a query sooner, as when it holds what it should not,
+delete it with a maintainer's login and drop the reports that may quote it;
+the next run of the schedule makes last week's report again, without it, and
+earlier weeks stay unreported:
+
+```bash
+pnpm exec wrangler d1 execute KB_STATE_DB --env production --remote \
+  --command "DELETE FROM mcp_calls WHERE query LIKE '%<words>%'"
+pnpm exec wrangler d1 execute KB_STATE_DB --env production --remote \
+  --command "DELETE FROM site_searches WHERE query LIKE '%<words>%'"
+pnpm exec wrangler d1 execute KB_STATE_DB --env production --remote \
+  --command "DELETE FROM reports"
+```
+
+Time Travel still holds the deleted rows for 30 days; restoring the database
+to an earlier point brings them back.
+
 ## Failure handling
 
 The sync workflow reports aggregate counts through `$GITHUB_STEP_SUMMARY`.
@@ -1018,7 +1101,8 @@ during routine rotation. The directory reader is the only identity with a key.
 
 ### Cloudflare deploy token
 
-1. create a new account- and zone-scoped token;
+1. create a new account- and zone-scoped token, with D1 Edit when insights
+   are on ([Deploy API token](CLOUDFLARE_SETUP.md#deploy-api-token));
 2. replace `CLOUDFLARE_API_TOKEN` in `production-deploy`;
 3. run a manual production deployment;
 4. revoke the previous token after the protected smoke succeeds.

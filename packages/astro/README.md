@@ -108,13 +108,23 @@ declarations.
 `defineUxConfig()` serves the build with `ctcdocs-preview` on port 4323.
 `defineAccessConfig()` takes its target from `CTCDOCS_BASE_URL`.
 
-Three binaries come with it: `ctcdocs-verify-search`, which proves the built
-Pagefind index finds the documents the corpus contains and holds none of the
-text the interface marks `data-ctcdocs-unindexed`;
-`ctcdocs-access-smoke`, which proves a deployment is reachable exactly by the
-audience it declares; and `ctcdocs-preview`, which serves the build with
-Astro's preview server and stays in the foreground where `astro preview` moves
-itself to the background under an AI agent.
+Its binaries:
+
+- `ctcdocs-verify-search` proves the built Pagefind index finds the documents
+  the corpus contains and holds none of the text the interface marks
+  `data-ctcdocs-unindexed`;
+- `ctcdocs-verify-gate`, the denial suite, asks the Worker's gate for every
+  built file as different readers;
+- `ctcdocs-access-smoke` proves a deployment is reachable exactly by the
+  audience it declares;
+- `ctcdocs-preview` serves the build with Astro's preview server and stays in
+  the foreground where `astro preview` moves itself to the background under
+  an AI agent;
+- `ctcdocs-machine-key` issues a machine key and the record to store for it;
+- `ctcdocs-eval-search` measures the MCP server's search against a project's
+  own questions;
+- `ctcdocs-insights` prints a week's insights report from the deployment's
+  database, and writes its misses as candidate questions.
 
 ## Documentation
 

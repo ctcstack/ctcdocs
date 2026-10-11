@@ -233,6 +233,70 @@ settings its documentation leaves unsaid; measure a change against the
 project's own questions with `ctcdocs-eval-search` before keeping it
 ([operations](OPERATIONS.md)).
 
+## What people and assistants could not find
+
+A deployment with the MCP server can record what is asked of it, and show
+admins every week what the documentation failed to answer
+([ADR-051](ADR/051-content-health-shows-what-people-and-assistants-could-not-find.md)):
+
+```json
+"insights": {
+  "enabled": true
+}
+```
+
+What is recorded, in the Worker's own D1 database
+([ADR-050](ADR/050-the-worker-keeps-operational-state-in-one-d1-database.md)):
+
+- each MCP tool call: the tool, a search's query cut to 200 characters,
+  whether it kept to a folder, a date or a format, the access classes the
+  reader may read, the assistant's name, how many documents it returned and
+  the first five of them, the reranker's best score, the characters of the
+  answer and how long it took;
+- each settled search on the site: its query, the classes, how many results
+  it showed and the page opened from them.
+
+A record names the classes a reader may read, never the reader: no address,
+account or group. In a small organization a rare set of classes, with a time
+and a query, can still point to a person, which is why only admins read the
+report. Query text may hold a name or a sensitive word; it is kept for
+`retentionDays` and 30 days more in D1's Time Travel.
+
+Every Monday the Worker reports the week before: what was not found, grouped
+by its words, what is asked most, what is found and not opened, and how the
+server is used. Admins see the latest report under **What people could not
+find** on the content health page; maintainers print it with
+`ctcdocs-insights` ([operations](OPERATIONS.md#insights)).
+
+`insights` needs `mcp.enabled` and `access.admins`, since only admins read
+the report. With it on, `ctcdocs-sync validate` requires the `KB_STATE_DB`
+database in every environment, each its own, with the platform's migrations,
+and the site Worker's five-minute cron, as
+[Cloudflare setup](CLOUDFLARE_SETUP.md#the-state-database) shows. The deploy
+token then needs D1 Edit
+([Deploy API token](CLOUDFLARE_SETUP.md#deploy-api-token)). Turned off, the
+Worker records nothing new, and still deletes what is past its retention for
+as long as the database stays bound.
+
+```json
+"insights": {
+  "enabled": true,
+  "retentionDays": 90,
+  "weakScore": 0.2,
+  "siteSearch": true
+}
+```
+
+| Setting                  | Meaning                                                                                                                                                                                            |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `insights.enabled`       | Whether the Worker records what is asked and reports it weekly.                                                                                                                                    |
+| `insights.retentionDays` | Days a record is kept, 14 to 365, 90 unless set. A weekly report quotes queries, so it is kept a week less than the records: at least a week after it is made.                                     |
+| `insights.weakScore`     | Optional. The reranker score, 0 to 1, below which a search's best result counts as not found. Unset, the weakest fifth of each week's searches is, which is a relative line until one is measured. |
+| `insights.siteSearch`    | Whether searches on the site are recorded as well as MCP calls, `true` unless set.                                                                                                                 |
+
+The build writes these into the access map, so a change takes effect with the
+next deploy; the documents' language for grouping queries is `mcp.language`.
+
 ## Who may read which folder
 
 A private deployment may close folders to everyone but named Google groups:
