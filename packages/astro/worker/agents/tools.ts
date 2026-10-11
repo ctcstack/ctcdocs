@@ -23,11 +23,13 @@ import {
   collapsedFolders,
   fetchDocument,
   linkPattern,
+  keepsToFolder,
   NarrowingError,
   recentDocuments,
   scoredSearch,
   type BrowsedFolder,
   type DocumentAccess,
+  type FolderName,
   type FolderTree,
 } from './documents.js';
 
@@ -210,9 +212,23 @@ type Answer = ReturnType<typeof result>;
 type Call = Pick<McpCall, 'tool' | 'results' | 'documents'> &
   Partial<Pick<McpCall, 'query' | 'narrowed' | 'topScore' | 'fetched'>>;
 
-/** Whether a call kept itself to a folder, a date or a format. */
-const narrowedBy = (narrowing: Readonly<Record<string, unknown>>) =>
-  Object.values(narrowing).some((value) => value !== undefined);
+/**
+ * Whether a call kept itself to a folder, a date or a format. A folder that
+ * resolves to the top level keeps to nothing.
+ */
+const narrowedBy = (
+  access: DocumentAccess,
+  {
+    folder,
+    ...rest
+  }: {
+    readonly folder?: FolderName | undefined;
+    readonly changedSince?: string | undefined;
+    readonly format?: string | undefined;
+  },
+) =>
+  keepsToFolder(access, folder) ||
+  Object.values(rest).some((value) => value !== undefined);
 
 /**
  * Hands the record of an answered call to the recorder, once the answer is
@@ -371,7 +387,7 @@ function server(context: ToolContext): McpServer {
         {
           tool: 'search',
           query,
-          narrowed: narrowedBy({ folder, changedSince, format }),
+          narrowed: narrowedBy(context, { folder, changedSince, format }),
           results: found.length,
           topScore: topScore ?? null,
           documents: found.map((entry) => entry.id),
@@ -458,7 +474,7 @@ function server(context: ToolContext): McpServer {
         started,
         {
           tool: 'browse',
-          narrowed: narrowedBy({ folder, format }),
+          narrowed: narrowedBy(context, { folder, format }),
           results: tree?.count ?? 0,
           documents: tree ? listedDocuments(tree) : [],
         },
@@ -494,7 +510,7 @@ function server(context: ToolContext): McpServer {
         started,
         {
           tool: 'recent',
-          narrowed: narrowedBy({ changedSince, folder, format }),
+          narrowed: narrowedBy(context, { changedSince, folder, format }),
           results: results.length,
           documents: results.map((entry) => entry.id),
         },

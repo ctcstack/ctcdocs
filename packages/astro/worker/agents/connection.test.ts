@@ -1310,6 +1310,9 @@ describe('recording what assistants ask', () => {
     await tool(token, 'search', { query: 'plan', folder: 'Team' });
     await tool(token, 'recent', { format: 'pdf' });
     await tool(token, 'browse', { folder: 'Team' });
+    // A blank folder is the top level: it keeps to nothing.
+    await tool(token, 'browse', { folder: ' / ' });
+    await tool(token, 'recent', { changedSince: '2026-01-01' });
     await Promise.all(writes);
     expect(
       rowsOf(database, 'mcp_calls').map(({ tool: name, classes, narrowed }) => [
@@ -1322,6 +1325,8 @@ describe('recording what assistants ask', () => {
       ['search', '["admins"]', 1],
       ['recent', '["admins"]', 1],
       ['browse', '["admins"]', 1],
+      ['browse', '["admins"]', 0],
+      ['recent', '["admins"]', 1],
     ]);
   });
 
