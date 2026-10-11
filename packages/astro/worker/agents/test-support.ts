@@ -36,6 +36,7 @@ export const agentMap: AccessMapFile = {
     workspaceDomains: ['example.com'],
     title: 'Example [DOCS]',
     description: 'Synthetic documentation',
+    language: 'English',
     mcp: true,
   },
   csp: { scriptHashes: [] },

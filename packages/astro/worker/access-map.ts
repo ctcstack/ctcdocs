@@ -97,6 +97,11 @@ export interface AccessMapFile {
     readonly workspaceDomains: readonly string[];
     readonly title: string;
     readonly description?: string;
+    /**
+     * The language the documents are written in, by its English name, which
+     * the MCP server tells assistants to search in (ADR-048).
+     */
+    readonly language?: string;
     /** Whether the Worker serves the MCP server and its OAuth routes. */
     readonly mcp?: boolean;
   };
