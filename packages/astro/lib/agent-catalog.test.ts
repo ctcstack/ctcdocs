@@ -124,6 +124,31 @@ describe('agent catalog', () => {
       '/handbook/index.md': projection('# Handbook\n\nEdited.\n'),
     });
     expect(edited.documents[0]?.hash).not.toBe(base.documents[0]?.hash);
+
+    // The indexed copy names the folders, so a move rewrites it (ADR-048).
+    const elsewhere = await catalog(
+      [document('handbook', { parentId: 'plans' })],
+      files,
+    );
+    expect(elsewhere.documents[0]?.hash).not.toBe(base.documents[0]?.hash);
+  });
+
+  it("lists a document's headings for the indexed copy", async () => {
+    const text = '# Title of handbook\n\n## Leave\n\nText.\n';
+    const result = await catalog(
+      [document('handbook')],
+      { '/handbook/index.md': 'members' },
+      { '/handbook/index.md': projection(text) },
+    );
+    expect(result.documents[0]?.outline).toEqual([
+      [text.indexOf('\n\nText'), 2, 'Leave'],
+    ]);
+    const bare = await catalog(
+      [document('handbook')],
+      { '/handbook/index.md': 'members' },
+      { '/handbook/index.md': projection('Only a paragraph.\n') },
+    );
+    expect(bare.documents[0]).not.toHaveProperty('outline');
   });
 
   it('hashes the text the Worker stores, not the front matter', async () => {

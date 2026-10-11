@@ -17,7 +17,6 @@ import {
   type DocumentAccess,
   type IndexedChunk,
 } from './documents.js';
-import { MemoryStore } from './memory-store.js';
 import { serveMcp } from './tools.js';
 import {
   agentMap,
@@ -154,8 +153,8 @@ function access(
     reader,
     stale,
     origin: ORIGIN,
-    store: new MemoryStore(),
     index,
+    assets: { fetch: async () => new Response('missing', { status: 404 }) },
   };
 }
 

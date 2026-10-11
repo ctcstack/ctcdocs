@@ -14,12 +14,7 @@ import { seal, sealKeys } from '../seal.js';
 import type { DirectorySnapshot } from '../snapshot.js';
 import type { DocumentIndex } from './documents.js';
 import { agentOAuth } from './oauth.js';
-import {
-  agentMap,
-  FixedIndex,
-  ORIGIN,
-  publishedStore,
-} from './test-support.js';
+import { agentMap, FixedIndex, ORIGIN, builtAssets } from './test-support.js';
 
 const NOW = Date.now();
 const SECRET = 'a-session-secret-long-enough-to-be-accepted-0123456789';
@@ -132,11 +127,20 @@ let snapshot: DirectorySnapshot | undefined;
 let googlePerson: { sub: string; nonce: string };
 let events: Record<string, unknown>[];
 
+/** Each document's Markdown version, and any other path as some asset. */
+const documentsBuilt = builtAssets();
+const assets = {
+  fetch: async (request: Request) => {
+    const response = await documentsBuilt.fetch(request);
+    return response.ok ? response : new Response('asset');
+  },
+};
+
 function context(map = agentMap): WorkerContext {
   const fetcher = google(() => googlePerson);
   return {
     map,
-    assets: { fetch: async () => new Response('asset') },
+    assets,
     snapshot: async () => snapshot,
     machineKeys: async () => [],
     secrets: {
@@ -161,7 +165,6 @@ function context(map = agentMap): WorkerContext {
           site: map.site.title,
           log: (event) => events.push(event),
         }),
-      store: publishedStore(),
       index,
     },
   };

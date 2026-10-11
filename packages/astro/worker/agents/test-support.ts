@@ -163,6 +163,36 @@ export class FixedIndex implements DocumentIndex {
   }
 }
 
+/** A Markdown version as the site serves it: front matter, then the text. */
+export function projection(text: string): string {
+  return `---\n"title": "x"\n---\n\n${text}`;
+}
+
+/**
+ * The build's assets for `agentMap`: each document's Markdown version, `# `
+ * and its title, and whatever `extra` adds by path. Anything else is missing.
+ */
+export function builtAssets(extra: Record<string, string> = {}): {
+  fetch(request: Request): Promise<Response>;
+} {
+  const texts = new Map<string, string>([
+    ...(agentMap.agents?.documents ?? []).map(
+      (document) =>
+        [document.markdown, projection(`# ${document.title}\n`)] as const,
+    ),
+    ...Object.entries(extra),
+  ]);
+  return {
+    fetch: async (request: Request) => {
+      const path = decodeURIComponent(new URL(request.url).pathname);
+      const text = texts.get(path);
+      return text === undefined
+        ? new Response('missing', { status: 404 })
+        : new Response(text);
+    },
+  };
+}
+
 /** The bucket as a deploy leaves it for `agentMap`. */
 export function publishedStore(): MemoryStore {
   const store = new MemoryStore();

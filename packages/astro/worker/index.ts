@@ -138,7 +138,6 @@ function agentsFor(
         site: accessMap.site.title,
         log,
       }),
-    store: KB_DOCUMENTS,
     index: documentIndex(KB_SEARCH),
   };
 }

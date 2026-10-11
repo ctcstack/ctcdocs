@@ -20,7 +20,7 @@
  */
 import type { AccessMapFile } from '../access-map.js';
 import { sitePath } from '../paths.js';
-import { documentText } from './document-text.js';
+import { documentText, indexedText } from './document-text.js';
 import {
   DOCUMENT_PREFIX,
   documentKey,
@@ -140,7 +140,7 @@ export async function publishDocuments(
           complete = false;
           continue;
         }
-        await store.put(key, text, {
+        await store.put(key, indexedText(text, document), {
           httpMetadata: { contentType: 'text/markdown; charset=utf-8' },
           customMetadata: {
             class: fileClass,
