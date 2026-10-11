@@ -319,11 +319,15 @@ export interface InsightsConfiguration {
    * as not found. Unset, the weekly report takes the week's lowest fifth.
    */
   readonly weakScore?: number;
+  /** Whether searches on the site are recorded as well as MCP calls. */
+  readonly siteSearch: boolean;
 }
 
 /** What `insights` holds when a project sets only `enabled` (ADR-051). */
-export const INSIGHTS_DEFAULTS: Omit<InsightsConfiguration, 'enabled'> =
-  Object.freeze({ retentionDays: 90 });
+export const INSIGHTS_DEFAULTS: Omit<
+  InsightsConfiguration,
+  'enabled' | 'weakScore'
+> = Object.freeze({ retentionDays: 90, siteSearch: true });
 
 /** About 10,000 tokens of English: a starting value, not a measured one. */
 const LARGE_DOCUMENT_CHARACTERS = 40_000;
@@ -958,7 +962,12 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
   let insights: InsightsConfiguration | undefined;
   if (root.insights !== undefined) {
     const source = record(root.insights, 'insights');
-    knownKeys(source, 'insights', ['enabled', 'retentionDays', 'weakScore']);
+    knownKeys(source, 'insights', [
+      'enabled',
+      'retentionDays',
+      'weakScore',
+      'siteSearch',
+    ]);
     const enabled = flag(source, 'enabled', 'insights.enabled');
     if (enabled && mcp?.enabled !== true) {
       fail('insights', 'needs mcp.enabled: it records what assistants ask');
@@ -978,6 +987,12 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
         'insights.retentionDays',
         INSIGHTS_DEFAULTS.retentionDays,
         { min: 14, max: 365, whole: true },
+      ),
+      siteSearch: optionalFlag(
+        source,
+        'siteSearch',
+        'insights.siteSearch',
+        INSIGHTS_DEFAULTS.siteSearch,
       ),
       ...(source.weakScore === undefined
         ? {}

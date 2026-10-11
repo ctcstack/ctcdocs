@@ -21,6 +21,8 @@ export const CLASSES_ROUTE = '/_kb/classes';
 export const STATUS_ROUTE = '/_kb/status';
 /** Where an admin reads the latest weekly insights report (ADR-051). */
 export const INSIGHTS_ROUTE = '/_kb/insights.json';
+/** Where the page reports a settled site search (ADR-051). */
+export const INSIGHTS_SEARCH_ROUTE = '/_kb/insights/search';
 /** A document's permanent link is this, its short ID and a slash (ADR-022). */
 export const PERMANENT_LINK_PREFIX = '/d/';
 
@@ -115,6 +117,8 @@ export interface AccessMapFile {
     readonly insights: {
       readonly enabled: boolean;
       readonly retentionDays: number;
+      /** Whether the site's own searches are recorded too. */
+      readonly siteSearch?: boolean;
       /** `insights.weakScore`; unset, the report's line is relative. */
       readonly weakScore?: number;
       /**

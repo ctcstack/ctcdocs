@@ -1058,7 +1058,7 @@ describe('recording what assistants ask', () => {
     state = {
       database,
       schedule: (write) => writes.push(write),
-      limit,
+      limits: { calls: limit, searches: new RecordLimit() },
     };
     insights = on;
     return writes;

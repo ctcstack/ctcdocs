@@ -27,7 +27,7 @@ import {
   type DirectorySnapshot,
 } from './snapshot.js';
 import type { StateDatabase } from './state/database.js';
-import { RecordLimit } from './state/limit.js';
+import { RecordLimit, SITE_SEARCHES_PER_MINUTE } from './state/limit.js';
 
 /** The part of an AI Search instance binding the Worker uses. */
 interface AiSearch {
@@ -73,8 +73,11 @@ const STATE_CACHE_MS = 60_000;
 let cached: { at: number; value: DirectorySnapshot | undefined } | undefined;
 let cachedKeys: { at: number; value: unknown } | undefined;
 
-/** Records of use one person's calls write a minute, in this isolate. */
-const recordLimit = new RecordLimit();
+/** Records of use one person writes a minute, in this isolate (ADR-051). */
+const recordLimits = {
+  calls: new RecordLimit(),
+  searches: new RecordLimit(SITE_SEARCHES_PER_MINUTE),
+};
 
 const googleKeys = new GoogleKeys(
   (input, init) => fetch(input, init),
@@ -197,7 +200,7 @@ export default {
         ? {
             database: env.KB_STATE_DB,
             schedule: (write) => ctx.waitUntil(write),
-            limit: recordLimit,
+            limits: recordLimits,
           }
         : undefined,
     });

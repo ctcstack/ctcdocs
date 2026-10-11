@@ -510,7 +510,14 @@ describe('parseSiteConfiguration', () => {
     expect(parseSiteConfiguration(raw).insights).toEqual({
       enabled: true,
       retentionDays: 90,
+      siteSearch: true,
     });
+    raw.insights = { enabled: true, siteSearch: false };
+    expect(parseSiteConfiguration(raw).insights?.siteSearch).toBe(false);
+    raw.insights = { enabled: true, siteSearch: 'yes' };
+    expect(() => parseSiteConfiguration(raw)).toThrow(
+      /insights\.siteSearch must be true or false/u,
+    );
 
     raw.insights = { enabled: true, retentionDays: 30 };
     expect(parseSiteConfiguration(raw).insights?.retentionDays).toBe(30);
@@ -526,6 +533,7 @@ describe('parseSiteConfiguration', () => {
     expect(parseSiteConfiguration(raw).insights).toEqual({
       enabled: true,
       retentionDays: 90,
+      siteSearch: true,
       weakScore: 0.25,
     });
     for (const weakScore of [-0.1, 1.5, '0.2']) {

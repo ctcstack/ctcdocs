@@ -510,6 +510,7 @@ export async function writeBuildOutput({
         enabled: mcp && site.insights?.enabled === true,
         retentionDays:
           site.insights?.retentionDays ?? INSIGHTS_DEFAULTS.retentionDays,
+        siteSearch: site.insights?.siteSearch ?? INSIGHTS_DEFAULTS.siteSearch,
         ...(site.insights?.weakScore === undefined
           ? {}
           : { weakScore: site.insights.weakScore }),
