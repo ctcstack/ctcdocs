@@ -274,6 +274,22 @@ function resolveFolder(
 }
 
 /**
+ * Whether a folder name keeps a call to a folder, read as the tools read it:
+ * one that resolves to the top level keeps to nothing, and one that names
+ * no folder the reader may open keeps to none.
+ */
+export function keepsToFolder(
+  access: DocumentAccess,
+  folder: FolderName | undefined,
+): boolean {
+  if (folder === undefined) {
+    return false;
+  }
+  const segments = resolveFolder(readableDocuments(access), folder);
+  return segments === undefined || segments.length > 0;
+}
+
+/**
  * The reader's documents as narrowed: all of them when nothing narrows.
  * Checking the date first, so a date the server cannot read is refused
  * whatever the folder.

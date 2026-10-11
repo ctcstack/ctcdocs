@@ -15,7 +15,14 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const project = fileURLToPath(new URL('./project/', import.meta.url));
-const wrangler = join(project, 'node_modules', '.bin', 'wrangler');
+// Run by Node itself, so it starts on every platform the same way.
+const wrangler = join(
+  project,
+  'node_modules',
+  'wrangler',
+  'bin',
+  'wrangler.js',
+);
 const persist = mkdtempSync(join(tmpdir(), 'ctcdocs-state-'));
 
 const AT = "'2026-10-12T09:30:00.000Z'";
@@ -38,8 +45,10 @@ const KEPT = [
   `INSERT INTO site_searches (at, query, classes, results, opened)
    VALUES (${AT}, 'leave policy', '["members"]', 0, '/handbook/');`,
   report('2026-10-05'),
-  // Retention's own statement, as the schedule runs it.
+  // Retention's statements, as the schedule runs them: a report goes by the
+  // Monday of its week, against a cutoff in time.
   `DELETE FROM mcp_calls WHERE at < '2026-01-01T00:00:00.000Z';`,
+  `DELETE FROM reports WHERE week < '2026-01-01T00:00:00.000Z';`,
 ];
 
 /** Rows the checks exist to refuse, each on its own. */
@@ -57,8 +66,16 @@ const REFUSED = {
 
 const run = (args) =>
   execFileSync(
-    wrangler,
-    [...args, '--env', 'production', '--local', '--persist-to', persist],
+    process.execPath,
+    [
+      wrangler,
+      ...args,
+      '--env',
+      'production',
+      '--local',
+      '--persist-to',
+      persist,
+    ],
     { cwd: project, stdio: 'pipe', encoding: 'utf8' },
   );
 
@@ -69,7 +86,13 @@ try {
     try {
       run(['d1', 'execute', 'KB_STATE_DB', '--command', statement]);
       return true;
-    } catch {
+    } catch (error) {
+      // Refused by a check, and by nothing else: a failure of Wrangler
+      // itself must not pass for one.
+      const output = `${error.stdout ?? ''}${error.stderr ?? ''}`;
+      if (!/CHECK constraint failed/u.test(output)) {
+        throw error;
+      }
       return false;
     }
   });

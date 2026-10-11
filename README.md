@@ -61,7 +61,7 @@ wrong tool, and it is cheaper to find that out now:
 - A private deployment's readers sign in with **Google Workspace** accounts,
   and its folder rules name **Google groups**. Reading group membership needs
   a Workspace super administrator to create a read-only admin role, once.
-- **Node 22.12 or newer** (below 23) and **pnpm 11**.
+- **Node 22.13 or newer** (below 23) and **pnpm 11**.
 
 Standing a project up involves a Google Workspace administrator and a
 Cloudflare account. Neither is fast to arrange, so start them early. Every step,
