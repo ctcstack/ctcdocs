@@ -68,14 +68,18 @@ library, the adapter and that step, and nothing else.
   a folder without a rule is closed to all but administrators, and a move in
   Drive never gives a document readers it did not have until a rule on its new
   place is confirmed.
-- Do not add server-side rendering, a database, or an LLM content
-  transformation. The Worker decides who may read a file; it serves pages and
-  files as built and never changes one. Its state is the directory snapshot,
-  the groups' pins and the machine keys in KV and, when the MCP server is on
-  (ADR-041), the OAuth library's own KV namespace and a copy of each
-  document's Markdown in R2, which AI Search indexes, beside a marker of the
-  build it holds. Neither the bucket nor the index decides access: the access
-  map does, on every request.
+- Do not add server-side rendering or an LLM content transformation. The
+  Worker decides who may read a file; it serves pages and files as built and
+  never changes one. Its state is the directory snapshot, the groups' pins and
+  the machine keys in KV and, when the MCP server is on (ADR-041), the OAuth
+  library's own KV namespace and a copy of each document's Markdown in R2,
+  which AI Search indexes, beside a marker of the build it holds. Neither the
+  bucket nor the index decides access: the access map does, on every request.
+- The Worker may keep operational state in one D1 database (ADR-050): records
+  of use and editors' workflow state. Never document content, never an access
+  decision, never a reader's identity, and never in the request's path: a
+  failed write is dropped and logged. The platform owns the schema as
+  append-only migrations and the retention of every record.
 - Do not broaden scope to Slides, comments, suggestions, webhooks, or
   bidirectional editing. Spreadsheets are published as tables (ADR-046);
   a video or audio file gets a page from its Drive metadata and plays in
@@ -165,6 +169,9 @@ Flag, and do not merge:
   split without a test that would fail if it admitted the wrong reader;
 - a built file the access map does not place, or text that reaches a wider
   class than the document it came from;
+- document content, an access decision or a reader's identity in the D1
+  database, a read of it that admits anyone to anything, or a write in a
+  request's path that can fail or slow the response;
 - a workflow exposing credentials to a pull request or taking permissions
   broader than its job needs;
 - a deployment value written into source, tests, workflows or documentation
