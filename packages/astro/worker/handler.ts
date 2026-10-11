@@ -27,7 +27,7 @@ import {
   type AgentOAuth,
   type AuthorizeContext,
 } from './agents/authorize.js';
-import type { DocumentIndex } from './agents/documents.js';
+import type { DocumentIndex, DocumentStore } from './agents/documents.js';
 import { serveMcp } from './agents/tools.js';
 import {
   groupsFor,
@@ -87,12 +87,12 @@ interface WorkerSecrets {
 }
 
 /**
- * The MCP server's parts that are Cloudflare's (ADR-041): its OAuth library
- * and the AI Search index. The bucket the index reads is the scheduled
- * publication's alone (ADR-048).
+ * The MCP server's parts that are Cloudflare's (ADR-041): its OAuth library,
+ * the bucket holding each document's Markdown, and the AI Search index.
  */
 export interface AgentContext {
   readonly oauth: (origin: string) => AgentOAuth;
+  readonly store: DocumentStore;
   readonly index: DocumentIndex;
 }
 
@@ -355,8 +355,8 @@ async function serveAgent(
     reader,
     stale: !snapshot || isStale(snapshot, gate.now),
     origin: gate.origin,
+    store: agents.store,
     index: agents.index,
-    assets: context.assets,
     log: context.log,
   });
 }

@@ -7,10 +7,9 @@
  * classes, and every result, and every document read, is judged again by the
  * build's own list of documents, which the Worker is bundled with. A short ID
  * the build does not list does not exist, its class is the one the build gives
- * its Markdown address. `fetch` reads the document's text from the build's own
- * Markdown version, never from the bucket, whose copy is written for the index
- * (ADR-048). An index that lags a deploy, or runs ahead of a rollback, can
- * hide a document for a while, never open one.
+ * its Markdown address, and an object is read only while it holds exactly the
+ * build's text. A store or an index that lags a deploy, or runs ahead of a
+ * rollback, can hide a document for a while, never open one.
  *
  * Search returns the passages that matched (ADR-042). A chunk counts only
  * when its document is one the reader may open and the class the chunk
@@ -44,8 +43,6 @@ import {
   type AgentSearchSettings,
 } from '../access-map.js';
 import { mayRead, type Reader } from '../decide.js';
-import { sitePath } from '../paths.js';
-import { documentText } from './document-text.js';
 import { FILTER_VALUES } from './search-filter.js';
 
 /** The part of an R2 bucket the server uses. */
@@ -153,18 +150,13 @@ export function readableClasses(
     .sort();
 }
 
-/** The build's static assets, which hold every page's Markdown version. */
-interface BuiltAssets {
-  fetch(request: Request): Promise<Response>;
-}
-
 export interface DocumentAccess {
   readonly map: AccessMapFile;
   readonly reader: Reader;
   readonly stale: boolean;
   readonly origin: string;
+  readonly store: DocumentStore;
   readonly index: DocumentIndex;
-  readonly assets: BuiltAssets;
 }
 
 /** The build's entry for a short ID, when it lists one the reader may open. */
@@ -910,16 +902,12 @@ export async function fetchDocument(
   if (!document || limit === undefined) {
     return undefined;
   }
-  // This build's text, whatever the bucket holds (ADR-048).
-  const response = await access.assets.fetch(
-    new Request(new URL(sitePath(document.markdown), access.origin), {
-      redirect: 'manual',
-    }),
-  );
-  const text = response.ok ? documentText(await response.text()) : undefined;
-  if (text === undefined) {
+  const object = await access.store.get(documentKey(id));
+  // Another build's text, until the schedule publishes this one.
+  if (!object || object.customMetadata?.hash !== document.hash) {
     return undefined;
   }
+  const text = await object.text();
   const url = permanentLink(access.origin, id);
   const truncated = text.length > limit;
   return {

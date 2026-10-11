@@ -199,7 +199,7 @@ function server(context: ToolContext): McpServer {
   const site = map.site.title;
   const about = map.site.description ? ` ${map.site.description}.` : '';
   const language = map.site.language;
-  // The index stems and reranks the documents' language best (ADR-048).
+  // The index stems and reranks the documents' language best.
   const inLanguage = language
     ? ` Documents are written in ${language}: search in ${language}, translating a question asked in another language, since a query in the documents' own language finds more.`
     : '';

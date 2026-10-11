@@ -9,13 +9,7 @@ All three packages share a version and are released together.
 - **Assistants search in the documents' language.** A project that sets
   `mcp.language`, such as `en`, has the MCP server's instructions, the
   `search` description and its query field tell an assistant that the
-  documents are written in it and that a query in it finds more (ADR-048).
-- **The indexed copy says where each section sits.** The copy of each
-  document in R2 names its folders and title above the text, and under each
-  heading the title and the headings the section sits under, so a chunk cut
-  from the middle of a document still says what it is about. The build lists
-  each document's headings in the catalog; the Worker writes the lines
-  (ADR-048).
+  documents are written in it and that a query in it finds more.
 - **Content health names near-duplicate documents.** A document whose text is
   at least 80% the same as another's, or stands 95% inside a longer one, is
   noted under Fix next with the other named (ADR-049).
@@ -24,20 +18,11 @@ All three packages share a version and are released together.
   Improve with the day of its last edit; `sync.staleFolders` gives a folder
   its own line, 0 for none (ADR-049).
 
-### Changed
-
-- **`fetch` reads the build, not the bucket.** It returns a document's
-  Markdown version from the build's static assets, so the indexed copy's
-  lines never reach an assistant, and a bucket that lags a deploy or a
-  rollback no longer makes it refuse a document.
-
 ### Upgrade note
 
 Bump the packages and the workflow pins, set `mcp.language` if the documents
-are in one language, and deploy. Every document's hash
-changes, so the Worker rewrites every object in R2 once and AI Search
-reindexes the corpus: about one full corpus of ingestion tokens. The two
-notes appear after the next sync.
+are in one language, and deploy. Nothing in R2 or the search index changes.
+The two notes appear after the next sync.
 
 ## 0.22.3
 

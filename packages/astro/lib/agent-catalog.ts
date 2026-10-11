@@ -7,12 +7,10 @@
  * that would change the stored object. The Worker compares those hashes with
  * the bucket and rewrites only what changed; the digest tells it, cheaply,
  * whether anything did. The object holds the projection without its front
- * matter (ADR-042), with where each section sits written in (ADR-048), so the
- * hash is of that text, its folders and the shape of the copy, and a sync
- * that touches only the front matter rewrites nothing. Each entry also names
- * the folders the document sits in, the source it is published from and its
- * headings, which the tools and the indexed copy use and the bucket does not
- * hold.
+ * matter (ADR-042), so the hash is of that text, and a sync that touches only
+ * the front matter rewrites nothing. Each entry also names the folders the
+ * document sits in and the source it is published from, which the tools
+ * return with it and the bucket does not hold.
  */
 import { createHash } from 'node:crypto';
 
@@ -27,12 +25,8 @@ import {
 } from '@ctcstack/ctcdocs-core/document-format';
 
 import type { AgentDocument } from '../worker/access-map.js';
-import {
-  documentText,
-  INDEXED_COPY_VERSION,
-} from '../worker/agents/document-text.js';
+import { documentText } from '../worker/agents/document-text.js';
 import type { BuiltPage, FileClass } from './access-map.js';
-import { agentOutline } from './agent-outline.js';
 
 export interface AgentCatalog {
   readonly digest: string;
@@ -95,31 +89,19 @@ export async function buildAgentCatalog({
     const title = document.title ?? document.slug;
     const page = pageAt.get(`/${document.slug}/`);
     const format = documentFormatOf(page?.source, page?.media) ?? 'google-doc';
-    const path = folderPath(document, folders);
-    const outline = agentOutline(text, title);
     listed.push({
       id: document.shortId,
       title,
       markdown,
       modified: document.modified ?? null,
-      path,
+      path: folderPath(document, folders),
       source: document.source ?? null,
       format: agentDocumentFormat(format),
       ...(format === 'pdf' && page?.pdfPages !== undefined
         ? { pages: page.pdfPages }
         : {}),
       characters: text.length,
-      ...(outline.length > 0 ? { outline } : {}),
-      hash: sha256(
-        JSON.stringify([
-          text,
-          fileClass,
-          title,
-          path,
-          outline,
-          INDEXED_COPY_VERSION,
-        ]),
-      ),
+      hash: sha256(JSON.stringify([text, fileClass, title])),
     });
   }
   listed.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
