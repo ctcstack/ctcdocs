@@ -241,7 +241,7 @@ export function formatReport(report, titles = new Map()) {
     `  Calls: ${Object.entries(use.calls)
       .map(([tool, count]) => `${tool} ${count}`)
       .join(', ')}`,
-    `  Clients: ${use.clients.map((entry) => `${shown(entry.client ?? 'unnamed')} ${entry.calls}`).join(', ') || 'none'}`,
+    `  Clients: ${use.clients.map((entry) => `${shown(entry.client ?? 'unnamed')} ${entry.calls}`).join(', ') || 'none'}${use.otherClients ? `, others ${use.otherClients}` : ''}`,
     `  Search latency: median ${use.searchLatencyMs.median ?? '-'} ms, 95th percentile ${use.searchLatencyMs.p95 ?? '-'} ms`,
     `  Characters per answer (median): ${Object.entries(use.characters)
       .map(([tool, count]) => `${tool} ${count ?? '-'}`)
@@ -359,8 +359,14 @@ export async function runInsights(
   return report;
 }
 
-/** The real place of a path whose file may not exist yet: its folder's. */
+/**
+ * The real place of a path: the file's own, through every link, when it
+ * exists; its folder's, when it does not yet.
+ */
 function realPlace(path) {
+  if (existsSync(path)) {
+    return realpathSync(path);
+  }
   let folder = dirname(path);
   const rest = [basename(path)];
   while (!existsSync(folder) && dirname(folder) !== folder) {

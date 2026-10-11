@@ -6,7 +6,9 @@
  *
  * A report names documents by short ID, classes by the access map's names
  * and clients by their labels; the only text in it is the queries. It is
- * bounded: the groups it lists, and the queries each holds, are capped.
+ * bounded: the groups it lists, and the queries, classes, clients and
+ * documents each holds, are capped, as are the clients its use names, so it
+ * stays well under the size of a D1 row whatever the week held.
  *
  * What counts as not found: an MCP search with no result, or whose best
  * result scores under the weak line, and a site search with no result. A
@@ -65,7 +67,7 @@ interface QueryGroup {
     readonly query: string;
     readonly count: number;
   }[];
-  /** How many of its searches could read each class. */
+  /** How many of its searches could read each class, for the classes most. */
   readonly classes: Readonly<Record<string, number>>;
   readonly clients: readonly {
     readonly client: string | null;
@@ -110,10 +112,12 @@ export interface WeeklyReport extends ReportWeek {
   }[];
   readonly use: {
     readonly calls: Readonly<Record<McpTool, number>>;
+    /** The clients that called most, and the calls of all the others. */
     readonly clients: readonly {
       readonly client: string | null;
       readonly calls: number;
     }[];
+    readonly otherClients: number;
     readonly searchLatencyMs: {
       readonly median: number | null;
       readonly p95: number | null;
@@ -134,6 +138,9 @@ const ASKED_MOST_GROUPS = 20;
 const QUERIES_PER_GROUP = 10;
 const DOCUMENTS_PER_GROUP = 5;
 const CLIENTS_PER_GROUP = 10;
+const CLASSES_PER_GROUP = 10;
+/** Clients the use lists by name; the rest are counted together. */
+const CLIENTS = 20;
 const FOUND_NOT_READ = 20;
 /** A document must be returned this often before its reading is judged. */
 const MIN_APPEARANCES = 5;
@@ -313,7 +320,11 @@ function describeGroup(members: readonly Asked[]): QueryGroup {
     queries: ranked(queries)
       .slice(0, QUERIES_PER_GROUP)
       .map(([query, count]) => ({ query, count })),
-    classes: Object.fromEntries([...classes].sort(([a], [b]) => byText(a, b))),
+    classes: Object.fromEntries(
+      ranked(classes)
+        .slice(0, CLASSES_PER_GROUP)
+        .sort(([a], [b]) => byText(a, b)),
+    ),
     clients: ranked(clients)
       .slice(0, CLIENTS_PER_GROUP)
       .map(([client, count]) => ({ client, count })),
@@ -461,10 +472,12 @@ export function weeklyReport({
       calls: Object.fromEntries(
         TOOLS.map((tool) => [tool, byTool(tool).length]),
       ) as Record<McpTool, number>,
-      clients: ranked(clients).map(([client, count]) => ({
-        client,
-        calls: count,
-      })),
+      clients: ranked(clients)
+        .slice(0, CLIENTS)
+        .map(([client, count]) => ({ client, calls: count })),
+      otherClients: ranked(clients)
+        .slice(CLIENTS)
+        .reduce((sum, [, count]) => sum + count, 0),
       searchLatencyMs: {
         median: percentile(searchLatency, 0.5),
         p95: percentile(searchLatency, 0.95),

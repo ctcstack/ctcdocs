@@ -1053,6 +1053,42 @@ test('the content health page shows admins what people could not find', async ({
   await expectNoAccessibilityViolations(page);
 });
 
+test('the report says when it is partial, and claims nothing of the rest', async ({
+  page,
+}) => {
+  test.skip(
+    siteConfiguration.insights?.enabled !== true,
+    'The project does not record what is asked.',
+  );
+  await page.route('**/_kb/insights.json', (route) =>
+    route.fulfill({
+      json: {
+        report: {
+          week: '2026-10-05',
+          records: { mcpCalls: 50_000, truncated: true, unreadable: 2 },
+          notFound: [],
+          foundNotRead: [],
+          use: {
+            notFound: {
+              mcp: { searches: 30_000, notFound: 0, share: 0 },
+              site: { searches: 0, notFound: 0, share: null },
+            },
+          },
+        },
+        documents: {},
+      },
+    }),
+  );
+  await page.goto('/content-health/');
+  const section = page.getByRole('region', {
+    name: 'What people could not find',
+  });
+  await expect(section).toContainText('these are the first of them');
+  await expect(section).toContainText('2 records could not be read');
+  await expect(section).not.toContainText('Nothing asked went unfound');
+  await expectNoAccessibilityViolations(page);
+});
+
 test('a settled site search is reported once, with the result opened', async ({
   page,
 }) => {

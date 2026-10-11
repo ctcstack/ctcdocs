@@ -154,8 +154,10 @@ The report holds:
   searches, so a week with fewer than five has none; a search scoring as
   the fifth's last does is as weak.
 - **Bounds.** Fifty groups of what was not found, the twenty asked most,
-  ten queries and five documents a group, twenty documents found and not
-  read, each returned at least five times. At most 50,000 records of each
+  ten queries, classes, clients and five documents a group, twenty
+  documents found and not read, each returned at least five times, and
+  twenty clients by name, the rest counted together. So a report stays far
+  under a D1 row; one past a megabyte is a fault, logged and not kept. At most 50,000 records of each
   table are read, and the report says when a week held more, and how many
   records it could not read.
 - **Names.** Documents by short ID, classes by the access map's names,
@@ -181,7 +183,9 @@ stale, and never to a machine key. Off, the feature answers an admin 404;
 unbound, the database 503; with no week reported yet, a report of `null`.
 Its answer names each document the report names by its title and permanent
 link, from the build the Worker serves, so the stored report keeps no
-title. The page sets every query as text, never as markup. Since only
+title. The page sets every query as text, never as markup, and says when a report
+is partial, of a week it could not read whole, rather than that nothing
+went unfound. Since only
 admins read the report, `insights.enabled` needs `access.admins`.
 
 A CLI, `ctcdocs-insights`, prints the same report from the database for

@@ -318,6 +318,41 @@ describe('use', () => {
   });
 });
 
+describe('bounds', () => {
+  it('names twenty clients, and counts the calls of the rest', () => {
+    const calls = Array.from({ length: 25 }, (_, index) =>
+      Array.from({ length: 25 - index }, () =>
+        call({ client: `client ${String(index).padStart(2, '0')}` }),
+      ),
+    ).flat();
+    const made = report(calls);
+    expect(made.use.clients).toHaveLength(20);
+    expect(made.use.clients[0]).toEqual({ client: 'client 00', calls: 25 });
+    // Clients 20 to 24 called 5, 4, 3, 2 and 1 times.
+    expect(made.use.otherClients).toBe(15);
+  });
+
+  it('stays far under a D1 row, whatever the week held', () => {
+    // As many records as a report reads, each its own client, class set and
+    // longest query of four-byte characters: the reviewer's worst week.
+    const long = (index: number) =>
+      `${'😀'.repeat(190)}${String(index).padStart(10, '0')}`;
+    const calls = Array.from({ length: 50_000 }, (_, index) =>
+      miss(long(index % 5_000), {
+        client: `client-${String(index).padStart(57, '0')}`,
+        classes: Array.from(
+          { length: 40 },
+          (_, cls) => `${(index + cls).toString(16).padStart(8, '0')}`,
+        ),
+      }),
+    );
+    const bytes = new TextEncoder().encode(
+      JSON.stringify(report(calls)),
+    ).byteLength;
+    expect(bytes).toBeLessThan(1_000_000);
+  });
+});
+
 describe('the report', () => {
   it('is the same for the same records, in any order', () => {
     const calls = [

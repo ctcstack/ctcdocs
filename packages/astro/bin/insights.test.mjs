@@ -7,6 +7,7 @@ import {
   readFile,
   rm,
   symlink,
+  writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -213,6 +214,32 @@ test('writes misses as candidate questions, never into the evaluation set', asyn
       );
     }
     assert.deepEqual(reads, []);
+
+    // An evaluation set that is itself a link: its real file is the set.
+    const linked = join(directory, 'linked');
+    await mkdir(join(linked, 'evaluation'), { recursive: true });
+    await copyFile(
+      join(PROJECT, 'site.config.json'),
+      join(linked, 'site.config.json'),
+    );
+    const real = join(directory, 'questions-kept-elsewhere.json');
+    await writeFile(real, '{"questions":[]}\n');
+    await symlink(real, join(linked, 'evaluation', 'search-questions.json'));
+    for (const path of [
+      real,
+      join(linked, 'evaluation', 'search-questions.json'),
+    ]) {
+      await assert.rejects(
+        runInsights(['--questions', path], {
+          cwd: linked,
+          now: NOW,
+          execute,
+          write: () => undefined,
+        }),
+        /never into evaluation\/search-questions\.json/u,
+      );
+    }
+    assert.equal(await readFile(real, 'utf8'), '{"questions":[]}\n');
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

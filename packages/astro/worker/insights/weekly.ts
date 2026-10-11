@@ -24,6 +24,11 @@ import {
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Rows of each table a report reads at most; past it, it says so. */
 const REPORT_ROWS = 50_000;
+/**
+ * Bytes a kept report may take: half of a D1 row's limit. The report's
+ * bounds keep it far under; one past this is a fault, logged, not kept.
+ */
+const REPORT_BYTES = 1_000_000;
 
 /** The week before the one `now` falls in, Monday to Monday, in UTC. */
 export function lastWeek(now: number): ReportWeek {
@@ -240,12 +245,19 @@ export async function reportLastWeek({
     if (!report) {
       return;
     }
+    const text = JSON.stringify(report);
+    const bytes = new TextEncoder().encode(text).byteLength;
+    if (bytes > REPORT_BYTES) {
+      throw new RangeError(
+        `The report of ${report.week} takes ${bytes} bytes, more than ${REPORT_BYTES}.`,
+      );
+    }
     // Two runs at once keep the first report; the second changes nothing.
     const { meta } = await database
       .prepare(
         'INSERT INTO reports (week, at, report) VALUES (?, ?, ?) ON CONFLICT (week) DO NOTHING',
       )
-      .bind(report.week, report.made, JSON.stringify(report))
+      .bind(report.week, report.made, text)
       .run();
     if (meta.changes === 0) {
       return;

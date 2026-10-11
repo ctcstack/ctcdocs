@@ -39,6 +39,10 @@ interface InsightsView {
   readonly notFound: number;
   readonly siteSearches: number;
   readonly siteNotFound: number;
+  /** Whether the week held more records than the report read. */
+  readonly truncated: boolean;
+  /** Records the report could not read. */
+  readonly unreadable: number;
   readonly groups: readonly MissedGroup[];
   readonly unread: readonly (NamedDocument & {
     readonly appearances: number;
@@ -125,6 +129,7 @@ export function parseInsights(body: unknown): InsightsAnswer | undefined {
     return undefined;
   }
   const use = isRecord(report.use) ? report.use : {};
+  const records = isRecord(report.records) ? report.records : {};
   const notFound = isRecord(use.notFound) ? use.notFound : {};
   const mcp = share(notFound.mcp);
   const site = share(notFound.site);
@@ -136,6 +141,8 @@ export function parseInsights(body: unknown): InsightsAnswer | undefined {
       notFound: mcp.notFound,
       siteSearches: site.searches,
       siteNotFound: site.notFound,
+      truncated: records.truncated === true,
+      unreadable: isCount(records.unreadable) ? records.unreadable : 0,
       groups: list(report.notFound).flatMap((entry) => {
         const parsed = group(entry, documents);
         return parsed ? [parsed] : [];
