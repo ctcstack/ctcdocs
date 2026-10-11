@@ -154,7 +154,7 @@ describe('the migrations', () => {
       '["team@example.com"]',
       '["Engineering"]',
       '["members", "x"]',
-      `[${'"a",'.repeat(600)}"a"]`,
+      `[${'"a",'.repeat(2100)}"a"]`,
     ]) {
       expect(() => insert('q', '[]', { classes })).toThrow(/CHECK/u);
     }

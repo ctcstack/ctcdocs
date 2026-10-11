@@ -23,7 +23,7 @@ CREATE TABLE mcp_calls (
     json_valid(classes)
     AND json_type(classes) = 'array'
     AND json_array_length(classes) >= 1
-    AND length(classes) <= 2048
+    AND length(classes) <= 8192
     AND classes NOT GLOB '*[^],"0-9a-z[]*'
   ),
   client TEXT CHECK (length(client) <= 64),
@@ -78,7 +78,7 @@ CREATE TABLE site_searches (
     json_valid(classes)
     AND json_type(classes) = 'array'
     AND json_array_length(classes) >= 1
-    AND length(classes) <= 2048
+    AND length(classes) <= 8192
     AND classes NOT GLOB '*[^],"0-9a-z[]*'
   ),
   results INTEGER NOT NULL CHECK (results >= 0),

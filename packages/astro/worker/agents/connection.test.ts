@@ -137,6 +137,8 @@ let googlePerson: { sub: string; nonce: string };
 let events: Record<string, unknown>[];
 /** The record of calls, when a test turns insights on. */
 let calls: McpCallRecorder | undefined;
+/** Milliseconds the clock has moved past `NOW`, for a test that times a call. */
+let elapsed: number;
 
 function context(map = agentMap): WorkerContext {
   const fetcher = google(() => googlePerson);
@@ -152,7 +154,7 @@ function context(map = agentMap): WorkerContext {
       previousSessionSecret: undefined,
     },
     fetch: fetcher,
-    now: () => NOW,
+    now: () => NOW + elapsed,
     googleKeys: new GoogleKeys(fetcher, () => NOW),
     log: (event) => events.push(event),
     agents: {
@@ -191,15 +193,19 @@ beforeEach(() => {
   googlePerson = { sub: 'user-member', nonce: '' };
   events = [];
   calls = undefined;
+  elapsed = 0;
 });
 
-async function register(redirectUri = CALLBACK): Promise<string> {
+async function register(
+  redirectUri = CALLBACK,
+  name: string | null = 'Example Assistant',
+): Promise<string> {
   const response = await call(
     new Request(`${ORIGIN}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        client_name: 'Example Assistant',
+        ...(name === null ? {} : { client_name: name }),
         redirect_uris: [redirectUri],
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
@@ -267,8 +273,8 @@ async function follow(jar: Jar, response: Response): Promise<Response> {
  * Connects an assistant for `sub`: consent, then the site's own sign-in with
  * Google, which returns to `/auth/connect`. Returns each step and the tokens.
  */
-async function connect(sub: string) {
-  const clientId = await register();
+async function connect(sub: string, name: string | null = 'Example Assistant') {
+  const clientId = await register(CALLBACK, name);
   const jar = new Jar();
   const { handle } = await consent(jar, clientId);
   const approved = await answer(jar, handle);
@@ -1232,6 +1238,40 @@ describe('recording what assistants ask', () => {
     const pending = recordInto(hanging);
     expect(await ask()).toEqual(expected);
     expect(pending).toHaveLength(1);
+  });
+
+  it('labels a client by its name, and one that gave none by nothing', async () => {
+    const database = new MemoryDatabase();
+    const writes = recordInto(database);
+    for (const name of ['Claude <Desktop>', null, '😀']) {
+      const { tokens } = await connect('user-member', name);
+      await tool(tokens.access_token, 'recent', {});
+    }
+    await Promise.all(writes);
+    expect(rowsOf(database).map((row) => row.client)).toEqual([
+      'Claude Desktop',
+      null,
+      null,
+    ]);
+  });
+
+  it('times a call from its start to its answer', async () => {
+    const database = new MemoryDatabase();
+    const writes = recordInto(database);
+    const { tokens } = await connect('user-member');
+    const fixed = index;
+    index = {
+      search: async (...args) => {
+        elapsed += 250;
+        return fixed.search(...args);
+      },
+      sync: () => fixed.sync(),
+    };
+    await tool(tokens.access_token, 'search', { query: 'plan' });
+    await Promise.all(writes);
+    expect(rowsOf(database).map((row) => [row.at, row.latency_ms])).toEqual([
+      [new Date(NOW).toISOString(), 250],
+    ]);
   });
 
   it('records nothing while insights are off', async () => {
