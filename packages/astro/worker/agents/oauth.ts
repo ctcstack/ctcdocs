@@ -97,7 +97,7 @@ export function agentOAuth({
           // The library advertises the required scopes; enforcing them is ours.
           fetch: (_request, _environment, context) =>
             REQUIRED_SCOPES.every((scope) => context.auth.scope.includes(scope))
-              ? handler(context.props.sub)
+              ? handler(context.props)
               : insufficientScope(context.auth, [...REQUIRED_SCOPES]),
         },
       }).fetch(request, env, executionContext),

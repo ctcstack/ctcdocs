@@ -20,6 +20,7 @@ import type {
 } from '@cloudflare/workers-oauth-provider';
 
 import { connectionFailedPage, consentPage } from '../pages.js';
+import { clientLabel } from '../state/mcp-calls.js';
 
 /** Everything the server can grant, and what any access needs. */
 export const SCOPES = ['kb:read', 'offline_access'] as const;
@@ -73,13 +74,18 @@ export interface AgentOAuth {
    */
   protect(
     request: Request,
-    handler: (sub: string) => Promise<Response>,
+    handler: (props: GrantProps) => Promise<Response>,
   ): Promise<Response>;
 }
 
-/** The props a grant stores: the person, and nothing about what they read. */
+/**
+ * The props a grant stores: the person, and nothing about what they read;
+ * and the name the assistant gave, as a label, for the record of its calls
+ * (ADR-051). A grant from before the label has none.
+ */
 export interface GrantProps {
   readonly sub: string;
+  readonly client?: string;
 }
 
 export interface AuthorizeContext {
@@ -164,12 +170,17 @@ async function complete(
   sub: string,
   headers: Headers,
 ): Promise<Response> {
+  // The name only labels the record of calls; a connection never fails on it.
+  const client = await context.oauth.api
+    .describeConsent(request)
+    .then((facts) => clientLabel(facts.clientName))
+    .catch(() => undefined);
   const options: CompleteAuthorizationOptions = {
     request,
     userId: sub,
     metadata: {},
     scope: request.scope,
-    props: { sub } satisfies GrantProps,
+    props: { sub, ...(client ? { client } : {}) } satisfies GrantProps,
   };
   const { redirectTo } = await context.oauth.api.completeAuthorization(options);
   context.log({ event: 'assistant-connected' });

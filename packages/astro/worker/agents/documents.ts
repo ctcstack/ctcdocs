@@ -77,6 +77,8 @@ export interface IndexedChunk {
   readonly text: string;
   /** The class the chunk's object carried when it was indexed. */
   readonly class: string | undefined;
+  /** The reranker's score, 0 to 1, when reranking is on. */
+  readonly score?: number | undefined;
 }
 
 /**
@@ -756,14 +758,29 @@ export async function searchDocuments(
   narrowing: Narrowing = {},
   shape: SearchShape = {},
 ): Promise<SearchResult[]> {
+  return (await scoredSearch(access, query, narrowing, shape)).results;
+}
+
+/**
+ * A search, with the best reranker score among the chunks that counted: a
+ * chunk the reader may not read, or of a document past the results, never
+ * lends it its score (ADR-051).
+ */
+export async function scoredSearch(
+  access: DocumentAccess,
+  query: string,
+  narrowing: Narrowing = {},
+  shape: SearchShape = {},
+): Promise<{ results: SearchResult[]; topScore: number | undefined }> {
   const { map, reader, stale, origin, index } = access;
   // Read first, so a date the server cannot read is refused before searching.
   const openable = narrows(narrowing) ? readableDocuments(access) : undefined;
   const matching = openable && narrowed(openable, narrowing);
   const settings = map.agents?.search;
   const classes = readableClasses(map, reader, stale);
+  const none = { results: [], topScore: undefined };
   if (!settings || classes.length === 0 || query.trim().length === 0) {
-    return [];
+    return none;
   }
   // Kept to what the reader may open that matches; the index is asked for
   // those, or for all but the rest, when either fits its filter.
@@ -772,7 +789,7 @@ export async function searchDocuments(
   if (openable && matching) {
     const inside = matching.map((document) => document.id);
     if (inside.length === 0) {
-      return [];
+      return none;
     }
     kept = new Set(inside);
     const outside = openable
@@ -797,6 +814,7 @@ export async function searchDocuments(
   // such chunk, in the order the index ranked them.
   const found = new Map<string, AgentDocument>();
   const ranked: { readonly id: string; readonly text: string }[] = [];
+  let topScore: number | undefined;
   for (const chunk of await index.search(
     query,
     classes,
@@ -822,13 +840,23 @@ export async function searchDocuments(
       }
       found.set(id, document);
     }
+    if (
+      chunk.score !== undefined &&
+      Number.isFinite(chunk.score) &&
+      (topScore === undefined || chunk.score > topScore)
+    ) {
+      topScore = chunk.score;
+    }
     if (!compact) {
       ranked.push({ id, text: chunk.text.trim() });
     }
   }
 
   if (compact) {
-    return [...found.values()].map((document) => listed(origin, document));
+    return {
+      results: [...found.values()].map((document) => listed(origin, document)),
+      topScore,
+    };
   }
 
   // Whole chunks in the index's order, never cut, while the budget lasts: a
@@ -851,7 +879,7 @@ export async function searchDocuments(
     }
   }
 
-  return [...found].map(([id, document]) => {
+  const results = [...found].map(([id, document]) => {
     const passages = shown.get(id) ?? [];
     const more = (matched.get(id) ?? 0) - passages.length;
     return {
@@ -862,6 +890,7 @@ export async function searchDocuments(
       ...(more > 0 ? { morePassages: more } : {}),
     };
   });
+  return { results, topScore };
 }
 
 export interface FetchedDocument {

@@ -17,9 +17,9 @@ function insertCall(database: MemoryDatabase, at: string): void {
   database.sqlite
     .prepare(
       `INSERT INTO mcp_calls
-        (at, tool, query, class, client, results, top_score, documents,
+        (at, tool, query, classes, client, results, top_score, documents,
          fetched, characters, latency_ms, stale)
-       VALUES (?, 'search', 'leave policy', 'members', 'Claude', 2, 0.71,
+       VALUES (?, 'search', 'leave policy', '["members"]', 'Claude', 2, 0.71,
          '["a1b2c3","d4e5f6"]', NULL, 1800, 420, 0)`,
     )
     .run(at);
@@ -28,8 +28,8 @@ function insertCall(database: MemoryDatabase, at: string): void {
 function insertSearch(database: MemoryDatabase, at: string): void {
   database.sqlite
     .prepare(
-      `INSERT INTO site_searches (at, query, class, results, opened)
-       VALUES (?, 'leave policy', 'members', 0, NULL)`,
+      `INSERT INTO site_searches (at, query, classes, results, opened)
+       VALUES (?, 'leave policy', '["members"]', 0, NULL)`,
     )
     .run(at);
 }
@@ -98,21 +98,21 @@ describe('the migrations', () => {
       documents: string,
       {
         tool = 'search',
-        cls = 'members',
+        classes = '["members"]',
         fetched = null as string | null,
       } = {},
     ) =>
       database.sqlite
         .prepare(
           `INSERT INTO mcp_calls
-            (at, tool, query, class, client, results, top_score, documents,
+            (at, tool, query, classes, client, results, top_score, documents,
              fetched, characters, latency_ms, stale)
            VALUES (?, ?, ?, ?, NULL, 0, NULL, ?, ?, 0, 0, 0)`,
         )
-        .run(ago(1), tool, query, cls, documents, fetched);
+        .run(ago(1), tool, query, classes, documents, fetched);
     const ids = ['a1b2c3', 'd4e5f6', '0123456789', 'abcdef', 'f'.repeat(64)];
     insert('x'.repeat(200), JSON.stringify(ids), {
-      cls: 'f'.repeat(64),
+      classes: '["3f177bba","70d5c845","members"]',
       fetched: 'a1b2c3',
     });
     insert('q', '[]', { fetched: 'f'.repeat(64) });
@@ -145,7 +145,19 @@ describe('the migrations', () => {
       }
     }
     expect(() => insert('q', '[1,null,[]]')).toThrow(/CHECK/u);
-    expect(() => insert('q', '[]', { cls: 'f'.repeat(65) })).toThrow(/CHECK/u);
+    insert('q', '[]', { classes: '["admins"]' });
+    // Only the access map's names: never an address, a group or text.
+    for (const classes of [
+      '[]',
+      '"members"',
+      'members',
+      '["team@example.com"]',
+      '["Engineering"]',
+      '["members", "x"]',
+      `[${'"a",'.repeat(600)}"a"]`,
+    ]) {
+      expect(() => insert('q', '[]', { classes })).toThrow(/CHECK/u);
+    }
     expect(() => insert('x'.repeat(201), '[]')).toThrow(/CHECK/u);
     expect(() => insert('q', '{}')).toThrow(/CHECK/u);
     expect(() => insert('q', 'not json')).toThrow(/CHECK/u);
@@ -154,8 +166,8 @@ describe('the migrations', () => {
     expect(() =>
       database.sqlite
         .prepare(
-          `INSERT INTO site_searches (at, query, class, results)
-           VALUES (?, 'q', 'members', 'many')`,
+          `INSERT INTO site_searches (at, query, classes, results)
+           VALUES (?, 'q', '["members"]', 'many')`,
         )
         .run(ago(1)),
     ).toThrow();

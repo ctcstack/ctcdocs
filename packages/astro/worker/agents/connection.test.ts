@@ -12,10 +12,14 @@ import { GoogleKeys } from '../oidc.js';
 import { fakeGoogle, type FakeGoogle } from '../google-test-support.js';
 import { seal, sealKeys } from '../seal.js';
 import type { DirectorySnapshot } from '../snapshot.js';
+import type { StateDatabase } from '../state/database.js';
+import { MemoryDatabase } from '../state/memory-database.js';
+import { mcpCallRecorder, type McpCallRecorder } from '../state/mcp-calls.js';
 import type { DocumentIndex } from './documents.js';
 import { agentOAuth } from './oauth.js';
 import {
   agentMap,
+  chunkOf,
   FixedIndex,
   ORIGIN,
   publishedStore,
@@ -131,6 +135,8 @@ let kv: MemoryKv;
 let snapshot: DirectorySnapshot | undefined;
 let googlePerson: { sub: string; nonce: string };
 let events: Record<string, unknown>[];
+/** The record of calls, when a test turns insights on. */
+let calls: McpCallRecorder | undefined;
 
 function context(map = agentMap): WorkerContext {
   const fetcher = google(() => googlePerson);
@@ -163,6 +169,7 @@ function context(map = agentMap): WorkerContext {
         }),
       store: publishedStore(),
       index,
+      calls,
     },
   };
 }
@@ -183,6 +190,7 @@ beforeEach(() => {
   snapshot = snapshotWith(['user-member']);
   googlePerson = { sub: 'user-member', nonce: '' };
   events = [];
+  calls = undefined;
 });
 
 async function register(redirectUri = CALLBACK): Promise<string> {
@@ -1015,5 +1023,221 @@ describe('an assistant reading', () => {
     expect(logged).not.toContain('secret plans');
     expect(logged).not.toContain('user-member');
     expect(logged).not.toContain('Handbook');
+  });
+});
+
+describe('recording what assistants ask', () => {
+  /** Turns insights on over `database`; returns the writes to wait for. */
+  function recordInto(database: StateDatabase): Promise<void>[] {
+    const writes: Promise<void>[] = [];
+    calls = mcpCallRecorder({
+      database,
+      schedule: (write) => writes.push(write),
+      log: (event) => events.push(event),
+    });
+    return writes;
+  }
+
+  const rowsOf = (database: MemoryDatabase) =>
+    database.sqlite
+      .prepare('SELECT * FROM mcp_calls ORDER BY id')
+      .all() as Record<string, unknown>[];
+
+  it('records each answered call by the classes read, never the person', async () => {
+    const database = new MemoryDatabase();
+    const writes = recordInto(database);
+    // The team's document scores best, but this reader may not read it.
+    index = new FixedIndex([
+      chunkOf('docs/bbbbbb.md', { score: 0.93 }),
+      chunkOf('docs/aaaaaa.md', { score: 0.42 }),
+    ]);
+    const { tokens } = await connect('user-member');
+    const token = tokens.access_token;
+
+    await tool(token, 'search', { query: 'secret plans' });
+    await tool(token, 'fetch', { id: 'aaaaaa' });
+    await tool(token, 'fetch', { id: 'zzzzzz' });
+    await tool(token, 'browse', {});
+    await tool(token, 'recent', {});
+    await Promise.all(writes);
+
+    const rows = rowsOf(database);
+    expect(
+      rows.map((row) => {
+        const kept: Record<string, unknown> = { ...row };
+        delete kept.id;
+        delete kept.at;
+        delete kept.characters;
+        return { ...kept, answered: (row.characters as number) > 0 };
+      }),
+    ).toEqual([
+      {
+        tool: 'search',
+        query: 'secret plans',
+        classes: '["members"]',
+        client: 'Example Assistant',
+        results: 1,
+        top_score: 0.42,
+        documents: '["aaaaaa"]',
+        fetched: null,
+        latency_ms: 0,
+        stale: 0,
+        answered: true,
+      },
+      {
+        tool: 'fetch',
+        query: null,
+        classes: '["members"]',
+        client: 'Example Assistant',
+        results: 1,
+        top_score: null,
+        documents: '["aaaaaa"]',
+        fetched: 'aaaaaa',
+        latency_ms: 0,
+        stale: 0,
+        answered: true,
+      },
+      {
+        tool: 'fetch',
+        query: null,
+        classes: '["members"]',
+        client: 'Example Assistant',
+        results: 0,
+        top_score: null,
+        documents: '[]',
+        fetched: null,
+        latency_ms: 0,
+        stale: 0,
+        answered: false,
+      },
+      {
+        tool: 'browse',
+        query: null,
+        classes: '["members"]',
+        client: 'Example Assistant',
+        results: 1,
+        top_score: null,
+        documents: '["aaaaaa"]',
+        fetched: null,
+        latency_ms: 0,
+        stale: 0,
+        answered: true,
+      },
+      {
+        tool: 'recent',
+        query: null,
+        classes: '["members"]',
+        client: 'Example Assistant',
+        results: 1,
+        top_score: null,
+        documents: '["aaaaaa"]',
+        fetched: null,
+        latency_ms: 0,
+        stale: 0,
+        answered: true,
+      },
+    ]);
+    expect(rows.every((row) => row.at === new Date(NOW).toISOString())).toBe(
+      true,
+    );
+    const recorded = JSON.stringify(rows);
+    for (const identity of [
+      'user-member',
+      '@example.com',
+      'team@example.com',
+      'zzzzzz',
+      'Handbook',
+      'bbbbbb',
+    ]) {
+      expect(recorded).not.toContain(identity);
+    }
+  });
+
+  it('takes the classes from the access decision of each request', async () => {
+    const database = new MemoryDatabase();
+    const writes = recordInto(database);
+    snapshot = snapshotWith(['user-member'], ['user-member']);
+    const { tokens } = await connect('user-member');
+    const token = tokens.access_token;
+
+    await tool(token, 'search', { query: 'plan' });
+    // Out of the team: the next call reads, and is named, as a member.
+    snapshot = snapshotWith(['user-member']);
+    await tool(token, 'search', { query: 'plan' });
+    // Back in the team, but the directory is three hours old.
+    snapshot = snapshotWith(['user-member'], ['user-member'], 3 * 60 * 60_000);
+    await tool(token, 'search', { query: 'plan' });
+    await Promise.all(writes);
+
+    expect(
+      rowsOf(database).map(({ classes, documents, stale }) => ({
+        classes,
+        documents,
+        stale,
+      })),
+    ).toEqual([
+      {
+        classes: '["members","team0001"]',
+        documents: '["aaaaaa","bbbbbb"]',
+        stale: 0,
+      },
+      { classes: '["members"]', documents: '["aaaaaa"]', stale: 0 },
+      { classes: '["members"]', documents: '["aaaaaa"]', stale: 1 },
+    ]);
+  });
+
+  it('answers the same whether the write succeeds, fails or never ends', async () => {
+    const { tokens } = await connect('user-member');
+    const token = tokens.access_token;
+    const ask = async () => {
+      const answer = await tool(token, 'search', { query: 'plan' });
+      return { status: answer.status, result: answer.body.result };
+    };
+    const expected = await ask();
+    expect(expected.result?.structuredContent).toMatchObject({
+      results: [{ id: 'aaaaaa' }],
+    });
+
+    const working = new MemoryDatabase();
+    const writes = recordInto(working);
+    expect(await ask()).toEqual(expected);
+    await Promise.all(writes);
+    expect(rowsOf(working)).toHaveLength(1);
+
+    const failing: StateDatabase = {
+      prepare: () => {
+        throw new Error('D1_ERROR: no such table: mcp_calls');
+      },
+      batch: () => Promise.reject(new Error('unused')),
+    };
+    const failed = recordInto(failing);
+    expect(await ask()).toEqual(expected);
+    await Promise.all(failed);
+    expect(events).toContainEqual({
+      event: 'state-write-failed',
+      table: 'mcp_calls',
+      error: 'D1_ERROR: no such table: mcp_calls',
+    });
+
+    // A write that never ends neither holds the answer nor changes it.
+    const hanging: StateDatabase = {
+      prepare: () => ({
+        bind() {
+          return this;
+        },
+        run: () => new Promise(() => undefined),
+      }),
+      batch: () => new Promise(() => undefined),
+    };
+    const pending = recordInto(hanging);
+    expect(await ask()).toEqual(expected);
+    expect(pending).toHaveLength(1);
+  });
+
+  it('records nothing while insights are off', async () => {
+    const { tokens } = await connect('user-member');
+    const answer = await tool(tokens.access_token, 'search', { query: 'x' });
+    expect(answer.status).toBe(200);
+    expect(JSON.stringify(events)).not.toContain('state-');
   });
 });

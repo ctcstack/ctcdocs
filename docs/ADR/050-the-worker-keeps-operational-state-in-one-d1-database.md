@@ -51,8 +51,9 @@ bound as `KB_STATE_DB`. Operational state means:
   to anything, and a row naming a class never widens what that class reads.
 - **Never a reader's identity.** The rule that no reader's address, ID or
   group membership is logged applies to the database as to logs: a record of
-  use names an access class, not a person. Workflow state may name the admin
-  or editor who set it, because that is the state itself.
+  use names the access classes the reader may read, never a person or a
+  group (ADR-051 weighs what a set of classes says). Workflow state may name
+  the admin or editor who set it, because that is the state itself.
 - **Never in the request's path.** A write that fails is dropped and logged as
   an event; it never fails or slows the response to a reader or an assistant.
   Writes happen in `waitUntil`.

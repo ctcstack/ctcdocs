@@ -26,6 +26,7 @@ import {
   type DirectorySnapshot,
 } from './snapshot.js';
 import type { StateDatabase } from './state/database.js';
+import { mcpCallRecorder } from './state/mcp-calls.js';
 import { expireOnSchedule } from './state/retention.js';
 
 /** The part of an AI Search instance binding the Worker uses. */
@@ -46,6 +47,7 @@ interface AiSearch {
     chunks?: {
       text?: string;
       item: { key: string; metadata?: Record<string, unknown> };
+      scoring_details?: { reranking_score?: number };
     }[];
   }>;
   readonly jobs: { create(): Promise<unknown> };
@@ -113,10 +115,12 @@ function documentIndex(search: AiSearch): DocumentIndex {
       });
       return (response.chunks ?? []).map((chunk) => {
         const cls = chunk.item.metadata?.class;
+        const score = chunk.scoring_details?.reranking_score;
         return {
           key: chunk.item.key,
           text: chunk.text ?? '',
           class: typeof cls === 'string' ? cls : undefined,
+          score: typeof score === 'number' ? score : undefined,
         };
       });
     },
@@ -145,6 +149,15 @@ function agentsFor(
       }),
     store: KB_DOCUMENTS,
     index: documentIndex(KB_SEARCH),
+    // Recorded only while insights are on and the database is bound.
+    calls:
+      accessMap.site.insights.enabled && env.KB_STATE_DB
+        ? mcpCallRecorder({
+            database: env.KB_STATE_DB,
+            schedule: (write) => ctx.waitUntil(write),
+            log,
+          })
+        : undefined,
   };
 }
 
