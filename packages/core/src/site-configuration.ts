@@ -15,6 +15,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import {
+  isDriveFolderId,
   parseAccessConfiguration,
   type AccessConfiguration,
 } from './access-configuration.js';
@@ -145,6 +146,23 @@ export interface SyncConfigurationDefaults {
    * or to that limit where it is lower.
    */
   readonly largeDocumentCharacters: number;
+  /**
+   * Months without an edit in Drive after which the content health page asks
+   * for a document to be reviewed (ADR-049). Defaults to 12; 0 asks for none.
+   */
+  readonly staleAfterMonths: number;
+  /** Folders that keep their own line, for everything below them. */
+  readonly staleFolders: readonly StaleFolder[];
+}
+
+/** A folder whose documents are asked for review on a line of their own. */
+export interface StaleFolder {
+  /** The Drive folder, with everything below it. */
+  readonly folder: string;
+  /** The folder's name as the author knew it, for review. */
+  readonly label: string;
+  /** Months without an edit; 0 asks for no review below this folder. */
+  readonly months: number;
 }
 
 export interface NavigationConfiguration {
@@ -786,6 +804,8 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
     'defaultLocale',
     'largeImageMegabytes',
     'largeDocumentCharacters',
+    'staleAfterMonths',
+    'staleFolders',
   ]);
   const generatedBy = text(syncSource, 'generatedBy', 'sync.generatedBy');
   // The marker is embedded in an HTML comment in every generated Markdown
@@ -964,8 +984,55 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
         Math.min(LARGE_DOCUMENT_CHARACTERS, fetchLimit),
         { min: 1, max: fetchLimit, whole: true },
       ),
+      staleAfterMonths: optionalNumber(
+        syncSource,
+        'staleAfterMonths',
+        'sync.staleAfterMonths',
+        12,
+        STALE_MONTHS,
+      ),
+      staleFolders: optionalStaleFolders(syncSource.staleFolders),
     },
   };
+}
+
+/** The range a line of months without an edit may take. */
+const STALE_MONTHS = { min: 0, max: 120, whole: true } as const;
+
+function optionalStaleFolders(value: unknown): StaleFolder[] {
+  if (value === undefined) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    fail('sync.staleFolders', 'must be a list');
+  }
+  const seen = new Set<string>();
+  return value.map((entry: unknown, index) => {
+    const path = `sync.staleFolders[${index}]`;
+    const source = record(entry, path);
+    knownKeys(source, path, ['folder', 'label', 'months']);
+    if (!isDriveFolderId(source.folder)) {
+      fail(`${path}.folder`, 'must be a Drive folder ID');
+    }
+    if (seen.has(source.folder)) {
+      fail(`${path}.folder`, 'must not be listed twice');
+    }
+    seen.add(source.folder);
+    if (source.months === undefined) {
+      fail(`${path}.months`, 'must be a whole number from 0 to 120');
+    }
+    return {
+      folder: source.folder,
+      label: text(source, 'label', `${path}.label`),
+      months: optionalNumber(
+        source,
+        'months',
+        `${path}.months`,
+        0,
+        STALE_MONTHS,
+      ),
+    };
+  });
 }
 
 /**

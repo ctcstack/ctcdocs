@@ -85,6 +85,7 @@ export type {
   NavigationConfiguration,
   SignInConfiguration,
   SiteConfiguration,
+  StaleFolder,
   SyncConfigurationDefaults,
 } from './site-configuration.js';
 export {

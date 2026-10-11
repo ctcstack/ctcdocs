@@ -117,6 +117,8 @@ const PRIORITY_BY_CODE: Readonly<Record<string, Priority>> = {
   'formatting-removed': 'fix-next',
   // AI agents read only its beginning (ADR-043).
   'document-over-agent-limit': 'fix-next',
+  // Two copies drift apart, and agents answer from either (ADR-049).
+  'document-near-duplicate': 'fix-next',
 
   // Easier to find and to understand, for people, search and agents.
   'image-undescribed': 'improve',
@@ -133,6 +135,8 @@ const PRIORITY_BY_CODE: Readonly<Record<string, Priority>> = {
   'heading-skips-level': 'improve',
   'heading-repeated': 'improve',
   'several-landing-documents': 'improve',
+  // A review, not a fix: an old document may still hold (ADR-049).
+  'document-stale': 'improve',
 
   // Names and order, which the site shows as Drive has them.
   'file-name-copy-of': 'tidy-up',

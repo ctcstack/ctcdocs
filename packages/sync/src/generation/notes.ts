@@ -30,6 +30,7 @@ import {
 } from '../manifest.js';
 import { plural } from '../plural.js';
 import { slugifySegment } from '../slug.js';
+import type { NearDuplicate } from './near-duplicates.js';
 import { describeFileType, driveUrl, folderLabels } from './unpublished.js';
 
 export type NoteCode =
@@ -54,7 +55,9 @@ export type NoteCode =
   | 'image-undescribed'
   | 'image-large'
   | 'summary-missing'
-  | 'media-undescribed';
+  | 'media-undescribed'
+  | 'document-near-duplicate'
+  | 'document-stale';
 
 export interface NoteKind {
   code: NoteCode;
@@ -193,6 +196,20 @@ export const NOTE_KINDS: readonly NoteKind[] = [
       "The site does not watch or listen to a recording: its page shows the recording's name and the description written in Drive, and that is all search and AI agents know of it. In Drive, right-click the file, choose File information → Details and fill in its description: what it shows, for whom, and the steps or topics in order. Rename it too if its name is what the recorder chose. The page changes on the next sync.",
   },
   {
+    code: 'document-near-duplicate',
+    title: 'Another document holds the same text',
+    action: 'Keep one, link to it',
+    instruction:
+      'This document and the one named share nearly all their text, or one holds the other whole, though their names differ. As one copy is edited the other goes out of date, and readers and AI agents find both and cannot tell which is right. Keep the text in one document, remove the other or replace its text with a link to the one you keep. If both must stay, make each say what only it covers.',
+  },
+  {
+    code: 'document-stale',
+    title: 'A document has not been edited for a long time',
+    action: 'Review it, then edit or retire it',
+    instruction:
+      'Nobody has edited this document in Drive for longer than this site asks: readers and AI agents cannot tell whether it still holds. Read it through. If it is right, make any small edit that keeps it current, such as the date it was reviewed; if it is not, correct it, or move it out of the published folders.',
+  },
+  {
     code: 'duplicate-order',
     title: 'Two items share an order number',
     action: 'Renumber one',
@@ -265,6 +282,18 @@ interface PublishedDocumentLengths {
 export interface PublishedSizes {
   images?: PublishedImageSizes;
   documents?: PublishedDocumentLengths;
+  /** Documents sharing their text, by Google file ID (ADR-049). */
+  nearDuplicates?: ReadonlyMap<string, readonly NearDuplicate[]>;
+}
+
+/** When a document is old enough to ask for its review (ADR-049). */
+export interface ReviewLines {
+  /** The run's time. */
+  now: Date;
+  /** From the project configuration: `sync.staleAfterMonths`; 0 for none. */
+  months: number;
+  /** Months by Drive folder ID, from `sync.staleFolders`, for what is below. */
+  folders: ReadonlyMap<string, number>;
 }
 
 export interface ReportNote {
@@ -372,8 +401,9 @@ export function createNotes(
   selection: InventorySelection,
   manifest: SyncManifest,
   sizes: PublishedSizes = {},
+  review?: ReviewLines,
 ): ReportNote[] {
-  const { images, documents } = sizes;
+  const { images, documents, nearDuplicates } = sizes;
   const itemsById = new Map<string, SelectedInventoryItem>(
     [...selection.folders, ...selection.documents].map((selected) => [
       selected.item.id,
@@ -430,6 +460,23 @@ export function createNotes(
     if (isMediaRecord(record) && !record.description) {
       notes.push(noteFor(selected, 'media-undescribed', record.stableSlug));
     }
+    const duplicates = nearDuplicates?.get(record.googleFileId);
+    if (duplicates && duplicates.length > 0) {
+      notes.push(
+        noteFor(
+          selected,
+          'document-near-duplicate',
+          record.stableSlug,
+          nearDuplicateDetail(duplicates, itemsById),
+        ),
+      );
+    }
+    const stale = review
+      ? staleDetail(record, selected, review, itemsById)
+      : undefined;
+    if (stale) {
+      notes.push(noteFor(selected, 'document-stale', record.stableSlug, stale));
+    }
   }
 
   /*
@@ -482,6 +529,77 @@ export function createNotes(
       compareText(left.name, right.name) ||
       compareText(left.id, right.id),
   );
+}
+
+/** The names of a document's near duplicates and how each relates to it. */
+function nearDuplicateDetail(
+  duplicates: readonly NearDuplicate[],
+  itemsById: ReadonlyMap<string, SelectedInventoryItem>,
+): string {
+  const NAMED = 3;
+  const named = duplicates.slice(0, NAMED).map((duplicate) => {
+    const other = itemsById.get(duplicate.id);
+    const name = quoted(other ? other.item.name : duplicate.id);
+    return duplicate.relation === 'inside'
+      ? `Its text is also in ${name}`
+      : duplicate.relation === 'holds'
+        ? `Holds the text of ${name}`
+        : `Nearly the same text as ${name} (${duplicate.similarPercent}% shared)`;
+  });
+  const more = duplicates.length - named.length;
+  return more > 0
+    ? `${named.join('; ')}; and ${plural(more, 'other document')}`
+    : named.join('; ');
+}
+
+/**
+ * The line a document is held to: that of the nearest folder above it with
+ * one of its own, else the project's.
+ */
+function reviewMonths(
+  selected: SelectedInventoryItem,
+  review: ReviewLines,
+  itemsById: ReadonlyMap<string, SelectedInventoryItem>,
+): number {
+  const seen = new Set<string>();
+  let folderId = selected.parentId;
+  while (folderId !== null && !seen.has(folderId)) {
+    seen.add(folderId);
+    const months = review.folders.get(folderId);
+    if (months !== undefined) {
+      return months;
+    }
+    folderId = itemsById.get(folderId)?.parentId ?? null;
+  }
+  return review.months;
+}
+
+/** The day `months` calendar months before `now`, in UTC. */
+function monthsBefore(now: Date, months: number): Date {
+  const line = new Date(now.getTime());
+  line.setUTCMonth(line.getUTCMonth() - months);
+  return line;
+}
+
+/**
+ * When a document was last edited, if that is longer ago than its line. The
+ * date, not an age, so the note reads the same on every run until an edit.
+ */
+function staleDetail(
+  record: SyncedDocumentRecord,
+  selected: SelectedInventoryItem,
+  review: ReviewLines,
+  itemsById: ReadonlyMap<string, SelectedInventoryItem>,
+): string | undefined {
+  const months = reviewMonths(selected, review, itemsById);
+  if (months === 0) {
+    return undefined;
+  }
+  const edited = new Date(record.googleModifiedTime);
+  if (edited >= monthsBefore(review.now, months)) {
+    return undefined;
+  }
+  return `Last edited ${edited.toISOString().slice(0, 10)}; this site asks for a review after ${plural(months, 'month')}`;
 }
 
 function issueNote(

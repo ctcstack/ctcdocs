@@ -84,5 +84,7 @@ Rejected
   part once accepted.
 - ADR-047: publish a page for each video and audio file. Proposed;
   supersedes ADR-025 in part once accepted.
+- ADR-049: content health names stale and near-duplicate documents.
+  Proposed.
 
 Create a new ADR by copying `000-template.md`.

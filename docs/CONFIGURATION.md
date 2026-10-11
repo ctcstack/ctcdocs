@@ -43,36 +43,46 @@ name of its own; they read this file. The rationale is recorded in
     "commitBotName": "ctcdocs-sync[bot]",
     "defaultLocale": "en",
     "largeImageMegabytes": 2,
-    "largeDocumentCharacters": 40000
+    "largeDocumentCharacters": 40000,
+    "staleAfterMonths": 12,
+    "staleFolders": [
+      {
+        "folder": "1AbCdEfGhIjKlMnOpQrStUvWxYz",
+        "label": "Archive",
+        "months": 0
+      }
+    ]
   }
 }
 ```
 
-| Value                                  | Where it shows up                                                                                                                                          |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `brand.name`                           | Reserved for prose that names the organization rather than the site.                                                                                       |
-| `brand.siteTitle`                      | Browser tab, header wordmark, home page heading, and both browser test suites.                                                                             |
-| `brand.siteDescription`                | Site-wide meta description and the home page's own description.                                                                                            |
-| `brand.faviconPath`                    | The `<link rel="icon">` target and an asset the access smoke test probes.                                                                                  |
-| `brand.faviconDarkPath`                | Optional. The same mark drawn for a dark ground: the header shows it under the site's dark theme, and a browser with a dark interface shows it in the tab. |
-| `deployment.workerName`                | The Worker `wrangler.jsonc` must declare; environments deploy as `<name>-<environment>`.                                                                   |
-| `deployment.environments.*`            | Canonical site URL, Wrangler custom domains, deployment summaries, smoke-test defaults.                                                                    |
-| `deployment.environments.*.visibility` | Who may read that environment: `private` (default) or `public`. See below.                                                                                 |
-| `home.lede`                            | The paragraph under the home page heading, in full: where documents come from and what a reader may do with them.                                          |
-| `home.recentLimit`                     | How many documents the "recently updated" band lists. A whole number of at least 1; defaults to 6.                                                         |
-| `home.corpusIndex`                     | Whether the home page carries the full index, which is published at `/documents/` either way. Defaults to `true`.                                          |
-| `home.start`                           | Optional. The address of a hand-authored page, such as `about`; the opening links newcomers to it by its title.                                            |
-| `navigation.landingDocumentTitles`     | Titles that open the folder they sit in, most preferred first. Also picks the description the home page shows for a folder.                                |
-| `navigation.sectionIndexPages`         | Whether each folder gets a generated page listing its subfolders, then its documents, at `/<folder-slug>/`.                                                |
-| `navigation.nameScripts`               | Optional. The Unicode scripts a letter in a Drive name may belong to, such as `["Latin"]`. See below.                                                      |
-| `navigation.addresses`                 | Optional. `stable` (default) keeps an address through renames and moves; `follow-names` re-derives it from the Drive path on every sync.                   |
-| `sync.generatedBy`                     | The ownership marker stamped into every generated Markdown and TypeScript file.                                                                            |
-| `sync.commitBotName`                   | Git author the sync workflow commits generated output as.                                                                                                  |
-| `sync.defaultLocale`                   | Fallback locale for documents whose language cannot be determined.                                                                                         |
-| `sync.largeImageMegabytes`             | Optional. Megabytes (a million bytes each) above which the content health page notes an image. Above 0; defaults to 2.                                     |
-| `sync.largeDocumentCharacters`         | Optional. Characters of a document's text above which the content health page suggests splitting it. See below.                                            |
-| `signIn.workspaceDomains`              | The organization's Google Workspace domains, whose accounts may sign in. Required on a private deployment. See below.                                      |
-| `access`                               | Optional. Who may read which folder, by Google group. Only on a deployment whose every environment is private. See below.                                  |
+| Value                                  | Where it shows up                                                                                                                                                                     |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `brand.name`                           | Reserved for prose that names the organization rather than the site.                                                                                                                  |
+| `brand.siteTitle`                      | Browser tab, header wordmark, home page heading, and both browser test suites.                                                                                                        |
+| `brand.siteDescription`                | Site-wide meta description and the home page's own description.                                                                                                                       |
+| `brand.faviconPath`                    | The `<link rel="icon">` target and an asset the access smoke test probes.                                                                                                             |
+| `brand.faviconDarkPath`                | Optional. The same mark drawn for a dark ground: the header shows it under the site's dark theme, and a browser with a dark interface shows it in the tab.                            |
+| `deployment.workerName`                | The Worker `wrangler.jsonc` must declare; environments deploy as `<name>-<environment>`.                                                                                              |
+| `deployment.environments.*`            | Canonical site URL, Wrangler custom domains, deployment summaries, smoke-test defaults.                                                                                               |
+| `deployment.environments.*.visibility` | Who may read that environment: `private` (default) or `public`. See below.                                                                                                            |
+| `home.lede`                            | The paragraph under the home page heading, in full: where documents come from and what a reader may do with them.                                                                     |
+| `home.recentLimit`                     | How many documents the "recently updated" band lists. A whole number of at least 1; defaults to 6.                                                                                    |
+| `home.corpusIndex`                     | Whether the home page carries the full index, which is published at `/documents/` either way. Defaults to `true`.                                                                     |
+| `home.start`                           | Optional. The address of a hand-authored page, such as `about`; the opening links newcomers to it by its title.                                                                       |
+| `navigation.landingDocumentTitles`     | Titles that open the folder they sit in, most preferred first. Also picks the description the home page shows for a folder.                                                           |
+| `navigation.sectionIndexPages`         | Whether each folder gets a generated page listing its subfolders, then its documents, at `/<folder-slug>/`.                                                                           |
+| `navigation.nameScripts`               | Optional. The Unicode scripts a letter in a Drive name may belong to, such as `["Latin"]`. See below.                                                                                 |
+| `navigation.addresses`                 | Optional. `stable` (default) keeps an address through renames and moves; `follow-names` re-derives it from the Drive path on every sync.                                              |
+| `sync.generatedBy`                     | The ownership marker stamped into every generated Markdown and TypeScript file.                                                                                                       |
+| `sync.commitBotName`                   | Git author the sync workflow commits generated output as.                                                                                                                             |
+| `sync.defaultLocale`                   | Fallback locale for documents whose language cannot be determined.                                                                                                                    |
+| `sync.largeImageMegabytes`             | Optional. Megabytes (a million bytes each) above which the content health page notes an image. Above 0; defaults to 2.                                                                |
+| `sync.largeDocumentCharacters`         | Optional. Characters of a document's text above which the content health page suggests splitting it. See below.                                                                       |
+| `sync.staleAfterMonths`                | Optional. Months without an edit in Drive after which the content health page asks for a document's review. A whole number from 0 to 120; 0 asks for none. Defaults to 12. See below. |
+| `sync.staleFolders`                    | Optional. Folders whose documents keep their own line: each a Drive folder ID, its name as a label, and its months. See below.                                                        |
+| `signIn.workspaceDomains`              | The organization's Google Workspace domains, whose accounts may sign in. Required on a private deployment. See below.                                                                 |
+| `access`                               | Optional. Who may read which folder, by Google group. Only on a deployment whose every environment is private. See below.                                                             |
 
 ## Who may read the deployment
 
@@ -327,6 +337,10 @@ than reaching a deployment:
   or `Cyrillic`;
 - `sync.largeDocumentCharacters`, where present, must be a whole number from 1
   to the characters an assistant reads of a document (see below);
+- `sync.staleAfterMonths`, where present, and each `months` in
+  `sync.staleFolders` must be a whole number from 0 to 120; each
+  `sync.staleFolders` entry needs a Drive folder ID listed once, a label and
+  its months, and nothing else;
 - `sync` and `mcp` accept only the settings this page lists;
 - no required value may be empty.
 
@@ -348,6 +362,19 @@ off). The first is 40,000 unless the project sets it, and never more than
 the second: unset, it is the second where the second is lower; set above
 it, the configuration fails. The sync reads both, so a change shows on the
 page after the next sync, without exporting anything again.
+
+## Stale and near-duplicate documents
+
+The content health page asks for the review of a document nobody has edited
+in Drive for longer than `sync.staleAfterMonths`, 12 unless the project sets
+it, and names documents that hold nearly the same text as another, or whose
+text stands whole inside a longer one
+([ADR-049](ADR/049-content-health-names-stale-and-near-duplicate-documents.md)).
+A folder in `sync.staleFolders` holds everything below it to its own line,
+the nearest listed folder winning; `0` there exempts a folder, such as an
+archive of decisions that are meant to stay as they were. Both are measured
+on every sync from its own output, so a changed line shows after the next
+sync.
 
 ## What the home page shows
 

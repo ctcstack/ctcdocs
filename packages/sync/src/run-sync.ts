@@ -47,7 +47,11 @@ import {
   type SyncReport,
 } from './generation/sync-report.js';
 import { createNotes, NOTE_KINDS } from './generation/notes.js';
-import { publishedLengths } from './generation/published-length.js';
+import { findNearDuplicates } from './generation/near-duplicates.js';
+import {
+  generatedBody,
+  publishedLengths,
+} from './generation/published-length.js';
 import {
   createIgnoredFolders,
   createUnpublishedItems,
@@ -2008,17 +2012,38 @@ async function synchronize(
     fetchCharacters: fetchCharacterLimit(site.mcp),
     markdownVersion: PUBLISHED_MARKDOWN_VERSION,
   };
-  const notes = createNotes(selection, candidateManifest, {
-    images: {
-      largeImageMegabytes: site.sync.largeImageMegabytes,
-      imageBytes,
+  // Each published document's body, from the output, to compare their text.
+  const bodies = new Map(
+    Object.values(candidateManifest.documents).flatMap((record) => {
+      const content = output.get(record.generatedMarkdownPath);
+      const body =
+        typeof content === 'string' ? generatedBody(content) : undefined;
+      return body === undefined ? [] : [[record.googleFileId, body] as const];
+    }),
+  );
+  const notes = createNotes(
+    selection,
+    candidateManifest,
+    {
+      images: {
+        largeImageMegabytes: site.sync.largeImageMegabytes,
+        imageBytes,
+      },
+      documents: {
+        ...documentLengths,
+        // From the output too: each page's Markdown version, as `fetch` cuts it.
+        characters: publishedLengths(output, candidateManifest, markdownHeader),
+      },
+      nearDuplicates: findNearDuplicates(bodies),
     },
-    documents: {
-      ...documentLengths,
-      // From the output too: each page's Markdown version, as `fetch` cuts it.
-      characters: publishedLengths(output, candidateManifest, markdownHeader),
+    {
+      now: new Date(runTimestamp),
+      months: site.sync.staleAfterMonths,
+      folders: new Map(
+        site.sync.staleFolders.map(({ folder, months }) => [folder, months]),
+      ),
     },
-  });
+  );
   const published = (...formats: DocumentFormat[]) =>
     publishedRecords.filter((record) =>
       formats.includes(documentFormat(record)),

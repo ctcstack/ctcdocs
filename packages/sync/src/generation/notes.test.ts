@@ -319,6 +319,104 @@ describe('createNotes', () => {
     ]);
   });
 
+  it('notes documents that share their text, naming the other', () => {
+    const notes = createNotes(
+      corpus([
+        item(
+          'copy',
+          'Setup checklist',
+          GOOGLE_DRIVE_DOCUMENT_MIME_TYPE,
+          'team',
+        ),
+        item('first', 'Checklist', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('policy', 'Policy', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('handbook', 'Handbook', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+      ]),
+      manifestOf([
+        record('copy', 'team/setup-checklist'),
+        record('first', 'team/checklist'),
+        record('policy', 'team/policy'),
+        record('handbook', 'team/handbook'),
+      ]),
+      {
+        nearDuplicates: new Map([
+          ['copy', [{ id: 'first', similarPercent: 96, relation: 'alike' }]],
+          ['first', [{ id: 'copy', similarPercent: 96, relation: 'alike' }]],
+          [
+            'policy',
+            [{ id: 'handbook', similarPercent: 20, relation: 'inside' }],
+          ],
+          [
+            'handbook',
+            [{ id: 'policy', similarPercent: 20, relation: 'holds' }],
+          ],
+        ]),
+      },
+    );
+
+    expect(notes.map((note) => [note.name, note.note, note.detail])).toEqual([
+      [
+        'Checklist',
+        'document-near-duplicate',
+        'Nearly the same text as “Setup checklist” (96% shared)',
+      ],
+      ['Handbook', 'document-near-duplicate', 'Holds the text of “Policy”'],
+      ['Policy', 'document-near-duplicate', 'Its text is also in “Handbook”'],
+      [
+        'Setup checklist',
+        'document-near-duplicate',
+        'Nearly the same text as “Checklist” (96% shared)',
+      ],
+    ]);
+  });
+
+  it('asks for the review of a document not edited within its line', () => {
+    const edited = (id: string, modified: string) => ({
+      ...record(id, `team/${id}`),
+      googleModifiedTime: modified,
+    });
+    const selection = buildInventorySelection(
+      [
+        item('root', 'Published', GOOGLE_DRIVE_FOLDER_MIME_TYPE, 'drive'),
+        item('team', 'Team', GOOGLE_DRIVE_FOLDER_MIME_TYPE, 'root'),
+        item('archive', 'Archive', GOOGLE_DRIVE_FOLDER_MIME_TYPE, 'root'),
+        item('old', 'Old', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('recent', 'Recent', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('kept', 'Kept', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'archive'),
+      ],
+      'root',
+      [],
+      ['drive'],
+    );
+    const manifest = manifestOf([
+      edited('old', '2025-10-10T09:00:00.000Z'),
+      edited('recent', '2025-10-12T09:00:00.000Z'),
+      edited('kept', '2020-01-01T00:00:00.000Z'),
+    ]);
+    const review = {
+      now: new Date('2026-10-11T12:00:00.000Z'),
+      months: 12,
+      folders: new Map([['archive', 0]]),
+    };
+
+    expect(
+      createNotes(selection, manifest, {}, review).map((note) => [
+        note.name,
+        note.note,
+        note.detail,
+      ]),
+    ).toEqual([
+      [
+        'Old',
+        'document-stale',
+        'Last edited 2025-10-10; this site asks for a review after 12 months',
+      ],
+    ]);
+    expect(
+      createNotes(selection, manifest, {}, { ...review, months: 0 }),
+    ).toEqual([]);
+  });
+
   it('turns what the inventory warned about into notes with names', () => {
     const selection = corpus([
       item('one', '01 - Intro', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
