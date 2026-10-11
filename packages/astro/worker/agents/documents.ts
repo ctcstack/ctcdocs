@@ -42,7 +42,7 @@ import {
   type AgentDocumentFormat,
   type AgentSearchSettings,
 } from '../access-map.js';
-import { mayRead, type Reader } from '../decide.js';
+import { mayRead, readableClasses, type Reader } from '../decide.js';
 import { FILTER_VALUES } from './search-filter.js';
 
 /** The part of an R2 bucket the server uses. */
@@ -139,17 +139,6 @@ function permanentLink(origin: string, id: string): string {
 /** Every permanent link, with `{id}` in place of the short ID. */
 export function linkPattern(origin: string): string {
   return permanentLink(origin, '{id}');
-}
-
-/** The classes whose documents the reader may open. */
-export function readableClasses(
-  map: AccessMapFile,
-  reader: Reader,
-  stale: boolean,
-): string[] {
-  return Object.keys(map.classes)
-    .filter((cls) => mayRead(map, reader, cls, stale))
-    .sort();
 }
 
 export interface DocumentAccess {

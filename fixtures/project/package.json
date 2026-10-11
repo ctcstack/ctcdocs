@@ -15,8 +15,7 @@
     "test:search": "ctcdocs-verify-search",
     "test:ux": "playwright test --config playwright.ux.config.ts",
     "deploy:dry-run": "wrangler deploy --env production --dry-run && wrangler deploy --config wrangler.directory.jsonc --env production --dry-run",
-    "test:gate": "ctcdocs-verify-gate",
-    "test:migrations": "node -e \"require('node:fs').rmSync('.wrangler/migrations-check', { recursive: true, force: true })\" && wrangler d1 migrations apply KB_STATE_DB --env production --local --persist-to .wrangler/migrations-check"
+    "test:gate": "ctcdocs-verify-gate"
   },
   "dependencies": {
     "@astrojs/starlight": "0.41.5",

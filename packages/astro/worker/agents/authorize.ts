@@ -20,7 +20,7 @@ import type {
 } from '@cloudflare/workers-oauth-provider';
 
 import { connectionFailedPage, consentPage } from '../pages.js';
-import { clientLabel } from '../state/mcp-calls.js';
+import { clientLabel } from './client-label.js';
 
 /** Everything the server can grant, and what any access needs. */
 export const SCOPES = ['kb:read', 'offline_access'] as const;
@@ -164,6 +164,26 @@ function consentPolicy(redirectUri: string): string {
   ].join('; ');
 }
 
+/**
+ * How long the end of a connection waits for the client's description: a
+ * client with a metadata document may be fetched again.
+ */
+const CLIENT_LABEL_MS = 2_000;
+
+/** What `promise` gives within `ms`, or nothing. */
+function withinTime<T>(
+  promise: Promise<T>,
+  ms: number,
+): Promise<T | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    promise,
+    new Promise<undefined>((resolve) => {
+      timer = setTimeout(() => resolve(undefined), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
 async function complete(
   context: AuthorizeContext,
   request: AuthRequest,
@@ -171,18 +191,20 @@ async function complete(
   headers: Headers,
 ): Promise<Response> {
   /*
-   * The name only labels the record of calls; a connection never fails on
-   * it. A client that gave no name is described by its ID, which names no
-   * assistant, so it gets no label.
+   * The name only labels the record of calls; a connection never fails or
+   * waits long on it. A client that gave no name is described by its ID,
+   * which names no assistant, so it gets no label.
    */
-  const client = await context.oauth.api
-    .describeConsent(request)
-    .then((facts) =>
-      facts.clientName === facts.clientId
-        ? undefined
-        : clientLabel(facts.clientName),
-    )
-    .catch(() => undefined);
+  const client = await withinTime(
+    context.oauth.api
+      .describeConsent(request)
+      .then((facts) =>
+        facts.clientName === facts.clientId
+          ? undefined
+          : clientLabel(facts.clientName),
+      ),
+    CLIENT_LABEL_MS,
+  ).catch(() => undefined);
   const options: CompleteAuthorizationOptions = {
     request,
     userId: sub,

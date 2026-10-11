@@ -2,7 +2,7 @@
  * The database of operational state in memory: SQLite, with the platform's
  * migrations applied in order, behind the interface the Worker uses. The
  * stand-in for D1 in the unit tests, so the SQL they run is the Worker's.
- * Never bundled into the Worker.
+ * Never bundled into the Worker, nor published.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
@@ -71,4 +71,15 @@ export class MemoryDatabase implements StateDatabase {
       throw error;
     }
   }
+}
+
+/** Every row of a table, in the order it was written. */
+export function rowsOf(
+  database: MemoryDatabase,
+  table: 'mcp_calls' | 'site_searches' | 'reports',
+): Record<string, unknown>[] {
+  const order = table === 'reports' ? 'week' : 'id';
+  return database.sqlite
+    .prepare(`SELECT * FROM ${table} ORDER BY ${order}`)
+    .all() as Record<string, unknown>[];
 }

@@ -8,6 +8,7 @@
  * day. D1's Time Travel keeps deleted rows 30 days more.
  */
 import type { StateDatabase } from './database.js';
+import { failureMessage, type StateLog } from './record.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -17,9 +18,6 @@ const RECORDS = [
   { table: 'site_searches', time: 'at' },
   { table: 'reports', time: 'week' },
 ] as const;
-
-/** At most this much of a failure's message is logged. */
-const MESSAGE_CHARACTERS = 200;
 
 /**
  * Deletes every record older than the retention, in one transaction, and
@@ -35,7 +33,7 @@ export async function expireRecords({
   readonly database: StateDatabase;
   readonly retentionDays: number;
   readonly now: number;
-  readonly log: (event: Readonly<Record<string, unknown>>) => void;
+  readonly log: StateLog;
 }): Promise<void> {
   try {
     const before = new Date(now - retentionDays * DAY_MS).toISOString();
@@ -55,17 +53,7 @@ export async function expireRecords({
       ),
     });
   } catch (error: unknown) {
-    /*
-     * D1 names the table or the constraint that failed, never a bound
-     * value: a missing migration shows up here as "no such table".
-     */
-    log({
-      event: 'state-expiry-failed',
-      error:
-        error instanceof Error
-          ? error.message.slice(0, MESSAGE_CHARACTERS)
-          : 'unknown',
-    });
+    log({ event: 'state-expiry-failed', error: failureMessage(error) });
   }
 }
 
@@ -88,7 +76,7 @@ export function expireOnSchedule({
   };
   readonly database: StateDatabase | undefined;
   readonly now: number;
-  readonly log: (event: Readonly<Record<string, unknown>>) => void;
+  readonly log: StateLog;
 }): Promise<void> | undefined {
   if (!database) {
     if (insights.enabled) {

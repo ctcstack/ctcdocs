@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import type { AccessMapFile } from '../access-map.js';
-import type { Reader } from '../decide.js';
+import { readableClasses, type Reader } from '../decide.js';
 import {
   browseFolder,
   fetchDocument,
-  readableClasses,
   recentDocuments,
   searchDocuments,
   type DocumentAccess,

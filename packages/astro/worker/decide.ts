@@ -72,6 +72,33 @@ export function mayRead(
   return classes.some((cls) => mayReadClass(map, reader, cls, stale));
 }
 
+/** The classes whose documents the reader may open. */
+export function readableClasses(
+  map: AccessMapFile,
+  reader: Reader,
+  stale: boolean,
+): string[] {
+  return Object.keys(map.classes)
+    .filter((cls) => mayRead(map, reader, cls, stale))
+    .sort();
+}
+
+/**
+ * The classes a record of use names (ADR-051): those the reader may read.
+ * An admin reads every class, and is named by the admins class alone; while
+ * the snapshot is stale an admin reads what every member reads, and is
+ * named as one.
+ */
+export function recordedClasses(
+  map: AccessMapFile,
+  reader: Reader,
+  stale: boolean,
+): string[] {
+  return !stale && isAdmin(map, reader)
+    ? [ADMINS_CLASS]
+    : readableClasses(map, reader, stale);
+}
+
 /** The search bundles beyond the members bundle that a reader may open. */
 export function readableBundles(
   map: AccessMapFile,

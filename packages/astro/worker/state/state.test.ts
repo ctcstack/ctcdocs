@@ -5,7 +5,7 @@ import { PLATFORM_WORKERS } from '@ctcstack/ctcdocs-core';
 import { describe, expect, it } from 'vitest';
 
 import type { StateDatabase } from './database.js';
-import { MemoryDatabase, migrationFiles } from './memory-database.js';
+import { MemoryDatabase, migrationFiles, rowsOf } from './test-support.js';
 import { expireOnSchedule, expireRecords } from './retention.js';
 
 const NOW = Date.parse('2026-10-12T00:05:00.000Z');
@@ -17,9 +17,9 @@ function insertCall(database: MemoryDatabase, at: string): void {
   database.sqlite
     .prepare(
       `INSERT INTO mcp_calls
-        (at, tool, query, classes, client, results, top_score, documents,
+        (at, tool, query, narrowed, classes, client, results, top_score, documents,
          fetched, characters, latency_ms, stale)
-       VALUES (?, 'search', 'leave policy', '["members"]', 'Claude', 2, 0.71,
+       VALUES (?, 'search', 'leave policy', 0, '["members"]', 'Claude', 2, 0.71,
          '["a1b2c3","d4e5f6"]', NULL, 1800, 420, 0)`,
     )
     .run(at);
@@ -38,13 +38,6 @@ function insertReport(database: MemoryDatabase, week: string): void {
   database.sqlite
     .prepare(`INSERT INTO reports (week, at, report) VALUES (?, ?, '{}')`)
     .run(week, `${week}T00:05:00.000Z`);
-}
-
-function count(database: MemoryDatabase, table: string): number {
-  const row = database.sqlite
-    .prepare(`SELECT count(*) AS n FROM ${table}`)
-    .get() as { n: number };
-  return row.n;
 }
 
 describe('the migrations', () => {
@@ -105,9 +98,9 @@ describe('the migrations', () => {
       database.sqlite
         .prepare(
           `INSERT INTO mcp_calls
-            (at, tool, query, classes, client, results, top_score, documents,
+            (at, tool, query, narrowed, classes, client, results, top_score, documents,
              fetched, characters, latency_ms, stale)
-           VALUES (?, ?, ?, ?, NULL, 0, NULL, ?, ?, 0, 0, 0)`,
+           VALUES (?, ?, ?, 0, ?, NULL, 0, NULL, ?, ?, 0, 0, 0)`,
         )
         .run(ago(1), tool, query, classes, documents, fetched);
     const ids = ['a1b2c3', 'd4e5f6', '0123456789', 'abcdef', 'f'.repeat(64)];
@@ -194,9 +187,9 @@ describe('expireRecords', () => {
       log: (event) => events.push({ ...event }),
     });
 
-    expect(count(database, 'mcp_calls')).toBe(2);
-    expect(count(database, 'site_searches')).toBe(2);
-    expect(count(database, 'reports')).toBe(1);
+    expect(rowsOf(database, 'mcp_calls').length).toBe(2);
+    expect(rowsOf(database, 'site_searches').length).toBe(2);
+    expect(rowsOf(database, 'reports').length).toBe(1);
     expect(events).toEqual([
       {
         event: 'state-expired',
@@ -216,7 +209,7 @@ describe('expireRecords', () => {
       now: NOW,
       log: () => undefined,
     });
-    expect(count(database, 'reports')).toBe(0);
+    expect(rowsOf(database, 'reports').length).toBe(0);
   });
 
   it('deletes nothing or everything: one transaction', async () => {
@@ -232,7 +225,7 @@ describe('expireRecords', () => {
       log: (event) => events.push({ ...event }),
     });
 
-    expect(count(database, 'mcp_calls')).toBe(1);
+    expect(rowsOf(database, 'mcp_calls').length).toBe(1);
     expect(events).toEqual([
       {
         event: 'state-expiry-failed',
@@ -288,7 +281,7 @@ describe('expireRecords', () => {
       now: NOW,
       log,
     });
-    expect(count(database, 'mcp_calls')).toBe(1);
+    expect(rowsOf(database, 'mcp_calls').length).toBe(1);
     expect(events).toEqual([
       expect.objectContaining({ event: 'state-expired' }),
     ]);

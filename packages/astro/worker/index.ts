@@ -26,7 +26,7 @@ import {
   type DirectorySnapshot,
 } from './snapshot.js';
 import type { StateDatabase } from './state/database.js';
-import { mcpCallRecorder } from './state/mcp-calls.js';
+import { RecordLimit } from './state/limit.js';
 import { expireOnSchedule } from './state/retention.js';
 
 /** The part of an AI Search instance binding the Worker uses. */
@@ -72,6 +72,9 @@ const accessMap: AccessMapFile = builtMap;
 const STATE_CACHE_MS = 60_000;
 let cached: { at: number; value: DirectorySnapshot | undefined } | undefined;
 let cachedKeys: { at: number; value: unknown } | undefined;
+
+/** Records of use one person's calls write a minute, in this isolate. */
+const recordLimit = new RecordLimit();
 
 const googleKeys = new GoogleKeys(
   (input, init) => fetch(input, init),
@@ -149,15 +152,6 @@ function agentsFor(
       }),
     store: KB_DOCUMENTS,
     index: documentIndex(KB_SEARCH),
-    // Recorded only while insights are on and the database is bound.
-    calls:
-      accessMap.site.insights.enabled && env.KB_STATE_DB
-        ? mcpCallRecorder({
-            database: env.KB_STATE_DB,
-            schedule: (write) => ctx.waitUntil(write),
-            log,
-          })
-        : undefined,
   };
 }
 
@@ -199,6 +193,13 @@ export default {
       googleKeys,
       log,
       agents: agentsFor(env, ctx),
+      state: env.KB_STATE_DB
+        ? {
+            database: env.KB_STATE_DB,
+            schedule: (write) => ctx.waitUntil(write),
+            limit: recordLimit,
+          }
+        : undefined,
     });
   },
 

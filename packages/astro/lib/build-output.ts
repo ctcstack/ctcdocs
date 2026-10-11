@@ -504,7 +504,9 @@ export async function writeBuildOutput({
         ? languageName(site.mcp.language)
         : undefined,
       mcp,
+      // Retention holds whether insights record or not (ADR-050).
       insights: {
+        // The configuration refuses insights without MCP; the map agrees.
         enabled: mcp && site.insights?.enabled === true,
         retentionDays:
           site.insights?.retentionDays ?? INSIGHTS_DEFAULTS.retentionDays,

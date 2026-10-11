@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@11.9.0",
   "engines": {
-    "node": ">=22.12.0 <23",
+    "node": ">=22.13.0 <23",
     "pnpm": ">=11.9.0 <12"
   },
   "scripts": {
@@ -28,7 +28,7 @@
     "fixtures:ux": "pnpm --filter ctcdocs-fixture-project test:ux",
     "fixtures:deploy-dry-run": "pnpm --filter ctcdocs-fixture-project deploy:dry-run",
     "fixtures:gate": "pnpm --filter ctcdocs-fixture-project test:gate",
-    "fixtures:migrations": "pnpm --filter ctcdocs-fixture-project test:migrations"
+    "fixtures:migrations": "node fixtures/verify-state-schema.mjs"
   },
   "devDependencies": {
     "@ctcstack/ctcdocs-core": "workspace:*",
