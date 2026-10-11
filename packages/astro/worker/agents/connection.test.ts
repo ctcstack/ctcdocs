@@ -333,7 +333,14 @@ async function mcp(token: string, method: string, params: object = {}) {
     status: response.status,
     body: (data ? JSON.parse(data) : {}) as {
       result?: {
-        tools?: { name: string; annotations?: { readOnlyHint?: boolean } }[];
+        tools?: {
+          name: string;
+          description?: string;
+          inputSchema?: {
+            properties?: Record<string, { description?: string }>;
+          };
+          annotations?: { readOnlyHint?: boolean };
+        }[];
         structuredContent?: Record<string, unknown>;
         content?: { type: string; text?: string }[];
         isError?: boolean;
@@ -660,6 +667,20 @@ describe('an assistant reading', () => {
         (entry) => entry.annotations?.readOnlyHint === true,
       ),
     ).toBe(true);
+  });
+
+  it("tells assistants to search in the documents' language", async () => {
+    const { tokens } = await connect('user-member');
+    const listed = await mcp(tokens.access_token, 'tools/list');
+    const search = listed.body.result?.tools?.find(
+      (entry) => entry.name === 'search',
+    );
+    expect(search?.description).toContain(
+      'Documents are written in English: search in English',
+    );
+    expect(search?.inputSchema?.properties?.query?.description).toBe(
+      "What to look for, best in English, the documents' language",
+    );
   });
 
   it('finds and reads only what the person may open, decided per request', async () => {

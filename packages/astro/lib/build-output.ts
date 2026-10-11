@@ -38,6 +38,7 @@ import {
   type BuiltPage,
   type FileClass,
 } from './access-map.js';
+import { languageName } from './language-name.js';
 import {
   findLeaks,
   htmlSegments,
@@ -498,6 +499,7 @@ export async function writeBuildOutput({
       workspaceDomains: site.signIn?.workspaceDomains ?? [],
       title: site.brand.siteTitle,
       description: site.brand.siteDescription,
+      language: languageName(site.sync.defaultLocale),
       mcp,
     },
     csp: { scriptHashes: [...scriptHashes].sort() },
