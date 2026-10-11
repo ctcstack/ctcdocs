@@ -450,12 +450,17 @@ function server(context: ToolContext): McpServer {
       const started = context.now();
       const tree = browseFolder(context, folder, depth, format);
       log({ event: 'tool', tool: 'browse', found: tree !== undefined });
-      const listed = tree ? listedDocuments(tree) : [];
       const answer = browsed(context.origin, tree, format);
+      // A tree counts what it collapses, so a browse that lists nothing
+      // directly may still have answered with every count.
       recordCall(
         context,
         started,
-        { tool: 'browse', results: listed.length, documents: listed },
+        {
+          tool: 'browse',
+          results: tree?.count ?? 0,
+          documents: tree ? listedDocuments(tree) : [],
+        },
         answer,
       );
       return answer;

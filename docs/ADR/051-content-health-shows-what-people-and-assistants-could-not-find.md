@@ -40,7 +40,7 @@ The product decisions behind this record:
 | `query`      | `search`'s query, at most 200 characters; null for the others                    |
 | `classes`    | JSON array of the access classes the reader may read, sorted; never the reader   |
 | `client`     | The name the client gave when it connected, as letters, digits, spaces and `.-_` |
-| `results`    | Documents returned                                                               |
+| `results`    | Documents returned; for `browse`, those under the folder, as its count says      |
 | `top_score`  | The best reranker score among the chunks that counted; null when there is none   |
 | `documents`  | JSON array of the first five short IDs returned                                  |
 | `fetched`    | The short ID `fetch` read; null for the others                                   |

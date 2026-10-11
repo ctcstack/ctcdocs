@@ -170,10 +170,18 @@ async function complete(
   sub: string,
   headers: Headers,
 ): Promise<Response> {
-  // The name only labels the record of calls; a connection never fails on it.
+  /*
+   * The name only labels the record of calls; a connection never fails on
+   * it. A client that gave no name is described by its ID, which names no
+   * assistant, so it gets no label.
+   */
   const client = await context.oauth.api
     .describeConsent(request)
-    .then((facts) => clientLabel(facts.clientName))
+    .then((facts) =>
+      facts.clientName === facts.clientId
+        ? undefined
+        : clientLabel(facts.clientName),
+    )
     .catch(() => undefined);
   const options: CompleteAuthorizationOptions = {
     request,
