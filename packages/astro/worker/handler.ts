@@ -26,6 +26,7 @@ import {
   showConsent,
   type AgentOAuth,
   type AuthorizeContext,
+  type GrantProps,
 } from './agents/authorize.js';
 import type { DocumentIndex, DocumentStore } from './agents/documents.js';
 import { serveMcp } from './agents/tools.js';
@@ -70,6 +71,7 @@ import {
   isStale,
   type DirectorySnapshot,
 } from './snapshot.js';
+import type { McpCallRecorder } from './state/mcp-calls.js';
 import { directoryStatus } from './status.js';
 
 export const SESSION_COOKIE = '__Host-kb-session';
@@ -94,6 +96,11 @@ export interface AgentContext {
   readonly oauth: (origin: string) => AgentOAuth;
   readonly store: DocumentStore;
   readonly index: DocumentIndex;
+  /**
+   * Records each tool call (ADR-051): present while insights are on and the
+   * database is bound.
+   */
+  readonly calls?: McpCallRecorder | undefined;
 }
 
 /** The metadata of the one protected resource, `/mcp` (RFC 9728). */
@@ -336,7 +343,7 @@ async function serveAgent(
   gate: Gate,
   agents: AgentContext,
   request: Request,
-  sub: string,
+  { sub, client }: GrantProps,
 ): Promise<Response> {
   const { context } = gate;
   const snapshot = await context.snapshot();
@@ -358,6 +365,9 @@ async function serveAgent(
     store: agents.store,
     index: agents.index,
     log: context.log,
+    now: context.now,
+    client,
+    record: agents.calls,
   });
 }
 
@@ -377,8 +387,8 @@ async function agentRoute(
       return finishConnection(request, authorizeContext(gate, oauth, request));
     case AGENT_PATHS.mcp:
     case MCP_METADATA:
-      return oauth.protect(request, (sub) =>
-        serveAgent(gate, agents, request, sub),
+      return oauth.protect(request, (props) =>
+        serveAgent(gate, agents, request, props),
       );
     case AGENT_PATHS.resourceMetadata:
       // Some clients look at the root; the one resource is `/mcp`. The

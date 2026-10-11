@@ -8,12 +8,19 @@
  * `browse` counts them by format (ADR-044). All four only read.
  *
  * A fresh server answers each request, as the stateless protocol revision
- * expects, for the reader its token belongs to.
+ * expects, for the reader its token belongs to. With insights on, each
+ * answered call is recorded once its answer is made (ADR-051).
  */
 import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 
 import { AGENT_DOCUMENT_FORMATS } from '../access-map.js';
+import {
+  clientLabel,
+  recordedClasses,
+  type McpCall,
+  type McpCallRecorder,
+} from '../state/mcp-calls.js';
 import {
   browseFolder,
   collapsedFolders,
@@ -21,12 +28,20 @@ import {
   linkPattern,
   NarrowingError,
   recentDocuments,
-  searchDocuments,
+  scoredSearch,
+  type BrowsedFolder,
   type DocumentAccess,
+  type FolderTree,
 } from './documents.js';
 
 export interface ToolContext extends DocumentAccess {
   readonly log: (event: Readonly<Record<string, unknown>>) => void;
+  /** The clock a call's latency is measured by. */
+  readonly now: () => number;
+  /** The assistant's name, as its grant labels it. */
+  readonly client?: string | undefined;
+  /** Records each answered call, while insights are on (ADR-051). */
+  readonly record?: McpCallRecorder | undefined;
 }
 
 const FORMAT_VALUE = z.enum(AGENT_DOCUMENT_FORMATS);
@@ -192,6 +207,98 @@ function result(value: Record<string, unknown>, note?: string) {
   };
 }
 
+type Answer = ReturnType<typeof result>;
+
+/** What a tool knows of its call; the rest comes from the context. */
+type Call = Pick<McpCall, 'tool' | 'results' | 'documents'> &
+  Partial<Pick<McpCall, 'query' | 'topScore' | 'fetched'>>;
+
+/**
+ * Hands the record of an answered call to the recorder, once the answer is
+ * made. The answer is never changed and never waits: whatever recording
+ * does, the assistant gets the same reply. The classes come from the access
+ * decision the answer was made under, never from the request.
+ */
+function recordCall(
+  context: ToolContext,
+  started: number,
+  call: Call,
+  answer: Answer | undefined,
+): void {
+  const { record } = context;
+  if (!record) {
+    return;
+  }
+  try {
+    record({
+      query: null,
+      topScore: null,
+      fetched: null,
+      ...call,
+      at: new Date(started).toISOString(),
+      classes: recordedClasses(context.map, context.reader, context.stale),
+      // Labelled again: a grant's props are read back from storage.
+      client: clientLabel(context.client) ?? null,
+      characters: answer?.content[0]?.text.length ?? 0,
+      latencyMs: context.now() - started,
+      stale: context.stale,
+    });
+  } catch (error: unknown) {
+    context.log({
+      event: 'state-write-failed',
+      table: 'mcp_calls',
+      error: error instanceof Error ? error.name : 'unknown',
+    });
+  }
+}
+
+/** The documents a tree lists, in the order its answer lists them. */
+function listedDocuments(tree: FolderTree): string[] {
+  const ids: string[] = [];
+  const visit = (folder: Pick<BrowsedFolder, 'documents' | 'folders'>) => {
+    for (const document of folder.documents ?? []) {
+      ids.push(document.id);
+    }
+    for (const inner of folder.folders ?? []) {
+      visit(inner);
+    }
+  };
+  visit(tree);
+  return ids;
+}
+
+/** A browse's answer: the tree, or an empty one, with its note. */
+function browsed(
+  origin: string,
+  tree: FolderTree | undefined,
+  format: string | undefined,
+): Answer {
+  if (!tree) {
+    return result(
+      {
+        folder: [],
+        count: 0,
+        formats: {},
+        documents: [],
+        folders: [],
+        links: linkPattern(origin),
+      },
+      NO_FOLDER,
+    );
+  }
+  const collapsed = collapsedFolders(tree.folders);
+  return result(
+    { ...tree },
+    tree.count === 0 && format !== undefined
+      ? NO_FORMAT
+      : tree.omitted
+        ? omittedNote(tree.omitted)
+        : collapsed > 0
+          ? collapsedNote(collapsed)
+          : undefined,
+  );
+}
+
 function server(context: ToolContext): McpServer {
   const { map, log } = context;
   const mostResults = map.agents?.search.results ?? 1;
@@ -244,8 +351,9 @@ function server(context: ToolContext): McpServer {
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async ({ query, folder, changedSince, format, limit, compact }) => {
-      const found = await guarded('search', log, () =>
-        searchDocuments(
+      const started = context.now();
+      const { results: found, topScore } = await guarded('search', log, () =>
+        scoredSearch(
           context,
           query,
           { folder, changedSince, format },
@@ -253,10 +361,23 @@ function server(context: ToolContext): McpServer {
         ),
       );
       log({ event: 'tool', tool: 'search', results: found.length });
-      return result(
+      const answer = result(
         { results: found },
         found.length === 0 ? NOTHING_FOUND : undefined,
       );
+      recordCall(
+        context,
+        started,
+        {
+          tool: 'search',
+          query,
+          results: found.length,
+          topScore: topScore ?? null,
+          documents: found.map((entry) => entry.id),
+        },
+        answer,
+      );
+      return answer;
     },
   );
 
@@ -272,16 +393,36 @@ function server(context: ToolContext): McpServer {
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async ({ id }) => {
+      const started = context.now();
       const document = await guarded('fetch', log, () =>
         fetchDocument(context, id),
       );
       log({ event: 'tool', tool: 'fetch', found: document !== undefined });
       if (!document) {
+        // The id asked for is the assistant's, so it is not recorded.
+        recordCall(
+          context,
+          started,
+          { tool: 'fetch', results: 0, documents: [] },
+          undefined,
+        );
         throw new Error(
           'No document with that id for this person. Find a document’s id with search, browse or recent.',
         );
       }
-      return result({ ...document });
+      const answer = result({ ...document });
+      recordCall(
+        context,
+        started,
+        {
+          tool: 'fetch',
+          results: 1,
+          documents: [document.id],
+          fetched: document.id,
+        },
+        answer,
+      );
+      return answer;
     },
   );
 
@@ -306,32 +447,18 @@ function server(context: ToolContext): McpServer {
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     ({ folder, depth, format }) => {
+      const started = context.now();
       const tree = browseFolder(context, folder, depth, format);
       log({ event: 'tool', tool: 'browse', found: tree !== undefined });
-      if (!tree) {
-        return result(
-          {
-            folder: [],
-            count: 0,
-            formats: {},
-            documents: [],
-            folders: [],
-            links: linkPattern(context.origin),
-          },
-          NO_FOLDER,
-        );
-      }
-      const collapsed = collapsedFolders(tree.folders);
-      return result(
-        { ...tree },
-        tree.count === 0 && format !== undefined
-          ? NO_FORMAT
-          : tree.omitted
-            ? omittedNote(tree.omitted)
-            : collapsed > 0
-              ? collapsedNote(collapsed)
-              : undefined,
+      const listed = tree ? listedDocuments(tree) : [];
+      const answer = browsed(context.origin, tree, format);
+      recordCall(
+        context,
+        started,
+        { tool: 'browse', results: listed.length, documents: listed },
+        answer,
       );
+      return answer;
     },
   );
 
@@ -350,16 +477,28 @@ function server(context: ToolContext): McpServer {
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     ({ changedSince, folder, format, limit }) => {
+      const started = context.now();
       const results = recentDocuments(
         context,
         { changedSince, folder, format },
         limit,
       );
       log({ event: 'tool', tool: 'recent', results: results.length });
-      return result(
+      const answer = result(
         { results },
         results.length === 0 ? NOTHING_RECENT : undefined,
       );
+      recordCall(
+        context,
+        started,
+        {
+          tool: 'recent',
+          results: results.length,
+          documents: results.map((entry) => entry.id),
+        },
+        answer,
+      );
+      return answer;
     },
   );
   return mcp;

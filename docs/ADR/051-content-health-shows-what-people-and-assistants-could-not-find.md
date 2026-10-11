@@ -33,20 +33,37 @@ The product decisions behind this record:
 **One row per MCP tool call**, written in `waitUntil` after the answer
 (table `mcp_calls`):
 
-| Column       | Meaning                                                                             |
-| ------------ | ----------------------------------------------------------------------------------- |
-| `at`         | Time, ISO 8601 UTC                                                                  |
-| `tool`       | `search`, `fetch`, `browse` or `recent`                                             |
-| `query`      | `search`'s query, at most 200 characters; null for the others                       |
-| `class`      | The reader's access class, as the access map names it; never the reader             |
-| `client`     | The OAuth client's name, at most 64 characters of letters, digits, spaces and `.-_` |
-| `results`    | Documents returned                                                                  |
-| `top_score`  | The best reranker score among them; null when there is none                         |
-| `documents`  | JSON array of the first five short IDs returned                                     |
-| `fetched`    | The short ID `fetch` read; null for the others                                      |
-| `characters` | Characters of the answer's text                                                     |
-| `latency_ms` | From the call's start to its answer                                                 |
-| `stale`      | Whether the directory snapshot was stale                                            |
+| Column       | Meaning                                                                          |
+| ------------ | -------------------------------------------------------------------------------- |
+| `at`         | Time, ISO 8601 UTC                                                               |
+| `tool`       | `search`, `fetch`, `browse` or `recent`                                          |
+| `query`      | `search`'s query, at most 200 characters; null for the others                    |
+| `classes`    | JSON array of the access classes the reader may read, sorted; never the reader   |
+| `client`     | The name the client gave when it connected, as letters, digits, spaces and `.-_` |
+| `results`    | Documents returned                                                               |
+| `top_score`  | The best reranker score among the chunks that counted; null when there is none   |
+| `documents`  | JSON array of the first five short IDs returned                                  |
+| `fetched`    | The short ID `fetch` read; null for the others                                   |
+| `characters` | Characters of the answer's text                                                  |
+| `latency_ms` | From the call's start to its answer                                              |
+| `stale`      | Whether the directory snapshot was stale                                         |
+
+**Which classes a record names.** A reader reads a set of classes, not one:
+the members class, and each restricted class one of their groups opens. A
+record names that set as the access decision of the call reached it, so it
+follows the directory as the answer does: while the snapshot is stale it is
+the members class alone. An admin reads every class and is named by
+`admins` alone. The set lets the report tell a miss every member has from one
+only readers of some folders have. Its cost is under Consequences.
+
+**The client** is the name the assistant gave when it connected, kept in its
+grant. It is the client's own claim: it labels the report and decides
+nothing. A grant from before this record has none.
+
+A call is recorded once its answer is made. A failed lookup, or a narrowing
+the server could not read, is not an answer and is not recorded; `fetch` of
+an id the reader may not open is, with no document and no id, since the id
+asked for is the assistant's text.
 
 **One row per settled site search**, from the second step (table
 `site_searches`):
@@ -55,7 +72,7 @@ The product decisions behind this record:
 | --------- | -------------------------------------------- |
 | `at`      | Time                                         |
 | `query`   | The query, at most 200 characters            |
-| `class`   | The reader's access class                    |
+| `classes` | The access classes the reader may read       |
 | `results` | Results Pagefind showed                      |
 | `opened`  | The page the reader opened from them, if any |
 
@@ -64,7 +81,7 @@ opened. The page sends it with `navigator.sendBeacon` to
 `POST /_kb/insights/search`. The Worker:
 
 - accepts it only from a signed-in reader;
-- takes the class from the session, never from the body;
+- takes the classes from the session, never from the body;
 - keeps at most 30 a minute per session in memory.
 
 **Both are kept 90 days.** The five-minute cron deletes older rows (ADR-050:
@@ -155,6 +172,9 @@ One branch and pull request, committed in this order:
 
 - Query text is stored, and may hold a name or a sensitive word. It is kept 90
   days (120 with Time Travel), and only admins read it.
+- The classes a reader may read follow from their groups. In a small
+  organization a rare set, with a time and a query, can point to a person.
+  Only admins read it, and they already see who belongs to each group.
 - Grouping by words is crude across languages: the same question in two
   languages forms two groups.
 - The first week's "weak" line is relative, not a measured threshold.

@@ -526,7 +526,7 @@ describe('browse through the MCP server', () => {
           params: { name: 'browse', arguments: args },
         }),
       }),
-      { ...access(reader, { map }), log: () => undefined },
+      { ...access(reader, { map }), log: () => undefined, now: () => 0 },
     );
     // Answered over SSE: one `data:` line for the one message.
     const data = (await response.text())

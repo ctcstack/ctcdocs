@@ -2,8 +2,9 @@
 -- deployment applies it with `wrangler d1 migrations apply --remote` before
 -- it deploys. Migrations are append-only; a released one is never edited.
 --
--- A row names an access class, never a reader, and every column is bounded,
--- so that no text but a query fits where an identifier belongs.
+-- A row names the access classes a reader may read, never the reader, and
+-- every column is bounded, so that no text but a query fits where an
+-- identifier belongs.
 --
 -- Times are ISO 8601 in UTC as `Date.prototype.toISOString` writes them, so
 -- they sort as text; the checks keep any other form out, since retention
@@ -16,7 +17,15 @@ CREATE TABLE mcp_calls (
   at TEXT NOT NULL CHECK (at IS strftime('%Y-%m-%dT%H:%M:%fZ', at)),
   tool TEXT NOT NULL CHECK (tool IN ('search', 'fetch', 'browse', 'recent')),
   query TEXT CHECK (length(query) <= 200),
-  class TEXT NOT NULL CHECK (length(class) <= 64),
+  -- The access classes the reader may read, as a sorted JSON array of the
+  -- access map's names, which are lowercase letters and digits.
+  classes TEXT NOT NULL CHECK (
+    json_valid(classes)
+    AND json_type(classes) = 'array'
+    AND json_array_length(classes) >= 1
+    AND length(classes) <= 2048
+    AND classes NOT GLOB '*[^],"0-9a-z[]*'
+  ),
   client TEXT CHECK (length(client) <= 64),
   results INTEGER NOT NULL CHECK (results >= 0),
   top_score REAL,
@@ -63,7 +72,15 @@ CREATE TABLE site_searches (
   id INTEGER PRIMARY KEY,
   at TEXT NOT NULL CHECK (at IS strftime('%Y-%m-%dT%H:%M:%fZ', at)),
   query TEXT NOT NULL CHECK (length(query) <= 200),
-  class TEXT NOT NULL CHECK (length(class) <= 64),
+  -- The access classes the reader may read, as a sorted JSON array of the
+  -- access map's names, which are lowercase letters and digits.
+  classes TEXT NOT NULL CHECK (
+    json_valid(classes)
+    AND json_type(classes) = 'array'
+    AND json_array_length(classes) >= 1
+    AND length(classes) <= 2048
+    AND classes NOT GLOB '*[^],"0-9a-z[]*'
+  ),
   results INTEGER NOT NULL CHECK (results >= 0),
   opened TEXT CHECK (length(opened) <= 512)
 ) STRICT;
