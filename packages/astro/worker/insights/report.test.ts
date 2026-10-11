@@ -138,6 +138,19 @@ describe('what was not found', () => {
     expect(report(calls.slice(0, 4)).notFound).toEqual([]);
   });
 
+  it("counts every search scoring as the fifth's last does as weak", () => {
+    const calls = Array.from({ length: 10 }, (_, index) =>
+      call({
+        query: `subject ${index}`,
+        topScore: index < 4 ? 0.2 : 0.9,
+        documents: [`${index}`.padStart(6, 'a')],
+      }),
+    );
+    const made = report(calls);
+    expect(made.weakLine.relative).toBe(0.2);
+    expect(made.notFound).toHaveLength(4);
+  });
+
   it('never counts a narrowed or a wordless search as a gap', () => {
     const made = report([
       miss('handbook', { narrowed: true }),
@@ -221,7 +234,41 @@ describe('grouping', () => {
   });
 });
 
+describe('merging', () => {
+  it('chains groups that each overlap the next', () => {
+    // {a b} ~ {a b c} ~ {b c}: one gap, though {a b} and {b c} share one word.
+    const made = report([
+      miss('alpha beta'),
+      miss('alpha beta gamma'),
+      miss('beta gamma'),
+    ]);
+    expect(made.notFound).toHaveLength(1);
+    expect(made.notFound[0]?.count).toBe(3);
+  });
+});
+
 describe('found, not read', () => {
+  it('needs five appearances, and fewer reads than a tenth of them', () => {
+    const appear = (id: string, times: number) =>
+      Array.from({ length: times }, () => call({ documents: [id] }));
+    const read = (id: string, times: number) =>
+      Array.from({ length: times }, () =>
+        call({ tool: 'fetch', query: null, fetched: id }),
+      );
+    const made = report([
+      ...appear('aaaaaa', 4),
+      ...appear('bbbbbb', 5),
+      ...appear('cccccc', 20),
+      ...read('cccccc', 2),
+      ...appear('dddddd', 20),
+      ...read('dddddd', 1),
+    ]);
+    expect(made.foundNotRead).toEqual([
+      { id: 'dddddd', appearances: 20, fetches: 1 },
+      { id: 'bbbbbb', appearances: 5, fetches: 0 },
+    ]);
+  });
+
   it('names documents returned often and fetched under a tenth as often', () => {
     const searches = Array.from({ length: 20 }, () =>
       call({ documents: ['aaaaaa', 'bbbbbb'] }),
@@ -278,15 +325,25 @@ describe('the report', () => {
       miss('parking spot'),
       call({ query: 'leave', topScore: 0.05 }),
       call({ query: 'sick leave', topScore: 0.02, documents: ['ffffff'] }),
+      // Ties in score, so the order they are broken in counts.
       ...Array.from({ length: 10 }, (_, index) =>
-        call({ query: `q${index}`, topScore: 0.5 + index / 100 }),
+        call({ query: `q${index}`, topScore: 0.5 + (index % 3) / 100 }),
       ),
       call({ tool: 'fetch', query: null, fetched: 'aaaaaa' }),
     ];
     const searches = [site('parking'), site('lunch menu', 2)];
     const once = JSON.stringify(report(calls, searches));
+    // A fixed shuffle, so a failure is the same every run.
+    let seed = 7;
+    const next = () => {
+      seed = (seed * 48271) % 2147483647;
+      return seed;
+    };
     for (let turn = 0; turn < 5; turn += 1) {
-      const shuffled = [...calls].sort(() => Math.random() - 0.5);
+      const shuffled = [...calls]
+        .map((row) => ({ row, key: next() }))
+        .sort((a, b) => a.key - b.key)
+        .map(({ row }) => row);
       expect(JSON.stringify(report(shuffled, [...searches].reverse()))).toBe(
         once,
       );

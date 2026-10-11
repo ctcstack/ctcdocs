@@ -1,9 +1,12 @@
 /**
- * What the Worker's schedule asks of the database (ADR-050, ADR-051): last
- * week's report, then the deletion of what is past its retention.
+ * What the Worker's schedule asks of the database (ADR-050, ADR-051): the
+ * deletion of what is past its retention, then last week's report.
  *
- * The report comes first, so it is made from the week's records before any
- * of them could go. Retention follows the database, not the recording:
+ * Deletion comes first, so that a report that cannot finish, in a week too
+ * heavy for one run, never keeps a record past its line. It never takes
+ * what the report reads: retention is at least two weeks, and the report's
+ * week ended under one ago. Retention follows the database, not the
+ * recording:
  * whenever one is bound, what is past its line is deleted, so turning
  * insights off stops new records and reports and still lets the old ones
  * go. Recording with no database bound is logged, since nothing is kept.
@@ -32,6 +35,12 @@ export async function maintainState({
     }
     return;
   }
+  await expireRecords({
+    database,
+    retentionDays: insights.retentionDays,
+    now,
+    log,
+  });
   if (insights.enabled) {
     await reportLastWeek({
       database,
@@ -43,10 +52,4 @@ export async function maintainState({
       log,
     });
   }
-  await expireRecords({
-    database,
-    retentionDays: insights.retentionDays,
-    now,
-    log,
-  });
 }

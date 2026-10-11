@@ -11,14 +11,20 @@ const QUERY_CHARACTERS = 200;
 const MESSAGE_CHARACTERS = 200;
 
 /**
- * A query as it is kept: its first 200 characters, never half of one. The
- * text is cut to twice that in UTF-16 units first, which holds at least 200
- * characters, so a long query is never copied whole.
+ * A query as it is kept: its first 200 characters, never half of one, with
+ * control characters as spaces, so that none reaches a terminal that prints
+ * it. The text is cut to twice that in UTF-16 units first, which holds at
+ * least 200 characters, so a long query is never copied whole.
  */
 export function recordedQuery(query: string): string {
-  return Array.from(query.slice(0, QUERY_CHARACTERS * 2))
+  return Array.from(plainText(query.slice(0, QUERY_CHARACTERS * 2)))
     .slice(0, QUERY_CHARACTERS)
     .join('');
+}
+
+/** Text without control characters: each is a space. */
+function plainText(text: string): string {
+  return text.replace(/\p{Cc}/gu, ' ');
 }
 
 /**

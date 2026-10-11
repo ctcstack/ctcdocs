@@ -67,7 +67,13 @@ describe('the week reported', () => {
 
   it('begins on a Monday', () => {
     expect(weekFrom('2026-10-05').to).toBe('2026-10-12T00:00:00.000Z');
-    for (const week of ['2026-10-06', '2026-13-01', 'last week']) {
+    // 30 February 2026 would be read as Monday 2 March.
+    for (const week of [
+      '2026-10-06',
+      '2026-13-01',
+      '2026-02-30',
+      'last week',
+    ]) {
       expect(() => weekFrom(week)).toThrow(/begins on a Monday/u);
     }
   });
@@ -175,6 +181,7 @@ describe('reportLastWeek', () => {
         mcpCalls: 3,
         siteSearches: 0,
         truncated: false,
+        unreadable: 0,
         notFound: 2,
       },
     ]);
@@ -229,10 +236,82 @@ describe('reportLastWeek', () => {
   });
 });
 
+describe('a week that cannot be reported', () => {
+  it('counts the records it could not read, and still reports the rest', async () => {
+    const database = await withCalls({}, { query: 'vacation' });
+    // A column the parser does not expect in the first row, as a drift
+    // between the schema and the reader would bring.
+    const reading = (
+      statement: ReturnType<StateDatabase['prepare']>,
+    ): ReturnType<StateDatabase['prepare']> => ({
+      bind: (...values) => reading(statement.bind(...values)),
+      run: () => statement.run(),
+      all: async () => {
+        const { results } = await statement.all();
+        return {
+          results: results.map((row, index) =>
+            index === 0 ? { ...(row as object), latency_ms: 1.5 } : row,
+          ),
+        };
+      },
+    });
+    const drifting: StateDatabase = {
+      prepare: (query) => reading(database.prepare(query)),
+      batch: (statements) => database.batch(statements),
+    };
+    const events: Record<string, unknown>[] = [];
+    await reportLastWeek({
+      database: drifting,
+      now: NOW,
+      settings: SETTINGS,
+      log: (event) => events.push({ ...event }),
+    });
+    const kept = await keptReport(database, '2026-10-05');
+    expect(kept?.records).toEqual({
+      mcpCalls: 1,
+      siteSearches: 0,
+      truncated: false,
+      unreadable: 1,
+    });
+    expect(events[0]).toMatchObject({ unreadable: 1 });
+  });
+
+  it('logs only the run that keeps the report', async () => {
+    const database = await withCalls({});
+    // Another run kept it between this one's look and its write.
+    const racing: StateDatabase = {
+      prepare: (query) =>
+        query.startsWith('SELECT week FROM reports')
+          ? {
+              bind: () => racing.prepare(query),
+              run: () => Promise.reject(new Error('unused')),
+              all: async () => ({ results: [] }),
+            }
+          : database.prepare(query),
+      batch: (statements) => database.batch(statements),
+    };
+    await reportLastWeek({
+      database,
+      now: NOW,
+      settings: SETTINGS,
+      log: () => undefined,
+    });
+    const events: Record<string, unknown>[] = [];
+    await reportLastWeek({
+      database: racing,
+      now: NOW,
+      settings: SETTINGS,
+      log: (event) => events.push({ ...event }),
+    });
+    expect(rowsOf(database, 'reports')).toHaveLength(1);
+    expect(events).toEqual([]);
+  });
+});
+
 describe('maintainState', () => {
   const insights = { enabled: true, retentionDays: 90 };
 
-  it('reports last week, then deletes what is past its retention', async () => {
+  it('deletes what is past its retention, then reports last week', async () => {
     const database = await withCalls(
       {},
       { at: '2026-07-01T00:00:00.000Z', query: 'old' },
@@ -245,11 +324,40 @@ describe('maintainState', () => {
       log: (event) => events.push({ ...event }),
     });
     expect(events.map((event) => event.event)).toEqual([
-      'insights-reported',
       'state-expired',
+      'insights-reported',
     ]);
     expect(rowsOf(database, 'reports')).toHaveLength(1);
     expect(rowsOf(database, 'mcp_calls')).toHaveLength(1);
+  });
+
+  it('deletes past its retention even when the report cannot be made', async () => {
+    const database = await withCalls(
+      {},
+      { at: '2026-07-01T00:00:00.000Z', query: 'old' },
+    );
+    const failing: StateDatabase = {
+      prepare: (query) =>
+        query.startsWith('DELETE')
+          ? database.prepare(query)
+          : {
+              bind: () => failing.prepare(query),
+              run: () => Promise.reject(new Error('unused')),
+              // A report that never ends, as an isolate past its limits.
+              all: () => new Promise(() => undefined),
+            },
+      batch: (statements) => database.batch(statements),
+    };
+    void maintainState({
+      insights,
+      database: failing,
+      now: NOW,
+      log: () => undefined,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(rowsOf(database, 'mcp_calls').map((row) => row.query)).toEqual([
+      'parking permit',
+    ]);
   });
 
   it('reports nothing with insights off, and still deletes', async () => {

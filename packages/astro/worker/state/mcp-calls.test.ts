@@ -51,6 +51,12 @@ describe('recordedQuery', () => {
     expect(Array.from(kept)).toHaveLength(200);
     expect(kept).toBe('😀'.repeat(200));
   });
+
+  it('keeps no control character, which a terminal would act on', () => {
+    expect(recordedQuery('a\u001b]52;c;x\u0007b\nc\u007fd')).toBe(
+      'a ]52;c;x b c d',
+    );
+  });
 });
 
 describe('clientLabel', () => {

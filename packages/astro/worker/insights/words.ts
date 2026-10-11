@@ -52,7 +52,7 @@ export function queryWords(
   const tokens = query
     .normalize('NFKC')
     .toLowerCase()
-    .split(/[^\p{L}\p{N}]+/u)
+    .split(/[^\p{L}\p{M}\p{N}]+/u)
     .filter((token) => token.length > 0);
   const kept = tokens.filter((token) => !stopWords.has(token));
   return [...new Set(kept.length > 0 ? kept : tokens)].sort();

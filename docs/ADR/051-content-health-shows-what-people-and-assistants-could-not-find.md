@@ -127,8 +127,9 @@ The report holds:
 - **Once a week, made up if missed.** Each run of the schedule reports the
   week before, from Monday to Monday in UTC, unless that report is kept. A
   run that fails is made up by the next; two at once keep the first. A week
-  with no record is not reported. The report is made before retention
-  deletes anything.
+  with no record is not reported. Retention deletes first, so a week too
+  heavy to report in one run never keeps a record past its line; with
+  retention at least two weeks, it never takes what the report reads.
 - **What is never a gap.** A search kept to a folder, a date or a format,
   and one with no word to group by, count in the use but never as not
   found, nor in the share: what it missed may be there.
@@ -140,14 +141,17 @@ The report holds:
   same best document merges groups of what was not found only: among all
   searches it would join every question a popular document answers.
 - **The relative weak line** is the lowest fifth of the week's scored
-  searches, so a week with fewer than five has none.
+  searches, so a week with fewer than five has none; a search scoring as
+  the fifth's last does is as weak.
 - **Bounds.** Fifty groups of what was not found, the twenty asked most,
   ten queries and five documents a group, twenty documents found and not
   read, each returned at least five times. At most 50,000 records of each
-  table are read, and the report says when a week held more.
+  table are read, and the report says when a week held more, and how many
+  records it could not read.
 - **Names.** Documents by short ID, classes by the access map's names,
-  clients by their labels: the queries are its only text. `ctcdocs-insights`
-  and the content health page show titles from the build.
+  clients by their labels: the queries are its only text, kept without
+  control characters. `ctcdocs-insights` and the content health page show
+  titles from the build.
 
 ### How editors see it
 

@@ -42,7 +42,12 @@ export function weekFrom(monday: number | string): ReportWeek {
   const start =
     typeof monday === 'number' ? monday : Date.parse(`${monday}T00:00:00Z`);
   const from = new Date(start);
-  if (Number.isNaN(start) || from.getUTCDay() !== 1) {
+  // A date that does not exist, as 30 February, is not read as another.
+  if (
+    Number.isNaN(start) ||
+    from.getUTCDay() !== 1 ||
+    (typeof monday === 'string' && from.toISOString().slice(0, 10) !== monday)
+  ) {
     throw new RangeError('A week begins on a Monday, given as YYYY-MM-DD.');
   }
   return {
@@ -95,12 +100,19 @@ const siteSearchRow = z.object({
   results: z.number().int(),
 });
 
-/** The rows that parse; a row the schema allowed but this cannot read is left out. */
-function parsed<T>(rows: readonly unknown[], schema: z.ZodType<T>): T[] {
-  return rows.flatMap((row) => {
+/**
+ * The rows that parse. A row the schema allowed but this cannot read is left
+ * out, and counted, so that a drift between the two shows in the report.
+ */
+function parsed<T>(
+  rows: readonly unknown[],
+  schema: z.ZodType<T>,
+): { rows: T[]; unreadable: number } {
+  const read = rows.flatMap((row) => {
     const result = schema.safeParse(row);
     return result.success ? [result.data] : [];
   });
+  return { rows: read, unreadable: rows.length - read.length };
 }
 
 /** A week's records, at most `limit` of each table. */
@@ -112,6 +124,7 @@ export async function readWeek(
   calls: CallRow[];
   siteSearches: SiteSearchRow[];
   truncated: boolean;
+  unreadable: number;
 }> {
   const [calls, searches] = await Promise.all([
     database
@@ -130,10 +143,13 @@ export async function readWeek(
       .bind(from, to, limit + 1)
       .all(),
   ]);
+  const read = parsed(calls.results.slice(0, limit), callRow);
+  const searched = parsed(searches.results.slice(0, limit), siteSearchRow);
   return {
-    calls: parsed(calls.results.slice(0, limit), callRow),
-    siteSearches: parsed(searches.results.slice(0, limit), siteSearchRow),
+    calls: read.rows,
+    siteSearches: searched.rows,
     truncated: calls.results.length > limit || searches.results.length > limit,
+    unreadable: read.unreadable + searched.unreadable,
   };
 }
 
@@ -149,8 +165,11 @@ export async function makeReport({
   readonly now: number;
   readonly settings: ReportSettings;
 }): Promise<WeeklyReport | undefined> {
-  const { calls, siteSearches, truncated } = await readWeek(database, week);
-  if (calls.length === 0 && siteSearches.length === 0) {
+  const { calls, siteSearches, truncated, unreadable } = await readWeek(
+    database,
+    week,
+  );
+  if (calls.length === 0 && siteSearches.length === 0 && unreadable === 0) {
     return undefined;
   }
   return weeklyReport({
@@ -159,6 +178,7 @@ export async function makeReport({
     calls,
     siteSearches,
     truncated,
+    unreadable,
     settings,
   });
 }
@@ -207,18 +227,22 @@ export async function reportLastWeek({
       return;
     }
     // Two runs at once keep the first report; the second changes nothing.
-    await database
+    const { meta } = await database
       .prepare(
         'INSERT INTO reports (week, at, report) VALUES (?, ?, ?) ON CONFLICT (week) DO NOTHING',
       )
       .bind(report.week, report.made, JSON.stringify(report))
       .run();
+    if (meta.changes === 0) {
+      return;
+    }
     log({
       event: 'insights-reported',
       week: report.week,
       mcpCalls: report.records.mcpCalls,
       siteSearches: report.records.siteSearches,
       truncated: report.records.truncated,
+      unreadable: report.records.unreadable,
       notFound: report.notFound.length,
     });
   } catch (error: unknown) {

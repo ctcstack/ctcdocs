@@ -22,7 +22,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, realpathSync } from 'node:fs';
 import { readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { dirname, join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
@@ -175,7 +175,13 @@ function wranglerExecute({ projectRoot, env, local }) {
         '--command',
         command,
       ],
-      { cwd: projectRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+      {
+        cwd: projectRoot,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        // A busy week is tens of megabytes of JSON.
+        maxBuffer: 512 * 1024 * 1024,
+      },
     );
     const parsed = JSON.parse(output);
     return Array.isArray(parsed) ? (parsed[0]?.results ?? []) : [];
@@ -220,19 +226,22 @@ export function candidateQuestions(report) {
 const percent = (share) =>
   share === null ? 'none' : `${Math.round(share * 1000) / 10}%`;
 
+/** Text as a terminal shows it: no control character reaches it. */
+const shown = (text) => String(text).replace(/[\p{Cc}\u2028\u2029]/gu, ' ');
+
 /** The report as a maintainer reads it in a terminal. */
 export function formatReport(report, titles = new Map()) {
-  const name = (id) => (titles.has(id) ? `${titles.get(id)} (${id})` : id);
+  const name = (id) => shown(titles.has(id) ? `${titles.get(id)} (${id})` : id);
   const { use } = report;
   const lines = [
     `Insights for the week of ${report.week} (${report.from} to ${report.to}), made ${report.made}`,
-    `Records: ${report.records.mcpCalls} MCP calls, ${report.records.siteSearches} site searches${report.records.truncated ? ' (more than the report read)' : ''}`,
+    `Records: ${report.records.mcpCalls} MCP calls, ${report.records.siteSearches} site searches${report.records.truncated ? ' (more than the report read)' : ''}${report.records.unreadable ? `; ${report.records.unreadable} could not be read` : ''}`,
     '',
     'Use',
     `  Calls: ${Object.entries(use.calls)
       .map(([tool, count]) => `${tool} ${count}`)
       .join(', ')}`,
-    `  Clients: ${use.clients.map((entry) => `${entry.client ?? 'unnamed'} ${entry.calls}`).join(', ') || 'none'}`,
+    `  Clients: ${use.clients.map((entry) => `${shown(entry.client ?? 'unnamed')} ${entry.calls}`).join(', ') || 'none'}`,
     `  Search latency: median ${use.searchLatencyMs.median ?? '-'} ms, 95th percentile ${use.searchLatencyMs.p95 ?? '-'} ms`,
     `  Characters per answer (median): ${Object.entries(use.characters)
       .map(([tool, count]) => `${tool} ${count ?? '-'}`)
@@ -244,12 +253,12 @@ export function formatReport(report, titles = new Map()) {
     ...(report.notFound.length === 0
       ? ['  Nothing.']
       : report.notFound.slice(0, PRINTED_GROUPS).flatMap((group) => [
-          `  ${group.count}× ${group.label}${group.site > 0 ? ` (site ${group.site})` : ''}`,
+          `  ${group.count}× ${shown(group.label)}${group.site > 0 ? ` (site ${group.site})` : ''}`,
           ...(group.queries.length > 1
             ? [
                 `      also: ${group.queries
                   .filter((entry) => entry.query !== group.label)
-                  .map((entry) => entry.query)
+                  .map((entry) => shown(entry.query))
                   .join(' | ')}`,
               ]
             : []),
@@ -263,7 +272,9 @@ export function formatReport(report, titles = new Map()) {
     'Asked most',
     ...(report.askedMost.length === 0
       ? ['  Nothing.']
-      : report.askedMost.map((group) => `  ${group.count}× ${group.label}`)),
+      : report.askedMost.map(
+          (group) => `  ${group.count}× ${shown(group.label)}`,
+        )),
     '',
     'Found, not read',
     ...(report.foundNotRead.length === 0
@@ -295,10 +306,15 @@ export async function runInsights(
     now = Date.now(),
     execute,
     write = (text) => process.stdout.write(text),
+    note = (text) => process.stderr.write(text),
   } = {},
 ) {
   const options = parseInsightsArguments(argv);
   const projectRoot = findProjectRoot(cwd);
+  // Refused before anything is read, so a wrong path costs nothing.
+  const target = options.questions
+    ? questionsTarget(resolve(cwd, options.questions), projectRoot)
+    : undefined;
   const site = loadSiteConfiguration(projectRoot);
   if (!Object.hasOwn(site.deployment.environments, options.env)) {
     throw new InsightsError(
@@ -322,7 +338,7 @@ export async function runInsights(
       },
     }));
   if (!report) {
-    write(`No record of use in the week of ${week.week}.\n`);
+    note(`No record of use in the week of ${week.week}.\n`);
     return undefined;
   }
   write(
@@ -330,22 +346,44 @@ export async function runInsights(
       ? `${JSON.stringify(report, null, 2)}\n`
       : formatReport(report, await documentTitles(projectRoot)),
   );
-  if (options.questions) {
-    const target = resolve(cwd, options.questions);
-    if (target === resolve(projectRoot, EVALUATION_SET)) {
-      throw new InsightsError(
-        `--questions writes candidates beside the evaluation set, never into ${EVALUATION_SET}.`,
-      );
-    }
+  if (target) {
     await writeAtomically(
       target,
       `${JSON.stringify(candidateQuestions(report), null, 2)}\n`,
     );
-    write(
+    // Beside the report, never in it: `--json` stays one document.
+    note(
       `Wrote ${report.notFound.length} candidate questions to ${relative(cwd, target) || target}.\n`,
     );
   }
   return report;
+}
+
+/** The real place of a path whose file may not exist yet: its folder's. */
+function realPlace(path) {
+  let folder = dirname(path);
+  const rest = [basename(path)];
+  while (!existsSync(folder) && dirname(folder) !== folder) {
+    rest.unshift(basename(folder));
+    folder = dirname(folder);
+  }
+  return join(realpathSync(folder), ...rest);
+}
+
+/**
+ * Where candidates go: anywhere but the evaluation set itself, however the
+ * path names it, through a link or in another case.
+ */
+function questionsTarget(target, projectRoot) {
+  const same = (a, b) => a.toLowerCase() === b.toLowerCase();
+  if (
+    same(realPlace(target), realPlace(resolve(projectRoot, EVALUATION_SET)))
+  ) {
+    throw new InsightsError(
+      `--questions writes candidates beside the evaluation set, never into ${EVALUATION_SET}.`,
+    );
+  }
+  return target;
 }
 
 function isMain() {
