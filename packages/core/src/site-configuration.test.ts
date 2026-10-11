@@ -499,6 +499,48 @@ describe('parseSiteConfiguration', () => {
     expect(fetchCharacterLimit(parsed.mcp)).toBe(100_000);
   });
 
+  it('records what is asked only beside the MCP server, for a bounded time', () => {
+    const raw: Record<string, unknown> = {
+      ...validConfiguration(),
+      signIn: { workspaceDomains: ['example.com'] },
+      mcp: { enabled: true },
+      insights: { enabled: true },
+    };
+    expect(parseSiteConfiguration(raw).insights).toEqual({
+      enabled: true,
+      retentionDays: 90,
+    });
+
+    raw.insights = { enabled: true, retentionDays: 30 };
+    expect(parseSiteConfiguration(raw).insights?.retentionDays).toBe(30);
+
+    for (const retentionDays of [6, 366, 30.5, '90']) {
+      raw.insights = { enabled: true, retentionDays };
+      expect(() => parseSiteConfiguration(raw)).toThrow(
+        /insights\.retentionDays must be a whole number from 7 to 365/u,
+      );
+    }
+
+    raw.insights = { enabled: true, siteSearches: true };
+    expect(() => parseSiteConfiguration(raw)).toThrow(
+      /insights\.siteSearches is not a known setting/u,
+    );
+
+    raw.insights = { enabled: true };
+    raw.mcp = { enabled: false };
+    expect(() => parseSiteConfiguration(raw)).toThrow(
+      /insights needs mcp\.enabled/u,
+    );
+    delete raw.mcp;
+    expect(() => parseSiteConfiguration(raw)).toThrow(
+      /insights needs mcp\.enabled/u,
+    );
+
+    // Off, it may stay configured without the server.
+    raw.insights = { enabled: false };
+    expect(parseSiteConfiguration(raw).insights?.enabled).toBe(false);
+  });
+
   it("names the documents' language only when the project does", () => {
     const raw: Record<string, unknown> = {
       ...validConfiguration(),

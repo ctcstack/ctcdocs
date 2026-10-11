@@ -5,8 +5,10 @@
  * Only this file knows it runs on Cloudflare: the asset binding, the KV
  * namespace holding the directory snapshot and the machine keys, and the
  * secrets; and, for the MCP server (ADR-041), the OAuth library with its own
- * namespace, the bucket of documents and the AI Search instance. Its schedule
- * keeps that bucket in step with the build.
+ * namespace, the bucket of documents and the AI Search instance; and, for
+ * insights (ADR-051), the database of operational state (ADR-050). Its
+ * schedule keeps that bucket in step with the build and deletes the records
+ * the database no longer keeps.
  */
 import builtMap from 'ctcdocs-access-map';
 
@@ -23,6 +25,8 @@ import {
   SNAPSHOT_KEY,
   type DirectorySnapshot,
 } from './snapshot.js';
+import type { StateDatabase } from './state/database.js';
+import { expireRecords } from './state/retention.js';
 
 /** The part of an AI Search instance binding the Worker uses. */
 interface AiSearch {
@@ -53,6 +57,7 @@ interface Env {
   readonly OAUTH_KV?: unknown;
   readonly KB_DOCUMENTS?: DocumentStore;
   readonly KB_SEARCH?: AiSearch;
+  readonly KB_STATE_DB?: StateDatabase;
   readonly GOOGLE_CLIENT_ID?: string;
   readonly GOOGLE_CLIENT_SECRET?: string;
   readonly SESSION_SECRET?: string;
@@ -184,12 +189,30 @@ export default {
     });
   },
 
-  /** Publishes the build's documents for the MCP server, when it has changed. */
+  /**
+   * Deletes the records of use past their retention, and publishes the
+   * build's documents for the MCP server when it has changed.
+   */
   async scheduled(
     _controller: unknown,
     env: Env,
     ctx: ExecutionContextLike,
   ): Promise<void> {
+    const insights = accessMap.site.insights;
+    if (insights) {
+      if (env.KB_STATE_DB) {
+        ctx.waitUntil(
+          expireRecords({
+            database: env.KB_STATE_DB,
+            retentionDays: insights.retentionDays,
+            now: Date.now(),
+            log,
+          }),
+        );
+      } else {
+        log({ event: 'state-unbound' });
+      }
+    }
     const origin = Object.values(accessMap.site.environments)[0]?.origin;
     if (
       accessMap.site.mcp !== true ||

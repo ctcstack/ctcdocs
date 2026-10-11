@@ -78,11 +78,31 @@ const agentEnvironmentSchema = {
     .length(1),
 };
 
+/**
+ * The database of operational state (ADR-050), which insights need
+ * (ADR-051). It names the platform's migrations, so that `wrangler d1
+ * migrations apply` creates the tables the Worker writes to; without them
+ * every write would fail, and be dropped.
+ */
+const stateDatabaseSchema = z
+  .array(
+    z
+      .object({
+        binding: z.literal(PLATFORM_WORKERS.stateDatabaseBinding),
+        database_name: z.string().min(1),
+        database_id: z.string().min(1),
+        migrations_dir: z.literal(PLATFORM_WORKERS.stateMigrations),
+      })
+      .strict(),
+  )
+  .length(1);
+
 /** An environment's MCP resources, once the schema above has accepted them. */
 interface AgentResources {
   readonly kv_namespaces: readonly { binding: string; id: string }[];
   readonly r2_buckets: readonly { bucket_name: string }[];
   readonly ai_search: readonly { instance_name: string }[];
+  readonly d1_databases?: readonly { database_id: string }[];
 }
 
 /**
@@ -90,7 +110,8 @@ interface AgentResources {
  * (ADR-041). Two environments sharing a bucket or an index would overwrite
  * each other's documents on every scheduled run, and OAuth state kept in the
  * namespace that holds the snapshot and the machine keys would mix records
- * any client can create with the ones that decide access.
+ * any client can create with the ones that decide access. Two sharing a
+ * database would report each other's use as their own.
  */
 function agentResourceErrors(
   environments: Readonly<Record<string, AgentResources>>,
@@ -124,6 +145,14 @@ function agentResourceErrors(
         environment.ai_search[0]?.instance_name ?? '',
       ],
       [`the ${PLATFORM_WORKERS.oauthBinding} namespace`, oauth],
+      ...(environment.d1_databases
+        ? [
+            [
+              `the ${PLATFORM_WORKERS.stateDatabaseBinding} database`,
+              environment.d1_databases[0]?.database_id ?? '',
+            ] satisfies [string, string],
+          ]
+        : []),
     ];
     for (const [resource, value] of resources) {
       const key = JSON.stringify([resource, value]);
@@ -144,6 +173,7 @@ function protectedEnvironmentSchema(
   pattern: string,
   gated: boolean,
   agents: boolean,
+  insights: boolean,
 ) {
   const base = {
     workers_dev: z.literal(false),
@@ -177,6 +207,10 @@ function protectedEnvironmentSchema(
           ...base,
           vars: z.object({ GOOGLE_CLIENT_ID: z.string().min(1) }).strict(),
           ...agentBindings,
+          // Off, the database may stay, as the MCP server's bindings may.
+          d1_databases: insights
+            ? stateDatabaseSchema
+            : stateDatabaseSchema.optional(),
         })
         .strict()
     : z.object(base).strict();
@@ -211,10 +245,11 @@ function wranglerConfigurationSchema(site: SiteConfiguration) {
   const { deployment } = site;
   const gated = isGated(site);
   const agents = gated && site.mcp?.enabled === true;
+  const insights = agents && site.insights?.enabled === true;
   const environments = Object.fromEntries(
     Object.entries(deployment.environments).map(([name, environment]) => [
       name,
-      protectedEnvironmentSchema(environment.hostname, gated, agents),
+      protectedEnvironmentSchema(environment.hostname, gated, agents, insights),
     ]),
   );
   const assets = {
@@ -642,7 +677,7 @@ export async function validateRepositoryContent(
   } catch {
     errors.push(
       gated
-        ? `${PROJECT_LAYOUT.wranglerConfigurationFile} must deploy Worker ${site.deployment.workerName} with main ${PLATFORM_WORKERS.gate}, the ASSETS binding, run_worker_first, the ${PLATFORM_WORKERS.accessMapAlias} alias, and in each environment its configured hostname, public Worker URLs disabled, the ${PLATFORM_WORKERS.stateBinding} KV namespace and a GOOGLE_CLIENT_ID var${site.mcp?.enabled ? `; with MCP on, also the ${PLATFORM_WORKERS.oauthCompatibilityFlag} compatibility flag, the cron ${PLATFORM_WORKERS.publishSchedule}, and in each environment the ${PLATFORM_WORKERS.oauthBinding} KV namespace, the ${PLATFORM_WORKERS.documentsBinding} R2 bucket and the ${PLATFORM_WORKERS.searchBinding} AI Search instance` : ''}: ${names}`
+        ? `${PROJECT_LAYOUT.wranglerConfigurationFile} must deploy Worker ${site.deployment.workerName} with main ${PLATFORM_WORKERS.gate}, the ASSETS binding, run_worker_first, the ${PLATFORM_WORKERS.accessMapAlias} alias, and in each environment its configured hostname, public Worker URLs disabled, the ${PLATFORM_WORKERS.stateBinding} KV namespace and a GOOGLE_CLIENT_ID var${site.mcp?.enabled ? `; with MCP on, also the ${PLATFORM_WORKERS.oauthCompatibilityFlag} compatibility flag, the cron ${PLATFORM_WORKERS.publishSchedule}, and in each environment the ${PLATFORM_WORKERS.oauthBinding} KV namespace, the ${PLATFORM_WORKERS.documentsBinding} R2 bucket and the ${PLATFORM_WORKERS.searchBinding} AI Search instance` : ''}${site.insights?.enabled ? `; with insights on, also in each environment the ${PLATFORM_WORKERS.stateDatabaseBinding} D1 database with migrations_dir ${PLATFORM_WORKERS.stateMigrations}` : ''}: ${names}`
         : `${PROJECT_LAYOUT.wranglerConfigurationFile} must deploy Worker ${site.deployment.workerName} to exactly these environments and their configured hostnames, with public Worker URLs disabled: ${names}`,
     );
   }

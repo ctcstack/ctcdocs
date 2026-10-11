@@ -104,6 +104,11 @@ export interface AccessMapFile {
     readonly language?: string;
     /** Whether the Worker serves the MCP server and its OAuth routes. */
     readonly mcp?: boolean;
+    /**
+     * Present when the Worker records what is asked (ADR-051): how many
+     * days its schedule keeps a record of use.
+     */
+    readonly insights?: { readonly retentionDays: number };
   };
   readonly csp: { readonly scriptHashes: readonly string[] };
   readonly enabled: boolean;

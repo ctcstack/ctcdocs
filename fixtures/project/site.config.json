@@ -33,6 +33,9 @@
     "browseCharacters": 1000,
     "language": "en"
   },
+  "insights": {
+    "enabled": true
+  },
   "brand": {
     "name": "Example Corp",
     "siteTitle": "Example [DOCS]",

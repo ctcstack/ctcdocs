@@ -97,6 +97,16 @@ export const PLATFORM_WORKERS = {
   searchBinding: 'KB_SEARCH',
   /** How often the site's Worker checks that the bucket matches its build. */
   publishSchedule: '*/5 * * * *',
+  /**
+   * The database of operational state (ADR-050): records of use, and
+   * editors' workflow state. Never content, access or a reader's identity.
+   */
+  stateDatabaseBinding: 'KB_STATE_DB',
+  /**
+   * The platform's migrations for that database, which the binding names so
+   * that `wrangler d1 migrations apply` finds them.
+   */
+  stateMigrations: 'node_modules/@ctcstack/ctcdocs/worker/state/migrations',
   /** Lets the OAuth library fetch a client's metadata document safely. */
   oauthCompatibilityFlag: 'global_fetch_strictly_public',
 } as const;

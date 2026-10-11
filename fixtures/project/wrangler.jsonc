@@ -12,6 +12,11 @@
 // With MCP on (ADR-041) the Worker also keeps the OAuth library's state in
 // OAUTH_KV, publishes each document's Markdown to the KB_DOCUMENTS bucket on
 // its schedule, and searches it through the KB_SEARCH AI Search instance.
+//
+// With insights on (ADR-051) it records what is asked in the KB_STATE_DB
+// database, whose tables the platform's migrations create: apply them with
+// `wrangler d1 migrations apply KB_STATE_DB --env production --remote`
+// before each deploy.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "example-docs",
@@ -52,6 +57,14 @@
       ],
       "ai_search": [
         { "binding": "KB_SEARCH", "instance_name": "example-docs-search" },
+      ],
+      "d1_databases": [
+        {
+          "binding": "KB_STATE_DB",
+          "database_name": "example-docs-state",
+          "database_id": "22222222-2222-2222-2222-222222222222",
+          "migrations_dir": "node_modules/@ctcstack/ctcdocs/worker/state/migrations",
+        },
       ],
       "vars": {
         "GOOGLE_CLIENT_ID": "example.apps.googleusercontent.com",
