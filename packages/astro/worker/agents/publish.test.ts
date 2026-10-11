@@ -22,6 +22,7 @@ function setup({
   marker,
   missing = [] as string[],
   bare = [] as string[],
+  projections = {} as Record<string, string>,
 }: {
   map?: AccessMapFile;
   store?: MemoryStore;
@@ -29,6 +30,8 @@ function setup({
   missing?: string[];
   /** Projections served without the front matter the site writes. */
   bare?: string[];
+  /** A projection's text, by path, in place of the one made up from it. */
+  projections?: Record<string, string>;
 } = {}) {
   const fetched: string[] = [];
   const index = new FixedIndex([]);
@@ -51,7 +54,7 @@ function setup({
             if (missing.includes(path)) {
               return new Response('missing', { status: 404 });
             }
-            const body = `# Projection of ${path}\n`;
+            const body = projections[path] ?? `# Projection of ${path}\n`;
             return new Response(
               bare.includes(path)
                 ? body
@@ -80,8 +83,11 @@ describe('publishing documents for the MCP server', () => {
     const run = setup();
     expect(await run.run()).toBe('published');
     expect(run.store.objects.get('docs/bbbbbb.md')).toEqual({
-      // Without the front matter, which the index would hold as text.
-      text: '# Projection of /team/plan/index.md\n',
+      /*
+       * Without the front matter, which the index would hold as text, and
+       * with where the document sits on its first line (ADR-048).
+       */
+      text: 'Team › Team plan\n\n# Projection of /team/plan/index.md\n',
       customMetadata: {
         class: 'team0001',
         title: 'Team plan',
@@ -99,6 +105,33 @@ describe('publishing documents for the MCP server', () => {
       complete: true,
       synced: true,
     });
+  });
+
+  it('writes under each heading where its section sits', async () => {
+    const text =
+      '# Team plan\n\n## Leave\n\nAsk first.\n\n### Approval\n\nA lead.\n';
+    const map: AccessMapFile = {
+      ...agentMap,
+      agents: {
+        ...(agentMap.agents as NonNullable<AccessMapFile['agents']>),
+        documents: (agentMap.agents?.documents ?? []).map((document) =>
+          document.id === 'bbbbbb'
+            ? {
+                ...document,
+                outline: [
+                  [text.indexOf('\n\nAsk'), 2, 'Leave'],
+                  [text.indexOf('\n\nA lead'), 3, 'Approval'],
+                ],
+              }
+            : document,
+        ),
+      },
+    };
+    const run = setup({ map, projections: { '/team/plan/index.md': text } });
+    expect(await run.run()).toBe('published');
+    expect(run.store.objects.get('docs/bbbbbb.md')?.text).toBe(
+      'Team › Team plan\n\n# Team plan\n\n## Leave\n\nTeam plan › Leave\n\nAsk first.\n\n### Approval\n\nTeam plan › Leave › Approval\n\nA lead.\n',
+    );
   });
 
   it('rewrites only what changed and deletes what the build dropped', async () => {

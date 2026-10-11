@@ -84,11 +84,23 @@ export interface AgentDocument {
   readonly format: AgentDocumentFormat;
   /** A PDF's pages, when the sync counted them. */
   readonly pages?: number;
-  /** Characters of the stored text, which `fetch` returns (ADR-044). */
+  /** Characters of the document's text, which `fetch` returns (ADR-044). */
   readonly characters: number;
-  /** SHA-256 of the stored text, its class and its title. */
+  /**
+   * Its headings, in order: where each ends in the text, its depth and its
+   * words, from which the copy AI Search indexes says, under each heading,
+   * where the section sits (ADR-048). Absent when it has none.
+   */
+  readonly outline?: readonly AgentHeading[];
+  /**
+   * SHA-256 of the text, its class, its title, its folders and the shape of
+   * the indexed copy: everything that changes the object in R2.
+   */
   readonly hash: string;
 }
+
+/** A heading: the offset its line ends at in the text, its depth, its words. */
+export type AgentHeading = readonly [end: number, depth: number, text: string];
 
 export interface AccessMapFile {
   readonly schemaVersion: number;
