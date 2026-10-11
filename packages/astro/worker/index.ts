@@ -26,7 +26,7 @@ import {
   type DirectorySnapshot,
 } from './snapshot.js';
 import type { StateDatabase } from './state/database.js';
-import { expireRecords } from './state/retention.js';
+import { expireOnSchedule } from './state/retention.js';
 
 /** The part of an AI Search instance binding the Worker uses. */
 interface AiSearch {
@@ -198,20 +198,14 @@ export default {
     env: Env,
     ctx: ExecutionContextLike,
   ): Promise<void> {
-    const insights = accessMap.site.insights;
-    if (insights) {
-      if (env.KB_STATE_DB) {
-        ctx.waitUntil(
-          expireRecords({
-            database: env.KB_STATE_DB,
-            retentionDays: insights.retentionDays,
-            now: Date.now(),
-            log,
-          }),
-        );
-      } else {
-        log({ event: 'state-unbound' });
-      }
+    const expiring = expireOnSchedule({
+      insights: accessMap.site.insights,
+      database: env.KB_STATE_DB,
+      now: Date.now(),
+      log,
+    });
+    if (expiring) {
+      ctx.waitUntil(expiring);
     }
     const origin = Object.values(accessMap.site.environments)[0]?.origin;
     if (

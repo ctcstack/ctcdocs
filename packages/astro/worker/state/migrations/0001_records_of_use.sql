@@ -20,13 +20,37 @@ CREATE TABLE mcp_calls (
   client TEXT CHECK (length(client) <= 64),
   results INTEGER NOT NULL CHECK (results >= 0),
   top_score REAL,
-  -- A JSON array of at most five short IDs.
+  -- A JSON array of at most five short IDs. A check cannot read the array
+  -- with json_each, so each of the five places is checked in turn.
   documents TEXT NOT NULL CHECK (
     json_valid(documents)
     AND json_type(documents) = 'array'
     AND json_array_length(documents) <= 5
+    AND (json_type(documents, '$[0]') IS NULL
+      OR (json_type(documents, '$[0]') = 'text'
+        AND length(json_extract(documents, '$[0]')) BETWEEN 6 AND 64
+        AND json_extract(documents, '$[0]') NOT GLOB '*[^0-9a-f]*'))
+    AND (json_type(documents, '$[1]') IS NULL
+      OR (json_type(documents, '$[1]') = 'text'
+        AND length(json_extract(documents, '$[1]')) BETWEEN 6 AND 64
+        AND json_extract(documents, '$[1]') NOT GLOB '*[^0-9a-f]*'))
+    AND (json_type(documents, '$[2]') IS NULL
+      OR (json_type(documents, '$[2]') = 'text'
+        AND length(json_extract(documents, '$[2]')) BETWEEN 6 AND 64
+        AND json_extract(documents, '$[2]') NOT GLOB '*[^0-9a-f]*'))
+    AND (json_type(documents, '$[3]') IS NULL
+      OR (json_type(documents, '$[3]') = 'text'
+        AND length(json_extract(documents, '$[3]')) BETWEEN 6 AND 64
+        AND json_extract(documents, '$[3]') NOT GLOB '*[^0-9a-f]*'))
+    AND (json_type(documents, '$[4]') IS NULL
+      OR (json_type(documents, '$[4]') = 'text'
+        AND length(json_extract(documents, '$[4]')) BETWEEN 6 AND 64
+        AND json_extract(documents, '$[4]') NOT GLOB '*[^0-9a-f]*'))
   ),
-  fetched TEXT CHECK (length(fetched) <= 64),
+  -- A short ID: 6 to 64 lowercase hexadecimal digits.
+  fetched TEXT CHECK (
+    length(fetched) BETWEEN 6 AND 64 AND fetched NOT GLOB '*[^0-9a-f]*'
+  ),
   characters INTEGER NOT NULL CHECK (characters >= 0),
   latency_ms INTEGER NOT NULL CHECK (latency_ms >= 0),
   stale INTEGER NOT NULL CHECK (stale IN (0, 1))

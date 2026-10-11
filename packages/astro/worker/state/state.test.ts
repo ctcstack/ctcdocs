@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { StateDatabase } from './database.js';
 import { MemoryDatabase, migrationFiles } from './memory-database.js';
-import { expireRecords } from './retention.js';
+import { expireOnSchedule, expireRecords } from './retention.js';
 
 const NOW = Date.parse('2026-10-12T00:05:00.000Z');
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -110,18 +110,42 @@ describe('the migrations', () => {
            VALUES (?, ?, ?, ?, NULL, 0, NULL, ?, ?, 0, 0, 0)`,
         )
         .run(ago(1), tool, query, cls, documents, fetched);
-    const five = JSON.stringify(['a1', 'a2', 'a3', 'a4', 'a5']);
-    insert('x'.repeat(200), five, {
+    const ids = ['a1b2c3', 'd4e5f6', '0123456789', 'abcdef', 'f'.repeat(64)];
+    insert('x'.repeat(200), JSON.stringify(ids), {
       cls: 'f'.repeat(64),
-      fetched: 'f'.repeat(64),
+      fetched: 'a1b2c3',
     });
-    expect(() =>
-      insert('q', JSON.stringify(['a0', ...JSON.parse(five)])),
-    ).toThrow(/CHECK/u);
-    expect(() => insert('q', '[]', { cls: 'f'.repeat(65) })).toThrow(/CHECK/u);
-    expect(() => insert('q', '[]', { fetched: 'f'.repeat(65) })).toThrow(
+    insert('q', '[]', { fetched: 'f'.repeat(64) });
+    expect(() => insert('q', JSON.stringify(['a0b0c0', ...ids]))).toThrow(
       /CHECK/u,
     );
+    // Only short IDs, in any of the five places: never text, a number, a
+    // list or an object.
+    for (const intruder of [
+      'x'.repeat(100_000),
+      'f'.repeat(65),
+      'abcde',
+      'A1B2C3',
+      'a1b2c3 ',
+      '../d/a1b2c3',
+      1,
+      null,
+      [],
+      { text: 'the body of a document' },
+    ]) {
+      for (const place of [0, 4]) {
+        const documents = [...ids];
+        documents[place] = intruder as string;
+        expect(() => insert('q', JSON.stringify(documents))).toThrow(/CHECK/u);
+      }
+      if (typeof intruder === 'string') {
+        expect(() => insert('q', '[]', { fetched: intruder })).toThrow(
+          /CHECK/u,
+        );
+      }
+    }
+    expect(() => insert('q', '[1,null,[]]')).toThrow(/CHECK/u);
+    expect(() => insert('q', '[]', { cls: 'f'.repeat(65) })).toThrow(/CHECK/u);
     expect(() => insert('x'.repeat(201), '[]')).toThrow(/CHECK/u);
     expect(() => insert('q', '{}')).toThrow(/CHECK/u);
     expect(() => insert('q', 'not json')).toThrow(/CHECK/u);
@@ -235,5 +259,48 @@ describe('expireRecords', () => {
     expect(events).toEqual([
       { event: 'state-expiry-failed', error: 'Invalid time value' },
     ]);
+  });
+
+  it('runs on the schedule whenever the database is bound, recording or not', async () => {
+    const database = new MemoryDatabase();
+    insertCall(database, ago(100));
+    insertCall(database, ago(1));
+    const events: Record<string, unknown>[] = [];
+    const log = (event: Readonly<Record<string, unknown>>) =>
+      events.push({ ...event });
+
+    // Insights turned off, the database still bound: old records still go.
+    await expireOnSchedule({
+      insights: { enabled: false, retentionDays: 90 },
+      database,
+      now: NOW,
+      log,
+    });
+    expect(count(database, 'mcp_calls')).toBe(1);
+    expect(events).toEqual([
+      expect.objectContaining({ event: 'state-expired' }),
+    ]);
+
+    events.length = 0;
+    expect(
+      expireOnSchedule({
+        insights: { enabled: true, retentionDays: 90 },
+        database: undefined,
+        now: NOW,
+        log,
+      }),
+    ).toBeUndefined();
+    expect(events).toEqual([{ event: 'state-unbound' }]);
+
+    events.length = 0;
+    expect(
+      expireOnSchedule({
+        insights: { enabled: false, retentionDays: 90 },
+        database: undefined,
+        now: NOW,
+        log,
+      }),
+    ).toBeUndefined();
+    expect(events).toEqual([]);
   });
 });

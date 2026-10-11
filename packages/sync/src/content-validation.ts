@@ -169,6 +169,29 @@ function agentResourceErrors(
   return errors;
 }
 
+/**
+ * A bound database is emptied of expired records by the site Worker's
+ * schedule (ADR-050), whether insights are on or not: one kept after
+ * insights are turned off, or with the MCP server off, still needs the cron,
+ * or its records would be kept for good.
+ */
+function stateScheduleErrors(wrangler: unknown): string[] {
+  const { env, triggers } = (wrangler ?? {}) as {
+    env?: Record<string, { d1_databases?: unknown } | undefined>;
+    triggers?: { crons?: unknown };
+  };
+  const bound = Object.entries(env ?? {})
+    .filter(([, environment]) => environment?.d1_databases !== undefined)
+    .map(([name]) => name)
+    .sort();
+  const crons = Array.isArray(triggers?.crons) ? triggers.crons : [];
+  return bound.length > 0 && !crons.includes(PLATFORM_WORKERS.publishSchedule)
+    ? [
+        `${PROJECT_LAYOUT.wranglerConfigurationFile}: ${bound.length === 1 ? 'the environment' : 'the environments'} ${bound.join(', ')} ${bound.length === 1 ? 'binds' : 'bind'} the ${PLATFORM_WORKERS.stateDatabaseBinding} database, which needs the cron ${PLATFORM_WORKERS.publishSchedule} to delete expired records`,
+      ]
+    : [];
+}
+
 function protectedEnvironmentSchema(
   pattern: string,
   gated: boolean,
@@ -683,6 +706,7 @@ export async function validateRepositoryContent(
   }
 
   if (gated) {
+    errors.push(...stateScheduleErrors(wrangler));
     /*
      * The asset store applies `_redirects` before it serves a file, so a rule
      * there could answer one path with another file's bytes; the Worker

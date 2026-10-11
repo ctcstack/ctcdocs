@@ -38,6 +38,7 @@ export const agentMap: AccessMapFile = {
     description: 'Synthetic documentation',
     language: 'English',
     mcp: true,
+    insights: { enabled: false, retentionDays: 90 },
   },
   csp: { scriptHashes: [] },
   enabled: true,
