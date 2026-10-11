@@ -10,6 +10,7 @@ const answering = (status: number, body: unknown) =>
 const answer = {
   report: {
     week: '2026-10-05',
+    records: { mcpCalls: 50_000, truncated: true, unreadable: 3 },
     notFound: [
       {
         label: 'parking permit',
@@ -66,6 +67,8 @@ describe('the insights report in the browser', () => {
         notFound: 6,
         siteSearches: 10,
         siteNotFound: 1,
+        truncated: true,
+        unreadable: 3,
         groups: [
           {
             label: 'parking permit',

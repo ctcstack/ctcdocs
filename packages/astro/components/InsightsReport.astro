@@ -23,6 +23,7 @@
       <span>What people could not find</span>
     </h2>
     <p class="health-lede" data-lede></p>
+    <p class="health-notice" data-partial hidden></p>
     <ul class="health-folders" data-groups></ul>
     <div data-unread hidden>
       <h3 class="health-block-heading">Found, but not opened</h3>
@@ -110,7 +111,9 @@
       const groups = this.querySelector<HTMLElement>('[data-groups]');
       const unread = this.querySelector<HTMLElement>('[data-unread]');
       const unreadList = this.querySelector<HTMLElement>('[data-unread-list]');
-      if (!section || !lede || !groups || !unread || !unreadList) return;
+      const partial = this.querySelector<HTMLElement>('[data-partial]');
+      if (!section || !lede || !groups || !unread || !unreadList || !partial)
+        return;
 
       const answer = await readInsights();
       if (!answer) return;
@@ -122,6 +125,7 @@
         return;
       }
       const { view } = answer;
+      const incomplete = view.truncated || view.unreadable > 0;
       const week = new Date(`${view.week}T00:00:00Z`).toLocaleDateString(
         'en-GB',
         { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' },
@@ -133,7 +137,23 @@
           : '') +
         (view.groups.length > 0
           ? '. Each line is one thing asked, most asked first: write the document it needs, or name the one that has it the way people ask.'
-          : '. Nothing asked went unfound.');
+          : incomplete
+            ? '.'
+            : '. Nothing asked went unfound.');
+      if (incomplete) {
+        partial.hidden = false;
+        partial.textContent = [
+          view.truncated
+            ? 'The week held more searches than the report reads, so these are the first of them.'
+            : '',
+          view.unreadable > 0
+            ? `${plural(view.unreadable, 'record')} could not be read and are left out.`
+            : '',
+          'The figures are of what was read, not of the whole week.',
+        ]
+          .filter((part) => part.length > 0)
+          .join(' ');
+      }
       groups.replaceChildren(...view.groups.map(groupItem));
       groups.hidden = view.groups.length === 0;
 

@@ -69,6 +69,7 @@ function report(week: string, label: string): WeeklyReport {
     use: {
       calls: { search: 1, fetch: 0, browse: 0, recent: 0 },
       clients: [{ client: 'Claude', calls: 1 }],
+      otherClients: 0,
       searchLatencyMs: { median: 300, p95: 300 },
       characters: { search: 100, fetch: null, browse: null, recent: null },
       notFound: { mcp: { searches: 1, notFound: 1, share: 1 }, site: empty },

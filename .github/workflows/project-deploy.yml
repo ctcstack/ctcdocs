@@ -337,6 +337,45 @@ jobs:
             sleep "${delay}"
           done
 
+      # The database of operational state (ADR-050) takes the platform's
+      # migrations before the Worker that writes to it is deployed: its
+      # binding names them, and without them every record is dropped. Only a
+      # project with insights on has one in every environment, as validation
+      # requires; the migrations are append-only, so a rollback of the Worker
+      # runs on the schema as it is.
+      - name: Apply the state database migrations
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_ENVIRONMENT: ${{ inputs.wrangler_environment }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$(jq -r '.insights.enabled // false' site.config.json)" != "true" ]]; then
+            echo "Insights are off: no state database to migrate."
+            exit 0
+          fi
+
+          for attempt in 1 2 3
+          do
+            if pnpm exec wrangler d1 migrations apply KB_STATE_DB \
+              --env "${WRANGLER_ENVIRONMENT}" \
+              --remote
+            then
+              exit 0
+            fi
+
+            if [[ "${attempt}" == "3" ]]; then
+              echo "::error::The state database migrations failed after ${attempt} attempts; nothing was deployed."
+              exit 1
+            fi
+
+            delay=$((attempt * 15))
+            echo "::warning::Migration attempt ${attempt} failed; retrying in ${delay}s."
+            sleep "${delay}"
+          done
+
       - name: Deploy with Wrangler
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
