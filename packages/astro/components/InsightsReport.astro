@@ -116,6 +116,7 @@
       if (!answer) return;
       section.hidden = false;
       if (answer.kind === 'none') {
+        groups.hidden = true;
         lede.textContent =
           'No week has been reported yet. The first report comes the Monday after a week in which people searched.';
         return;
@@ -134,6 +135,7 @@
           ? '. Each line is one thing asked, most asked first: write the document it needs, or name the one that has it the way people ask.'
           : '. Nothing asked went unfound.');
       groups.replaceChildren(...view.groups.map(groupItem));
+      groups.hidden = view.groups.length === 0;
 
       if (view.unread.length > 0) {
         unread.hidden = false;

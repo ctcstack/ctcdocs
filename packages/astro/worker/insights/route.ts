@@ -22,13 +22,17 @@ interface InsightsAnswer {
   >;
 }
 
-/** The short IDs a report names, in every list that names one. */
+/**
+ * The short IDs a report names, in every list that names one; a list a
+ * report of another shape lacks names none.
+ */
 function namedDocuments(report: WeeklyReport): Set<string> {
+  const groups = [...(report.notFound ?? []), ...(report.askedMost ?? [])];
   return new Set([
-    ...[...report.notFound, ...report.askedMost].flatMap((group) =>
-      group.documents.map((entry) => entry.id),
+    ...groups.flatMap((group) =>
+      (group.documents ?? []).map((entry) => entry.id),
     ),
-    ...report.foundNotRead.map((entry) => entry.id),
+    ...(report.foundNotRead ?? []).map((entry) => entry.id),
   ]);
 }
 
@@ -50,8 +54,10 @@ export async function insightsAnswer({
     });
   }
   let report: WeeklyReport | undefined;
+  let named: Set<string>;
   try {
     report = await latestReport(database);
+    named = report ? namedDocuments(report) : new Set();
   } catch (error: unknown) {
     log({ event: 'insights-read-failed', error: failureMessage(error) });
     return new Response('The insights report could not be read.', {
@@ -62,7 +68,7 @@ export async function insightsAnswer({
     (map.agents?.documents ?? []).map((document) => [document.id, document]),
   );
   const documents = Object.fromEntries(
-    [...(report ? namedDocuments(report) : [])].sort().flatMap((id) => {
+    [...named].sort().flatMap((id) => {
       const document = catalog.get(id);
       return document
         ? [

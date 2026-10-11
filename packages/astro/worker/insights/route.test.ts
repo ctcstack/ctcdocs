@@ -206,6 +206,19 @@ describe('the insights report', () => {
     expect(await none.json()).toEqual({ report: null, documents: {} });
   });
 
+  it('answers a report of another shape, naming no document of it', async () => {
+    const database = new MemoryDatabase();
+    database.sqlite
+      .prepare('INSERT INTO reports (week, at, report) VALUES (?, ?, ?)')
+      .run('2026-10-05', '2026-10-12T00:05:00.000Z', '{"version":2}');
+    const answer = await ask(context({ database }), await as('user-admin'));
+    expect(answer.status).toBe(200);
+    expect(await answer.json()).toEqual({
+      report: { version: 2 },
+      documents: {},
+    });
+  });
+
   it('answers a database that fails plainly, and logs it', async () => {
     const failing: StateDatabase = {
       prepare: () => ({

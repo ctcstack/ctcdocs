@@ -993,8 +993,11 @@ test('the content health page shows admins what people could not find', async ({
     name: 'What people could not find',
   });
 
-  // Unanswered, as for anyone but an admin, the section is not there.
+  // Unanswered, as for anyone but an admin, the section is not there, once
+  // the page has asked and been refused.
+  const asked = page.waitForResponse('**/_kb/insights.json');
   await page.goto('/content-health/');
+  await asked;
   await expect(section).toBeHidden();
 
   // The Worker answers an admin; the static server does not, so it is here.
