@@ -963,6 +963,9 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
     if (enabled && mcp?.enabled !== true) {
       fail('insights', 'needs mcp.enabled: it records what assistants ask');
     }
+    if (enabled && !access) {
+      fail('insights', 'needs access.admins: only admins read the report');
+    }
     insights = {
       enabled,
       /*

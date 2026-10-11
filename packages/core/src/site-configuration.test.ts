@@ -504,6 +504,7 @@ describe('parseSiteConfiguration', () => {
       ...validConfiguration(),
       signIn: { workspaceDomains: ['example.com'] },
       mcp: { enabled: true },
+      access: { admins: ['admins@example.com'], rules: [] },
       insights: { enabled: true },
     };
     expect(parseSiteConfiguration(raw).insights).toEqual({
@@ -540,6 +541,12 @@ describe('parseSiteConfiguration', () => {
     );
 
     raw.insights = { enabled: true };
+    const { access } = raw;
+    delete raw.access;
+    expect(() => parseSiteConfiguration(raw)).toThrow(
+      /insights needs access\.admins/u,
+    );
+    raw.access = access;
     raw.mcp = { enabled: false };
     expect(() => parseSiteConfiguration(raw)).toThrow(
       /insights needs mcp\.enabled/u,

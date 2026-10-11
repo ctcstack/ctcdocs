@@ -982,6 +982,74 @@ test('the access review lays what holds now over the rules', async ({
   await expectNoAccessibilityViolations(page);
 });
 
+test('the content health page shows admins what people could not find', async ({
+  page,
+}) => {
+  test.skip(
+    siteConfiguration.insights?.enabled !== true,
+    'The project does not record what is asked.',
+  );
+  const section = page.getByRole('region', {
+    name: 'What people could not find',
+  });
+
+  // Unanswered, as for anyone but an admin, the section is not there.
+  await page.goto('/content-health/');
+  await expect(section).toBeHidden();
+
+  // The Worker answers an admin; the static server does not, so it is here.
+  const markup = '<img src=x onerror="document.title=1">';
+  await page.route('**/_kb/insights.json', (route) =>
+    route.fulfill({
+      json: {
+        report: {
+          week: '2026-10-05',
+          notFound: [
+            {
+              label: 'parking permit',
+              count: 4,
+              site: 1,
+              queries: [
+                { query: 'parking permit', count: 3 },
+                { query: markup, count: 1 },
+              ],
+              clients: [{ client: 'Claude', count: 3 }],
+              documents: [{ id: 'abcdef', count: 2 }],
+            },
+          ],
+          foundNotRead: [{ id: 'abcdef', appearances: 12, fetches: 0 }],
+          use: {
+            notFound: {
+              mcp: { searches: 40, notFound: 6, share: 0.15 },
+              site: { searches: 0, notFound: 0, share: null },
+            },
+          },
+        },
+        documents: { abcdef: { title: 'Parking', url: '/d/abcdef/' } },
+      },
+    }),
+  );
+  await page.goto('/content-health/');
+  await expect(section).toBeVisible();
+  await expect(section).toContainText(
+    'assistants found nothing good for 6 of 40 searches (15%)',
+  );
+  await expect(section.locator('q').first()).toHaveText('parking permit');
+  // What a reader typed is text, never markup.
+  await expect(section).toContainText(markup);
+  await expect(section.locator('img')).toHaveCount(0);
+  await expect(
+    section.getByRole('link', { name: 'Parking' }).first(),
+  ).toHaveAttribute('href', '/d/abcdef/');
+  await expect(section).toContainText('Returned 12×, read 0×');
+
+  const theme = page.getByRole('combobox', { name: 'Select theme' });
+  await theme.selectOption({ label: 'Light' });
+  await expectNoAccessibilityViolations(page);
+  await theme.selectOption({ label: 'Dark' });
+  await expectNoAccessibilityViolations(page);
+});
+
 test('a PDF has a page with the file and its text', async ({
   page,
   request,

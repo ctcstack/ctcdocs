@@ -650,6 +650,7 @@ describe('a deployment anyone may read', () => {
       parseSiteConfiguration({
         ...TEST_SITE_CONFIGURATION_INPUT,
         mcp: { enabled: true },
+        access: { admins: ['admins@example.com'], rules: [] },
         ...(insights ? { insights } : {}),
       });
     const root = await createProject();

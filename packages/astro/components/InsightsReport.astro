@@ -1,0 +1,161 @@
+---
+/**
+ * What people could not find (ADR-051): the content health page's section
+ * for the latest weekly insights report, which only admins may read.
+ *
+ * The page is built without it: the section is an empty, hidden frame, and
+ * the browser fills it from the Worker's admins-only route. Anyone else, the
+ * Worker refuses, and the section stays hidden; so it does without script,
+ * and on a deployment whose Worker does not answer. Queries are what readers
+ * typed, so they are set as text, never as markup.
+ */
+---
+
+<insights-report>
+  <section
+    class="health-tier"
+    id="not-found"
+    aria-labelledby="not-found-title"
+    hidden
+    data-insights
+  >
+    <h2 id="not-found-title">
+      <span>What people could not find</span>
+    </h2>
+    <p class="health-lede" data-lede></p>
+    <ul class="health-folders" data-groups></ul>
+    <div data-unread hidden>
+      <h3 class="health-block-heading">Found, but not opened</h3>
+      <p class="health-lede">
+        Documents searches returned often and assistants seldom read: their
+        title or first lines may not say what they hold.
+      </p>
+      <ul class="health-folders" data-unread-list></ul>
+    </div>
+  </section>
+</insights-report>
+
+<script>
+  /**
+   * The one request asks the Worker for the latest report. Without an answer
+   * the section stays hidden; with one, it lists each thing asked and not
+   * found, most asked first, with how else it was asked and what it nearly
+   * found.
+   */
+  import {
+    readInsights,
+    type MissedGroup,
+    type NamedDocument,
+  } from '../scripts/insights-report';
+
+  const plural = (count: number, one: string, many = `${one}s`) =>
+    `${count} ${count === 1 ? one : many}`;
+  const percent = (part: number, whole: number) =>
+    whole === 0 ? '' : ` (${Math.round((part / whole) * 1000) / 10}%)`;
+
+  /** An element with text, built without parsing markup. */
+  function element(tag: string, text?: string, className?: string) {
+    const node = document.createElement(tag);
+    if (text !== undefined) node.textContent = text;
+    if (className) node.className = className;
+    return node;
+  }
+
+  /** A document by its title and link, or by its ID when the build has none. */
+  function documentLink(entry: NamedDocument): HTMLElement {
+    if (entry.title && entry.url) {
+      const link = element('a', entry.title) as HTMLAnchorElement;
+      link.href = entry.url;
+      return link;
+    }
+    return element('code', entry.id);
+  }
+
+  function joined(parent: HTMLElement, items: readonly HTMLElement[]) {
+    items.forEach((item, index) => {
+      if (index > 0) parent.append(', ');
+      parent.append(item);
+    });
+  }
+
+  function groupItem(group: MissedGroup): HTMLLIElement {
+    const item = element('li') as HTMLLIElement;
+    const name = element('span', undefined, 'health-folder-name');
+    name.append(`${group.count}× `, element('q', group.label));
+    item.append(name);
+    const facts = [
+      group.variants.length > 0
+        ? `Also asked as: ${group.variants.join(' · ')}`
+        : '',
+      group.site > 0
+        ? `${plural(group.site, 'site search', 'site searches')}`
+        : '',
+      group.clients.length > 0 ? `Through ${group.clients.join(', ')}` : '',
+    ].filter((fact) => fact.length > 0);
+    if (facts.length > 0) {
+      item.append(element('span', facts.join(' · '), 'health-folder-meta'));
+    }
+    if (group.documents.length > 0) {
+      const nearly = element('span', 'Nearly found: ', 'health-folder-meta');
+      joined(nearly, group.documents.map(documentLink));
+      item.append(nearly);
+    }
+    return item;
+  }
+
+  class InsightsReport extends HTMLElement {
+    async connectedCallback() {
+      const section = this.querySelector<HTMLElement>('[data-insights]');
+      const lede = this.querySelector<HTMLElement>('[data-lede]');
+      const groups = this.querySelector<HTMLElement>('[data-groups]');
+      const unread = this.querySelector<HTMLElement>('[data-unread]');
+      const unreadList = this.querySelector<HTMLElement>('[data-unread-list]');
+      if (!section || !lede || !groups || !unread || !unreadList) return;
+
+      const answer = await readInsights();
+      if (!answer) return;
+      section.hidden = false;
+      if (answer.kind === 'none') {
+        lede.textContent =
+          'No week has been reported yet. The first report comes the Monday after a week in which people searched.';
+        return;
+      }
+      const { view } = answer;
+      const week = new Date(`${view.week}T00:00:00Z`).toLocaleDateString(
+        'en-GB',
+        { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' },
+      );
+      lede.textContent =
+        `In the week of ${week}, assistants found nothing good for ${view.notFound} of ${plural(view.searches, 'search', 'searches')}${percent(view.notFound, view.searches)}` +
+        (view.siteSearches > 0
+          ? `, and the site's search for ${view.siteNotFound} of ${view.siteSearches}${percent(view.siteNotFound, view.siteSearches)}`
+          : '') +
+        (view.groups.length > 0
+          ? '. Each line is one thing asked, most asked first: write the document it needs, or name the one that has it the way people ask.'
+          : '. Nothing asked went unfound.');
+      groups.replaceChildren(...view.groups.map(groupItem));
+
+      if (view.unread.length > 0) {
+        unread.hidden = false;
+        unreadList.replaceChildren(
+          ...view.unread.map((entry) => {
+            const item = element('li');
+            const name = element('span', undefined, 'health-folder-name');
+            name.append(documentLink(entry));
+            item.append(
+              name,
+              element(
+                'span',
+                `Returned ${entry.appearances}×, read ${entry.fetches}×`,
+                'health-folder-meta',
+              ),
+            );
+            return item;
+          }),
+        );
+      }
+    }
+  }
+
+  customElements.define('insights-report', InsightsReport);
+</script>
