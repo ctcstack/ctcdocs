@@ -88,5 +88,9 @@ Rejected
   measuring no gain.
 - ADR-049: content health names stale and near-duplicate documents.
   Proposed.
+- ADR-050: the Worker keeps operational state in one D1 database. Supersedes
+  the "no database" clause of the product invariant in part.
+- ADR-051: content health shows what people and assistants could not find.
+  Proposed.
 
 Create a new ADR by copying `000-template.md`.
