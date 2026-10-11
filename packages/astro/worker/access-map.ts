@@ -113,6 +113,13 @@ export interface AccessMapFile {
     readonly insights: {
       readonly enabled: boolean;
       readonly retentionDays: number;
+      /** `insights.weakScore`; unset, the report's line is relative. */
+      readonly weakScore?: number;
+      /**
+       * The documents' language tag, from `mcp.language`: the weekly report
+       * drops its stop words as well as English ones.
+       */
+      readonly language?: string;
     };
   };
   readonly csp: { readonly scriptHashes: readonly string[] };

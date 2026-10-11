@@ -134,6 +134,7 @@ describe('mcpCallRecorder', () => {
           return this;
         },
         run: () => Promise.reject(new Error('D1_ERROR: no such table')),
+        all: () => Promise.reject(new Error('unused')),
       }),
       batch: () => Promise.reject(new Error('unused')),
     };

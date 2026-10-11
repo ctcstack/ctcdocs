@@ -1,7 +1,7 @@
 /**
  * The Worker's database of operational state (ADR-050), as far as the Worker
- * uses one: SQL statements with bound values, run alone or as one
- * transaction.
+ * uses one: SQL statements with bound values, run alone, as one
+ * transaction, or read.
  *
  * A D1 binding is one as it stands. The unit tests use SQLite in memory with
  * the same migrations, so the SQL the Worker runs is the SQL they run, and
@@ -20,6 +20,8 @@ export interface StateResult {
 export interface StateStatement {
   bind(...values: StateValue[]): StateStatement;
   run(): Promise<StateResult>;
+  /** The rows a query reads, as the database gives them: parse them. */
+  all(): Promise<{ readonly results: readonly unknown[] }>;
 }
 
 export interface StateDatabase {

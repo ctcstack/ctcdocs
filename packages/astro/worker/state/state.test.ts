@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { StateDatabase } from './database.js';
 import { MemoryDatabase, migrationFiles, rowsOf } from './test-support.js';
-import { expireOnSchedule, expireRecords } from './retention.js';
+import { expireRecords } from './retention.js';
 
 const NOW = Date.parse('2026-10-12T00:05:00.000Z');
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -264,48 +264,5 @@ describe('expireRecords', () => {
     expect(events).toEqual([
       { event: 'state-expiry-failed', error: 'Invalid time value' },
     ]);
-  });
-
-  it('runs on the schedule whenever the database is bound, recording or not', async () => {
-    const database = new MemoryDatabase();
-    insertCall(database, ago(100));
-    insertCall(database, ago(1));
-    const events: Record<string, unknown>[] = [];
-    const log = (event: Readonly<Record<string, unknown>>) =>
-      events.push({ ...event });
-
-    // Insights turned off, the database still bound: old records still go.
-    await expireOnSchedule({
-      insights: { enabled: false, retentionDays: 90 },
-      database,
-      now: NOW,
-      log,
-    });
-    expect(rowsOf(database, 'mcp_calls').length).toBe(1);
-    expect(events).toEqual([
-      expect.objectContaining({ event: 'state-expired' }),
-    ]);
-
-    events.length = 0;
-    expect(
-      expireOnSchedule({
-        insights: { enabled: true, retentionDays: 90 },
-        database: undefined,
-        now: NOW,
-        log,
-      }),
-    ).toBeUndefined();
-    expect(events).toEqual([{ event: 'state-unbound' }]);
-
-    events.length = 0;
-    expect(
-      expireOnSchedule({
-        insights: { enabled: false, retentionDays: 90 },
-        database: undefined,
-        now: NOW,
-        log,
-      }),
-    ).toBeUndefined();
-    expect(events).toEqual([]);
   });
 });

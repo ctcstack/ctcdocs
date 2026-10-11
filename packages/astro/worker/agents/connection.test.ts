@@ -1252,6 +1252,7 @@ describe('recording what assistants ask', () => {
           return this;
         },
         run: () => new Promise(() => undefined),
+        all: () => new Promise(() => undefined),
       }),
       batch: () => new Promise(() => undefined),
     };
