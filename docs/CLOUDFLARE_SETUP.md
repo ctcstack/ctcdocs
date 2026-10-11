@@ -312,6 +312,21 @@ from the **Edit Cloudflare Workers** template, then:
 - **remove Workers KV Storage**. Deploying a Worker with a KV binding does not
   need it, and without it the token cannot write the snapshot or mint a
   machine key.
+- **with insights on (ADR-051), add Account → D1 → Edit**. The deploy
+  workflow applies the state database's migrations with this token before it
+  deploys the Worker, and a token without it stops every deployment there.
+  Without insights, leave it out.
+
+D1 Edit cannot be kept to one database: it reaches every D1 database in the
+account, and with it the records of use, query text included, that only
+admins read on the site. Keep the token where the deploy credentials already
+are, in its `<environment>-deploy` environment, and give it to nothing else.
+
+**Before turning insights on in a deployment that already has tokens**, edit
+each environment's deploy token in the Cloudflare dashboard (**My Profile → API
+Tokens → Edit**) and add the D1 permission. The token's value does not change,
+so the GitHub secret stays as it is. Then create and bind the database, and
+turn insights on: the next deployment migrates it.
 
 Do not grant Access, broad DNS administration, account administration, or
 access to unrelated accounts and zones. Store each token only as
