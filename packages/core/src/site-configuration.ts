@@ -267,7 +267,7 @@ export interface McpConfiguration {
   readonly recent: McpRecentConfiguration;
   /**
    * The language the documents are written in, as a language tag such as
-   * `en`. The MCP server tells assistants to search in it (ADR-048); unset,
+   * `en`. The MCP server tells assistants to search in it; unset,
    * it says nothing of the language.
    */
   readonly language?: string;

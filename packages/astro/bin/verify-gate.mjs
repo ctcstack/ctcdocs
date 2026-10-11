@@ -351,9 +351,8 @@ async function verifyAgents({ map, projectRoot, distRoot, environment, keys }) {
       reader,
       stale: false,
       origin: environment.origin,
+      store,
       index,
-      // `fetch` reads the build's own Markdown version (ADR-048).
-      assets: assetsFrom(distRoot),
     };
     const results = await searchDocuments(access, 'anything');
     const found = new Set(results.map((result) => result.id));

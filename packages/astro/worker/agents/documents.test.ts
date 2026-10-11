@@ -16,8 +16,7 @@ import {
   chunkOf,
   FixedIndex,
   ORIGIN,
-  builtAssets,
-  projection,
+  publishedStore,
   readers,
 } from './test-support.js';
 
@@ -28,11 +27,11 @@ function access(
   {
     stale = false,
     index = new FixedIndex(ALL_KEYS),
-    assets = builtAssets(),
+    store = publishedStore(),
     map = agentMap,
-  }: Partial<Pick<DocumentAccess, 'stale' | 'index' | 'assets' | 'map'>> = {},
+  }: Partial<Pick<DocumentAccess, 'stale' | 'index' | 'store' | 'map'>> = {},
 ): DocumentAccess {
-  return { map, reader, stale, origin: ORIGIN, index, assets };
+  return { map, reader, stale, origin: ORIGIN, store, index };
 }
 
 const ids = (results: readonly { id: string }[]) =>
@@ -114,38 +113,45 @@ describe('search', () => {
   });
 
   it('drops a document this build does not list', async () => {
-    // Left in the index by an earlier build.
+    // Left in the bucket and the index by an earlier build.
+    const store = publishedStore();
+    store.seed('docs/dddddd.md', '# Removed\n', {
+      class: 'members',
+      title: 'Removed',
+      markdown: '/handbook/index.md',
+    });
     const index = new FixedIndex(['docs/dddddd.md']);
     expect(
-      await searchDocuments(access(readers.admin, { index }), 'x'),
+      await searchDocuments(access(readers.admin, { index, store }), 'x'),
     ).toEqual([]);
   });
 
-  it('judges a document by the build, not by what the index says of it', async () => {
-    // A chunk an earlier build indexed as everyone's.
-    const index = new FixedIndex([
+  it('judges a document by the build, not by what the bucket says of it', async () => {
+    // An object written by another build names a members address.
+    const store = publishedStore();
+    store.seed('docs/bbbbbb.md', '# Team plan\n', {
+      class: 'members',
+      title: 'Everyone’s plan',
+      markdown: '/handbook/index.md',
+      hash: 'h-plan',
+    });
+    const index = new FixedIndex(['docs/bbbbbb.md']);
+    expect(
+      await searchDocuments(access(readers.member, { index, store }), 'x'),
+    ).toEqual([]);
+    expect(
+      await searchDocuments(access(readers.team, { index, store }), 'x'),
+    ).toEqual([
       {
-        key: 'docs/bbbbbb.md',
+        id: 'bbbbbb',
+        title: 'Team plan',
+        url: `${ORIGIN}/d/bbbbbb/`,
         text: 'A passage of Team plan.',
-        class: 'members',
+        path: ['Team'],
+        format: 'pdf',
+        characters: 12,
       },
     ]);
-    expect(
-      await searchDocuments(access(readers.member, { index }), 'x'),
-    ).toEqual([]);
-    expect(await searchDocuments(access(readers.team, { index }), 'x')).toEqual(
-      [
-        {
-          id: 'bbbbbb',
-          title: 'Team plan',
-          url: `${ORIGIN}/d/bbbbbb/`,
-          text: 'A passage of Team plan.',
-          path: ['Team'],
-          format: 'pdf',
-          characters: 12,
-        },
-      ],
-    );
   });
 
   it('answers an empty query, or a reader with no class, with nothing', async () => {
@@ -553,14 +559,16 @@ describe('fetch', () => {
         ],
       },
     };
-    const assets = builtAssets(
-      Object.fromEntries(
-        extra.map(([id]) => [
-          `/extra/${id}/index.md`,
-          projection(`# Extra ${id}\n`),
-        ]),
-      ),
-    );
+    const store = publishedStore();
+    for (const [id, , cls] of extra) {
+      store.seed(`docs/${id}.md`, `# Extra ${id}\n`, {
+        class: cls,
+        title: `Extra ${id}`,
+        short_id: id,
+        markdown: `/extra/${id}/index.md`,
+        hash: `h-${id}`,
+      });
+    }
     const index = new FixedIndex([
       ...ALL_KEYS,
       ...extra.map(([id, , cls]) => ({
@@ -576,7 +584,7 @@ describe('fetch', () => {
       [readers.admin, false],
       [readers.admin, true],
     ] as const) {
-      const reading = access(reader, { stale, map, assets, index });
+      const reading = access(reader, { stale, map, store, index });
       const fetched = new Map<string, unknown>();
       for (const id of catalog) {
         const document = await fetchDocument(reading, id);
@@ -621,40 +629,57 @@ describe('fetch', () => {
     ).toBe(undefined);
   });
 
-  it('reads this build’s text, whatever the bucket holds', async () => {
-    /*
-     * A rollback: the bucket may still hold what a newer build wrote. The
-     * text comes from the build's own Markdown version (ADR-048), so
-     * there is no bucket to consult.
-     */
-    expect((await fetchDocument(access(readers.member), 'aaaaaa'))?.text).toBe(
-      '# Handbook\n',
-    );
+  it('reads the class from the build, not from the object', async () => {
+    const store = publishedStore();
+    store.seed('docs/bbbbbb.md', '# Team plan\n', {
+      class: 'members',
+      title: 'Team plan',
+      markdown: '/handbook/index.md',
+      hash: 'h-plan',
+    });
+    expect(
+      await fetchDocument(access(readers.member, { store }), 'bbbbbb'),
+    ).toBe(undefined);
   });
 
-  it('reads nothing when the build has no Markdown version to read', async () => {
-    const assets = builtAssets({ '/handbook/index.md': '# No front matter\n' });
+  it('refuses an object holding another build’s text', async () => {
+    /*
+     * A rollback: the bucket still holds what a newer build wrote, which
+     * may have narrowed the document's readers.
+     */
+    const store = publishedStore();
+    store.seed('docs/aaaaaa.md', '# Handbook, restricted\n', {
+      class: 'team0001',
+      title: 'Handbook',
+      markdown: '/handbook/index.md',
+      hash: 'h-handbook-newer',
+    });
     expect(
-      await fetchDocument(access(readers.member, { assets }), 'aaaaaa'),
+      await fetchDocument(access(readers.member, { store }), 'aaaaaa'),
     ).toBe(undefined);
+    const unpublished = publishedStore();
+    unpublished.objects.delete('docs/aaaaaa.md');
     expect(
       await fetchDocument(
-        access(readers.member, {
-          assets: { fetch: async () => new Response('gone', { status: 404 }) },
-        }),
+        access(readers.member, { store: unpublished }),
         'aaaaaa',
       ),
     ).toBe(undefined);
   });
 
   it('cuts a very long document and says so', async () => {
-    const assets = builtAssets({
-      '/unruled/notes/index.md': projection(
-        'x'.repeat(agentSettings.fetchCharacters + 10),
-      ),
-    });
+    const store = publishedStore();
+    store.seed(
+      'docs/cccccc.md',
+      'x'.repeat(agentSettings.fetchCharacters + 10),
+      {
+        title: 'Unruled notes',
+        markdown: '/unruled/notes/index.md',
+        hash: 'h-notes',
+      },
+    );
     const document = await fetchDocument(
-      access(readers.admin, { assets }),
+      access(readers.admin, { store }),
       'cccccc',
     );
     const { fetchCharacters } = agentSettings;
@@ -679,17 +704,21 @@ describe('fetch', () => {
         fetchCharacters,
       },
     });
-    const assets = builtAssets({
-      '/handbook/index.md': projection('Café 🙂 and more'),
+    const store = publishedStore();
+    store.seed('docs/aaaaaa.md', 'Café 🙂 and more', {
+      class: 'members',
+      title: 'Handbook',
+      markdown: '/handbook/index.md',
+      hash: 'h-handbook',
     });
     const document = await fetchDocument(
-      access(readers.member, { map: cutAt(5), assets }),
+      access(readers.member, { map: cutAt(5), store }),
       'aaaaaa',
     );
     expect(document?.text.startsWith('Café \n')).toBe(true);
     expect(document?.text).toContain('its first 5 characters');
     const smiley = await fetchDocument(
-      access(readers.member, { map: cutAt(6), assets }),
+      access(readers.member, { map: cutAt(6), store }),
       'aaaaaa',
     );
     // The emoji's two halves stay together, outside the cut.

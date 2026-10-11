@@ -1,6 +1,6 @@
 /**
  * The language a deployment's documents are written in, `mcp.language`,
- * named for the MCP server's instructions (ADR-048).
+ * named for the MCP server's instructions.
  */
 
 /**

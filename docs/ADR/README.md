@@ -84,8 +84,8 @@ Rejected
   part once accepted.
 - ADR-047: publish a page for each video and audio file. Proposed;
   supersedes ADR-025 in part once accepted.
-- ADR-048: the indexed copy says where each section sits. Proposed;
-  supersedes ADR-042 in part once accepted.
+- ADR-048: the indexed copy says where each section sits. Rejected after
+  measuring no gain.
 - ADR-049: content health names stale and near-duplicate documents.
   Proposed.
 
