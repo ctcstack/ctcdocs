@@ -1,6 +1,6 @@
 # ADR-051: Content health shows what people and assistants could not find
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-11
 - Owners: CTCDocs maintainers
 - Supersedes: none
