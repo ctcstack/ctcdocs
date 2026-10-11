@@ -603,6 +603,96 @@ describe('a deployment anyone may read', () => {
     );
   });
 
+  it('requires the database, with the platform migrations, once insights are on', async () => {
+    const configuration = (insights: Record<string, unknown> | undefined) =>
+      parseSiteConfiguration({
+        ...TEST_SITE_CONFIGURATION_INPUT,
+        mcp: { enabled: true },
+        ...(insights ? { insights } : {}),
+      });
+    const root = await createProject();
+    const errorsFor = async (insights?: Record<string, unknown>) =>
+      (
+        await validateRepositoryContent(
+          createSyncContext(root, configuration(insights)),
+        )
+      ).errors.join('\n');
+    const path = join(root, PROJECT_LAYOUT.wranglerConfigurationFile);
+    const wrangler = JSON.parse(await readFile(path, 'utf8')) as {
+      env: { production: Record<string, unknown> };
+    } & Record<string, unknown>;
+    const database = {
+      binding: PLATFORM_WORKERS.stateDatabaseBinding,
+      database_name: 'example-state',
+      database_id: '00000000-0000-0000-0000-000000000000',
+      migrations_dir: PLATFORM_WORKERS.stateMigrations,
+    };
+    const write = (d1: unknown) =>
+      writeFile(
+        path,
+        JSON.stringify({
+          ...wrangler,
+          compatibility_flags: [PLATFORM_WORKERS.oauthCompatibilityFlag],
+          triggers: { crons: [PLATFORM_WORKERS.publishSchedule] },
+          env: {
+            production: {
+              ...wrangler.env.production,
+              kv_namespaces: [
+                { binding: PLATFORM_WORKERS.stateBinding, id: 'kv-production' },
+                { binding: PLATFORM_WORKERS.oauthBinding, id: 'kv-oauth' },
+              ],
+              r2_buckets: [
+                {
+                  binding: PLATFORM_WORKERS.documentsBinding,
+                  bucket_name: 'example-documents',
+                },
+              ],
+              ai_search: [
+                {
+                  binding: PLATFORM_WORKERS.searchBinding,
+                  instance_name: 'example-search',
+                },
+              ],
+              ...(d1 === undefined ? {} : { d1_databases: d1 }),
+            },
+          },
+        }),
+      );
+
+    await write(undefined);
+    expect(await errorsFor()).not.toContain(
+      PLATFORM_WORKERS.stateDatabaseBinding,
+    );
+    expect(await errorsFor({ enabled: false })).not.toContain(
+      PLATFORM_WORKERS.stateDatabaseBinding,
+    );
+    expect(await errorsFor({ enabled: true })).toContain(
+      `the ${PLATFORM_WORKERS.stateDatabaseBinding} D1 database with migrations_dir ${PLATFORM_WORKERS.stateMigrations}`,
+    );
+
+    await write([database]);
+    expect(await errorsFor({ enabled: true })).toBe('');
+    // Turning insights off is one change: the database may stay.
+    expect(await errorsFor({ enabled: false })).toBe('');
+
+    // Without the platform's migrations, no table would exist to write to.
+    for (const entry of [
+      { ...database, migrations_dir: 'migrations' },
+      { ...database, migrations_dir: undefined },
+      { ...database, binding: 'DB' },
+      { ...database, database_id: '' },
+    ]) {
+      await write([entry]);
+      expect(await errorsFor({ enabled: true })).toContain(
+        PLATFORM_WORKERS.stateDatabaseBinding,
+      );
+    }
+    await write([database, { ...database, binding: 'OTHER_DB' }]);
+    expect(await errorsFor({ enabled: true })).toContain(
+      PLATFORM_WORKERS.stateDatabaseBinding,
+    );
+  });
+
   it('gives each environment its own bucket, index and OAuth namespace', async () => {
     const twoEnvironments = parseSiteConfiguration({
       ...TEST_SITE_CONFIGURATION_INPUT,
@@ -689,6 +779,27 @@ describe('a deployment anyone may read', () => {
     );
     expect(errors).toContain(
       `share the ${PLATFORM_WORKERS.oauthBinding} namespace kv-oauth-production`,
+    );
+
+    const database = (id: string) => [
+      {
+        binding: PLATFORM_WORKERS.stateDatabaseBinding,
+        database_name: `state-${id}`,
+        database_id: id,
+        migrations_dir: PLATFORM_WORKERS.stateMigrations,
+      },
+    ];
+    await write({
+      production: { ...production, d1_databases: database('db-production') },
+      staging: { ...staging, d1_databases: database('db-staging') },
+    });
+    expect(await errorsFor()).not.toContain('environments share');
+    await write({
+      production: { ...production, d1_databases: database('db-production') },
+      staging: { ...staging, d1_databases: database('db-production') },
+    });
+    expect(await errorsFor()).toContain(
+      `share the ${PLATFORM_WORKERS.stateDatabaseBinding} database db-production`,
     );
   });
 

@@ -66,6 +66,7 @@ export { accessFindings } from './access-findings.js';
 export type { AccessFinding } from './access-findings.js';
 export {
   fetchCharacterLimit,
+  INSIGHTS_DEFAULTS,
   loadSiteConfiguration,
   MCP_DEFAULTS,
   parseSiteConfiguration,
@@ -79,6 +80,7 @@ export type {
   DeploymentEnvironmentConfigurations,
   DeploymentVisibility,
   HomeConfiguration,
+  InsightsConfiguration,
   McpConfiguration,
   McpRecentConfiguration,
   McpSearchConfiguration,

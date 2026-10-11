@@ -1,0 +1,56 @@
+-- Records of use (ADR-050, ADR-051). The platform owns this schema: a
+-- deployment applies it with `wrangler d1 migrations apply --remote` before
+-- it deploys. Migrations are append-only; a released one is never edited.
+--
+-- A row names an access class, never a reader, and every column is bounded,
+-- so that no text but a query fits where an identifier belongs.
+--
+-- Times are ISO 8601 in UTC as `Date.prototype.toISOString` writes them, so
+-- they sort as text; the checks keep any other form out, since retention
+-- compares them as text. (D1 caps the length of a GLOB pattern, so the form
+-- is checked by rewriting it.)
+
+-- One row per MCP tool call, written after the answer.
+CREATE TABLE mcp_calls (
+  id INTEGER PRIMARY KEY,
+  at TEXT NOT NULL CHECK (at IS strftime('%Y-%m-%dT%H:%M:%fZ', at)),
+  tool TEXT NOT NULL CHECK (tool IN ('search', 'fetch', 'browse', 'recent')),
+  query TEXT CHECK (length(query) <= 200),
+  class TEXT NOT NULL CHECK (length(class) <= 64),
+  client TEXT CHECK (length(client) <= 64),
+  results INTEGER NOT NULL CHECK (results >= 0),
+  top_score REAL,
+  -- A JSON array of at most five short IDs.
+  documents TEXT NOT NULL CHECK (
+    json_valid(documents)
+    AND json_type(documents) = 'array'
+    AND json_array_length(documents) <= 5
+  ),
+  fetched TEXT CHECK (length(fetched) <= 64),
+  characters INTEGER NOT NULL CHECK (characters >= 0),
+  latency_ms INTEGER NOT NULL CHECK (latency_ms >= 0),
+  stale INTEGER NOT NULL CHECK (stale IN (0, 1))
+) STRICT;
+
+CREATE INDEX mcp_calls_at ON mcp_calls (at);
+
+-- One row per settled search on the site.
+CREATE TABLE site_searches (
+  id INTEGER PRIMARY KEY,
+  at TEXT NOT NULL CHECK (at IS strftime('%Y-%m-%dT%H:%M:%fZ', at)),
+  query TEXT NOT NULL CHECK (length(query) <= 200),
+  class TEXT NOT NULL CHECK (length(class) <= 64),
+  results INTEGER NOT NULL CHECK (results >= 0),
+  opened TEXT CHECK (length(opened) <= 512)
+) STRICT;
+
+CREATE INDEX site_searches_at ON site_searches (at);
+
+-- One weekly report, as JSON. It quotes queries, so it is kept no longer
+-- than the oldest record it was made from: `week` is that week's Monday.
+CREATE TABLE reports (
+  week TEXT NOT NULL PRIMARY KEY
+    CHECK (week IS date(week) AND strftime('%w', week) = '1'),
+  at TEXT NOT NULL,
+  report TEXT NOT NULL CHECK (json_valid(report))
+) STRICT;

@@ -503,6 +503,9 @@ export async function writeBuildOutput({
         ? languageName(site.mcp.language)
         : undefined,
       mcp,
+      ...(mcp && site.insights?.enabled === true
+        ? { insights: { retentionDays: site.insights.retentionDays } }
+        : {}),
     },
     csp: { scriptHashes: [...scriptHashes].sort() },
     enabled: model.enabled,

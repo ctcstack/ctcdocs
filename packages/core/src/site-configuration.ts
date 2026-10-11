@@ -304,6 +304,22 @@ export function fetchCharacterLimit(mcp: McpConfiguration | undefined): number {
   return mcp?.enabled ? mcp.fetchCharacters : MCP_DEFAULTS.fetchCharacters;
 }
 
+/**
+ * What people and assistants ask, recorded so editors see what the
+ * documentation fails to answer (ADR-051). The records live in the Worker's
+ * database (ADR-050), so it needs the MCP server, and with it a private
+ * deployment.
+ */
+export interface InsightsConfiguration {
+  readonly enabled: boolean;
+  /** Days a record of use is kept before the Worker's schedule deletes it. */
+  readonly retentionDays: number;
+}
+
+/** What `insights` holds when a project sets only `enabled` (ADR-051). */
+export const INSIGHTS_DEFAULTS: Omit<InsightsConfiguration, 'enabled'> =
+  Object.freeze({ retentionDays: 90 });
+
 /** About 10,000 tokens of English: a starting value, not a measured one. */
 const LARGE_DOCUMENT_CHARACTERS = 40_000;
 
@@ -312,6 +328,8 @@ export interface SiteConfiguration {
   readonly signIn?: SignInConfiguration;
   /** Absent or disabled, the Worker serves no MCP or OAuth route. */
   readonly mcp?: McpConfiguration;
+  /** Absent or disabled, the Worker records nothing of what is asked. */
+  readonly insights?: InsightsConfiguration;
   /**
    * Who may read which folder (ADR-039). Absent, every document is open to
    * every reader the deployment admits, as before access rules existed.
@@ -932,9 +950,31 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
   }
   const fetchLimit = fetchCharacterLimit(mcp);
 
+  let insights: InsightsConfiguration | undefined;
+  if (root.insights !== undefined) {
+    const source = record(root.insights, 'insights');
+    knownKeys(source, 'insights', ['enabled', 'retentionDays']);
+    const enabled = flag(source, 'enabled', 'insights.enabled');
+    if (enabled && mcp?.enabled !== true) {
+      fail('insights', 'needs mcp.enabled: it records what assistants ask');
+    }
+    insights = {
+      enabled,
+      // At least the week one report aggregates (ADR-051).
+      retentionDays: optionalNumber(
+        source,
+        'retentionDays',
+        'insights.retentionDays',
+        INSIGHTS_DEFAULTS.retentionDays,
+        { min: 7, max: 365, whole: true },
+      ),
+    };
+  }
+
   return {
     ...(signIn ? { signIn } : {}),
     ...(mcp ? { mcp } : {}),
+    ...(insights ? { insights } : {}),
     ...(access ? { access } : {}),
     brand,
     deployment,
