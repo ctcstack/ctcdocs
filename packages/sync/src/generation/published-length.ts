@@ -40,7 +40,7 @@ function isProjectionFacts(value: unknown): value is ProjectionFacts {
 }
 
 /** What follows the front matter: what the site reads as the page's body. */
-function bodyOf(content: string): string | undefined {
+export function generatedBody(content: string): string | undefined {
   const lines = content.split('\n');
   const closing = lines[0] === '---' ? lines.indexOf('---', 1) : -1;
   return closing < 0 ? undefined : lines.slice(closing + 1).join('\n');
@@ -78,7 +78,7 @@ export function publishedLengths(
       continue;
     }
     const facts = extractGeneratedFrontmatter(content);
-    const body = bodyOf(content);
+    const body = generatedBody(content);
     if (!isProjectionFacts(facts) || body === undefined) {
       continue;
     }

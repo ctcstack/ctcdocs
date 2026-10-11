@@ -40,6 +40,11 @@ const GROUP_ADDRESS =
 /** The characters Google uses in file and folder IDs. */
 const FOLDER_ID = /^[A-Za-z0-9_-]{1,128}$/u;
 
+/** Whether a configured value has the shape of a Drive folder ID. */
+export function isDriveFolderId(value: unknown): value is string {
+  return typeof value === 'string' && FOLDER_ID.test(value);
+}
+
 function object(
   value: unknown,
   path: string,

@@ -397,6 +397,70 @@ describe('parseSiteConfiguration', () => {
     );
   });
 
+  it('asks for review after 12 months without an edit unless a project sets its own line', () => {
+    const defaults = parseSiteConfiguration(validConfiguration()).sync;
+    expect(defaults.staleAfterMonths).toBe(12);
+    expect(defaults.staleFolders).toEqual([]);
+
+    const raw = validConfiguration();
+    Object.assign(raw.sync as Record<string, unknown>, {
+      staleAfterMonths: 0,
+      staleFolders: [
+        { folder: 'folder-policies', label: 'Policies', months: 6 },
+        { folder: 'folder-archive', label: 'Archive', months: 0 },
+      ],
+    });
+    const sync = parseSiteConfiguration(raw).sync;
+    expect(sync.staleAfterMonths).toBe(0);
+    expect(sync.staleFolders).toEqual([
+      { folder: 'folder-policies', label: 'Policies', months: 6 },
+      { folder: 'folder-archive', label: 'Archive', months: 0 },
+    ]);
+  });
+
+  it.each<[string, unknown, RegExp]>([
+    [
+      'a part of a month',
+      { staleAfterMonths: 1.5 },
+      /sync\.staleAfterMonths must be a whole number from 0 to 120/u,
+    ],
+    [
+      'a folder that is not a Drive ID',
+      { staleFolders: [{ folder: 'a/b', label: 'A', months: 3 }] },
+      /sync\.staleFolders\[0\]\.folder must be a Drive folder ID/u,
+    ],
+    [
+      'a folder listed twice',
+      {
+        staleFolders: [
+          { folder: 'f1', label: 'A', months: 3 },
+          { folder: 'f1', label: 'A', months: 4 },
+        ],
+      },
+      /sync\.staleFolders\[1\]\.folder must not be listed twice/u,
+    ],
+    [
+      'a folder without its months',
+      { staleFolders: [{ folder: 'f1', label: 'A' }] },
+      /sync\.staleFolders\[0\]\.months must be a whole number from 0 to 120/u,
+    ],
+    [
+      'a folder setting it does not know',
+      { staleFolders: [{ folder: 'f1', label: 'A', months: 3, days: 4 }] },
+      /sync\.staleFolders\[0\]/u,
+    ],
+    [
+      'folders not in a list',
+      { staleFolders: { folder: 'f1' } },
+      /sync\.staleFolders must be a list/u,
+    ],
+  ])('rejects %s as a review line', (_case, settings, message) => {
+    const raw = validConfiguration();
+    Object.assign(raw.sync as Record<string, unknown>, settings);
+
+    expect(() => parseSiteConfiguration(raw)).toThrow(message);
+  });
+
   it('refuses a sync setting it does not know, such as a misspelled line', () => {
     const raw = validConfiguration();
     (raw.sync as Record<string, unknown>).largeDocumentCharacter = 500;

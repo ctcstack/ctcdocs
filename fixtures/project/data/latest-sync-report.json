@@ -345,6 +345,18 @@
       "instruction": "The site does not watch or listen to a recording: its page shows the recording's name and the description written in Drive, and that is all search and AI agents know of it. In Drive, right-click the file, choose File information → Details and fill in its description: what it shows, for whom, and the steps or topics in order. Rename it too if its name is what the recorder chose. The page changes on the next sync."
     },
     {
+      "code": "document-near-duplicate",
+      "title": "Another document holds the same text",
+      "action": "Keep one, link to it",
+      "instruction": "This document and the one named share nearly all their text, or one holds the other whole, though their names differ. As one copy is edited the other goes out of date, and readers and AI agents find both and cannot tell which is right. Keep the text in one document, remove the other or replace its text with a link to the one you keep. If both must stay, make each say what only it covers."
+    },
+    {
+      "code": "document-stale",
+      "title": "A document has not been edited for a long time",
+      "action": "Review it, then edit or retire it",
+      "instruction": "Nobody has edited this document in Drive for longer than this site asks: readers and AI agents cannot tell whether it still holds. Read it through. If it is right, make any small edit that keeps it current, such as the date it was reviewed; if it is not, correct it, or move it out of the published folders."
+    },
+    {
       "code": "duplicate-order",
       "title": "Two items share an order number",
       "action": "Renumber one",
