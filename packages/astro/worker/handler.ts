@@ -18,6 +18,7 @@ import {
   CLASSES_ROUTE,
   environmentOf,
   INSIGHTS_ROUTE,
+  INSIGHTS_SEARCH_ROUTE,
   STATUS_ROUTE,
   type AccessMapFile,
 } from './access-map.js';
@@ -33,6 +34,7 @@ import {
 import type { DocumentIndex, DocumentStore } from './agents/documents.js';
 import { serveMcp } from './agents/tools.js';
 import { insightsAnswer } from './insights/route.js';
+import { siteSearchAnswer } from './insights/search-route.js';
 import {
   groupsFor,
   isAdmin,
@@ -111,8 +113,14 @@ export interface StateContext {
   readonly database: StateDatabase;
   /** Lets a write finish after the response, as `waitUntil` does. */
   readonly schedule: (write: Promise<void>) => void;
-  /** Bounds the records one person's calls write; one per isolate. */
-  readonly limit: RecordLimit;
+  /**
+   * Bound the records one person writes, of MCP calls and of site
+   * searches; one of each per isolate.
+   */
+  readonly limits: {
+    readonly calls: RecordLimit;
+    readonly searches: RecordLimit;
+  };
 }
 
 /** The metadata of the one protected resource, `/mcp` (RFC 9728). */
@@ -326,11 +334,16 @@ async function finishSignIn(
   }
 }
 
+/** Whether a request was sent by a page of this site, not another's. */
+function isSameOrigin(request: Request, origin: string): boolean {
+  return (
+    request.headers.get('Origin') === origin ||
+    request.headers.get('Sec-Fetch-Site') === 'same-origin'
+  );
+}
+
 function signOut(gate: Gate, request: Request): Response {
-  const sameOrigin =
-    request.headers.get('Origin') === gate.origin ||
-    request.headers.get('Sec-Fetch-Site') === 'same-origin';
-  if (!sameOrigin) {
+  if (!isSameOrigin(request, gate.origin)) {
     return new Response('Forbidden', { status: 403 });
   }
   return redirect('/auth/signed-out', 303, [cookie(SESSION_COOKIE, '', 0)]);
@@ -370,7 +383,7 @@ function callRecorder(
     log,
   });
   return (call) => {
-    const { record, dropped } = state.limit.take(sub, context.now());
+    const { record, dropped } = state.limits.calls.take(sub, context.now());
     if (record) {
       write(call);
     } else if (dropped === 1) {
@@ -537,6 +550,7 @@ async function route(
   const agents = map.site.mcp === true ? context.agents : undefined;
   const agentMethods = agents ? AGENT_ROUTES[url.pathname] : undefined;
   const isSignOut = url.pathname === '/auth/sign-out';
+  const isSearchReport = url.pathname === INSIGHTS_SEARCH_ROUTE;
   if (agentMethods) {
     if (!agentMethods.includes(request.method)) {
       return noStore(
@@ -548,7 +562,7 @@ async function route(
     }
   } else if (
     !(request.method === 'GET' || request.method === 'HEAD') &&
-    !(request.method === 'POST' && isSignOut)
+    !(request.method === 'POST' && (isSignOut || isSearchReport))
   ) {
     return noStore(
       new Response('Method not allowed', {
@@ -639,6 +653,33 @@ async function route(
     );
   }
   const stale = !snapshot || isStale(snapshot, now);
+
+  if (isSearchReport) {
+    // Sent by a person's page on this site: never by a machine, or another site.
+    if (request.method !== 'POST') {
+      return noStore(
+        new Response('Method not allowed', {
+          status: 405,
+          headers: { Allow: 'POST' },
+        }),
+      );
+    }
+    if (reader.kind !== 'person' || !isSameOrigin(request, gate.origin)) {
+      return noStore(new Response('Forbidden', { status: 403 }));
+    }
+    return noStore(
+      await siteSearchAnswer({
+        request,
+        map,
+        reader,
+        stale,
+        origin: gate.origin,
+        state: context.state,
+        now,
+        log: context.log,
+      }),
+    );
+  }
 
   if (url.pathname === CLASSES_ROUTE) {
     return noStore(

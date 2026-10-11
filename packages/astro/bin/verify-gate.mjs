@@ -184,7 +184,7 @@ export async function verifyGate({ projectRoot, distRoot }) {
       batch: async () => [],
     },
     schedule: () => {},
-    limit: new RecordLimit(),
+    limits: { calls: new RecordLimit(), searches: new RecordLimit(30) },
   };
   const context = {
     map,
@@ -333,6 +333,49 @@ export async function verifyGate({ projectRoot, distRoot }) {
     }
   }
   requests += keys.length + 4;
+
+  /*
+   * A site search report (ADR-051) is taken from a person on this site
+   * only: not signed out, not from a key, not from another site.
+   */
+  const searchReport = (headers) =>
+    handle(
+      new Request(new URL('/_kb/insights/search', environment.origin), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ query: 'denial suite', results: 0 }),
+      }),
+      context,
+    );
+  assert.equal(
+    (await searchReport({ 'Sec-Fetch-Site': 'same-origin' })).status,
+    401,
+    'A search report was taken from no one.',
+  );
+  for (const { name, key } of keys) {
+    assert.equal(
+      (
+        await searchReport({
+          Authorization: `Bearer ${key}`,
+          'Sec-Fetch-Site': 'same-origin',
+        })
+      ).status,
+      403,
+      `A search report was taken from a key for ${name}.`,
+    );
+  }
+  assert.equal(
+    (
+      await searchReport({
+        Cookie: adminCookie,
+        'Sec-Fetch-Site': 'cross-site',
+        Origin: 'https://elsewhere.invalid',
+      })
+    ).status,
+    403,
+    'A search report was taken from another site.',
+  );
+  requests += keys.length + 2;
 
   const page = await ask('/', { 'Sec-Fetch-Mode': 'navigate' });
   assert.equal(page.status, 302);

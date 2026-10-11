@@ -9,7 +9,7 @@
  * dropped and logged.
  */
 import type { StateDatabase } from './database.js';
-import { failureMessage, recordedQuery, type StateLog } from './record.js';
+import { backgroundWriter, recordedQuery, type StateLog } from './record.js';
 
 type McpTool = 'search' | 'fetch' | 'browse' | 'recent';
 
@@ -69,11 +69,7 @@ export async function insertMcpCall(
     .run();
 }
 
-/**
- * Records calls in `database`, each write handed to `schedule`, which the
- * Worker's entry backs with `waitUntil`. Neither a write that fails nor one
- * that throws reaches the caller.
- */
+/** Records calls in `database`, in the background (see `backgroundWriter`). */
 export function mcpCallRecorder({
   database,
   schedule,
@@ -83,18 +79,10 @@ export function mcpCallRecorder({
   readonly schedule: (write: Promise<void>) => void;
   readonly log: StateLog;
 }): McpCallRecorder {
-  const failed = (error: unknown) => {
-    log({
-      event: 'state-write-failed',
-      table: 'mcp_calls',
-      error: failureMessage(error),
-    });
-  };
-  return (call) => {
-    try {
-      schedule(insertMcpCall(database, call).catch(failed));
-    } catch (error: unknown) {
-      failed(error);
-    }
-  };
+  return backgroundWriter({
+    table: 'mcp_calls',
+    write: (call: McpCall) => insertMcpCall(database, call),
+    schedule,
+    log,
+  });
 }

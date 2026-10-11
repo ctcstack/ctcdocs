@@ -105,7 +105,11 @@ function context(
     now: () => NOW,
     googleKeys: new GoogleKeys(fetcher, () => NOW),
     log: (event) => events.push(event),
-    state: { database, schedule: () => undefined, limit: new RecordLimit() },
+    state: {
+      database,
+      schedule: () => undefined,
+      limits: { calls: new RecordLimit(), searches: new RecordLimit() },
+    },
     events,
     ...rest,
   };

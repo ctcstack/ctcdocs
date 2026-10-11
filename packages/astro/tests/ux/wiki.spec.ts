@@ -1053,6 +1053,44 @@ test('the content health page shows admins what people could not find', async ({
   await expectNoAccessibilityViolations(page);
 });
 
+test('a settled site search is reported once, with the result opened', async ({
+  page,
+}) => {
+  test.skip(
+    siteConfiguration.insights?.enabled !== true ||
+      siteConfiguration.insights.siteSearch === false,
+    'The project does not record site searches.',
+  );
+  const reports: unknown[] = [];
+  await page.route('**/_kb/insights/search', async (route) => {
+    reports.push(JSON.parse(route.request().postData() ?? 'null'));
+    await route.fulfill({ status: 204 });
+  });
+  const { title } = anyDocument();
+  await page.goto('/');
+  await page
+    .locator('header')
+    .getByRole('button', { name: 'Search', exact: true })
+    .click();
+  await page.getByPlaceholder('Search').fill(title);
+  const first = page.locator('.pagefind-ui__result a').first();
+  await expect(first).toBeVisible();
+  // Settled, but not sent until what follows it is known.
+  await page.waitForTimeout(1_700);
+  expect(reports).toEqual([]);
+
+  const href = new URL(
+    (await first.getAttribute('href')) ?? '/',
+    'https://site.invalid',
+  ).pathname;
+  const sent = page.waitForRequest('**/_kb/insights/search');
+  await first.click();
+  await sent;
+  await expect.poll(() => reports.length).toBe(1);
+  expect(reports[0]).toMatchObject({ query: title, opened: href });
+  expect((reports[0] as { results: number }).results).toBeGreaterThan(0);
+});
+
 test('a PDF has a page with the file and its text', async ({
   page,
   request,

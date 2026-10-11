@@ -1,6 +1,6 @@
 /**
- * How many records of use one person's calls may write (ADR-051): at most
- * 60 a minute in each isolate. An assistant in a loop is answered as ever;
+ * How many records of use one person may write (ADR-051): at most 60 MCP
+ * calls and 30 site searches a minute in each isolate. An assistant in a loop is answered as ever;
  * only its records past the line are dropped, so it cannot fill the
  * database, or its bill, with copies of one call.
  *
@@ -8,8 +8,10 @@
  * it: no record, log or response names the key.
  */
 
-/** Records one key may write a minute, by default. */
+/** Records one key may write a minute, by default: MCP calls. */
 export const RECORDS_PER_MINUTE = 60;
+/** Site searches one session may record a minute. */
+export const SITE_SEARCHES_PER_MINUTE = 30;
 const MINUTE_MS = 60_000;
 /** Keys kept at most; past it, the windows that have ended are let go. */
 const KEYS = 10_000;

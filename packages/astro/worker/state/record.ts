@@ -37,3 +37,31 @@ export function failureMessage(error: unknown): string {
     ? error.message.slice(0, MESSAGE_CHARACTERS)
     : 'unknown';
 }
+
+/**
+ * Hands each write to `schedule`, which the Worker's entry backs with
+ * `waitUntil`, and logs one that fails, by its table: neither a write that
+ * fails nor one that throws reaches the caller.
+ */
+export function backgroundWriter<Row>({
+  table,
+  write,
+  schedule,
+  log,
+}: {
+  readonly table: string;
+  readonly write: (row: Row) => Promise<void>;
+  readonly schedule: (write: Promise<void>) => void;
+  readonly log: StateLog;
+}): (row: Row) => void {
+  const failed = (error: unknown) => {
+    log({ event: 'state-write-failed', table, error: failureMessage(error) });
+  };
+  return (row) => {
+    try {
+      schedule(write(row).catch(failed));
+    } catch (error: unknown) {
+      failed(error);
+    }
+  };
+}

@@ -85,11 +85,17 @@ asked for is the assistant's text.
 
 A search is settled after 1.5 seconds without typing, or when a result is
 opened. The page sends it with `navigator.sendBeacon` to
-`POST /_kb/insights/search`. The Worker:
+`POST /_kb/insights/search` once what follows it is known: the next search,
+a result opened, the search closed or the page left. So a search and the
+result opened from it are one record. The Worker:
 
-- accepts it only from a signed-in reader;
+- accepts it only from a person signed in, on a page of this site: never
+  signed out, from a machine key, or from another site;
 - takes the classes from the session, never from the body;
-- keeps at most 30 a minute per session in memory.
+- keeps the page opened only when it is a page of this build the reader may
+  read;
+- keeps at most 30 a minute per person in memory, and answers the page the
+  same whether it recorded, dropped or failed to write.
 
 **Both are kept 90 days.** The five-minute cron deletes older rows (ADR-050:
 Time Travel keeps them 30 days more). It does so whenever the database is
@@ -191,7 +197,7 @@ binding. Optional settings:
   is kept at least the week after it is made;
 - `insights.weakScore`: 0 to 1, unset by default;
 - `insights.siteSearch`: whether site searches are recorded, `true` by
-  default once the second step ships.
+  default.
 
 ### Steps
 

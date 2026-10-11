@@ -8,11 +8,13 @@
  * from the Worker's list of the reader's classes instead of one bundle; the
  * ranking Starlight's configuration would supply is stated here, because the
  * preset turns Starlight's own Pagefind run off; the trailing-slash option the
- * platform does not use is gone. Keep it in step with Starlight on upgrade.
+ * platform does not use is gone; with insights on, each settled search is
+ * reported to the Worker (ADR-051). Keep it in step with Starlight on upgrade.
  */
 import { Icon } from '@astrojs/starlight/components';
 
 import { hasRestrictedClasses } from '../lib/access-source';
+import { siteConfiguration } from '../lib/project';
 
 const pagefindTranslations = {
   placeholder: Astro.locals.t('search.label'),
@@ -28,6 +30,14 @@ const dataAttributes: DOMStringMap = {
 };
 // Without restricted classes there is nothing to merge, and nothing to ask.
 if (hasRestrictedClasses) dataAttributes['data-access-classes'] = '';
+// Only a deployment that records site searches says what was searched.
+if (
+  siteConfiguration.mcp?.enabled === true &&
+  siteConfiguration.insights?.enabled === true &&
+  siteConfiguration.insights.siteSearch
+) {
+  dataAttributes['data-record-searches'] = '';
+}
 ---
 
 <site-search class={Astro.props.class} {...dataAttributes}>
@@ -94,6 +104,7 @@ if (hasRestrictedClasses) dataAttributes['data-access-classes'] = '';
 </script>
 
 <script>
+  import { beacon, SearchReporter } from '../scripts/search-beacon';
   import { readableBundles, SEARCH_RANKING } from '../scripts/search-bundles';
 
   class SiteSearch extends HTMLElement {
@@ -160,6 +171,31 @@ if (hasRestrictedClasses) dataAttributes['data-access-classes'] = '';
 
       const formatURL = (path: string) => path;
       const askForClasses = this.dataset.accessClasses !== undefined;
+      const recordSearches = this.dataset.recordSearches !== undefined;
+
+      /*
+       * Each settled search goes to the Worker once, with the result opened
+       * from it if one is: its words, how many results it showed, and the
+       * page. Who asked, the Worker reads from the session (ADR-051).
+       */
+      const reportSearches = () => {
+        const frame = this.querySelector<HTMLElement>('#starlight__search');
+        const input = frame?.querySelector<HTMLInputElement>('input');
+        if (!frame || !input) return;
+        const reporter = new SearchReporter({
+          send: beacon,
+          results: () => frame.querySelectorAll('.pagefind-ui__result').length,
+        });
+        input.addEventListener('input', () => reporter.typed(input.value));
+        frame.addEventListener('click', (event) => {
+          const link = (event.target as Element | null)?.closest('a');
+          if (link && link.closest('.pagefind-ui__result')) {
+            reporter.opened(new URL(link.href, location.href).pathname);
+          }
+        });
+        dialog.addEventListener('close', () => reporter.flush());
+        window.addEventListener('pagehide', () => reporter.flush());
+      };
 
       window.addEventListener('DOMContentLoaded', () => {
         if (import.meta.env.DEV) return;
@@ -193,6 +229,7 @@ if (hasRestrictedClasses) dataAttributes['data-access-classes'] = '';
               });
             },
           });
+          if (recordSearches) reportSearches();
         });
       });
     }
