@@ -2,7 +2,7 @@
 
 All three packages share a version and are released together.
 
-## Unreleased
+## 0.23.1
 
 ### Added
 
@@ -13,6 +13,12 @@ All three packages share a version and are released together.
   `/favicon.ico` unless `public/` holds its own; those, the favicon and its
   dark variant are the only paths an anonymous request is answered with
   (ADR-052).
+
+### Upgrade note
+
+Bump the packages and the workflow pins, and deploy. A connector added
+before the upgrade may keep showing no icon until it is added again, since
+assistants cache what they fetched.
 
 ## 0.23.0
 
