@@ -2,6 +2,18 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Added
+
+- **Connectors show the site's mark.** The MCP server names the brand icons
+  in its implementation info, and a private deployment serves them before
+  sign-in, so Claude, ChatGPT and other clients show the mark beside the
+  connector. The build renders the favicon as `/icon-192.png` and
+  `/favicon.ico` unless `public/` holds its own; those, the favicon and its
+  dark variant are the only paths an anonymous request is answered with
+  (ADR-052).
+
 ## 0.23.0
 
 ### Added

@@ -22,7 +22,6 @@ test('anonymous traffic cannot read a private deployment', async ({
 
   const protectedPaths = [
     '/',
-    siteConfiguration.brand.faviconPath,
     '/pagefind/pagefind.js',
     '/missing-boundary-probe',
   ];
@@ -33,6 +32,26 @@ test('anonymous traffic cannot read a private deployment', async ({
     expect(await response.text(), path).not.toContain(
       siteConfiguration.brand.siteTitle,
     );
+  }
+});
+
+test('anyone may fetch the brand icons of a private deployment', async ({
+  request,
+}) => {
+  test.skip(
+    productionVisibility !== 'private',
+    'This deployment is published to everyone.',
+  );
+
+  // An assistant's connector list fetches them without signing in (ADR-052).
+  for (const path of [
+    siteConfiguration.brand.faviconPath,
+    '/icon-192.png',
+    '/favicon.ico',
+  ]) {
+    const response = await request.get(path, { maxRedirects: 0 });
+    expect(response.status(), path).toBe(200);
+    expect(response.headers()['content-type'], path).toMatch(/^image\//u);
   }
 });
 

@@ -547,6 +547,18 @@ async function route(
   const noStore = (response: Response) =>
     withPolicy(response, { path: url.pathname, policy: 'no-store', map });
 
+  /*
+   * The brand icons are the one exception to sign-in (ADR-052): an
+   * assistant's connector list fetches them without a session. Each is
+   * matched by its exact path, as the build listed it.
+   */
+  if (
+    (request.method === 'GET' || request.method === 'HEAD') &&
+    map.site.icons?.some((icon) => icon.path === url.pathname)
+  ) {
+    return serveFile(context, environment.origin, request, url.pathname);
+  }
+
   const agents = map.site.mcp === true ? context.agents : undefined;
   const agentMethods = agents ? AGENT_ROUTES[url.pathname] : undefined;
   const isSignOut = url.pathname === '/auth/sign-out';
@@ -755,6 +767,20 @@ async function route(
     );
   }
 
+  return serveFile(context, environment.origin, request, path);
+}
+
+/**
+ * The one file a canonical path names, once it has been judged: by that
+ * path, never by forwarding the incoming request.
+ */
+async function serveFile(
+  context: WorkerContext,
+  origin: string,
+  request: Request,
+  path: string,
+): Promise<Response> {
+  const { map } = context;
   const headers = new Headers();
   for (const name of ['If-None-Match', 'If-Modified-Since', 'Range']) {
     const value = request.headers.get(name);
@@ -773,7 +799,7 @@ async function route(
     ? path.slice(0, -'.html'.length)
     : path;
   const response = await context.assets.fetch(
-    new Request(new URL(sitePath(stored), environment.origin), {
+    new Request(new URL(sitePath(stored), origin), {
       method: request.method === 'HEAD' ? 'HEAD' : 'GET',
       headers,
       redirect: 'manual',
@@ -785,8 +811,9 @@ async function route(
     response.status !== 304
   ) {
     context.log({ event: 'asset-redirect-refused' });
-    return noStore(
+    return withPolicy(
       new Response('The file could not be served.', { status: 500 }),
+      { path, policy: 'no-store', map },
     );
   }
   return withPolicy(response, { path, policy: cachePolicyFor(path), map });

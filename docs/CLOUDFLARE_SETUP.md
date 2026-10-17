@@ -422,8 +422,8 @@ Before and after a deployment the smoke test requires, of a private
 environment:
 
 - anonymous denial — 401, or a redirect to `/auth/sign-in` — for the home
-  page, raw Markdown, the favicon, the Pagefind runtime, the agent index and a
-  missing route;
+  page, raw Markdown, the Pagefind runtime, the agent index and a missing
+  route; the brand icons alone are served to anyone (ADR-052);
 - machine-key admission to the home page and to the Markdown of a document
   every member may read, with `noindex` metadata, the private cache policy and
   the Markdown content type;
