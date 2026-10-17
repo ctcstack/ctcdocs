@@ -46,6 +46,11 @@ const map: AccessMapFile = {
     },
     workspaceDomains: ['example.com', 'example.org'],
     title: 'Example [DOCS]',
+    icons: [
+      { path: '/icon-192.png', type: 'image/png', sizes: ['192x192'] },
+      { path: '/brand.svg', type: 'image/svg+xml', sizes: ['any'] },
+      { path: '/favicon.ico', type: 'image/x-icon', sizes: ['16x16'] },
+    ],
     insights: { enabled: false, retentionDays: 90 },
   },
   csp: { scriptHashes: ['sha256-abc'] },
@@ -69,6 +74,10 @@ const map: AccessMapFile = {
     '/team/plan/index.md': 'team0001',
     '/content-health/': 'admins',
     '/_astro/app.js': 'platform',
+    '/icon-192.png': 'platform',
+    '/brand.svg': 'platform',
+    '/favicon.ico': 'platform',
+    '/brand-dark.svg': 'platform',
     '/_astro/shared.webp': ['team0001', 'admins'],
     '/рабочие-заметки/': 'members',
     '/404.html': 'members',
@@ -415,6 +424,40 @@ describe('the gate', () => {
       `/auth/sign-in?return=${encodeURIComponent('/team/plan/?q=1')}`,
     );
     expect(navigation.headers.get('Cache-Control')).toBe('no-store');
+  });
+
+  it('serves the brand icons to anyone, and nothing else', async () => {
+    // No session, and no sign-in configured: the icons need neither.
+    const unconfigured = context({
+      secrets: { ...context().secrets, sessionSecret: undefined },
+    });
+    for (const icon of map.site.icons ?? []) {
+      for (const method of ['GET', 'HEAD']) {
+        const response = await handle(get(icon.path, {}, method), unconfigured);
+        expect(response.status, `${method} ${icon.path}`).toBe(200);
+        expect(response.headers.get('X-Robots-Tag')).toContain('noindex');
+        if (method === 'GET') {
+          expect(await response.text()).toBe(`asset ${icon.path}`);
+        }
+      }
+    }
+    // Only these paths, spelled exactly, and only read.
+    for (const path of [
+      '/',
+      '/handbook/index.md',
+      '/_astro/app.js',
+      '/brand-dark.svg',
+      '/icon-192.png/',
+      '/icon-192.png.map',
+      '/ICON-192.PNG',
+      '/%69con-192.png',
+      '/favicon.svg',
+    ]) {
+      const response = await handle(get(path), context());
+      expect(response.status, path).toBe(401);
+    }
+    const posted = await handle(get('/brand.svg', {}, 'POST'), context());
+    expect(posted.status).toBe(405);
   });
 
   it('never takes a sign-in transaction for a session', async () => {

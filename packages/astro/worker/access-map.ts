@@ -94,6 +94,15 @@ export interface AgentDocument {
   readonly hash: string;
 }
 
+/** A brand icon, as the build listed it (ADR-052). */
+interface SiteIcon {
+  readonly path: string;
+  readonly type: string;
+  /** `WxH` sizes, `any` for a vector; empty when unknown. */
+  readonly sizes: readonly string[];
+  readonly theme?: 'light' | 'dark';
+}
+
 export interface AccessMapFile {
   readonly schemaVersion: number;
   readonly site: {
@@ -101,6 +110,12 @@ export interface AccessMapFile {
     readonly workspaceDomains: readonly string[];
     readonly title: string;
     readonly description?: string;
+    /**
+     * The brand icons served to anyone, signed in or not, and named by the
+     * MCP server (ADR-052). Each is one canonical path; nothing else is
+     * served before sign-in.
+     */
+    readonly icons?: readonly SiteIcon[];
     /**
      * The language the documents are written in, by its English name, from
      * `mcp.language`: the MCP server tells assistants to search in it.

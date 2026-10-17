@@ -244,9 +244,9 @@ export async function verifyAccessPreflight({
     visibility === 'private'
       ? serviceHeaders(clientId, clientSecret, machineKey)
       : undefined;
+  // The brand icons are served to anyone (ADR-052), so none is probed here.
   const anonymousPaths = [
     '/',
-    site.brand.faviconPath,
     '/pagefind/pagefind.js',
     markdownPath,
     '/llms.txt',

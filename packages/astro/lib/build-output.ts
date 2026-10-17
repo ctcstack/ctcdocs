@@ -39,6 +39,7 @@ import {
   type BuiltPage,
   type FileClass,
 } from './access-map.js';
+import { writeBrandIcons } from './brand-icons.js';
 import { languageName } from './language-name.js';
 import {
   findLeaks,
@@ -289,6 +290,20 @@ export async function writeBuildOutput({
   const corpus = readCorpusStructure(projectRoot);
   const model = computeAccessModel(site.access, corpus);
 
+  const publicRoot = resolve(projectRoot, PROJECT_LAYOUT.publicDirectory);
+  const publicFiles = new Set((await walk(publicRoot)).map(canonicalSitePath));
+  // Before the walk, so the raster copies are listed with every other file.
+  const icons = await writeBrandIcons({
+    publicRoot,
+    distRoot,
+    faviconPath: site.brand.faviconPath,
+    faviconDarkPath: site.brand.faviconDarkPath,
+    publicFiles,
+  });
+  for (const icon of icons) {
+    publicFiles.add(icon.path);
+  }
+
   const builtFiles = await walk(distRoot);
   const pages: BuiltPage[] = [];
   const pageHtml = new Map<string, string>();
@@ -312,12 +327,6 @@ export async function writeBuildOutput({
     }
     otherFiles.push(path);
   }
-  const publicFiles = new Set(
-    (await walk(resolve(projectRoot, PROJECT_LAYOUT.publicDirectory))).map(
-      canonicalSitePath,
-    ),
-  );
-
   const map = buildAccessMap({
     model,
     corpus,
@@ -500,6 +509,8 @@ export async function writeBuildOutput({
       workspaceDomains: site.signIn?.workspaceDomains ?? [],
       title: site.brand.siteTitle,
       description: site.brand.siteDescription,
+      // Served before sign-in, and named by the MCP server (ADR-052).
+      icons,
       language: site.mcp?.language
         ? languageName(site.mcp.language)
         : undefined,

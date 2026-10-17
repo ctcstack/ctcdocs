@@ -103,7 +103,8 @@ test('preflight requires Access denial and service-token admission', async () =>
     },
   });
 
-  assert.equal(calls.length, 7);
+  // The favicon is served to anyone (ADR-052), so it is not among them.
+  assert.equal(calls.length, 6);
   assert.deepEqual(calls.at(-1).headers, {
     'CF-Access-Client-Id': 'client-id',
     'CF-Access-Client-Secret': 'client-secret',
@@ -354,7 +355,7 @@ test('a public portal must answer anonymous readers', async () => {
   });
 
   // No service token is asked for, and none is needed: there is no boundary.
-  assert.equal(requested.length, 6);
+  assert.equal(requested.length, 5);
 });
 
 test('a public portal behind an identity boundary is a defect', async () => {

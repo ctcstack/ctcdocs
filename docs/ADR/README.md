@@ -91,5 +91,7 @@ Rejected
 - ADR-050: the Worker keeps operational state in one D1 database. Supersedes
   the "no database" clause of the product invariant in part.
 - ADR-051: content health shows what people and assistants could not find.
+- ADR-052: the brand icons are served before sign-in. Proposed; supersedes
+  ADR-038 in part once accepted.
 
 Create a new ADR by copying `000-template.md`.

@@ -223,6 +223,18 @@ export async function verifyGate({ projectRoot, distRoot }) {
     );
 
   let requests = 0;
+  /*
+   * The brand icons alone are served to anyone (ADR-052), and only if they
+   * are the platform's files, which every reader may have anyway.
+   */
+  const icons = new Set((map.site.icons ?? []).map((icon) => icon.path));
+  for (const icon of icons) {
+    assert.equal(
+      map.files[icon],
+      'platform',
+      `The icon ${icon} served before sign-in is not a platform file.`,
+    );
+  }
   const files = Object.entries(map.files);
   for (const [path, fileClass] of files) {
     const classes = readersOf(map, fileClass);
@@ -230,7 +242,7 @@ export async function verifyGate({ projectRoot, distRoot }) {
     const anonymous = await ask(path);
     assert.equal(
       anonymous.status,
-      401,
+      icons.has(path) ? 200 : 401,
       `An anonymous reader got ${path} (${anonymous.status}).`,
     );
     requests += 1;
