@@ -1,7 +1,10 @@
 name: Platform verification
 
+# A draft is work in progress: it is checked once it is ready for review, and
+# on every push after that, cancelling the run before it (ADR-053).
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - main
@@ -16,6 +19,7 @@ concurrency:
 jobs:
   quality:
     name: Packages and fixture project
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-24.04
     timeout-minutes: 25
 
@@ -105,6 +109,7 @@ jobs:
 
   workflow-security:
     name: Workflow and secret scanning
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-24.04
     timeout-minutes: 10
 
@@ -178,6 +183,7 @@ jobs:
 
   dependency-security:
     name: Dependency vulnerability audit
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-24.04
     timeout-minutes: 10
 

@@ -304,9 +304,11 @@ For an automatic deployment:
    skipped. A green workflow therefore guarantees that the verified commit was
    actually deployed and exercised through its boundary.
 
-A deployment started by a sync shows the candidate verification as skipped,
-not passed. The sync job ran `pnpm verify` and the denial suite on the exact
-tree it committed, and its caller passes `candidate_verified: true` with
+A deployment started by a sync or a merge shows the candidate verification as
+skipped, not passed. A sync ran the content gate on the exact tree it
+committed: validation, the build, the denial suite and the search check
+(ADR-053); a merge ran the project's full gate in the deployment workflow's
+own first job. Either caller passes `candidate_verified: true` with
 `candidate_sha`, so the gate does not run a second time. The input is refused
 without a SHA, and any other reason for verification to be skipped still stops
 the deployment.

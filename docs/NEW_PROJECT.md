@@ -543,14 +543,24 @@ After every deployment, an automatic check reads the site with this key.
    name: Verification
    on:
      pull_request:
-     push:
-       branches: [main]
+       types: [opened, synchronize, reopened, ready_for_review]
+     schedule:
+       - cron: '23 4 * * 1'
+     workflow_dispatch:
    permissions:
      contents: read
+   concurrency:
+     group: verification-${{ github.ref }}
+     cancel-in-progress: true
    jobs:
      verify:
+       if: github.event_name != 'pull_request' || !github.event.pull_request.draft
        uses: ctcstack/ctcdocs/.github/workflows/project-ci.yml@ROW-19
    ```
+
+   A draft is checked once it is ready for review, then on every push. The
+   weekly run is the browser suite against the real content, which a sync
+   no longer runs; a merge to `main` is verified by the deployment below.
 
    `.github/workflows/sync.yml`:
 
@@ -607,14 +617,23 @@ After every deployment, an automatic check reads the site with this key.
    concurrency:
      group: production-deploy
    jobs:
+     verify:
+       uses: ctcstack/ctcdocs/.github/workflows/project-ci.yml@ROW-19
      production:
+       needs: verify
        uses: ctcstack/ctcdocs/.github/workflows/project-deploy.yml@ROW-19
        with:
          wrangler_environment: production
          deploy_environment: production-deploy
          smoke_environment: production-smoke
+         candidate_sha: ${{ github.sha }}
+         candidate_verified: true
        secrets: inherit
    ```
+
+   A merge is verified once, here, and deployed only if that passes. The
+   deployment does not run the gate again, and no workflow a pull request
+   starts holds a deployment secret.
 
    `.github/workflows/rollback.yml`:
 
