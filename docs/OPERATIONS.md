@@ -153,6 +153,16 @@ runs `pnpm verify`, scans every changed generated file for secrets, stages only
 generated paths, and pushes without force. A concurrent human merge causes a
 safe non-fast-forward failure; the next run starts from the new `main`.
 
+A normal sync exports a document again only when the change reaches it: its
+own file changed in Drive; a folder above it was renamed or moved, which
+changes the folders its page names or its address; or an item it links to
+started or stopped being published, which changes the link from a Google
+address to a permanent link or back. Renaming or moving an item someone links
+to changes no other page, because links between documents are permanent links
+([ADR-022](ADR/022-permanent-short-ids.md)). The job log's `Phase timings`
+line says how long each phase took. A full regeneration, and a platform
+upgrade that changes the converter, export every document.
+
 No-op syncs create no commit. A successful content commit uses:
 
 ```text

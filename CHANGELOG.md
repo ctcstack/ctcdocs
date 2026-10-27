@@ -2,6 +2,19 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Changed
+
+- **A sync exports only what a change reaches.** Adding, removing or moving
+  a document no longer exports the whole corpus again, nor does renaming a
+  folder. A document is exported again when its own file changed, when a
+  folder above it was renamed or moved, or when an item it links to
+  started or stopped being published; a full sync and a converter upgrade
+  still export everything. A narrow run produces the same bytes a full
+  run would, which a property test checks over random corpora and changes
+  (ADR-053).
+
 ## 0.23.2
 
 ### Added

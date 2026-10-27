@@ -20,7 +20,7 @@ const stringifyOptions = {
   listItemIndent: 'one',
   strong: '*',
 } as const;
-const processor = unified()
+export const processor = unified()
   .use(remarkParse)
   .use(remarkGfm)
   .use(remarkStringify, stringifyOptions);
@@ -91,7 +91,7 @@ const GOOGLE_VIDS_PATH =
   /^\/videos(?:\/u\/\d+)?\/d\/([^/]+)(?:\/(?:edit|view|preview))?\/?$/u;
 const DRIVE_FILE_PATH = /^\/file\/d\/([^/]+)(?:\/(?:view|edit|preview))?\/?$/u;
 
-function parseGoogleDocumentLink(
+export function parseGoogleDocumentLink(
   value: string,
 ): GoogleDocumentLink | undefined {
   let url: URL;
@@ -156,13 +156,14 @@ const PERMANENT_LINK = new RegExp(
 );
 
 /**
- * The item a site address names, when the address is this site's: a
- * root-relative path, or an absolute URL on one of the site's origins.
+ * The path a link names on this site, when the address is this site's: a
+ * root-relative path, or an absolute URL on one of the site's origins. The
+ * path has no leading or trailing slash.
  */
-function siteLinkTarget(
+export function siteAddress(
   value: string,
-  targets: InternalLinkTargets,
-): { shortId: string; fragment: string } | undefined {
+  siteOrigins: readonly string[],
+): { path: string; fragment: string } | undefined {
   if (value.startsWith('//')) {
     return undefined;
   }
@@ -174,27 +175,46 @@ function siteLinkTarget(
   }
   if (
     url.origin !== 'https://relative.invalid' &&
-    !targets.siteOrigins.includes(url.origin)
+    !siteOrigins.includes(url.origin)
   ) {
     return undefined;
   }
   if (url.origin === 'https://relative.invalid' && !value.startsWith('/')) {
     return undefined;
   }
-  let path: string;
   try {
-    path = decodeURIComponent(url.pathname).replace(/^\/+|\/+$/gu, '');
+    return {
+      path: decodeURIComponent(url.pathname).replace(/^\/+|\/+$/gu, ''),
+      fragment: url.hash,
+    };
   } catch {
     return undefined;
   }
-  const permanent = PERMANENT_LINK.exec(path)?.[1];
+}
+
+/** The short ID a site path names as a permanent link (ADR-022). */
+export function permanentLinkShortId(path: string): string | undefined {
+  return PERMANENT_LINK.exec(path)?.[1];
+}
+
+/** The item a site address names, among those the site publishes. */
+function siteLinkTarget(
+  value: string,
+  targets: InternalLinkTargets,
+): { shortId: string; fragment: string } | undefined {
+  const address = siteAddress(value, targets.siteOrigins);
+  if (!address) {
+    return undefined;
+  }
+  const { path, fragment } = address;
+  const permanent = permanentLinkShortId(path);
   const knownShortIds = new Set(targets.shortIds.values());
   if (permanent && knownShortIds.has(permanent)) {
-    return { shortId: permanent, fragment: url.hash };
+    return { shortId: permanent, fragment: fragment };
   }
   const owner = targets.addressOwners.get(path);
   const shortId = owner ? targets.shortIds.get(owner) : undefined;
-  return shortId ? { shortId, fragment: url.hash } : undefined;
+  return shortId ? { shortId, fragment: fragment } : undefined;
 }
 
 interface RewrittenUrl {
@@ -260,7 +280,7 @@ function rewriteUrl(
   };
 }
 
-function walk(
+export function walk(
   node: Root | RootContent,
   visit: (node: RootContent) => void,
 ): void {
