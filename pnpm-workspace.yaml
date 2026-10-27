@@ -22,11 +22,12 @@ minimumReleaseAgeExclude:
 
 overrides:
   # Miniflare pins `undici` to exactly 7.29.0, which GHSA-3wwx-pv8p-q78v
-  # reports (moderate), in every `wrangler` up to 4.143.0. It reaches only the
-  # fixture project's tooling, and 7.29.1 is the fix on the same line. The key
+  # (moderate) and GHSA-xjj6-f33q-929c (high) report, in every `wrangler` up
+  # to 4.143.0. It reaches only the fixture project's tooling, and 7.30.1
+  # fixes both on the same line. The key
   # names the pinned version, so the override stops applying once Miniflare
   # pins another; drop it then.
-  'miniflare>undici@7.29.0': 7.29.1
+  'miniflare>undici@7.29.0': 7.30.1
   # Miniflare pins `sharp` to exactly 0.35.4, whose bundled librsvg
   # GHSA-wq5f-xc86-pv6w reports (high). Miniflare loads it only for the
   # fixture project's local image service; 0.35.5 is the fix on the same line.
