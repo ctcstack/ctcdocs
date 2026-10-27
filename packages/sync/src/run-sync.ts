@@ -122,6 +122,7 @@ import {
   loadManifest,
   NORMALIZER_VERSION,
   serializeManifest,
+  type ManifestHeldDocument,
   type SyncedDocumentRecord,
   type SyncedFolderRecord,
   type SyncManifest,
@@ -150,6 +151,7 @@ import {
   recordedTitleFacts,
   serializeTitleReport,
 } from './titles/title-report.js';
+import { PhaseTimer, type SyncTimings } from './phase-timer.js';
 import { allocateShortIds } from './short-id.js';
 import {
   allocateReseededSlug,
@@ -190,6 +192,8 @@ export interface RunSyncDependencies extends InventoryRunDependencies {
   fileDownloader?: FileDownloader;
   docsBaseUrl?: string;
   now?: () => Date;
+  /** Milliseconds from a monotonic origin, for the run's phase timings. */
+  clock?: () => number;
 }
 
 /** A page a run added, changed or removed. */
@@ -221,6 +225,8 @@ export interface SyncRunResult {
   addressesMoved: number;
   /** Documents with a heading that mixes alphabets in a word (ADR-023). */
   headingsMixingAlphabets: number;
+  /** How long each phase took, for the log only (ADR-053). */
+  timings: SyncTimings;
 }
 
 export class SyncSelectionError extends Error {
@@ -551,6 +557,91 @@ function folderShapeSignature(
   );
 }
 
+/** Holds a run records, so the next one need not export them again. */
+const RECORDED_HOLDS: ReadonlySet<string> = new Set([
+  'export-too-large',
+  'download-restricted',
+  'content-rejected',
+]);
+
+/**
+ * The documents an earlier run held that Drive still reports at the version
+ * they failed at (ADR-053). They are held again without being exported.
+ */
+function unchangedHolds(
+  manifest: SyncManifest,
+  selection: InventorySelection,
+  held: ReadonlyMap<string, HeldDocument>,
+): Map<string, HeldDocument> {
+  const modifiedTimes = new Map(
+    selection.documents.map((document) => [
+      document.item.id,
+      document.item.modifiedTime,
+    ]),
+  );
+  return new Map(
+    Object.entries(manifest.held ?? {}).flatMap(([fileId, recorded]) =>
+      !held.has(fileId) &&
+      modifiedTimes.get(fileId) === recorded.googleModifiedTime
+        ? [
+            [
+              fileId,
+              {
+                reason: recorded.reason,
+                ...(recorded.detail ? { detail: recorded.detail } : {}),
+              },
+            ] as const,
+          ]
+        : [],
+    ),
+  );
+}
+
+/**
+ * What the manifest records of the documents this run held: why, and at
+ * which Drive version. A targeted run tried one document and keeps the rest
+ * as an earlier run recorded them.
+ */
+function heldRecords(
+  existing: SyncManifest,
+  selection: InventorySelection,
+  held: ReadonlyMap<string, HeldDocument>,
+  targetedFileId: string | undefined,
+): Record<string, ManifestHeldDocument> | undefined {
+  if (targetedFileId) {
+    const rest = Object.fromEntries(
+      Object.entries(existing.held ?? {}).filter(
+        ([fileId]) => fileId !== targetedFileId,
+      ),
+    );
+    return Object.keys(rest).length > 0 ? rest : undefined;
+  }
+  const modifiedTimes = new Map(
+    selection.documents.map((document) => [
+      document.item.id,
+      document.item.modifiedTime,
+    ]),
+  );
+  const records = Object.fromEntries(
+    [...held].flatMap(([fileId, hold]) => {
+      const modifiedTime = modifiedTimes.get(fileId);
+      return RECORDED_HOLDS.has(hold.reason) && modifiedTime
+        ? [
+            [
+              fileId,
+              {
+                reason: hold.reason as ManifestHeldDocument['reason'],
+                ...(hold.detail ? { detail: hold.detail } : {}),
+                googleModifiedTime: modifiedTime,
+              },
+            ] as const,
+          ]
+        : [];
+    }),
+  );
+  return Object.keys(records).length > 0 ? records : undefined;
+}
+
 function manifestsMatchExceptGeneratedAt(
   left: SyncManifest,
   right: SyncManifest,
@@ -800,6 +891,7 @@ interface ResolvedRun {
   inspector: DocumentInspector;
   /** Downloads a PDF, up to the most the sync reads. */
   downloader: { downloadFile(fileId: string): Promise<Uint8Array> };
+  timer: PhaseTimer;
 }
 
 /** A document's page before its frontmatter and record are written. */
@@ -830,13 +922,11 @@ export async function runBasicMarkdownSync(
   dependencies: RunSyncDependencies = {},
 ): Promise<SyncRunResult> {
   const runTimestamp = (dependencies.now ?? (() => new Date()))().toISOString();
+  const timer = new PhaseTimer(dependencies.clock ?? (() => performance.now()));
   const inventory =
     dependencies.inventoryResult ??
-    (await runInventory(
-      context,
-      configuration,
-      accessTokenProvider,
-      dependencies,
+    (await timer.time('inventory', () =>
+      runInventory(context, configuration, accessTokenProvider, dependencies),
     ));
   const exporter =
     dependencies.markdownExporter ??
@@ -916,6 +1006,7 @@ export async function runBasicMarkdownSync(
     {
       runTimestamp,
       inventory,
+      timer,
       exporter: {
         exportMarkdown: remember((fileId) => exporter.exportMarkdown(fileId)),
         ...(exportHtmlZip ? { exportHtmlZip: remember(exportHtmlZip) } : {}),
@@ -951,10 +1042,13 @@ async function synchronize(
   configuration: SyncConfiguration,
   options: RunSyncOptions,
   run: ResolvedRun,
-  held: ReadonlyMap<string, HeldDocument>,
+  heldBefore: ReadonlyMap<string, HeldDocument>,
 ): Promise<SyncRunResult> {
   const { markdownHeader, repositoryRoot, site, sourceHeader } = context;
-  const { runTimestamp, inventory, exporter, inspector, downloader } = run;
+  const { runTimestamp, inventory, exporter, inspector, downloader, timer } =
+    run;
+  timer.startPass();
+  const planStart = timer.now();
   const existingManifest = await loadManifest(
     resolve(repositoryRoot, MANIFEST_PATH),
     configuration.GOOGLE_DRIVE_ID,
@@ -966,6 +1060,18 @@ async function synchronize(
     existingManifest.normalizerVersion !== NORMALIZER_VERSION;
   const forceFullExport = options.full || versionChanged;
   const targetedFileId = options.fileId ?? options.reseedSlugFileId;
+  /*
+   * A document an earlier run held stays held while Drive reports the version
+   * it failed at, without another export. A full run, or a new converter,
+   * tries every one again (ADR-053).
+   */
+  const held: ReadonlyMap<string, HeldDocument> =
+    forceFullExport || targetedFileId
+      ? heldBefore
+      : new Map([
+          ...heldBefore,
+          ...unchangedHolds(existingManifest, inventory.selection, heldBefore),
+        ]);
   if (
     targetedFileId &&
     versionChanged &&
@@ -1739,6 +1845,8 @@ async function synchronize(
     };
   };
   const failures = new Map<string, HeldDocument>();
+  timer.since('plan', planStart);
+  const exportStart = timer.now();
   const exportedDocuments = (
     await mapWithConcurrency(
       plannedDocuments.filter((document) => document.needsExport),
@@ -1763,6 +1871,7 @@ async function synchronize(
       },
     )
   ).filter((document) => document !== undefined);
+  timer.since('export', exportStart);
   if (failures.size > 0) {
     return synchronize(
       context,
@@ -1772,6 +1881,7 @@ async function synchronize(
       new Map([...held, ...failures]),
     );
   }
+  const assembleStart = timer.now();
   const exportedById = new Map(
     exportedDocuments.map((document) => [document.fileId, document]),
   );
@@ -1866,6 +1976,15 @@ async function synchronize(
       : folders,
     redirects,
   };
+  const heldInManifest = heldRecords(
+    existingManifest,
+    inventory.selection,
+    held,
+    targetedFileId,
+  );
+  if (heldInManifest) {
+    candidateManifest.held = heldInManifest;
+  }
   const widened = recordPublishedReaders(
     candidateManifest,
     existingManifest,
@@ -2206,13 +2325,23 @@ async function synchronize(
   );
   output.set(PROJECT_LAYOUT.titleReportFile, serializeTitleReport(titleReport));
 
+  timer.since('assemble', assembleStart);
+  const writeStart = timer.now();
+  const validatedBefore = timer.total('validate');
   const writeResult = await writeGeneratedOutputAtomically(
     repositoryRoot,
     output,
     {
       dryRun: options.dryRun,
-      validate: (stagedRoot) => validateGeneratedOutput(stagedRoot, context),
+      validate: (stagedRoot) =>
+        timer.time('validate', () =>
+          validateGeneratedOutput(stagedRoot, context),
+        ),
     },
+  );
+  timer.add(
+    'write',
+    timer.now() - writeStart - (timer.total('validate') - validatedBefore),
   );
 
   return {
@@ -2223,5 +2352,6 @@ async function synchronize(
     addressesMoved: slugAllocation.moves.length,
     headingsMixingAlphabets:
       titleReport.summary.checks['heading-mixes-alphabets'],
+    timings: timer.result(),
   };
 }

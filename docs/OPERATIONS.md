@@ -426,8 +426,10 @@ A group is folded to one line — what it is, what to do, how many files, where
 in Google Docs or Drive, straight to the line concerned when there is one,
 with its section, who last edited it and a link to its page. Each priority
 also lists the checks that were all clear. A document held back keeps
-its published version if it had one, the page says when that version was
-edited, and it is tried again on every sync. Folders the site is configured
+its published version if it had one, and the page says when that version was
+edited. The manifest records why it was held and the Drive version it failed
+at; it is tried again once that file changes in Drive, on a full sync, or
+after a platform upgrade that changes the converter (ADR-053). Folders the site is configured
 to leave out are listed last.
 
 Filter by section, or by last editor, to hand out the work: every task list
