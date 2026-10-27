@@ -93,5 +93,8 @@ Rejected
 - ADR-051: content health shows what people and assistants could not find.
 - ADR-052: the brand icons are served before sign-in. Proposed; supersedes
   ADR-038 in part once accepted.
+- ADR-053: generated content is kept in R2 and published by a container.
+  Proposed; supersedes ADR-002 and ADR-009, and ADR-003 in part, once
+  accepted.
 
 Create a new ADR by copying `000-template.md`.
