@@ -24,6 +24,8 @@ All three packages share a version and are released together.
   templates run `ci.yml` on pull requests that are not drafts and weekly,
   and verify a merge in `deploy.yml` before deploying it, instead of
   verifying it in both. The platform's own CI skips drafts too.
+- **Eight exports at a time.** `SYNC_CONCURRENCY` defaults to 8 instead of
+  4: most of a full export is waiting on Google, so this about halves it.
 
 ### Upgrade note
 

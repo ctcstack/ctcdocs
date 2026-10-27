@@ -29,7 +29,12 @@ export function createSyncConfigurationSchema(site: SiteConfiguration) {
           .filter(Boolean)
           .map((identifier) => googleDriveIdentifier.parse(identifier)),
       ),
-    SYNC_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(4),
+    /*
+     * Documents exported at once. Most of a full export is waiting on
+     * Google, so eight halves it without nearing Drive's per-user limit
+     * (ADR-053).
+     */
+    SYNC_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(8),
     SYNC_MAX_RETRIES: z.coerce.number().int().min(0).max(10).default(5),
     SYNC_FAIL_ON_WARNING: booleanFromString.default(false),
     SYNC_EXPORT_TIMEOUT_MS: z.coerce
