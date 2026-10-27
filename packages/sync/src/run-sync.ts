@@ -151,6 +151,7 @@ import {
   recordedTitleFacts,
   serializeTitleReport,
 } from './titles/title-report.js';
+import { documentLinks } from './links/document-links.js';
 import { PhaseTimer, type SyncTimings } from './phase-timer.js';
 import { allocateShortIds } from './short-id.js';
 import {
@@ -543,18 +544,97 @@ async function mapWithConcurrency<TInput, TOutput>(
  * prefix is deliberately excluded — renumbering a folder rearranges navigation
  * and must not re-export the corpus.
  */
-function folderShapeSignature(
-  folders: Readonly<Record<string, SyncManifest['folders'][string]>>,
-): string {
-  return JSON.stringify(
-    Object.entries(folders)
-      .map(([folderId, folder]) => [
-        folderId,
-        folder.displayLabel,
-        folder.googleParentId,
-      ])
-      .sort(([left], [right]) => compareText(String(left), String(right))),
+/** The labels of the folders between the root and a document, as its page names them. */
+function documentFolderPath(selected: SelectedInventoryItem): string[] {
+  return selected.path
+    .slice(1, -1)
+    .map((segment) => parseOrderedLabel(segment).label);
+}
+
+function sameFolderPath(
+  recorded: readonly string[] | undefined,
+  current: readonly string[],
+): boolean {
+  return (
+    recorded !== undefined &&
+    recorded.length === current.length &&
+    recorded.every((label, index) => label === current[index])
   );
+}
+
+/**
+ * Which of a published page's links this run's change to the corpus reaches.
+ * A link names an item by its permanent link once the item is published, or
+ * by its Google address or site address until it is (ADR-022): so a page
+ * changes when an item it links to starts or stops being published, or when
+ * an address it names starts or stops naming an item, and not when an item
+ * it links to is renamed or moved.
+ */
+function corpusChangeReach(
+  existing: SyncManifest,
+  targets: InternalLinkTargets,
+): (body: string) => boolean {
+  const publishedBefore = new Map<string, string>();
+  for (const record of Object.values(existing.documents)) {
+    if (record.shortId) {
+      publishedBefore.set(record.googleFileId, record.shortId);
+    }
+  }
+  for (const record of Object.values(existing.folders)) {
+    if (record.shortId) {
+      publishedBefore.set(record.googleFolderId, record.shortId);
+    }
+  }
+  const changedItems = new Set<string>();
+  for (const [itemId, shortId] of publishedBefore) {
+    if (targets.shortIds.get(itemId) !== shortId) {
+      changedItems.add(itemId);
+    }
+  }
+  for (const [itemId, shortId] of targets.shortIds) {
+    if (publishedBefore.get(itemId) !== shortId) {
+      changedItems.add(itemId);
+    }
+  }
+  const publishedShortIds = new Set(targets.shortIds.values());
+
+  const ownersBefore = new Map<string, string>([
+    ...Object.entries(existing.redirects).map(
+      ([source, redirect]) => [source, redirect.googleFileId] as const,
+    ),
+    ...Object.values(existing.folders).flatMap((record) =>
+      record.stableSlug
+        ? [[record.stableSlug, record.googleFolderId] as const]
+        : [],
+    ),
+    ...Object.values(existing.documents).map(
+      (record) => [record.stableSlug, record.googleFileId] as const,
+    ),
+  ]);
+  const changedAddresses = new Set<string>();
+  for (const path of new Set([
+    ...ownersBefore.keys(),
+    ...targets.addressOwners.keys(),
+  ])) {
+    if (ownersBefore.get(path) !== targets.addressOwners.get(path)) {
+      changedAddresses.add(path);
+    }
+  }
+
+  if (changedItems.size === 0 && changedAddresses.size === 0) {
+    return () => false;
+  }
+  return (body) =>
+    documentLinks(body, targets.siteOrigins).some((link) => {
+      switch (link.kind) {
+        case 'google':
+          return changedItems.has(link.fileId);
+        case 'permanent':
+          return !publishedShortIds.has(link.shortId);
+        case 'address':
+          return changedAddresses.has(link.path);
+      }
+    });
 }
 
 /** Holds a run records, so the next one need not export them again. */
@@ -1193,15 +1273,6 @@ async function synchronize(
     };
     slugChange = { oldSlug: existingRecord.stableSlug, newSlug };
   }
-  const selectedDocumentIds = new Set(
-    selection.documents.map((document) => document.item.id),
-  );
-  const corpusChanged =
-    selectedDocumentIds.size !==
-      Object.keys(existingManifest.documents).length ||
-    Object.keys(existingManifest.documents).some(
-      (fileId) => !selectedDocumentIds.has(fileId),
-    );
   const selectedForPlan = selection.documents.filter(
     (document) =>
       !targetedFileId ||
@@ -1253,6 +1324,7 @@ async function synchronize(
   const publishedPermanentLinks = new Set(
     [...linkTargets.shortIds.values()].map(permanentLinkPath),
   );
+  const linksReachedByChange = corpusChangeReach(existingManifest, linkTargets);
   const sectionIndexPages = site.navigation.sectionIndexPages;
   /*
    * The title report, read once: its facts are reused for documents this run
@@ -1294,9 +1366,6 @@ async function synchronize(
       })
       .sort(([left], [right]) => compareText(left, right)),
   );
-  const folderStructureChanged =
-    folderShapeSignature(folders) !==
-    folderShapeSignature(existingManifest.folders);
 
   const plannedDocuments = await Promise.all(
     [...selectedForPlan]
@@ -1309,12 +1378,22 @@ async function synchronize(
         const existingAssets = existingRecord
           ? await readExistingAssets(repositoryRoot, existingRecord)
           : [];
+        /*
+         * A page names the folders above it, so a renamed or moved folder
+         * reaches the documents inside it and no others.
+         */
+        const folderPathChanged =
+          existingContent !== undefined &&
+          !sameFolderPath(
+            extractGeneratedFolderPath(existingContent),
+            documentFolderPath(selected),
+          );
         const metadataChanged =
           existingRecord !== undefined &&
           (existingRecord.googleModifiedTime !== selected.item.modifiedTime ||
             existingRecord.googleName !== selected.item.name ||
             existingRecord.googleParentId !== selected.parentId ||
-            folderStructureChanged);
+            folderPathChanged);
         const existingBody = existingContent
           ? extractGeneratedDocumentBody(existingContent, markdownHeader)
           : undefined;
@@ -1349,7 +1428,8 @@ async function synchronize(
             : targetedFileId
               ? selected.item.id === targetedFileId
               : forceFullExport ||
-                corpusChanged ||
+                (existingBody !== undefined &&
+                  linksReachedByChange(existingBody)) ||
                 existingRecord === undefined ||
                 existingRecord.stableSlug !==
                   stableSlugs.get(selected.item.id) ||
