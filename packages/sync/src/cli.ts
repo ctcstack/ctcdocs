@@ -51,6 +51,7 @@ import { AtomicWriteError } from './output/atomic-writer.js';
 import { GeneratedOutputValidationError } from './output/validate-generated-output.js';
 import { loadSyncContext } from './project-context.js';
 import { runBasicMarkdownSync, SyncSelectionError } from './run-sync.js';
+import { formatTimings } from './phase-timer.js';
 
 /*
  * The command runs inside the project it acts on, wherever that project keeps
@@ -123,6 +124,8 @@ function printSyncSummary(
     `Ignored by configuration: ${summary.ignored} items in ${result.report.ignoredFolders.length} folders`,
   );
   console.log(`Warnings: ${summary.warnings}`);
+  // How long each phase took: the log only, never the generated output.
+  console.log(`Phase timings: ${formatTimings(result.timings)}`);
   console.log(
     dryRun
       ? `Generated output would change: ${result.outputChanged ? 'yes' : 'no'}`

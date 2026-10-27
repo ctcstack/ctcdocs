@@ -4,6 +4,23 @@ All three packages share a version and are released together.
 
 ## Unreleased
 
+### Added
+
+- **Phase timings.** `ctcdocs-sync sync` prints how long the inventory,
+  planning, export, assembly, validation and write took, and how many
+  times it planned the corpus. They go to the log only; nothing generated
+  carries them.
+
+### Changed
+
+- **A held document is not exported again until it changes.** A document
+  the sync could not export for a reason of its own (too large, download
+  restricted, content refused) is recorded in the manifest under `held`,
+  with the Drive version it failed at. Later syncs keep it held without
+  exporting it again until Drive reports a newer version; a full sync, or
+  a converter upgrade, tries it again. Before, every sync exported it again
+  and planned the corpus twice (ADR-053).
+
 ### Security
 
 - **Dependencies past new advisories.** `zod` 4.6.6 in the sync and site
@@ -11,6 +28,11 @@ All three packages share a version and are released together.
   `fast-uri` and `postcss-selector-parser`, and the override for
   Miniflare's pinned `undici` moves to 7.30.1. `vitest` is 4.1.12.
   `katex` stays at 0.16 with one low advisory: its fix is a new minor line.
+
+### Upgrade note
+
+The first sync after the upgrade records any held document in
+`data/sync-manifest.json`, so it changes that file once.
 
 ## 0.23.1
 

@@ -720,3 +720,218 @@ describe('what a run changed', () => {
     expect(edited.report.summary).toMatchObject({ exported: 1, changed: 1 });
   });
 });
+
+describe('a held document between runs', () => {
+  /** Runs the sync over `items`, recording which documents it exported. */
+  async function syncOnce(
+    root: string,
+    items: DriveItem[],
+    bodies: Record<string, string | Error>,
+    options: { full?: boolean; timestamp?: string } = {},
+  ) {
+    const calls: string[] = [];
+    const result = await runBasicMarkdownSync(
+      testSyncContext(root),
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: options.full ?? false },
+      {
+        inventoryResult: inventoryOf(items),
+        markdownExporter: exporterOf(bodies, calls),
+        now: () => new Date(options.timestamp ?? firstTimestamp),
+      },
+    );
+    return { result, calls };
+  }
+
+  it('records why it was held and the Drive version it was held at', async () => {
+    const root = await repository();
+    await syncOnce(
+      root,
+      [document('doc-alpha', 'Alpha'), document('doc-huge', 'Huge')],
+      { 'doc-huge': tooLarge('doc-huge') },
+    );
+
+    const manifest = await readJson<SyncManifest>(
+      root,
+      'data/sync-manifest.json',
+    );
+    expect(manifest.held).toEqual({
+      'doc-huge': {
+        reason: 'export-too-large',
+        googleModifiedTime: firstTimestamp,
+      },
+    });
+  });
+
+  it('does not export it again while its Drive file is unchanged', async () => {
+    const root = await repository();
+    const items = [
+      document('doc-alpha', 'Alpha'),
+      document('doc-huge', 'Huge'),
+    ];
+    await syncOnce(root, items, { 'doc-huge': tooLarge('doc-huge') });
+
+    const { result, calls } = await syncOnce(
+      root,
+      items,
+      { 'doc-huge': tooLarge('doc-huge') },
+      { timestamp: secondTimestamp },
+    );
+
+    expect(calls).not.toContain('doc-huge');
+    expect(result.outputChanged).toBe(false);
+    expect(result.report.unpublished).toEqual([
+      expect.objectContaining({
+        id: 'doc-huge',
+        status: 'not-published',
+        reason: 'export-too-large',
+      }),
+    ]);
+  });
+
+  it('tries it again once its Drive file changes', async () => {
+    const root = await repository();
+    await syncOnce(
+      root,
+      [document('doc-alpha', 'Alpha'), document('doc-huge', 'Huge')],
+      { 'doc-huge': tooLarge('doc-huge') },
+    );
+
+    const { result, calls } = await syncOnce(
+      root,
+      [
+        document('doc-alpha', 'Alpha'),
+        document('doc-huge', 'Huge', 'team', secondTimestamp),
+      ],
+      { 'doc-huge': 'Smaller now.\n' },
+      { timestamp: secondTimestamp },
+    );
+
+    expect(calls).toContain('doc-huge');
+    expect(result.report.unpublished).toEqual([]);
+    const manifest = await readJson<SyncManifest>(
+      root,
+      'data/sync-manifest.json',
+    );
+    expect(manifest.held).toBeUndefined();
+    expect(Object.keys(manifest.documents)).toEqual(['doc-alpha', 'doc-huge']);
+  });
+
+  it('tries it again on a full run', async () => {
+    const root = await repository();
+    const items = [
+      document('doc-alpha', 'Alpha'),
+      document('doc-huge', 'Huge'),
+    ];
+    await syncOnce(root, items, { 'doc-huge': tooLarge('doc-huge') });
+
+    const { calls } = await syncOnce(
+      root,
+      items,
+      { 'doc-huge': tooLarge('doc-huge') },
+      { full: true, timestamp: secondTimestamp },
+    );
+
+    expect(calls).toContain('doc-huge');
+  });
+
+  it('forgets it once it leaves Drive', async () => {
+    const root = await repository();
+    await syncOnce(
+      root,
+      [document('doc-alpha', 'Alpha'), document('doc-huge', 'Huge')],
+      { 'doc-huge': tooLarge('doc-huge') },
+    );
+
+    await syncOnce(
+      root,
+      [document('doc-alpha', 'Alpha')],
+      {},
+      {
+        timestamp: secondTimestamp,
+      },
+    );
+
+    const manifest = await readJson<SyncManifest>(
+      root,
+      'data/sync-manifest.json',
+    );
+    expect(manifest.held).toBeUndefined();
+  });
+
+  it('keeps a published version held while its Drive file is unchanged', async () => {
+    const root = await repository();
+    await syncOnce(root, [document('doc-beta', 'Beta')], {});
+    const heldItems = [document('doc-beta', 'Beta', 'team', secondTimestamp)];
+    await syncOnce(
+      root,
+      heldItems,
+      { 'doc-beta': tooLarge('doc-beta') },
+      { timestamp: secondTimestamp },
+    );
+
+    const { result, calls } = await syncOnce(
+      root,
+      heldItems,
+      { 'doc-beta': tooLarge('doc-beta') },
+      { timestamp: '2026-01-03T00:00:00.000Z' },
+    );
+
+    expect(calls).not.toContain('doc-beta');
+    expect(result.outputChanged).toBe(false);
+    expect(result.report.unpublished).toEqual([
+      expect.objectContaining({
+        id: 'doc-beta',
+        status: 'out-of-date',
+        reason: 'export-too-large',
+      }),
+    ]);
+  });
+});
+
+describe('phase timings', () => {
+  it('reports how long each phase took, and writes none of it', async () => {
+    const root = await repository();
+    let tick = 0;
+    const result = await runBasicMarkdownSync(
+      testSyncContext(root),
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: false },
+      {
+        inventoryResult: inventoryOf([
+          document('doc-alpha', 'Alpha'),
+          document('doc-huge', 'Huge'),
+        ]),
+        markdownExporter: exporterOf({ 'doc-huge': tooLarge('doc-huge') }),
+        now: () => new Date(firstTimestamp),
+        clock: () => (tick += 10),
+      },
+    );
+
+    expect(result.timings.phases.map((phase) => phase.phase)).toEqual([
+      'inventory',
+      'plan',
+      'export',
+      'assemble',
+      'validate',
+      'write',
+    ]);
+    for (const phase of result.timings.phases) {
+      expect(phase.milliseconds).toBeGreaterThanOrEqual(0);
+    }
+    // The held document made the run plan the corpus a second time.
+    expect(result.timings.passes).toBe(2);
+    const report = await readFile(
+      resolve(root, 'data/latest-sync-report.json'),
+      'utf8',
+    );
+    expect(report).not.toContain('milliseconds');
+    const manifest = await readFile(
+      resolve(root, 'data/sync-manifest.json'),
+      'utf8',
+    );
+    expect(manifest).not.toContain('milliseconds');
+  });
+});

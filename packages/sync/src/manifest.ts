@@ -125,6 +125,21 @@ const manifestRedirectSchema = z.object({
   createdAt: z.iso.datetime(),
 });
 
+/*
+ * A document a run could not export for a reason of its own (ADR-026), and
+ * the Drive version it failed at. The next run leaves it held, without
+ * exporting it again, until Drive reports a newer version (ADR-053).
+ */
+const manifestHeldSchema = z.object({
+  reason: z.enum([
+    'export-too-large',
+    'download-restricted',
+    'content-rejected',
+  ]),
+  detail: z.string().min(1).optional(),
+  googleModifiedTime: z.iso.datetime(),
+});
+
 const manifestCommonSchema = {
   converterVersion: z.string().min(1),
   normalizerVersion: z.string().min(1),
@@ -152,12 +167,15 @@ export const syncManifestSchema = z.object({
   ...manifestCommonSchema,
   folders: z.record(z.string(), manifestFolderSchema),
   redirects: z.record(z.string(), manifestRedirectSchema),
+  /** Absent when nothing is held, so a manifest without holds is unchanged. */
+  held: z.record(z.string(), manifestHeldSchema).optional(),
 });
 
 export type SyncManifest = z.infer<typeof syncManifestSchema>;
 export type SyncedDocumentRecord = z.infer<typeof manifestDocumentSchema>;
 export type SyncedFolderRecord = z.infer<typeof manifestFolderSchema>;
 export type ManifestRedirect = z.infer<typeof manifestRedirectSchema>;
+export type ManifestHeldDocument = z.infer<typeof manifestHeldSchema>;
 
 /** What a record's page publishes, from how its file was converted. */
 export function documentFormat(record: SyncedDocumentRecord): DocumentFormat {
@@ -291,5 +309,10 @@ export function serializeManifest(manifest: SyncManifest): string {
     folders: sortRecord(manifest.folders),
     redirects: sortRecord(manifest.redirects),
   };
+  if (manifest.held && Object.keys(manifest.held).length > 0) {
+    normalized.held = sortRecord(manifest.held);
+  } else {
+    delete normalized.held;
+  }
   return `${JSON.stringify(normalized, null, 2)}\n`;
 }
