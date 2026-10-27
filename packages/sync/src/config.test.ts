@@ -16,7 +16,7 @@ describe('sync configuration', () => {
     ).toEqual({
       ...requiredEnvironment,
       GOOGLE_IGNORED_FOLDER_IDS: [],
-      SYNC_CONCURRENCY: 4,
+      SYNC_CONCURRENCY: 8,
       SYNC_MAX_RETRIES: 5,
       SYNC_FAIL_ON_WARNING: false,
       SYNC_EXPORT_TIMEOUT_MS: 60_000,
