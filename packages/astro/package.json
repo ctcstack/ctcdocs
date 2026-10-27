@@ -98,7 +98,7 @@
     "remark-stringify": "11.0.0",
     "typescript-eslint": "8.70.1",
     "unified": "11.0.5",
-    "zod": "4.6.5"
+    "zod": "4.6.6"
   },
   "peerDependencies": {
     "@astrojs/starlight": "^0.41.5",
@@ -115,6 +115,6 @@
     "astro": "7.3.5",
     "linkedom": "0.18.13",
     "typescript": "6.0.3",
-    "vitest": "4.1.11"
+    "vitest": "4.1.12"
   }
 }

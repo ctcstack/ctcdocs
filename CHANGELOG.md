@@ -2,6 +2,16 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Security
+
+- **Dependencies past new advisories.** `zod` 4.6.6 in the sync and site
+  packages; the lockfile takes patched `undici`, `vite`, `dompurify`,
+  `fast-uri` and `postcss-selector-parser`, and the override for
+  Miniflare's pinned `undici` moves to 7.30.1. `vitest` is 4.1.12.
+  `katex` stays at 0.16 with one low advisory: its fix is a new minor line.
+
 ## 0.23.1
 
 ### Added

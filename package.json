@@ -34,13 +34,13 @@
     "@ctcstack/ctcdocs-core": "workspace:*",
     "@ctcstack/ctcdocs-sync": "workspace:*",
     "@types/node": "22.20.1",
-    "@vitest/coverage-v8": "4.1.11",
+    "@vitest/coverage-v8": "4.1.12",
     "eslint": "10.11.0",
     "husky": "9.1.7",
     "knip": "6.38.0",
     "lint-staged": "16.4.0",
     "prettier": "3.9.9",
     "typescript": "6.0.3",
-    "vitest": "4.1.11"
+    "vitest": "4.1.12"
   }
 }
