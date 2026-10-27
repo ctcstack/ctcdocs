@@ -149,8 +149,12 @@ Full regeneration:
 
 The sync job checks out `main`, writes through the atomic output writer, checks
 the complete working-tree diff against the shared generated-path allowlist,
-runs `pnpm verify`, scans every changed generated file for secrets, stages only
-generated paths, and pushes without force. A concurrent human merge causes a
+and, when anything changed, runs the content gate: validation, the build, the
+denial suite and the search check. Code checks and the browser suite are not
+part of it: they run in CI on every pull request that is not a draft, once on
+a merge, and weekly against the real content (ADR-053). It then scans every
+changed generated file for secrets, stages only generated paths, and pushes
+without force. A concurrent human merge causes a
 safe non-fast-forward failure; the next run starts from the new `main`.
 
 A normal sync exports a document again only when the change reaches it: its

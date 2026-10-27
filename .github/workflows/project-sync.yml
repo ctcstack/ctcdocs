@@ -207,9 +207,6 @@ jobs:
         id: generated_validation
         run: pnpm exec ctcdocs-sync validate:generated-diff
 
-      - name: Install Chromium for verification
-        run: pnpm exec playwright install --with-deps chromium
-
       # Astro keeps every image it optimizes under its cache directory, keyed by
       # the source bytes and the transform, and reuses an entry instead of
       # encoding the image again. That encoding is most of a build. The key
@@ -220,6 +217,7 @@ jobs:
       # The cache holds the optimized images, which is the same content the
       # repository already holds, and is readable only by this repository.
       - name: Restore optimized images
+        if: steps.changes.outputs.changed == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules/.astro/assets
@@ -227,13 +225,22 @@ jobs:
           restore-keys: |
             ctcdocs-astro-assets-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-
 
-      # The denial suite asks the platform's gate for every built file as
-      # different readers (ADR-038); a public deployment has nothing to refuse.
-      - name: Verify the site the new content produces
+      # The content gate: what new content can break without a line of code
+      # changing (ADR-053). Code checks — formatting, lint, types, unit tests
+      # and the browser suite — ran in CI when the code merged, and the code
+      # has not changed since. The build is the one the deployment ships; the
+      # denial suite asks the platform's gate for every built file as
+      # different readers (ADR-038), and the search check that no page's text
+      # reaches a wider class's index. A run with nothing new has nothing to
+      # check.
+      - name: Run the content gate
         id: build
+        if: steps.changes.outputs.changed == 'true'
         run: |
-          pnpm verify
+          pnpm exec ctcdocs-sync validate
+          pnpm exec astro build
           pnpm exec ctcdocs-verify-gate
+          pnpm exec ctcdocs-verify-search
 
       - name: Revalidate the generated diff after verification
         id: final_validation

@@ -14,6 +14,21 @@ All three packages share a version and are released together.
   still export everything. A narrow run produces the same bytes a full
   run would, which a property test checks over random corpora and changes
   (ADR-053).
+- **A sync runs the content gate, not the project's full gate.** When
+  anything changed, it validates the output, builds once, and runs the
+  denial suite and the search check; with nothing changed it checks
+  nothing. Formatting, lint, types, unit tests and the browser suite are
+  code checks and no longer run on every sync, nor does the denial suite
+  run twice (ADR-053).
+- **Callers: drafts wait, merges are verified once.** The `NEW_PROJECT.md`
+  templates run `ci.yml` on pull requests that are not drafts and weekly,
+  and verify a merge in `deploy.yml` before deploying it, instead of
+  verifying it in both. The platform's own CI skips drafts too.
+
+### Upgrade note
+
+Replace `.github/workflows/ci.yml` and `deploy.yml` with the templates in
+`docs/NEW_PROJECT.md`. Until then, a merge is still verified twice.
 
 ## 0.23.2
 
