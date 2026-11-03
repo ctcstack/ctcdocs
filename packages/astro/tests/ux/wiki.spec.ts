@@ -14,6 +14,7 @@ import {
   folderTrail,
   normalizeFolderName,
 } from '../../lib/folder-anchor.js';
+import { asksNothing } from '../../lib/content-health-view.js';
 import { siteConfiguration } from '../../lib/project.js';
 import {
   accessReviewShape,
@@ -769,6 +770,11 @@ test('the content health page names what is not on the site, and every note', as
     const entry = page.locator(
       `content-health li[data-kind="unpublished"]:has(a[href="${item.sourceUrl}"])`,
     );
+    if (asksNothing(item.reason)) {
+      // Named in the report, and not given to an editor as work.
+      await expect(entry).toHaveCount(0);
+      continue;
+    }
     await expect(entry).toHaveCount(1);
     await expect(entry).toContainText(item.name);
     await expect(entry.locator('xpath=ancestor::details[1]')).toHaveAttribute(
@@ -1301,6 +1307,23 @@ test("a recording plays in Drive's player, with a link to where it plays", async
     ).toBeVisible();
   }
   await expectNoAccessibilityViolations(page);
+});
+
+test('the home page shows the folders in the order the sidebar does', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const cards = (await page.locator('.category-name').allInnerTexts()).map(
+    (text) => text.trim(),
+  );
+  test.skip(cards.length < 2, 'The corpus has one folder to show.');
+
+  await page.goto(`/${anyDocument().slug}/`);
+  const sidebar = (
+    await page.locator('#starlight__sidebar details > summary').allInnerTexts()
+  ).map((text) => text.trim());
+
+  expect(cards).toEqual(sidebar.filter((label) => cards.includes(label)));
 });
 
 test('the sidebar marks a page that is not a Google Doc with an icon of its format', async ({

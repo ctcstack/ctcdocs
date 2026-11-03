@@ -2,6 +2,29 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Changed
+
+- **Folder cards follow the sidebar.** The home page shows the folders in
+  the order the sidebar does, the numbered order set in Drive, instead of
+  the folder edited last first. The documents inside a card stay most
+  recent first.
+- **Formats may share a name.** "Files in one folder share a name" notes
+  two files of one format only: a Google Doc beside its PDF or its
+  recording is no longer a copy to remove (ADR-054).
+- **An archive a document links to is not work.** It gets the reason
+  `archive-linked`, "Archives a document links to": the sync report and the
+  job summary list it, and the content health page leaves it out. Links by
+  a Drive download address count. A document whose only links off the site
+  lead to such archives gets no "A link leads to a Google file that is not
+  on this site" note (ADR-054).
+- **Where the other copy is.** A near duplicate names the folders of the
+  document it shares its text with, and a shortcut where its original is.
+- `@ctcstack/ctcdocs-core` exports `ROOT_FOLDER_LABEL` and
+  `folderTrailText`, which the sync and the site use to write where an item
+  lives.
+
 ## 0.24.0
 
 ### Changed

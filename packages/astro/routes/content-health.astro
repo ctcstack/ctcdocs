@@ -23,7 +23,11 @@
  */
 import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
 import { Icon } from '@astrojs/starlight/components';
-import { PLATFORM_ROUTE_HREFS } from '@ctcstack/ctcdocs-core';
+import {
+  folderTrailText,
+  PLATFORM_ROUTE_HREFS,
+  ROOT_FOLDER_LABEL,
+} from '@ctcstack/ctcdocs-core';
 
 import HealthBreakdown from '../components/HealthBreakdown.astro';
 import InsightsReport from '../components/InsightsReport.astro';
@@ -495,7 +499,7 @@ const blocks = (groups: Group[]) => {
                       data-section={
                         'trail' in finding && finding.folder !== rootFolderId
                           ? (finding.trail[0] ?? finding.name)
-                          : 'General'
+                          : ROOT_FOLDER_LABEL
                       }
                       data-editor=""
                     >
@@ -540,10 +544,8 @@ const blocks = (groups: Group[]) => {
                   <li data-section={sectionOf(folder)} data-editor="">
                     <span class="health-folder-name">{folder.name}</span>
                     <span class="health-folder-meta">
-                      {folder.folderPath.length > 0
-                        ? folder.folderPath.join(' › ')
-                        : 'General'}{' '}
-                      · {plural(folder.items, 'item')}
+                      {folderTrailText(folder.folderPath)} ·{' '}
+                      {plural(folder.items, 'item')}
                     </span>
                   </li>
                 ))}

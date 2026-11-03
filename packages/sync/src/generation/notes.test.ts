@@ -291,12 +291,12 @@ describe('createNotes', () => {
     const notes = createNotes(
       corpus([
         item('doc', 'Plan', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
-        item('pdf', 'Plan.pdf', GOOGLE_DRIVE_PDF_MIME_TYPE, 'team'),
+        item('copy', 'plan!', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
         item('other', 'Other', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
       ]),
       manifestOf([
         record('doc', 'team/plan'),
-        record('pdf', 'team/plan--123abc'),
+        record('copy', 'team/plan--123abc'),
         record('other', 'team/other'),
       ]),
     );
@@ -308,15 +308,50 @@ describe('createNotes', () => {
         'duplicate-name',
         'Plan',
         'team/plan',
-        'Also in this folder: “Plan.pdf” (PDF)',
+        'Also in this folder: “plan!” (Google Docs)',
       ],
       [
         'duplicate-name',
-        'Plan.pdf',
+        'plan!',
         'team/plan--123abc',
         'Also in this folder: “Plan” (Google Docs)',
       ],
     ]);
+  });
+
+  it('does not note links that lead only to archives', () => {
+    const notes = createNotes(
+      corpus([
+        item('only', 'Prompts', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('mixed', 'Guide', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+      ]),
+      manifestOf([
+        record('only', 'team/prompts', ['link:outside_site']),
+        record('mixed', 'team/guide', ['link:outside_site']),
+      ]),
+      { linksOnlyToArchives: new Set(['only']) },
+    );
+
+    expect(notes.map((note) => [note.name, note.note])).toEqual([
+      ['Guide', 'link-outside-site'],
+    ]);
+  });
+
+  it('does not note a document beside its PDF or recording', () => {
+    const notes = createNotes(
+      corpus([
+        item('doc', 'Plan', GOOGLE_DRIVE_DOCUMENT_MIME_TYPE, 'team'),
+        item('pdf', 'Plan.pdf', GOOGLE_DRIVE_PDF_MIME_TYPE, 'team'),
+        item('video', 'Plan.mp4', 'video/mp4', 'team'),
+      ]),
+      manifestOf([
+        record('doc', 'team/plan'),
+        record('pdf', 'team/plan--123abc'),
+        record('video', 'team/plan--456def'),
+      ]),
+    );
+
+    expect(notes.filter((note) => note.note === 'duplicate-name')).toEqual([]);
   });
 
   it('notes documents that share their text, naming the other', () => {
@@ -358,14 +393,22 @@ describe('createNotes', () => {
       [
         'Checklist',
         'document-near-duplicate',
-        'Nearly the same text as “Setup checklist” (96% shared)',
+        'Nearly the same text as “Setup checklist” in Team (96% shared)',
       ],
-      ['Handbook', 'document-near-duplicate', 'Holds the text of “Policy”'],
-      ['Policy', 'document-near-duplicate', 'Its text is also in “Handbook”'],
+      [
+        'Handbook',
+        'document-near-duplicate',
+        'Holds the text of “Policy” in Team',
+      ],
+      [
+        'Policy',
+        'document-near-duplicate',
+        'Its text is also in “Handbook” in Team',
+      ],
       [
         'Setup checklist',
         'document-near-duplicate',
-        'Nearly the same text as “Checklist” (96% shared)',
+        'Nearly the same text as “Checklist” in Team (96% shared)',
       ],
     ]);
   });

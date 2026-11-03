@@ -130,8 +130,14 @@ const items: DriveItem[] = [
   /*
    * What the site does not publish, so the content health page lists each
    * reason (ADR-025): a file of a kind it does not publish, a shortcut, a
-   * document too large for Google to export, and an ignored folder.
+   * document too large for Google to export, and an ignored folder. The
+   * archive is one a document links to, which the report names and the page
+   * does not count as work.
    */
+  {
+    ...document('archive-logo-pack', 'Logo pack.zip', 'folder-handbook'),
+    mimeType: 'application/zip',
+  },
   {
     ...document('sheet-old-budget', 'Old budget.xls', 'folder-reference'),
     mimeType: 'application/vnd.ms-excel',
@@ -393,6 +399,7 @@ const markdownExports = new Map<string, string>([
       '',
       '- Platform team: platform@example.com',
       '- Documentation desk: docs@example.com',
+      '- Logo files: [Logo pack](https://drive.google.com/file/d/archive-logo-pack/view)',
       '',
     ].join('\n'),
   ],

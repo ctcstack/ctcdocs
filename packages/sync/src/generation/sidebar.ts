@@ -1,4 +1,7 @@
-import { DOCUMENT_FORMAT_BADGES } from '@ctcstack/ctcdocs-core';
+import {
+  DOCUMENT_FORMAT_BADGES,
+  ROOT_FOLDER_LABEL,
+} from '@ctcstack/ctcdocs-core';
 
 import { documentName } from '../google/drive-types.js';
 import type {
@@ -189,7 +192,7 @@ export function createSidebar(
 
   return rootDocuments.length === 0
     ? groups
-    : [{ label: 'General', items: rootDocuments }, ...groups];
+    : [{ label: ROOT_FOLDER_LABEL, items: rootDocuments }, ...groups];
 }
 
 export function serializeSidebar(

@@ -9,7 +9,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { findProjectRoot, PROJECT_LAYOUT } from '@ctcstack/ctcdocs-core';
+import {
+  findProjectRoot,
+  PROJECT_LAYOUT,
+  ROOT_FOLDER_LABEL,
+} from '@ctcstack/ctcdocs-core';
 
 export type HealthSeverity = 'fix' | 'convention' | 'note';
 
@@ -92,7 +96,7 @@ export function googleDocsUrl(
 
 /** The top-level folder an item is filed under, for the section filter. */
 export function sectionOf(item: { folderPath: readonly string[] }): string {
-  return item.folderPath[0] ?? 'General';
+  return item.folderPath[0] ?? ROOT_FOLDER_LABEL;
 }
 
 type UnpublishedStatus = 'not-published' | 'out-of-date' | 'incomplete';

@@ -13,6 +13,8 @@
  * The list is a pure function of the inventory and the run's export failures:
  * an unchanged Drive rewrites it byte for byte.
  */
+import { folderTrailText } from '@ctcstack/ctcdocs-core';
+
 import type {
   InventorySelection,
   SelectedInventoryItem,
@@ -44,6 +46,7 @@ export type UnpublishedReasonCode =
   | 'word-file'
   | 'presentation-file'
   | 'archive-file'
+  | 'archive-linked'
   | 'image-file'
   | 'diagram-file'
   | 'spreadsheet-file'
@@ -171,6 +174,13 @@ export const UNPUBLISHED_REASONS: readonly UnpublishedReason[] = [
     action: 'Unpack and upload the files',
     instruction:
       'The site does not open archives. Unpack it and upload what it holds: Google Docs, PDF files, spreadsheets, video and audio are published, and anything else is listed here with its own advice. Then delete the archive.',
+  },
+  {
+    code: 'archive-linked',
+    title: 'Archives a document links to',
+    action: 'Nothing to do',
+    instruction:
+      'The site does not open archives, but a published document links to this one, so readers reach it in Drive. Nothing needs fixing. If no document should send readers to it any longer, remove the link and the archive.',
   },
   {
     code: 'image-file',
@@ -403,6 +413,34 @@ export function folderLabels(selected: SelectedInventoryItem): string[] {
     .map((segment) => parseOrderedLabel(segment).label);
 }
 
+/** Where an item lives, as the site writes a folder trail. */
+export function folderTrail(selected: SelectedInventoryItem): string {
+  return folderTrailText(folderLabels(selected));
+}
+
+/**
+ * An archive a published document links to is how that document hands its
+ * readers files, not one an editor left behind (ADR-054).
+ */
+function linkedReason(
+  reason: UnpublishedReasonCode,
+  isLinked: boolean,
+): UnpublishedReasonCode {
+  return reason === 'archive-file' && isLinked ? 'archive-linked' : reason;
+}
+
+/** Where a shortcut leads, so an editor can find the original. */
+function shortcutDetail(
+  selected: SelectedInventoryItem,
+  itemsById: ReadonlyMap<string, SelectedInventoryItem>,
+): string {
+  const targetId = selected.item.shortcutDetails?.targetId;
+  const target = targetId ? itemsById.get(targetId) : undefined;
+  return target
+    ? `Points to “${target.item.name}” in ${folderTrail(target)}`
+    : 'Points to a file outside the published folders, or in a folder the site leaves out';
+}
+
 /**
  * Opens the item in Drive. Drive's own link names the account that owns the
  * file and how the link was made; neither belongs in a report, so both go.
@@ -460,15 +498,31 @@ export function createUnpublishedItems(
   held: ReadonlyMap<string, HeldDocument>,
   kept: ReadonlyMap<string, SyncedDocumentRecord>,
   incomplete: ReadonlyMap<string, readonly IncompleteDocument[]> = new Map(),
+  linked: ReadonlySet<string> = new Set(),
 ): UnpublishedItem[] {
+  const itemsById = new Map<string, SelectedInventoryItem>(
+    [
+      ...selection.folders,
+      ...selection.documents,
+      ...selection.unsupported,
+    ].map((selected) => [selected.item.id, selected]),
+  );
   const items: UnpublishedItem[] = selection.unsupported.map((selected) =>
-    entryFor(
-      selected,
-      'not-published',
-      selected.item.mimeType === GOOGLE_SHORTCUT_MIME_TYPE
-        ? 'shortcut'
-        : unsupportedFileReason(selected.item.mimeType, selected.item.name),
-    ),
+    selected.item.mimeType === GOOGLE_SHORTCUT_MIME_TYPE
+      ? entryFor(
+          selected,
+          'not-published',
+          'shortcut',
+          shortcutDetail(selected, itemsById),
+        )
+      : entryFor(
+          selected,
+          'not-published',
+          linkedReason(
+            unsupportedFileReason(selected.item.mimeType, selected.item.name),
+            linked.has(selected.item.id),
+          ),
+        ),
   );
   for (const selected of selection.documents) {
     const failure = held.get(selected.item.id);

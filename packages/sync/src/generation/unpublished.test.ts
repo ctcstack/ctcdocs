@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
+import { buildInventorySelection } from '../inventory/inventory-graph.js';
+import type { DriveItem } from '../google/drive-types.js';
 import {
+  createUnpublishedItems,
   describeFileType,
   driveUrl,
   UNPUBLISHED_REASONS,
@@ -101,5 +104,86 @@ describe('driveUrl', () => {
     expect(driveUrl(selected())).toBe(
       'https://drive.google.com/open?id=file-one',
     );
+  });
+});
+
+describe('createUnpublishedItems', () => {
+  const FOLDER = 'application/vnd.google-apps.folder';
+  const SHORTCUT = 'application/vnd.google-apps.shortcut';
+  const DOCUMENT = 'application/vnd.google-apps.document';
+  const item = (
+    id: string,
+    name: string,
+    mimeType: string,
+    parent: string,
+    targetId?: string,
+  ): DriveItem => ({
+    id,
+    name,
+    mimeType,
+    parents: [parent],
+    modifiedTime: '2026-01-01T00:00:00.000Z',
+    createdTime: '2026-01-01T00:00:00.000Z',
+    trashed: false,
+    ...(targetId
+      ? { shortcutDetails: { targetId, targetMimeType: DOCUMENT } }
+      : {}),
+  });
+
+  it('says where a shortcut leads', () => {
+    const selection = buildInventorySelection(
+      [
+        item('root', 'Published', FOLDER, 'drive'),
+        item('team', 'Team', FOLDER, 'root'),
+        item('sales', 'Sales', FOLDER, 'team'),
+        item('original', 'Guide', DOCUMENT, 'sales'),
+        item('top', 'Overview', DOCUMENT, 'root'),
+        item('inside', 'Guide', SHORTCUT, 'team', 'original'),
+        item('to-top', 'Overview', SHORTCUT, 'team', 'top'),
+        item('outside', 'Elsewhere', SHORTCUT, 'team', 'not-on-the-site'),
+      ],
+      'root',
+      [],
+      ['drive'],
+    );
+
+    expect(
+      createUnpublishedItems(selection, new Map(), new Map())
+        .filter((entry) => entry.reason === 'shortcut')
+        .map((entry) => [entry.name, entry.detail]),
+    ).toEqual([
+      [
+        'Elsewhere',
+        'Points to a file outside the published folders, or in a folder the site leaves out',
+      ],
+      ['Guide', 'Points to “Guide” in Team › Sales'],
+      ['Overview', 'Points to “Overview” in General'],
+    ]);
+  });
+
+  it('tells an archive a document links to from one left behind', () => {
+    const selection = buildInventorySelection(
+      [
+        item('root', 'Published', FOLDER, 'drive'),
+        item('linked', 'Prompts.zip', 'application/zip', 'root'),
+        item('stray', 'Old.zip', 'application/zip', 'root'),
+      ],
+      'root',
+      [],
+      ['drive'],
+    );
+
+    expect(
+      createUnpublishedItems(
+        selection,
+        new Map(),
+        new Map(),
+        new Map(),
+        new Set(['linked']),
+      ).map((entry) => [entry.name, entry.reason]),
+    ).toEqual([
+      ['Old.zip', 'archive-file'],
+      ['Prompts.zip', 'archive-linked'],
+    ]);
   });
 });

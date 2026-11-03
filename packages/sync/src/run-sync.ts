@@ -46,6 +46,7 @@ import {
   serializeSyncReport,
   type SyncReport,
 } from './generation/sync-report.js';
+import { archiveLinks } from './generation/archive-links.js';
 import { createNotes, NOTE_KINDS } from './generation/notes.js';
 import { findNearDuplicates } from './generation/near-duplicates.js';
 import {
@@ -56,6 +57,7 @@ import {
   createIgnoredFolders,
   createUnpublishedItems,
   UNPUBLISHED_REASONS,
+  unsupportedFileReason,
   type HeldDocument,
   type IncompleteDocument,
 } from './generation/unpublished.js';
@@ -633,6 +635,9 @@ function corpusChangeReach(
           return !publishedShortIds.has(link.shortId);
         case 'address':
           return changedAddresses.has(link.path);
+        // The sync leaves a download address as it is, whatever its file.
+        case 'download':
+          return false;
       }
     });
 }
@@ -2173,6 +2178,30 @@ async function synchronize(
         : [];
     }),
   );
+  // Each published document's body, from the output, to compare their text
+  // and to see which files they link to.
+  const bodies = new Map(
+    Object.values(candidateManifest.documents).flatMap((record) => {
+      const content = output.get(record.generatedMarkdownPath);
+      const body =
+        typeof content === 'string' ? generatedBody(content) : undefined;
+      return body === undefined ? [] : [[record.googleFileId, body] as const];
+    }),
+  );
+  // Archives under the root, and the pages that hand them out (ADR-054).
+  const archives = archiveLinks(
+    bodies,
+    new Set(
+      inventory.selection.unsupported.flatMap((selected) =>
+        unsupportedFileReason(selected.item.mimeType, selected.item.name) ===
+        'archive-file'
+          ? [selected.item.id]
+          : [],
+      ),
+    ),
+    new Set(linkTargets.shortIds.keys()),
+    linkTargets.siteOrigins,
+  );
   const unpublished = createUnpublishedItems(
     inventory.selection,
     new Map([...carriedForward, ...held]),
@@ -2184,6 +2213,7 @@ async function synchronize(
       ...kept,
     ]),
     incomplete,
+    archives.linked,
   );
   /*
    * The image files each page publishes, from the output itself, so a change
@@ -2211,15 +2241,6 @@ async function synchronize(
     fetchCharacters: fetchCharacterLimit(site.mcp),
     markdownVersion: PUBLISHED_MARKDOWN_VERSION,
   };
-  // Each published document's body, from the output, to compare their text.
-  const bodies = new Map(
-    Object.values(candidateManifest.documents).flatMap((record) => {
-      const content = output.get(record.generatedMarkdownPath);
-      const body =
-        typeof content === 'string' ? generatedBody(content) : undefined;
-      return body === undefined ? [] : [[record.googleFileId, body] as const];
-    }),
-  );
   const notes = createNotes(
     selection,
     candidateManifest,
@@ -2234,6 +2255,7 @@ async function synchronize(
         characters: publishedLengths(output, candidateManifest, markdownHeader),
       },
       nearDuplicates: findNearDuplicates(bodies),
+      linksOnlyToArchives: archives.onlyToArchives,
     },
     {
       now: new Date(runTimestamp),

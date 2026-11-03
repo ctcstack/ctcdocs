@@ -410,11 +410,15 @@ findings, under its priority:
   and text files, presentations, archives, images, diagrams, spreadsheets in
   an older format, other files, shortcuts — PDFs with no
   readable text or too large for the site, and spreadsheets cut short
-  ([ADR-046](ADR/046-publish-spreadsheets-as-tables.md)); files in one folder
-  the site cannot tell apart; a
+  ([ADR-046](ADR/046-publish-spreadsheets-as-tables.md)); files of one format
+  in one folder the site cannot tell apart; a
   merged cell split, formatting removed; a document longer than AI agents read,
   `mcp.fetchCharacters`
   ([ADR-043](ADR/043-content-health-names-documents-too-long-to-read-whole.md)).
+  An archive a published document links to, and the files of other formats
+  that share a document's name, are not work: the sync report and the job
+  summary name such an archive, and the page leaves it out
+  ([ADR-054](ADR/054-content-health-leaves-alone-files-kept-on-purpose.md)).
 - **Improve**: images with no alt text
   ([ADR-029](ADR/029-say-when-an-image-has-no-alt-text.md)), a page with no
   summary, a recording with no description in Drive

@@ -96,5 +96,7 @@ Rejected
 - ADR-053: generated content is kept in R2 and published by a container.
   Proposed; supersedes ADR-002 and ADR-009, and ADR-003 in part, once
   accepted.
+- ADR-054: content health leaves alone files kept on purpose. Proposed;
+  amends ADR-025 and ADR-049.
 
 Create a new ADR by copying `000-template.md`.

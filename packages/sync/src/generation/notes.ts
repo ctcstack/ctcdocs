@@ -31,7 +31,12 @@ import {
 import { plural } from '../plural.js';
 import { slugifySegment } from '../slug.js';
 import type { NearDuplicate } from './near-duplicates.js';
-import { describeFileType, driveUrl, folderLabels } from './unpublished.js';
+import {
+  describeFileType,
+  driveUrl,
+  folderLabels,
+  folderTrail,
+} from './unpublished.js';
 
 export type NoteCode =
   | 'duplicate-name'
@@ -81,7 +86,7 @@ export const NOTE_KINDS: readonly NoteKind[] = [
     title: 'Files in one folder share a name',
     action: 'Rename one, or remove it',
     instruction:
-      'Readers see two pages called the same, and the second has an address with a code on the end. If both belong on the site, rename one so they can be told apart; if one is a copy, such as a PDF exported from the document, move it out of the published folders.',
+      'Readers see two pages called the same, and the second has an address with a code on the end. If both belong on the site, rename one so they can be told apart; if one is a copy, move it out of the published folders. Files of different formats, such as a document and its PDF or recording, may share a name.',
   },
   {
     code: 'image-removed',
@@ -284,6 +289,11 @@ export interface PublishedSizes {
   documents?: PublishedDocumentLengths;
   /** Documents sharing their text, by Google file ID (ADR-049). */
   nearDuplicates?: ReadonlyMap<string, readonly NearDuplicate[]>;
+  /**
+   * Documents whose every link to a Google file off the site leads to an
+   * archive the report names, by Google file ID (ADR-054).
+   */
+  linksOnlyToArchives?: ReadonlySet<string>;
 }
 
 /** When a document is old enough to ask for its review (ADR-049). */
@@ -403,7 +413,7 @@ export function createNotes(
   sizes: PublishedSizes = {},
   review?: ReviewLines,
 ): ReportNote[] {
-  const { images, documents, nearDuplicates } = sizes;
+  const { images, documents, nearDuplicates, linksOnlyToArchives } = sizes;
   const itemsById = new Map<string, SelectedInventoryItem>(
     [...selection.folders, ...selection.documents].map((selected) => [
       selected.item.id,
@@ -425,6 +435,10 @@ export function createNotes(
         return note ? [note] : [];
       }),
     );
+    // Readers reach such an archive in Drive on purpose; nothing is to fix.
+    if (linksOnlyToArchives?.has(record.googleFileId)) {
+      codes.delete('link-outside-site');
+    }
     for (const code of codes) {
       notes.push(noteFor(selected, code, record.stableSlug));
     }
@@ -481,14 +495,20 @@ export function createNotes(
 
   /*
    * Two names the site cannot tell apart are one page title and one address,
-   * whatever their case, punctuation or `.pdf` says.
+   * whatever their case or punctuation says. A document kept beside its PDF
+   * or its recording is the same material in another format, not a copy
+   * (ADR-054).
    */
   const byFolderAndName = new Map<string, SelectedInventoryItem[]>();
   for (const selected of selection.documents) {
     if (!manifest.documents[selected.item.id]) {
       continue;
     }
-    const key = `${selected.parentId ?? ''}/${slugifySegment(documentName(selected.item))}`;
+    const key = [
+      selected.parentId ?? '',
+      selected.item.mimeType,
+      slugifySegment(documentName(selected.item)),
+    ].join('/');
     byFolderAndName.set(key, [...(byFolderAndName.get(key) ?? []), selected]);
   }
   for (const group of byFolderAndName.values()) {
@@ -540,11 +560,12 @@ function nearDuplicateDetail(
   const NAMED = 3;
   const named = duplicates.slice(0, NAMED).map((duplicate) => {
     // A targeted run selects one file; the manifest still names the rest.
-    const name = quoted(
-      itemsById.get(duplicate.id)?.item.name ??
+    const selected = itemsById.get(duplicate.id);
+    const name = `${quoted(
+      selected?.item.name ??
         manifest.documents[duplicate.id]?.googleName ??
         duplicate.id,
-    );
+    )}${selected ? ` in ${folderTrail(selected)}` : ''}`;
     return duplicate.relation === 'inside'
       ? `Its text is also in ${name}`
       : duplicate.relation === 'holds'

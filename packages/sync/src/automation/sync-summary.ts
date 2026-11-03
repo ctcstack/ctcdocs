@@ -14,6 +14,8 @@
  */
 import {
   DOCUMENT_FORMAT_BADGES,
+  folderTrailText,
+  ROOT_FOLDER_LABEL,
   type AccessFinding,
   type DocumentFormat,
 } from '@ctcstack/ctcdocs-core';
@@ -51,7 +53,7 @@ function row(cells: readonly string[]): string {
 }
 
 function trail(folderPath: readonly string[]): string {
-  return folderPath.length > 0 ? folderPath.map(cell).join(' › ') : 'General';
+  return folderTrailText(folderPath.map(cell));
 }
 
 function pageUrl(siteUrl: string, slug: string): string {
@@ -75,7 +77,7 @@ function details(summary: string, body: readonly string[]): string[] {
 function where(items: ReadonlyArray<{ folderPath: readonly string[] }>) {
   const counts = new Map<string, number>();
   for (const item of items) {
-    const section = item.folderPath[0] ?? 'General';
+    const section = item.folderPath[0] ?? ROOT_FOLDER_LABEL;
     counts.set(section, (counts.get(section) ?? 0) + 1);
   }
   const sections = [...counts]
