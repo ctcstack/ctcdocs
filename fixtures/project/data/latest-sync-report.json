@@ -9,9 +9,9 @@
     "unchanged": 18,
     "removed": 0,
     "folders": 5,
-    "unsupported": 3,
+    "unsupported": 4,
     "warnings": 0,
-    "notPublished": 4,
+    "notPublished": 5,
     "outOfDate": 0,
     "incomplete": 2,
     "ignored": 2,
@@ -25,7 +25,7 @@
       "markdown": 8,
       "html": 2
     },
-    "notes": 8
+    "notes": 6
   },
   "reasons": [
     {
@@ -107,6 +107,12 @@
       "instruction": "The site does not open archives. Unpack it and upload what it holds: Google Docs, PDF files, spreadsheets, video and audio are published, and anything else is listed here with its own advice. Then delete the archive."
     },
     {
+      "code": "archive-linked",
+      "title": "Archives a document links to",
+      "action": "Nothing to do",
+      "instruction": "The site does not open archives, but a published document links to this one, so readers reach it in Drive. Nothing needs fixing. If no document should send readers to it any longer, remove the link and the archive."
+    },
+    {
       "code": "image-file",
       "title": "Images",
       "action": "Insert into a document",
@@ -152,6 +158,19 @@
       "lastEditedBy": "Avery Example"
     },
     {
+      "id": "archive-logo-pack",
+      "name": "Logo pack.zip",
+      "folderPath": [
+        "Handbook"
+      ],
+      "type": "ZIP archive",
+      "mimeType": "application/zip",
+      "status": "not-published",
+      "reason": "archive-linked",
+      "sourceUrl": "https://drive.google.com/open?id=archive-logo-pack",
+      "lastEditedBy": "Robin Sample"
+    },
+    {
       "id": "word-onboarding",
       "name": "Onboarding checklist.docx",
       "folderPath": [
@@ -174,6 +193,7 @@
       "mimeType": "application/vnd.google-apps.shortcut",
       "status": "not-published",
       "reason": "shortcut",
+      "detail": "Points to a file outside the published folders, or in a folder the site leaves out",
       "sourceUrl": "https://drive.google.com/open?id=shortcut-policies",
       "lastEditedBy": "Robin Sample"
     },
@@ -246,7 +266,7 @@
       "code": "duplicate-name",
       "title": "Files in one folder share a name",
       "action": "Rename one, or remove it",
-      "instruction": "Readers see two pages called the same, and the second has an address with a code on the end. If both belong on the site, rename one so they can be told apart; if one is a copy, such as a PDF exported from the document, move it out of the published folders."
+      "instruction": "Readers see two pages called the same, and the second has an address with a code on the end. If both belong on the site, rename one so they can be told apart; if one is a copy, move it out of the published folders. Files of different formats, such as a document and its PDF or recording, may share a name."
     },
     {
       "code": "image-removed",
@@ -407,34 +427,6 @@
       "slug": "reference/decision-log",
       "note": "document-over-agent-limit",
       "detail": "4,419 characters; AI agents read the first 3,000"
-    },
-    {
-      "id": "doc-style-guide",
-      "name": "Style guide",
-      "folderPath": [
-        "Reference",
-        "Guides"
-      ],
-      "type": "Google Docs",
-      "sourceUrl": "https://drive.google.com/open?id=doc-style-guide",
-      "lastEditedBy": "Robin Sample",
-      "slug": "reference/guides/style-guide",
-      "note": "duplicate-name",
-      "detail": "Also in this folder: “Style guide.pdf” (PDF)"
-    },
-    {
-      "id": "pdf-style-guide",
-      "name": "Style guide.pdf",
-      "folderPath": [
-        "Reference",
-        "Guides"
-      ],
-      "type": "PDF",
-      "sourceUrl": "https://drive.google.com/open?id=pdf-style-guide",
-      "lastEditedBy": "Robin Sample",
-      "slug": "reference/guides/style-guide--244fde",
-      "note": "duplicate-name",
-      "detail": "Also in this folder: “Style guide” (Google Docs)"
     },
     {
       "id": "doc-screenshots",
