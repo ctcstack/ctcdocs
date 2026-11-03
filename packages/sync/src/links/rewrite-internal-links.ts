@@ -9,7 +9,7 @@ import { permanentLinkPath, PLATFORM_ROUTES } from '@ctcstack/ctcdocs-core';
 
 import { unwrapGoogleRedirect } from '../conversion/url-policy.js';
 
-const GOOGLE_FILE_ID = /^[A-Za-z0-9_-]+$/u;
+export const GOOGLE_FILE_ID = /^[A-Za-z0-9_-]+$/u;
 const READABLE_ANCHOR = /^[\p{L}\p{N}][\p{L}\p{N}_.:-]*$/u;
 const GOOGLE_SPECIFIC_ANCHOR = /^(?:bookmark=id\.|heading=h\.)/u;
 

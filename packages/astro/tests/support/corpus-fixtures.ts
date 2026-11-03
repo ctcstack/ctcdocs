@@ -482,7 +482,12 @@ export function accessReviewShape():
  */
 export function unpublishedReport():
   | {
-      items: Array<{ name: string; sourceUrl: string; slug?: string }>;
+      items: Array<{
+        name: string;
+        sourceUrl: string;
+        reason: string;
+        slug?: string;
+      }>;
       ignoredFolders: number;
       notes: Array<{ name: string; sourceUrl: string; slug?: string }>;
       /** Titles of the kinds of note the report holds at least one of. */
@@ -502,7 +507,12 @@ export function unpublishedReport():
   }
   const typed = report as {
     schemaVersion?: number;
-    unpublished?: Array<{ name: string; sourceUrl: string; slug?: string }>;
+    unpublished?: Array<{
+      name: string;
+      sourceUrl: string;
+      reason: string;
+      slug?: string;
+    }>;
     ignoredFolders?: unknown[];
     noteKinds?: Array<{ code: string; title: string }>;
     notes?: Array<{

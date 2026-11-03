@@ -172,8 +172,26 @@ export function priorityOf(code: string, severity?: HealthSeverity): Priority {
   );
 }
 
+/**
+ * Files the sync report names, as it names every file the site leaves out
+ * (ADR-025), that ask nothing of an editor: the page does not count them as
+ * work or list them.
+ */
+const NOT_WORK: ReadonlySet<string> = new Set([
+  // A published document links to it, so readers reach it in Drive (ADR-054).
+  'archive-linked',
+]);
+
+/** Whether the page leaves a file out as no work, though the report names it. */
+export function asksNothing(reason: string): boolean {
+  return NOT_WORK.has(reason);
+}
+
 /** Every code with a rank of its own, for the test that keeps it complete. */
-export const RANKED_CODES: readonly string[] = Object.keys(PRIORITY_BY_CODE);
+export const RANKED_CODES: readonly string[] = [
+  ...Object.keys(PRIORITY_BY_CODE),
+  ...NOT_WORK,
+];
 
 interface EntryBase {
   /** The file in Drive the entry is about. */
@@ -278,10 +296,15 @@ export function buildHealthView(
   const groups: HealthGroup[] = [];
   const clear: Array<ClearCheck & { priority: Priority }> = [];
   const documents = report?.documents ?? [];
-  const unpublished = state?.unpublished ?? [];
+  const unpublished = (state?.unpublished ?? []).filter(
+    (item) => !NOT_WORK.has(item.reason),
+  );
   const notes = state?.notes ?? [];
 
   for (const reason of state?.reasons ?? []) {
+    if (NOT_WORK.has(reason.code)) {
+      continue;
+    }
     const priority = priorityOf(reason.code);
     const items = unpublished.filter((item) => item.reason === reason.code);
     const entries = items.map((item): HealthEntry => ({

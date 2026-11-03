@@ -9,6 +9,7 @@
  * concerned when a check names one; its page on the site is a quieter link.
  */
 import { Icon } from '@astrojs/starlight/components';
+import { folderTrailText } from '@ctcstack/ctcdocs-core';
 
 import { googleDocsUrl, type UnpublishedItem } from '../lib/content-health';
 import {
@@ -28,7 +29,7 @@ const { group, open } = Astro.props;
 
 const unit = group.source === 'check' ? 'document' : 'file';
 const trail = (item: { folderPath: readonly string[] }) =>
-  item.folderPath.length > 0 ? item.folderPath.join(' › ') : 'General';
+  folderTrailText(item.folderPath);
 const status = (item: UnpublishedItem) =>
   item.status === 'incomplete'
     ? 'On the site, incomplete.'

@@ -18,10 +18,10 @@ describe('documentLinks', () => {
 
     expect(documentLinks(body, origins)).toEqual([
       { kind: 'address', path: 'team/guide' },
-      { kind: 'google', fileId: 'doc-beta' },
-      { kind: 'google', fileId: 'doc-open' },
-      { kind: 'google', fileId: 'file-pdf' },
-      { kind: 'google', fileId: 'sheet-one' },
+      { kind: 'google', fileId: 'doc-beta', typed: true },
+      { kind: 'google', fileId: 'doc-open', typed: false },
+      { kind: 'google', fileId: 'file-pdf', typed: true },
+      { kind: 'google', fileId: 'sheet-one', typed: true },
       { kind: 'permanent', shortId: 'abc123' },
     ]);
   });
@@ -32,7 +32,7 @@ describe('documentLinks', () => {
     )}`;
 
     expect(documentLinks(`[Doc](${wrapped})`, origins)).toEqual([
-      { kind: 'google', fileId: 'doc-beta' },
+      { kind: 'google', fileId: 'doc-beta', typed: true },
     ]);
   });
 
@@ -41,6 +41,19 @@ describe('documentLinks', () => {
 
     expect(documentLinks(body, origins)).toEqual([
       { kind: 'permanent', shortId: 'abc123' },
+    ]);
+  });
+
+  it('reads a Drive download address as the file it downloads', () => {
+    const body = [
+      '[One](https://drive.google.com/uc?export=download&id=zip-one)',
+      '[Two](https://drive.usercontent.google.com/download?id=zip-two&export=download)',
+      '[None](https://drive.google.com/uc?export=download)',
+    ].join('\n\n');
+
+    expect(documentLinks(body, origins)).toEqual([
+      { kind: 'download', fileId: 'zip-one' },
+      { kind: 'download', fileId: 'zip-two' },
     ]);
   });
 

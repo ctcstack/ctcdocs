@@ -30,6 +30,7 @@ export type {
   AccessConfiguration,
   AccessRule,
 } from './access-configuration.js';
+export { folderTrailText, ROOT_FOLDER_LABEL } from './folder-trail.js';
 export {
   CorpusStructureError,
   EMPTY_CORPUS,

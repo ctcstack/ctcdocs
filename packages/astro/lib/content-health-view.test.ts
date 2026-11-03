@@ -239,6 +239,28 @@ describe('content health view', () => {
     ]);
   });
 
+  it('leaves out an archive a document links to, as no work', () => {
+    const linked = buildHealthView(report, {
+      ...state,
+      reasons: [
+        ...state.reasons,
+        {
+          code: 'archive-linked',
+          title: 'Archives a document links to',
+          action: 'Nothing to do',
+          instruction: 'Nothing needs fixing.',
+        },
+      ],
+      unpublished: [
+        ...state.unpublished,
+        unpublishedItem('z', 'archive-linked', 'not-published'),
+      ],
+    });
+
+    expect(linked.tiers).toEqual(view.tiers);
+    expect(linked.files).toEqual(view.files);
+  });
+
   it('lists the checks that found nothing under their priority', () => {
     expect(tier(view, 'fix-now')?.clear).toEqual([
       {

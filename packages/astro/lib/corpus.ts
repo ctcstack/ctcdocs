@@ -12,17 +12,18 @@
 import { isOpenToMembers } from './access-source.js';
 import { siteConfiguration } from './project.js';
 import { getCollection } from 'astro:content';
+import navigation from 'virtual:ctcdocs/navigation';
+import { ROOT_FOLDER_LABEL } from '@ctcstack/ctcdocs-core';
 import {
   documentFormatOf,
   isDocumentSourceType,
   type DocumentFormat,
 } from '@ctcstack/ctcdocs-core/document-format';
 
+import type { NavigationItem } from './agent-index.js';
 import { folderAnchorHref, folderAnchorId, folderTrail } from './folder-anchor';
 import { loadSectionHrefs, sectionHref } from './sections';
-
-/** Documents at the Drive root are grouped under this heading. */
-const ROOT_GROUP = 'General';
+import { inSidebarOrder, sidebarPositions } from './sidebar-order.js';
 
 /**
  * The document that speaks for its folder is the one the sidebar opens the
@@ -47,6 +48,8 @@ export type CorpusDocument = {
   openToMembers: boolean;
   /** Sub-folder path, when the document sits deeper than the top level. */
   qualifier: string | undefined;
+  /** The page's address, as the sidebar names it. */
+  slug: string;
   title: string;
 };
 
@@ -94,13 +97,6 @@ function byRecency(a: CorpusDocument, b: CorpusDocument): number {
   return b.modified.getTime() - a.modified.getTime();
 }
 
-function newestEdit(group: CorpusGroup): number {
-  const times = group.documents
-    .map((entry) => entry.modified?.getTime())
-    .filter((time): time is number => typeof time === 'number');
-  return times.length > 0 ? Math.max(...times) : Number.NEGATIVE_INFINITY;
-}
-
 /**
  * Picks the description a folder publishes about itself, when it has one. The
  * home page is read by every member, so a description is taken only from a
@@ -131,7 +127,7 @@ export async function loadCorpus(): Promise<Corpus> {
 
   for (const doc of synced) {
     const trail = folderTrail(doc.data.folderPath);
-    const label = trail[0] ?? ROOT_GROUP;
+    const label = trail[0] ?? ROOT_FOLDER_LABEL;
     const modifiedRaw = doc.data.googleModifiedTime;
     const description = doc.data.description?.trim();
 
@@ -147,6 +143,7 @@ export async function loadCorpus(): Promise<Corpus> {
       // Deeper folders are shown on the row rather than as their own group,
       // which would fragment the index at this corpus size.
       qualifier: trail.length > 1 ? trail.slice(1).join(' / ') : undefined,
+      slug: doc.id,
       title: doc.data.title,
     };
 
@@ -179,16 +176,14 @@ export async function loadCorpus(): Promise<Corpus> {
   }
 
   /*
-   * Groups are ordered the way their documents are: the folder someone touched
-   * most recently opens the page. A folder with no dated document sorts last,
-   * by name.
+   * Folders stand in the order the sidebar gives them, the numbered order
+   * editors set in Drive, so a reader finds a folder where they left it; the
+   * documents inside stay most recent first.
    */
-  const ordered = [...groups.values()].sort((a, b) => {
-    const difference = newestEdit(b) - newestEdit(a);
-    return Number.isNaN(difference) || difference === 0
-      ? a.label.localeCompare(b.label, 'en')
-      : difference;
-  });
+  const ordered = inSidebarOrder(
+    [...groups.values()],
+    sidebarPositions(navigation as readonly NavigationItem[]),
+  );
 
   const recent = [...all].sort(byRecency);
 
