@@ -7,7 +7,7 @@
 "googleFileId": "doc-contacts"
 "googleModifiedTime": "2026-02-04T09:30:00.000Z"
 "syncedAt": "2026-02-10T06:00:00.000Z"
-"contentHash": "sha256:9a1119eeac2975375f999354755d4c8ab627172c4922e7dccf6f4c08563de568"
+"contentHash": "sha256:b25d4ada42709696c10f0cf064c930a237c396566997fa4019e491cc2547536b"
 "folderPath":
   - "Handbook"
 "pagefind": true
@@ -16,3 +16,4 @@
 
 - Platform team: <platform@example.com>
 - Documentation desk: <docs@example.com>
+- Logo files: [Logo pack](https://drive.google.com/file/d/archive-logo-pack/view)
