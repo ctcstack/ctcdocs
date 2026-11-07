@@ -47,7 +47,7 @@ on:
       pnpm_version:
         required: false
         type: string
-        default: 11.9.0
+        default: 12.14.0
     outputs:
       changed:
         description: Whether the run produced new generated output

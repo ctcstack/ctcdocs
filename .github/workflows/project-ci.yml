@@ -16,7 +16,7 @@ on:
         description: pnpm release the project is locked to
         required: false
         type: string
-        default: 11.9.0
+        default: 12.14.0
 
 permissions:
   contents: read

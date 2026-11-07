@@ -2,6 +2,22 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Changed
+
+- **pnpm 12.** The platform is built with pnpm 12.14.0, and the reusable
+  workflows install it unless a project passes `pnpm_version`. The packages
+  ask nothing new of a project's pnpm.
+
+### Upgrade note
+
+Pin the project to the same pnpm when bumping the workflow pins: set
+`packageManager` to `pnpm@12.14.0` and `engines.pnpm` to
+`>=12.14.0 <13`, then run `pnpm install`. `pnpm/action-setup` fails when
+its version and `packageManager` disagree, so a project that stays on
+pnpm 11 passes `pnpm_version: 11.9.0` to every workflow it calls instead.
+
 ## 0.25.0
 
 ### Changed
