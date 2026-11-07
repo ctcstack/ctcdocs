@@ -11,7 +11,7 @@ pnpm --filter ctcdocs-fixture-project exec playwright install --with-deps chromi
 pnpm verify
 ```
 
-You need Node 22 (see `.node-version`) and pnpm 11. The browser is a separate
+You need Node 22 (see `.node-version`) and pnpm 12. The browser is a separate
 step because the gate ends in browser checks and nothing else installs it.
 
 `pnpm verify` is the gate CI runs: formatting, lint, types, unit and fixture

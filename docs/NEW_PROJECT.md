@@ -73,11 +73,11 @@ repository or a chat.
 
    ```bash
    pnpm init
-   npm pkg set packageManager=pnpm@11.9.0 type=module
+   npm pkg set packageManager=pnpm@12.14.0 type=module
    npm pkg set private=true --json
    ```
 
-3. Create `pnpm-workspace.yaml` — pnpm 11 reads its settings from here, not
+3. Create `pnpm-workspace.yaml` — pnpm reads its settings from here, not
    from `.npmrc`:
 
    ```yaml
