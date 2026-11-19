@@ -141,6 +141,45 @@ export function deepestDocument(): CorpusFixture {
 }
 
 /**
+ * The document whose body has the most section headings, the one with the
+ * longest contents list.
+ */
+export function documentWithMostHeadings(): CorpusFixture {
+  let best = anyDocument();
+  let most = -1;
+  for (const document of documents) {
+    let body: string;
+    try {
+      body = readFileSync(
+        resolve(
+          repositoryRoot,
+          PROJECT_LAYOUT.generatedDocumentsDirectory,
+          `${document.id}.md`,
+        ),
+        'utf8',
+      );
+    } catch {
+      continue;
+    }
+    // Lines inside a code fence are code, not headings.
+    let fenced = false;
+    let headings = 0;
+    for (const line of body.split('\n')) {
+      if (/^\s*(```|~~~)/u.test(line)) {
+        fenced = !fenced;
+      } else if (!fenced && /^#{2,3} /u.test(line)) {
+        headings += 1;
+      }
+    }
+    if (headings > most) {
+      most = headings;
+      best = document;
+    }
+  }
+  return best;
+}
+
+/**
  * A document whose body carries a Markdown table.
  *
  * Which document that is depends on the corpus, so it is found by reading the

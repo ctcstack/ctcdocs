@@ -2,6 +2,31 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Changed
+
+- **Sidebar folders start closed.** Every folder of the generated sidebar is
+  collapsed by default; Starlight still opens the folders that hold the
+  current page and remembers what a reader opened during the session. There is no setting to keep them open.
+
+### Added
+
+- **Hide the sidebar.** On a wide screen a button before the mark in the
+  header hides and shows the sidebar, and the content recentres in the room it
+  leaves. The
+  choice is kept in the reader's browser and applied before the page paints.
+  Phones keep Starlight's menu unchanged.
+- **Filter the sidebar.** A field above the tree keeps the documents whose
+  title, or whose folders' names, hold every word typed, and opens the
+  folders that hold them. `/` reaches it from anywhere on the page, Enter
+  opens the first match, and Escape clears it and puts every folder back.
+- **Reading aids for long pages.** The sidebar opens scrolled to the current
+  page when it would be out of view, and again when it is shown; the contents list follows the heading
+  being read; a screenshot drawn smaller than its file opens full size on
+  click, and closes on Escape or a click; a page more than two screens long
+  offers a Back to top button once the reader has scrolled down.
+
 ## 0.26.0
 
 ### Changed

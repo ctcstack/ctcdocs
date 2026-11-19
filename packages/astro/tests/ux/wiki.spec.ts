@@ -27,6 +27,7 @@ import {
   documentInFolder,
   documentLinkingAnother,
   documentWithAsset,
+  documentWithMostHeadings,
   documentWithPermanentLink,
   documentWithTable,
   folderPages,
@@ -1410,4 +1411,319 @@ test('the header shows the mark the project configures, for the theme chosen on 
   } else {
     await expect(darkIcon).toHaveCount(0);
   }
+});
+
+test('the sidebar opens only the folders that hold the current page', async ({
+  page,
+}) => {
+  const document = deepestDocument();
+  await page.goto(`/${document.slug}/`);
+  const current = page.locator('#starlight__sidebar a[aria-current="page"]');
+  await expect(current).toBeVisible();
+  // Every folder that does not hold the page starts closed.
+  const states = await page
+    .locator('#starlight__sidebar details')
+    .evaluateAll((elements) =>
+      elements
+        .filter((element) => element.querySelector('a[href]') !== null)
+        .filter(
+          (element) =>
+            !element.querySelector('a[aria-current="page"]') &&
+            // The navigation section the platform adds above the corpus.
+            !element.querySelector(':scope > ul > li > a[href="/"]'),
+        )
+        .map((element) => (element as HTMLDetailsElement).open),
+    );
+  expect(states.length).toBeGreaterThan(0);
+  expect(states.every((open) => !open)).toBe(true);
+});
+
+test('a reader can hide the sidebar and the choice holds across pages', async ({
+  page,
+}) => {
+  const document = anyDocument();
+  await page.goto(`/${document.slug}/`);
+  const sidebar = page.locator('#starlight__sidebar');
+  const toggle = page.getByRole('button', { name: 'Hide sidebar' });
+  await expect(sidebar).toBeVisible();
+  const before = await page.locator('main').boundingBox();
+
+  await toggle.click();
+  await expect(sidebar).toBeHidden();
+  const show = page.getByRole('button', { name: 'Show sidebar' });
+  await expect(show).toHaveAttribute('aria-controls', 'starlight__sidebar');
+  const after = await page.locator('main').boundingBox();
+  // The content takes the room the sidebar left.
+  expect(after?.x ?? 0).toBeLessThan(before?.x ?? 0);
+  await expectNoAccessibilityViolations(page);
+
+  await page.reload();
+  await expect(sidebar).toBeHidden();
+  await page.getByRole('button', { name: 'Show sidebar' }).click();
+  await expect(sidebar).toBeVisible();
+  await page.reload();
+  await expect(sidebar).toBeVisible();
+
+  // On a phone the sidebar is Starlight's menu and the button is not drawn;
+  // a stored choice to hide it does not empty the menu.
+  await page.getByRole('button', { name: 'Hide sidebar' }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await expect(page.locator('.kb-sidebar-toggle')).toBeHidden();
+  await page.getByRole('button', { name: 'Menu' }).click();
+  await expect(sidebar.locator('a[aria-current="page"]')).toBeVisible();
+});
+
+test('a shown sidebar comes back scrolled to the current page', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 320 });
+  await page.goto(`/${deepestDocument().slug}/`);
+  await page.getByRole('button', { name: 'Hide sidebar' }).click();
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload();
+  const sidebar = page.locator('#starlight__sidebar');
+  const scrollable = await page.evaluate(() => {
+    document.documentElement.removeAttribute('data-kb-sidebar');
+    const pane = document.getElementById('starlight__sidebar');
+    const tall = pane ? pane.scrollHeight > pane.clientHeight : false;
+    document.documentElement.dataset.kbSidebar = 'hidden';
+    return tall;
+  });
+  test.skip(!scrollable, 'The sidebar fits the screen.');
+  await page.getByRole('button', { name: 'Show sidebar' }).click();
+  await expect(sidebar.locator('a[aria-current="page"]')).toBeInViewport({
+    ratio: 1,
+  });
+});
+
+test('the sidebar opens scrolled to the current page', async ({ page }) => {
+  const document = deepestDocument();
+  // A short screen, so the sidebar is taller than its pane.
+  await page.setViewportSize({ width: 1280, height: 320 });
+  await page.goto(`/${document.slug}/`);
+  const sidebar = page.locator('#starlight__sidebar');
+  const scrollable = await sidebar.evaluate(
+    (element) => element.scrollHeight > element.clientHeight,
+  );
+  test.skip(!scrollable, 'The sidebar fits the screen.');
+  await expect(sidebar.locator('a[aria-current="page"]')).toBeInViewport({
+    ratio: 1,
+  });
+});
+
+test('the contents list keeps the heading being read in view', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 320 });
+  await page.goto(`/${documentWithMostHeadings().slug}/`);
+  const tall = await page
+    .locator('.right-sidebar')
+    .evaluate((element) => element.scrollHeight > element.clientHeight * 1.5)
+    .catch(() => false);
+  test.skip(!tall, 'No contents list is taller than the screen.');
+  // Bring the last section's heading to where Starlight marks it as read.
+  await page.evaluate(() => {
+    const headings = document.querySelectorAll<HTMLElement>(
+      '.sl-markdown-content h2[id], .sl-markdown-content h3[id]',
+    );
+    const last = headings[headings.length - 1];
+    const header = document.querySelector('header')?.offsetHeight ?? 0;
+    if (last) {
+      window.scrollTo(
+        0,
+        last.getBoundingClientRect().top + window.scrollY - header - 48,
+      );
+    }
+  });
+  const current = page.locator('.right-sidebar a[aria-current="true"]:visible');
+  await expect(current).toHaveCount(1);
+  await expect(current).toBeInViewport({ ratio: 1 });
+});
+
+test('a screenshot drawn smaller than its file opens full size', async ({
+  page,
+}) => {
+  const withAsset = documentWithAsset();
+  if (!withAsset) {
+    test.skip(true, 'The corpus has no image.');
+    return;
+  }
+  // The corpus images are tiny swatches: serve a wide one in their place.
+  await page.route(/\.(png|jpe?g|webp|gif)(\?|$)|\/_image\?/u, (route) =>
+    route.fulfill({
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900"><rect width="1600" height="900" fill="#888"/></svg>',
+    }),
+  );
+  await page.goto(`/${withAsset.document.slug}/`);
+  const zoom = page.locator('.sl-markdown-content .kb-zoom').first();
+  await expect(zoom).toBeVisible();
+  await expect(zoom).toHaveAccessibleName(/^Enlarge image/u);
+  await expectNoAccessibilityViolations(page);
+
+  await zoom.click();
+  const dialog = page.locator('dialog.kb-zoom-dialog');
+  await expect(dialog).toBeVisible();
+  // Centred on the screen, not pinned to a corner by a margin reset.
+  const box = await dialog.boundingBox();
+  const width = page.viewportSize()?.width ?? 0;
+  expect(Math.abs((box?.x ?? 0) * 2 + (box?.width ?? 0) - width)).toBeLessThan(
+    4,
+  );
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await zoom.click();
+  await dialog.click();
+  await expect(dialog).toBeHidden();
+});
+
+test('a long page offers a way back to the top', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 320 });
+  await page.goto(`/${documentWithMostHeadings().slug}/`);
+  const button = page.getByRole('button', { name: 'Back to top' });
+  await expect(button).toBeHidden();
+  const long = await page.evaluate(
+    () => document.documentElement.scrollHeight > window.innerHeight * 3,
+  );
+  test.skip(!long, 'The page is too short.');
+  await page.evaluate(() =>
+    window.scrollTo(0, document.documentElement.scrollHeight),
+  );
+  await expect(button).toBeVisible();
+  await expectNoAccessibilityViolations(page);
+  await button.click();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await expect(button).toBeHidden();
+  // Keyboard focus goes back to the page's title.
+  await expect(page.locator('#_top')).toBeFocused();
+
+  // On a phone the open menu covers the button and keeps focus to itself.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() =>
+    window.scrollTo(0, document.documentElement.scrollHeight),
+  );
+  await expect(button).toBeVisible();
+  await page.getByRole('button', { name: 'Menu' }).click();
+  const box = await button.boundingBox();
+  const onTop = await page.evaluate(
+    ([x, y]) =>
+      document.elementFromPoint(x ?? 0, y ?? 0)?.closest('.kb-back-to-top') !==
+      null,
+    [(box?.x ?? 0) + 5, (box?.y ?? 0) + 5],
+  );
+  expect(onTop).toBe(false);
+  expect(
+    await button.evaluate((element) => element.closest('[inert]') !== null),
+  ).toBe(true);
+});
+
+test('the sidebar filter keeps the documents whose title or folder matches', async ({
+  page,
+}) => {
+  const document = deepestDocument();
+  await page.goto(`/${document.slug}/`);
+  const sidebar = page.locator('#starlight__sidebar');
+  const field = page.getByRole('searchbox', { name: 'Filter sidebar' });
+  const openBefore = await sidebar
+    .locator('details')
+    .evaluateAll((elements) =>
+      elements.map((element) => (element as HTMLDetailsElement).open),
+    );
+
+  // `/` reaches the field from the page.
+  await page.locator('main').click({ position: { x: 1, y: 1 } });
+  await page.keyboard.press('/');
+  await expect(field).toBeFocused();
+
+  // A word of the document's title and one of its folder's name.
+  const title = await sidebar
+    .locator('a[aria-current="page"] > span')
+    .innerText();
+  const titleWord =
+    title.split(/\s+/u).find((word) => /^\p{L}{4,}$/u.test(word)) ?? title;
+  const folder = document.folderPath?.at(-1) ?? '';
+  const folderWord =
+    folder.split(/\s+/u).find((word) => /^\p{L}{3,}$/u.test(word)) ?? '';
+  await field.fill(`${folderWord} ${titleWord}`.trim());
+
+  const visible = sidebar.locator('a[href]:visible');
+  await expect(visible.first()).toBeVisible();
+  const count = await visible.count();
+  const total = await sidebar.locator('a[href]').count();
+  expect(count).toBeLessThan(total);
+  await expect(sidebar.locator('a[aria-current="page"]')).toBeVisible();
+  const statusLine = page.locator('#kb-sidebar-filter-status');
+  await expect(statusLine).toHaveText(
+    `${count} ${count === 1 ? 'document' : 'documents'}`,
+  );
+  await expectNoAccessibilityViolations(page);
+
+  await field.fill('zzzz-nothing-has-this-title');
+  await expect(visible).toHaveCount(0);
+  await expect(statusLine).toHaveText('No document matches.');
+
+  // Escape clears the field and puts every folder back as it was.
+  await page.keyboard.press('Escape');
+  await expect(field).toHaveValue('');
+  await expect(sidebar.locator('li[hidden]')).toHaveCount(0);
+  const openAfter = await sidebar
+    .locator('details')
+    .evaluateAll((elements) =>
+      elements.map((element) => (element as HTMLDetailsElement).open),
+    );
+  expect(openAfter).toEqual(openBefore);
+
+  // Enter opens the first match: here a document other than this one.
+  const otherTitle = await sidebar.evaluate(
+    (element) =>
+      [
+        ...element.querySelectorAll(
+          'a[href]:not([aria-current]) > span:first-child',
+        ),
+      ]
+        .map((span) => span.textContent?.trim() ?? '')
+        .filter((text) => text.length > 0)
+        .at(-1) ?? '',
+  );
+  expect(otherTitle).not.toBe('');
+  await field.fill(otherTitle);
+  const first = await visible.first().getAttribute('href');
+  const here = new URL(page.url()).pathname;
+  expect(first).not.toBe(here);
+  await page.keyboard.press('Enter');
+  await page.waitForURL((url) => url.pathname === first);
+});
+
+test('the sidebar filter leaves the phone menu and the slash key alone', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/${deepestDocument().slug}/`);
+  const menu = page.getByRole('button', { name: 'Menu' });
+
+  // With the menu closed, `/` is the browser's again.
+  const taken = await page.evaluate(() => {
+    const event = new KeyboardEvent('keydown', {
+      key: '/',
+      bubbles: true,
+      cancelable: true,
+    });
+    document.body.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(taken).toBe(false);
+
+  // In the open menu, Escape clears the field and the menu stays open.
+  await menu.click();
+  const field = page.getByRole('searchbox', { name: 'Filter sidebar' });
+  await field.fill('a');
+  await field.press('Escape');
+  await expect(field).toHaveValue('');
+  // Starlight marks an open menu on the body.
+  const body = page.locator('body');
+  await expect(body).toHaveAttribute('data-mobile-menu-expanded', '');
+  // A second Escape, on an empty field, closes the menu as Starlight does.
+  await field.press('Escape');
+  await expect(body).not.toHaveAttribute('data-mobile-menu-expanded');
 });

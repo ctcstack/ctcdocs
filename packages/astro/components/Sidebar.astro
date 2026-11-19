@@ -1,0 +1,108 @@
+---
+/**
+ * Overrides Starlight's `Sidebar` to put a filter above the tree: a reader
+ * types part of a title and the sidebar keeps only the documents whose title,
+ * or whose folders' names, hold every word typed (scripts/sidebar-filter.ts).
+ * `/` reaches the field from anywhere on the page, Escape clears it. Without
+ * the script the field is not shown and the sidebar is Starlight's own.
+ */
+import Default from '@astrojs/starlight/components/Sidebar.astro';
+---
+
+<div class="kb-sidebar-filter" hidden>
+  <input
+    type="search"
+    id="kb-sidebar-filter"
+    placeholder="Filter sidebar"
+    aria-label="Filter sidebar"
+    aria-describedby="kb-sidebar-filter-status"
+    autocomplete="off"
+    spellcheck="false"
+  />
+  <kbd aria-hidden="true">/</kbd>
+  <p
+    id="kb-sidebar-filter-status"
+    class="kb-sidebar-filter-status"
+    aria-live="polite"
+  >
+  </p>
+</div>
+<Default />
+
+<script>
+  import '../scripts/sidebar-filter';
+</script>
+
+<style>
+  @layer starlight.core {
+    .kb-sidebar-filter {
+      background: var(--kb-ground);
+      margin-top: -1rem;
+      padding-top: 1rem;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .kb-sidebar-filter[hidden] {
+      display: none;
+    }
+
+    input {
+      background: var(--kb-surface-sunken);
+      border: 1px solid var(--kb-hairline);
+      border-radius: 0.375rem;
+      color: var(--kb-text);
+      font: inherit;
+      font-size: var(--kb-text-sm);
+      padding: 0.4rem 2rem 0.4rem 0.6rem;
+      width: 100%;
+    }
+
+    input::placeholder {
+      color: var(--kb-gray-3);
+    }
+
+    input:focus-visible {
+      border-color: var(--kb-accent);
+      outline: 2px solid var(--kb-accent);
+      outline-offset: 1px;
+    }
+
+    /* The shortcut hint gives way to the browser's own clear button. */
+    kbd {
+      border: 1px solid var(--kb-hairline);
+      border-radius: 0.25rem;
+      color: var(--kb-gray-3);
+      font-family: inherit;
+      font-size: 0.75rem;
+      line-height: 1;
+      padding: 0.2rem 0.4rem;
+      pointer-events: none;
+      position: absolute;
+      inset-inline-end: 0.5rem;
+      top: calc(1rem + 0.45rem);
+    }
+
+    input:not(:placeholder-shown) ~ kbd {
+      display: none;
+    }
+
+    /* A touch screen has no key to press. */
+    @media (hover: none) and (pointer: coarse) {
+      kbd {
+        display: none;
+      }
+    }
+
+    .kb-sidebar-filter-status {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-sm);
+      margin: 0;
+    }
+
+    .kb-sidebar-filter-status:not(:empty) {
+      padding-top: 0.5rem;
+    }
+  }
+</style>

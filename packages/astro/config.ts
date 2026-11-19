@@ -114,6 +114,23 @@ function formatIcons(items: SidebarConfiguration): SidebarConfiguration {
   }) as SidebarConfiguration;
 }
 
+/**
+ * Every folder of the generated sidebar starts closed: a reader sees the top
+ * level and opens what they need. Starlight still opens the folders that hold
+ * the current page, and remembers what the reader opened for the session.
+ */
+function collapseGroups(items: SidebarConfiguration): SidebarConfiguration {
+  return items.map((item) =>
+    typeof item === 'object' && item !== null && 'items' in item
+      ? {
+          ...item,
+          collapsed: true,
+          items: collapseGroups(item.items as SidebarConfiguration),
+        }
+      : item,
+  ) as SidebarConfiguration;
+}
+
 export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
   const site = parseSiteConfiguration(options.siteConfig);
   const { brand, deployment } = site;
@@ -191,6 +208,8 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
       Search: '@ctcstack/ctcdocs/components/Search.astro',
       // Carets rather than arrows on the previous and next links.
       Pagination: '@ctcstack/ctcdocs/components/Pagination.astro',
+      // A filter above the tree finds a document by its title.
+      Sidebar: '@ctcstack/ctcdocs/components/Sidebar.astro',
       SiteTitle: '@ctcstack/ctcdocs/components/SiteTitle.astro',
       // A private deployment's header and mobile menu offer Sign out.
       SocialIcons: '@ctcstack/ctcdocs/components/SocialIcons.astro',
@@ -207,7 +226,10 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
     // The platform serves its own 404, which searches for the missing address.
     disable404Route: true,
     pagination: true,
-    sidebar: [...sidebarPrefix, ...formatIcons(generatedSidebar)],
+    sidebar: [
+      ...sidebarPrefix,
+      ...collapseGroups(formatIcons(generatedSidebar)),
+    ],
     /*
      * A private deployment asks not to be indexed; a public one must not.
      * The built site is one artifact deployed to every environment, so the tag
