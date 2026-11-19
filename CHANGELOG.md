@@ -16,6 +16,11 @@ All three packages share a version and are released together.
   header hides and shows the sidebar, and the content takes its room. The
   choice is kept in the reader's browser and applied before the page paints.
   Phones keep Starlight's menu unchanged.
+- **Reading aids for long pages.** The sidebar opens scrolled to the current
+  page when it would be out of view; the contents list follows the heading
+  being read; a screenshot drawn smaller than its file opens full size on
+  click, and closes on Escape or a click; a page more than two screens long
+  offers a Back to top button once the reader has scrolled down.
 
 ## 0.26.0
 

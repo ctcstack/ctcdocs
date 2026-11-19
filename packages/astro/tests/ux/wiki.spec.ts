@@ -27,6 +27,7 @@ import {
   documentInFolder,
   documentLinkingAnother,
   documentWithAsset,
+  documentWithMostHeadings,
   documentWithPermanentLink,
   documentWithTable,
   folderPages,
@@ -1466,4 +1467,104 @@ test('a reader can hide the sidebar and the choice holds across pages', async ({
   // On a phone the sidebar is Starlight's menu and the button is not drawn.
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator('.kb-sidebar-toggle')).toBeHidden();
+});
+
+test('the sidebar opens scrolled to the current page', async ({ page }) => {
+  const document = deepestDocument();
+  // A short screen, so the sidebar is taller than its pane.
+  await page.setViewportSize({ width: 1280, height: 320 });
+  await page.goto(`/${document.slug}/`);
+  const sidebar = page.locator('#starlight__sidebar');
+  const scrollable = await sidebar.evaluate(
+    (element) => element.scrollHeight > element.clientHeight,
+  );
+  test.skip(!scrollable, 'The sidebar fits the screen.');
+  await expect(sidebar.locator('a[aria-current="page"]')).toBeInViewport({
+    ratio: 1,
+  });
+});
+
+test('the contents list keeps the heading being read in view', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 320 });
+  await page.goto(`/${documentWithMostHeadings().slug}/`);
+  const tall = await page
+    .locator('.right-sidebar')
+    .evaluate((element) => element.scrollHeight > element.clientHeight * 1.5)
+    .catch(() => false);
+  test.skip(!tall, 'No contents list is taller than the screen.');
+  // Bring the last section's heading to where Starlight marks it as read.
+  await page.evaluate(() => {
+    const headings = document.querySelectorAll<HTMLElement>(
+      '.sl-markdown-content h2[id], .sl-markdown-content h3[id]',
+    );
+    const last = headings[headings.length - 1];
+    const header = document.querySelector('header')?.offsetHeight ?? 0;
+    if (last) {
+      window.scrollTo(
+        0,
+        last.getBoundingClientRect().top + window.scrollY - header - 48,
+      );
+    }
+  });
+  const current = page.locator('.right-sidebar a[aria-current="true"]:visible');
+  await expect(current).toHaveCount(1);
+  await expect(current).toBeInViewport({ ratio: 1 });
+});
+
+test('a screenshot drawn smaller than its file opens full size', async ({
+  page,
+}) => {
+  const withAsset = documentWithAsset();
+  if (!withAsset) {
+    test.skip(true, 'The corpus has no image.');
+    return;
+  }
+  // The corpus images are tiny swatches: serve a wide one in their place.
+  await page.route(/\.(png|jpe?g|webp|gif)(\?|$)|\/_image\?/u, (route) =>
+    route.fulfill({
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900"><rect width="1600" height="900" fill="#888"/></svg>',
+    }),
+  );
+  await page.goto(`/${withAsset.document.slug}/`);
+  const zoom = page.locator('.sl-markdown-content .kb-zoom').first();
+  await expect(zoom).toBeVisible();
+  await expect(zoom).toHaveAccessibleName(/^Enlarge image/u);
+  await expectNoAccessibilityViolations(page);
+
+  await zoom.click();
+  const dialog = page.locator('dialog.kb-zoom-dialog');
+  await expect(dialog).toBeVisible();
+  // Centred on the screen, not pinned to a corner by a margin reset.
+  const box = await dialog.boundingBox();
+  const width = page.viewportSize()?.width ?? 0;
+  expect(Math.abs((box?.x ?? 0) * 2 + (box?.width ?? 0) - width)).toBeLessThan(
+    4,
+  );
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await zoom.click();
+  await dialog.click();
+  await expect(dialog).toBeHidden();
+});
+
+test('a long page offers a way back to the top', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 320 });
+  await page.goto(`/${documentWithMostHeadings().slug}/`);
+  const button = page.getByRole('button', { name: 'Back to top' });
+  await expect(button).toBeHidden();
+  const long = await page.evaluate(
+    () => document.documentElement.scrollHeight > window.innerHeight * 3,
+  );
+  test.skip(!long, 'The page is too short.');
+  await page.evaluate(() =>
+    window.scrollTo(0, document.documentElement.scrollHeight),
+  );
+  await expect(button).toBeVisible();
+  await expectNoAccessibilityViolations(page);
+  await button.click();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await expect(button).toBeHidden();
 });
