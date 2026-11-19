@@ -31,6 +31,8 @@ function labelOf(element: Element | null): string {
 
 /** The open state of every folder before the reader started typing. */
 let saved: Map<HTMLDetailsElement, boolean> | undefined;
+/** Folders the reader opened or closed by hand while filtering keep that. */
+const touched = new Set<HTMLDetailsElement>();
 
 function items(list: Element): HTMLLIElement[] {
   return [...list.children].filter(
@@ -83,9 +85,12 @@ function apply(): void {
   if (terms.length === 0) {
     clearList(tree);
     for (const [details, open] of saved ?? []) {
-      details.open = open;
+      if (!touched.has(details)) {
+        details.open = open;
+      }
     }
     saved = undefined;
+    touched.clear();
     statusLine.textContent = '';
     return;
   }
@@ -102,9 +107,33 @@ function apply(): void {
       : `${kept} ${kept === 1 ? 'document' : 'documents'}`;
 }
 
+/*
+ * Drawn and visible: a closed phone menu hides the sidebar with
+ * `visibility`, which leaves its boxes in place.
+ */
+function isShown(element: HTMLElement): boolean {
+  return (
+    element.getClientRects().length > 0 &&
+    getComputedStyle(element).visibility === 'visible'
+  );
+}
+
 function firstMatch(): HTMLAnchorElement | undefined {
   return [...(tree?.querySelectorAll<HTMLAnchorElement>('a[href]') ?? [])].find(
-    (link) => link.offsetParent !== null,
+    isShown,
+  );
+}
+
+/** Keeps a key's release from reaching the menu, which closes on Escape. */
+function swallowRelease(key: string): void {
+  field?.addEventListener(
+    'keyup',
+    (event) => {
+      if (event.key === key) {
+        event.stopPropagation();
+      }
+    },
+    { once: true },
   );
 }
 
@@ -120,9 +149,18 @@ if (field && wrapper && tree && statusLine) {
   wrapper.hidden = false;
   statusLine.textContent = '';
   field.addEventListener('input', apply);
+  tree.addEventListener('click', (event) => {
+    const details = (event.target as Element | null)
+      ?.closest('summary')
+      ?.closest('details');
+    if (saved && details) {
+      touched.add(details);
+    }
+  });
   field.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && field.value) {
       event.preventDefault();
+      swallowRelease('Escape');
       field.value = '';
       apply();
     } else if (event.key === 'Enter') {
@@ -140,13 +178,16 @@ if (field && wrapper && tree && statusLine) {
       event.ctrlKey ||
       event.altKey ||
       isTyping(event.target) ||
-      // On a narrow screen the sidebar is a closed menu.
-      field.offsetParent === null
+      // On a narrow screen the sidebar is a menu, which may be closed.
+      !isShown(field)
     ) {
       return;
     }
-    event.preventDefault();
     field.focus();
-    field.select();
+    // The key is taken only when it moved the reader to the field.
+    if (document.activeElement === field) {
+      event.preventDefault();
+      field.select();
+    }
   });
 }

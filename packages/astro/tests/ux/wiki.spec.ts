@@ -1451,7 +1451,7 @@ test('a reader can hide the sidebar and the choice holds across pages', async ({
   await toggle.click();
   await expect(sidebar).toBeHidden();
   const show = page.getByRole('button', { name: 'Show sidebar' });
-  await expect(show).toHaveAttribute('aria-expanded', 'false');
+  await expect(show).toHaveAttribute('aria-controls', 'starlight__sidebar');
   const after = await page.locator('main').boundingBox();
   // The content takes the room the sidebar left.
   expect(after?.x ?? 0).toBeLessThan(before?.x ?? 0);
@@ -1464,9 +1464,37 @@ test('a reader can hide the sidebar and the choice holds across pages', async ({
   await page.reload();
   await expect(sidebar).toBeVisible();
 
-  // On a phone the sidebar is Starlight's menu and the button is not drawn.
+  // On a phone the sidebar is Starlight's menu and the button is not drawn;
+  // a stored choice to hide it does not empty the menu.
+  await page.getByRole('button', { name: 'Hide sidebar' }).click();
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
   await expect(page.locator('.kb-sidebar-toggle')).toBeHidden();
+  await page.getByRole('button', { name: 'Menu' }).click();
+  await expect(sidebar.locator('a[aria-current="page"]')).toBeVisible();
+});
+
+test('a shown sidebar comes back scrolled to the current page', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 320 });
+  await page.goto(`/${deepestDocument().slug}/`);
+  await page.getByRole('button', { name: 'Hide sidebar' }).click();
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload();
+  const sidebar = page.locator('#starlight__sidebar');
+  const scrollable = await page.evaluate(() => {
+    document.documentElement.removeAttribute('data-kb-sidebar');
+    const pane = document.getElementById('starlight__sidebar');
+    const tall = pane ? pane.scrollHeight > pane.clientHeight : false;
+    document.documentElement.dataset.kbSidebar = 'hidden';
+    return tall;
+  });
+  test.skip(!scrollable, 'The sidebar fits the screen.');
+  await page.getByRole('button', { name: 'Show sidebar' }).click();
+  await expect(sidebar.locator('a[aria-current="page"]')).toBeInViewport({
+    ratio: 1,
+  });
 });
 
 test('the sidebar opens scrolled to the current page', async ({ page }) => {
@@ -1567,6 +1595,27 @@ test('a long page offers a way back to the top', async ({ page }) => {
   await button.click();
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   await expect(button).toBeHidden();
+  // Keyboard focus goes back to the page's title.
+  await expect(page.locator('#_top')).toBeFocused();
+
+  // On a phone the open menu covers the button and keeps focus to itself.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() =>
+    window.scrollTo(0, document.documentElement.scrollHeight),
+  );
+  await expect(button).toBeVisible();
+  await page.getByRole('button', { name: 'Menu' }).click();
+  const box = await button.boundingBox();
+  const onTop = await page.evaluate(
+    ([x, y]) =>
+      document.elementFromPoint(x ?? 0, y ?? 0)?.closest('.kb-back-to-top') !==
+      null,
+    [(box?.x ?? 0) + 5, (box?.y ?? 0) + 5],
+  );
+  expect(onTop).toBe(false);
+  expect(
+    await button.evaluate((element) => element.closest('[inert]') !== null),
+  ).toBe(true);
 });
 
 test('the sidebar filter keeps the documents whose title or folder matches', async ({
@@ -1625,9 +1674,56 @@ test('the sidebar filter keeps the documents whose title or folder matches', asy
     );
   expect(openAfter).toEqual(openBefore);
 
-  // Enter opens the first match.
-  await field.fill(titleWord);
+  // Enter opens the first match: here a document other than this one.
+  const otherTitle = await sidebar.evaluate(
+    (element) =>
+      [
+        ...element.querySelectorAll(
+          'a[href]:not([aria-current]) > span:first-child',
+        ),
+      ]
+        .map((span) => span.textContent?.trim() ?? '')
+        .filter((text) => text.length > 0)
+        .at(-1) ?? '',
+  );
+  expect(otherTitle).not.toBe('');
+  await field.fill(otherTitle);
   const first = await visible.first().getAttribute('href');
+  const here = new URL(page.url()).pathname;
+  expect(first).not.toBe(here);
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(new RegExp(`${first ?? ''}$`, 'u'));
+  await page.waitForURL((url) => url.pathname === first);
+});
+
+test('the sidebar filter leaves the phone menu and the slash key alone', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/${deepestDocument().slug}/`);
+  const menu = page.getByRole('button', { name: 'Menu' });
+
+  // With the menu closed, `/` is the browser's again.
+  const taken = await page.evaluate(() => {
+    const event = new KeyboardEvent('keydown', {
+      key: '/',
+      bubbles: true,
+      cancelable: true,
+    });
+    document.body.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(taken).toBe(false);
+
+  // In the open menu, Escape clears the field and the menu stays open.
+  await menu.click();
+  const field = page.getByRole('searchbox', { name: 'Filter sidebar' });
+  await field.fill('a');
+  await field.press('Escape');
+  await expect(field).toHaveValue('');
+  // Starlight marks an open menu on the body.
+  const body = page.locator('body');
+  await expect(body).toHaveAttribute('data-mobile-menu-expanded', '');
+  // A second Escape, on an empty field, closes the menu as Starlight does.
+  await field.press('Escape');
+  await expect(body).not.toHaveAttribute('data-mobile-menu-expanded');
 });

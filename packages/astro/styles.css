@@ -222,7 +222,7 @@
   --kb-text-2xl: var(--sl-text-2xl);
   --kb-line-height: var(--sl-line-height);
   --kb-nav-height: var(--sl-nav-height);
-  --kb-z-index-navbar: var(--sl-z-index-navbar);
+  --kb-z-index-toc: var(--sl-z-index-toc);
   --kb-nav-pad-y: var(--sl-nav-pad-y);
   --kb-nav-gap: var(--sl-nav-gap);
 }
@@ -231,6 +231,16 @@
 :root[data-theme='light'],
 [data-theme='light'] ::backdrop {
   --sl-color-gray-7: var(--kb-gray-7);
+}
+
+/*
+ * A reader who hid the sidebar (SiteTitle.astro) gives its room to the
+ * content: Starlight offsets the main frame by this token on wide screens.
+ */
+@media (min-width: 50em) {
+  :root[data-has-sidebar][data-kb-sidebar='hidden'] {
+    --sl-content-inline-start: 0rem;
+  }
 }
 
 /* ------------------------------------------------------------ typography */
@@ -317,10 +327,6 @@ header.header {
  * menu, which this leaves alone.
  */
 @media (min-width: 50em) {
-  :root[data-has-sidebar][data-kb-sidebar='hidden'] {
-    --sl-content-inline-start: 0rem;
-  }
-
   :root[data-kb-sidebar='hidden'] .sidebar-pane {
     display: none;
   }
@@ -948,6 +954,86 @@ sheet-tables {
   color: var(--kb-ink);
 }
 
+/* ----------------------------------------------------------- reading aids */
+
+/*
+ * A screenshot drawn smaller than its file opens full size on click
+ * (scripts/reading-aids.ts). The button around it takes no room of its own.
+ */
+.sl-markdown-content .kb-zoom {
+  background: none;
+  border: 0;
+  border-radius: 0.25rem;
+  cursor: zoom-in;
+  display: inline-block;
+  max-width: 100%;
+  padding: 0;
+}
+
+.sl-markdown-content .kb-zoom:focus-visible {
+  outline: 2px solid var(--kb-accent);
+  outline-offset: 2px;
+}
+
+/* Starlight's reset zeroes every margin, which a dialog centres by. */
+.kb-zoom-dialog {
+  background: none;
+  border: 0;
+  cursor: zoom-out;
+  margin: auto;
+  max-height: 95vh;
+  max-width: 95vw;
+  padding: 0;
+}
+
+.kb-zoom-dialog::backdrop {
+  background: rgb(0 0 0 / 80%);
+}
+
+.kb-zoom-dialog img {
+  display: block;
+  height: auto;
+  max-height: 95vh;
+  max-width: 95vw;
+  object-fit: contain;
+  width: auto;
+}
+
+/* The way back from far down a long page. */
+.kb-back-to-top {
+  align-items: center;
+  background: var(--kb-ground);
+  border: 1px solid var(--kb-hairline);
+  border-radius: 999px;
+  bottom: 1.5rem;
+  color: var(--kb-gray-3);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 1.125rem;
+  height: 2.5rem;
+  inset-inline-end: 1.5rem;
+  justify-content: center;
+  position: fixed;
+  width: 2.5rem;
+  z-index: var(--kb-z-index-toc);
+}
+
+.kb-back-to-top[hidden] {
+  display: none;
+}
+
+.kb-back-to-top:hover,
+.kb-back-to-top:focus-visible {
+  background: var(--kb-surface-hover);
+  color: var(--kb-text);
+}
+
+@media print {
+  .kb-back-to-top {
+    display: none;
+  }
+}
+
 /* --------------------------------------------------------- mermaid blocks */
 
 /*
@@ -1005,81 +1091,4 @@ sheet-tables {
 
 .hero-lede {
   max-width: 100%;
-}
-
-/*
- * A screenshot drawn smaller than its file opens full size on click
- * (scripts/reading-aids.ts). The button around it takes no room of its own.
- */
-.sl-markdown-content .kb-zoom {
-  background: none;
-  border: 0;
-  border-radius: 0.25rem;
-  cursor: zoom-in;
-  display: inline-block;
-  max-width: 100%;
-  padding: 0;
-}
-
-.sl-markdown-content .kb-zoom:focus-visible {
-  outline: 2px solid var(--kb-accent);
-  outline-offset: 2px;
-}
-
-/* Starlight's reset zeroes every margin, which a dialog centres by. */
-.kb-zoom-dialog {
-  background: none;
-  border: 0;
-  cursor: zoom-out;
-  margin: auto;
-  max-height: 95vh;
-  max-width: 95vw;
-  padding: 0;
-}
-
-.kb-zoom-dialog::backdrop {
-  background: rgb(0 0 0 / 80%);
-}
-
-.kb-zoom-dialog img {
-  display: block;
-  height: auto;
-  max-height: 95vh;
-  max-width: 95vw;
-  object-fit: contain;
-  width: auto;
-}
-
-/* The way back from far down a long page. */
-.kb-back-to-top {
-  align-items: center;
-  background: var(--kb-ground);
-  border: 1px solid var(--kb-hairline);
-  border-radius: 999px;
-  bottom: 1.5rem;
-  color: var(--kb-gray-3);
-  cursor: pointer;
-  display: inline-flex;
-  height: 2.5rem;
-  inset-inline-end: 1.5rem;
-  justify-content: center;
-  position: fixed;
-  width: 2.5rem;
-  z-index: var(--kb-z-index-navbar);
-}
-
-.kb-back-to-top[hidden] {
-  display: none;
-}
-
-.kb-back-to-top:hover,
-.kb-back-to-top:focus-visible {
-  background: var(--kb-surface-hover);
-  color: var(--kb-text);
-}
-
-@media print {
-  .kb-back-to-top {
-    display: none;
-  }
 }

@@ -34,7 +34,7 @@ import Default from '@astrojs/starlight/components/Sidebar.astro';
 </script>
 
 <style>
-  @layer starlight.components {
+  @layer starlight.core {
     .kb-sidebar-filter {
       background: var(--kb-ground);
       margin-top: -1rem;
@@ -65,7 +65,8 @@ import Default from '@astrojs/starlight/components/Sidebar.astro';
 
     input:focus-visible {
       border-color: var(--kb-accent);
-      outline: none;
+      outline: 2px solid var(--kb-accent);
+      outline-offset: 1px;
     }
 
     /* The shortcut hint gives way to the browser's own clear button. */
@@ -79,12 +80,19 @@ import Default from '@astrojs/starlight/components/Sidebar.astro';
       padding: 0.2rem 0.4rem;
       pointer-events: none;
       position: absolute;
-      right: 0.5rem;
+      inset-inline-end: 0.5rem;
       top: calc(1rem + 0.45rem);
     }
 
     input:not(:placeholder-shown) ~ kbd {
       display: none;
+    }
+
+    /* A touch screen has no key to press. */
+    @media (hover: none) and (pointer: coarse) {
+      kbd {
+        display: none;
+      }
     }
 
     .kb-sidebar-filter-status {

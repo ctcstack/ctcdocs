@@ -7,6 +7,7 @@
  * - A screenshot shown smaller than it is opens full size on click.
  * - A long page offers a way back to the top.
  */
+import { SIDEBAR_SHOWN_EVENT } from '../lib/sidebar-state';
 
 const WIDE = '(min-width: 50em)';
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
@@ -15,40 +16,41 @@ function scrollBehavior(): ScrollBehavior {
   return matchMedia(REDUCED_MOTION).matches ? 'auto' : 'smooth';
 }
 
-/** Where `element` sits inside the scrolling `container`, in its own pixels. */
-function offsetWithin(container: HTMLElement, element: HTMLElement): number {
-  return (
-    element.getBoundingClientRect().top -
-    container.getBoundingClientRect().top +
-    container.scrollTop
-  );
+/** Whether the element is drawn at all: not hidden, nor in a closed folder. */
+function isRendered(element: HTMLElement): boolean {
+  return element.getClientRects().length > 0;
 }
 
-function isInView(container: HTMLElement, element: HTMLElement): boolean {
-  const box = container.getBoundingClientRect();
-  const item = element.getBoundingClientRect();
-  return item.top >= box.top && item.bottom <= box.bottom;
-}
-
-/** Centres `element` in `container` when it is out of view. */
+/**
+ * Centres `element` in the part of `container` a reader can see, below
+ * `inset` pixels covered at its top, when it is out of that part.
+ */
 function bringIntoView(
   container: HTMLElement,
   element: HTMLElement,
+  inset: number,
   behavior: ScrollBehavior,
 ): void {
-  if (isInView(container, element)) {
+  if (!isRendered(container) || !isRendered(element)) {
     return;
   }
-  const top =
-    offsetWithin(container, element) -
-    (container.clientHeight - element.offsetHeight) / 2;
-  container.scrollTo({ top: Math.max(0, top), behavior });
+  const box = container.getBoundingClientRect();
+  const item = element.getBoundingClientRect();
+  const top = box.top + inset;
+  if (item.top >= top && item.bottom <= box.bottom) {
+    return;
+  }
+  const visible = box.bottom - top;
+  const target =
+    item.top - top + container.scrollTop - (visible - item.height) / 2;
+  container.scrollTo({ top: Math.max(0, target), behavior });
 }
 
 /*
  * Starlight restores the sidebar's scroll position within a session; this
  * steps in only when the current page is still out of view after that, as on
- * a page opened from a link.
+ * a page opened from a link, or when a hidden sidebar is shown again. The
+ * sidebar filter sticks to the top of the pane and covers what is under it.
  */
 function revealCurrentPage(): void {
   if (!matchMedia(WIDE).matches) {
@@ -56,14 +58,22 @@ function revealCurrentPage(): void {
   }
   const sidebar = document.getElementById('starlight__sidebar');
   const current = sidebar?.querySelector<HTMLElement>('a[aria-current="page"]');
-  if (sidebar && current) {
-    bringIntoView(sidebar, current, 'auto');
+  if (!sidebar || !current) {
+    return;
   }
+  const filter = sidebar.querySelector<HTMLElement>('.kb-sidebar-filter');
+  const inset =
+    filter && isRendered(filter)
+      ? filter.getBoundingClientRect().bottom -
+        sidebar.getBoundingClientRect().top
+      : 0;
+  bringIntoView(sidebar, current, Math.max(0, inset), 'auto');
 }
 
 /*
  * Starlight marks the heading being read with `aria-current` but does not
- * scroll the list, which on a long document is taller than the screen.
+ * scroll the list, which on a long document is taller than the screen. The
+ * rail runs under the fixed header and pads its top by the header's height.
  */
 function followContents(): void {
   const rail = document.querySelector<HTMLElement>('.right-sidebar');
@@ -75,11 +85,9 @@ function followContents(): void {
     for (const record of records) {
       const link = record.target as HTMLElement;
       // The rail also holds a collapsed copy of the list, which is skipped.
-      if (
-        link.getAttribute('aria-current') === 'true' &&
-        link.offsetParent !== null
-      ) {
-        bringIntoView(rail, link, scrollBehavior());
+      if (link.getAttribute('aria-current') === 'true' && isRendered(link)) {
+        const inset = parseFloat(getComputedStyle(rail).paddingTop) || 0;
+        bringIntoView(rail, link, inset, scrollBehavior());
       }
     }
   }).observe(contents, {
@@ -142,6 +150,32 @@ function enlargeableImages(): void {
   }
 }
 
+const SVG = 'http://www.w3.org/2000/svg';
+
+/** An upward arrow, drawn to the icon rule: 16×16, 1.5 stroke, 1em. */
+function arrowUpIcon(): SVGSVGElement {
+  const icon = document.createElementNS(SVG, 'svg');
+  for (const [name, value] of Object.entries({
+    'aria-hidden': 'true',
+    viewBox: '0 0 16 16',
+    width: '1em',
+    height: '1em',
+    fill: 'none',
+    stroke: 'currentColor',
+    'stroke-width': '1.5',
+    'stroke-linecap': 'round',
+    'stroke-linejoin': 'round',
+  })) {
+    icon.setAttribute(name, value);
+  }
+  for (const d of ['M8 13V3', 'M3.5 7.5 8 3l4.5 4.5']) {
+    const path = document.createElementNS(SVG, 'path');
+    path.setAttribute('d', d);
+    icon.append(path);
+  }
+  return icon;
+}
+
 /** The button appears once the reader is this many screens down. */
 const BACK_TO_TOP_AFTER = 2;
 
@@ -152,8 +186,7 @@ function backToTop(): void {
   button.hidden = true;
   button.setAttribute('aria-label', 'Back to top');
   button.title = 'Back to top';
-  button.innerHTML =
-    '<svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>';
+  button.append(arrowUpIcon());
   button.addEventListener('click', () => {
     window.scrollTo({ top: 0, behavior: scrollBehavior() });
     // Keyboard focus follows the reader back to the start of the page.
@@ -163,7 +196,11 @@ function backToTop(): void {
       title.focus({ preventScroll: true });
     }
   });
-  document.body.append(button);
+  /*
+   * Inside the main frame, which Starlight makes inert while the phone menu
+   * is open, and below the menu's layer: the open menu covers it.
+   */
+  (document.querySelector('.main-frame') ?? document.body).append(button);
 
   let pending = false;
   const update = (): void => {
@@ -184,6 +221,7 @@ function backToTop(): void {
 }
 
 revealCurrentPage();
+document.addEventListener(SIDEBAR_SHOWN_EVENT, revealCurrentPage);
 followContents();
 enlargeableImages();
 backToTop();

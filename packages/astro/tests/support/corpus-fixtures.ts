@@ -141,13 +141,6 @@ export function deepestDocument(): CorpusFixture {
 }
 
 /**
- * A document whose body carries a Markdown table.
- *
- * Which document that is depends on the corpus, so it is found by reading the
- * generated Markdown rather than named here. The delimiter row is the reliable
- * marker: a table cannot exist without one, and no other construct has one.
- */
-/**
  * The document whose body has the most section headings, the one with the
  * longest contents list.
  */
@@ -168,9 +161,16 @@ export function documentWithMostHeadings(): CorpusFixture {
     } catch {
       continue;
     }
-    const headings = body
-      .split('\n')
-      .filter((line) => /^#{2,3} /u.test(line)).length;
+    // Lines inside a code fence are code, not headings.
+    let fenced = false;
+    let headings = 0;
+    for (const line of body.split('\n')) {
+      if (/^\s*(```|~~~)/u.test(line)) {
+        fenced = !fenced;
+      } else if (!fenced && /^#{2,3} /u.test(line)) {
+        headings += 1;
+      }
+    }
     if (headings > most) {
       most = headings;
       best = document;
@@ -179,6 +179,13 @@ export function documentWithMostHeadings(): CorpusFixture {
   return best;
 }
 
+/**
+ * A document whose body carries a Markdown table.
+ *
+ * Which document that is depends on the corpus, so it is found by reading the
+ * generated Markdown rather than named here. The delimiter row is the reliable
+ * marker: a table cannot exist without one, and no other construct has one.
+ */
 export function documentWithTable(): CorpusFixture | undefined {
   return documents.find((document) => {
     let body: string;
