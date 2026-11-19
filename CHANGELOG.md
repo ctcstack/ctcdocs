@@ -2,6 +2,29 @@
 
 All three packages share a version and are released together.
 
+## 0.27.2
+
+### Fixed
+
+- **The interface tests audit the platform's controls, not a project's
+  writing.** The tests for the sidebar toggle, the filter, image zoom and
+  Back to top open a page chosen by its content, such as the document with
+  the most headings. They now run the accessibility audit on the control
+  they test, so a heading level a document's author skipped no longer fails
+  a project's `pnpm verify`.
+
+### Added
+
+- **`pnpm release:check`.** Before a tag, the platform proves the candidate on
+  real deployments: it packs the packages, clones each deployment named,
+  installs the tarballs there and runs that deployment's `pnpm verify`.
+  Nothing is published. See CONTRIBUTING.md.
+
+### Upgrade note
+
+Bump the packages and the workflow pins. Nothing else changes for a
+project.
+
 ## 0.27.1
 
 ### Fixed

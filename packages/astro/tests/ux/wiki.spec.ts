@@ -70,7 +70,16 @@ function escapeRegExp(value: string): string {
   return value.replace(/[$()*+.?[\\\]^{|}]/gu, '\\$&');
 }
 
-async function expectNoAccessibilityViolations(page: Page): Promise<void> {
+/**
+ * `include` narrows the audit to the platform's own controls on a page that
+ * a test picks for its content: the document with the most headings or with
+ * an image is a deployment's own, and how its author used headings is not
+ * the control's to answer for.
+ */
+async function expectNoAccessibilityViolations(
+  page: Page,
+  include: string[] = [],
+): Promise<void> {
   /*
    * Audit the page once it has settled. Switching the theme changes a link's
    * text at once and fades its background over 150ms, so a check in between
@@ -93,7 +102,11 @@ async function expectNoAccessibilityViolations(page: Page): Promise<void> {
       new Promise((settled) => setTimeout(settled, 2000)),
     ]),
   );
-  const results = await new AxeBuilder({ page }).analyze();
+  let builder = new AxeBuilder({ page });
+  for (const selector of include) {
+    builder = builder.include(selector);
+  }
+  const results = await builder.analyze();
   expect(results.violations).toEqual([]);
 }
 
@@ -1455,7 +1468,7 @@ test('a reader can hide the sidebar and the choice holds across pages', async ({
   const after = await page.locator('main').boundingBox();
   // The content takes the room the sidebar left.
   expect(after?.x ?? 0).toBeLessThan(before?.x ?? 0);
-  await expectNoAccessibilityViolations(page);
+  await expectNoAccessibilityViolations(page, ['.header']);
 
   await page.reload();
   await expect(sidebar).toBeHidden();
@@ -1560,7 +1573,7 @@ test('a screenshot drawn smaller than its file opens full size', async ({
   const zoom = page.locator('.sl-markdown-content .kb-zoom').first();
   await expect(zoom).toBeVisible();
   await expect(zoom).toHaveAccessibleName(/^Enlarge image/u);
-  await expectNoAccessibilityViolations(page);
+  await expectNoAccessibilityViolations(page, ['.kb-zoom']);
 
   await zoom.click();
   const dialog = page.locator('dialog.kb-zoom-dialog');
@@ -1591,7 +1604,7 @@ test('a long page offers a way back to the top', async ({ page }) => {
     window.scrollTo(0, document.documentElement.scrollHeight),
   );
   await expect(button).toBeVisible();
-  await expectNoAccessibilityViolations(page);
+  await expectNoAccessibilityViolations(page, ['.kb-back-to-top']);
   await button.click();
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   await expect(button).toBeHidden();
@@ -1657,7 +1670,7 @@ test('the sidebar filter keeps the documents whose title or folder matches', asy
   await expect(statusLine).toHaveText(
     `${count} ${count === 1 ? 'document' : 'documents'}`,
   );
-  await expectNoAccessibilityViolations(page);
+  await expectNoAccessibilityViolations(page, ['#starlight__sidebar']);
 
   await field.fill('zzzz-nothing-has-this-title');
   await expect(visible).toHaveCount(0);

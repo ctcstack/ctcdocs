@@ -76,6 +76,25 @@ ADR that supersedes it rather than quietly diverging.
 All three packages share a version and are released together; what changed is
 in [CHANGELOG.md](CHANGELOG.md).
 
+A release is public and final: npm keeps every version, and everyone who
+watches the repository is told of it. So a release is never how a change
+meets a real deployment for the first time. Before the tag, prove the
+candidate on every deployment checkout you have:
+
+```bash
+pnpm release:check ../a-deployment ../another-deployment
+```
+
+It packs the three packages as publishing would, clones each deployment's
+committed state into a temporary directory, points it at the packed
+tarballs, and runs that deployment's own `pnpm verify` against its real
+corpus. Nothing is published and the checkouts are not touched. The fixture
+corpus is synthetic and cannot stand in for this: a change that depends on
+content, such as a test that picks the document with the most headings,
+meets a deployment's own writing only here. Tag only when every deployment
+passes; when one fails, fix the branch and check again, so that one release
+carries the fix rather than a run of patch releases.
+
 A release is a `v*` tag whose name matches the version in all three manifests
 and has a section in the changelog. The workflow refuses a tag that disagrees
 with either, runs the gate, and publishes core, then sync, then the site

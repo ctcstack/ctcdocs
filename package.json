@@ -20,6 +20,7 @@
     "prepare": "husky",
     "verify:staged": "lint-staged",
     "verify": "pnpm format:check && pnpm lint && pnpm build && pnpm typecheck && pnpm test:coverage && pnpm fixtures:check && pnpm fixtures:build && pnpm fixtures:validate && pnpm fixtures:gate && pnpm fixtures:deploy-dry-run && pnpm fixtures:migrations && pnpm fixtures:search && pnpm fixtures:ux && pnpm knip",
+    "release:check": "node scripts/release-check.mjs",
     "fixtures:generate": "node fixtures/generate-corpus.ts",
     "fixtures:check": "node fixtures/verify-corpus.mjs",
     "fixtures:build": "pnpm --filter ctcdocs-fixture-project build",
