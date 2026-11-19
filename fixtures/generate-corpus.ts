@@ -471,6 +471,10 @@ const markdownExports = new Map<string, string>([
         'one, never as an edit to it.',
         '',
       ]),
+      // A heading line whose text was deleted: the export keeps the marker,
+      // and the page must leave it out.
+      '##',
+      '',
     ].join('\n'),
   ],
   [

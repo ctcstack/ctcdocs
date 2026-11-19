@@ -8,7 +8,7 @@
 "googleFileId": "doc-decision-log"
 "googleModifiedTime": "2026-01-05T09:00:00.000Z"
 "syncedAt": "2026-02-10T06:00:00.000Z"
-"contentHash": "sha256:c794f5c64db8586ed8c83a2f5ab301091f80992c93fe1f69a34bc42ed74f064c"
+"contentHash": "sha256:48d444a4eb4572cc44d76219b63959be2bf69150244c61dcb76dffee11bb1ec4"
 "folderPath":
   - "Reference"
 "pagefind": true
@@ -115,3 +115,5 @@ The platform team decided to hold back a document that cannot be exported. It we
 wrote down why this one won, and agreed to revisit it if those reasons
 stop holding. A change is proposed as a new entry that replaces this
 one, never as an edit to it.
+
+##

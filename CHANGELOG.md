@@ -2,6 +2,21 @@
 
 All three packages share a version and are released together.
 
+## 0.27.1
+
+### Fixed
+
+- **Empty headings are left out.** A Google Doc keeps a line styled as a
+  heading after its text is deleted, and the page drew it as an empty
+  heading with an empty entry in the contents list, which screen readers
+  announce and axe reports. Such a heading is now dropped when the page is
+  built; the generated Markdown keeps the document as exported.
+
+### Upgrade note
+
+Bump the packages and the workflow pins. Nothing else changes for a
+project.
+
 ## 0.27.0
 
 ### Changed

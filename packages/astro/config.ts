@@ -24,6 +24,7 @@ import {
 import type { AstroUserConfig } from 'astro';
 
 import { normalizeFolderName } from './lib/folder-anchor.js';
+import { remarkEmptyHeadings } from './lib/remark-empty-headings.js';
 import { remarkExternalLinks } from './lib/remark-external-links.js';
 import { remarkMermaid } from './lib/remark-mermaid.js';
 import { remarkPermanentLinks } from './lib/remark-permanent-links.js';
@@ -263,8 +264,9 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
       /*
        * Transforms the reader interface needs and Markdown has no node for:
        * mermaid fences are claimed before Expressive Code turns them into a
-       * code frame, every table gains its own scroll container, and a link
-       * that leaves the site opens in a new tab.
+       * code frame, every table gains its own scroll container, a heading
+       * with nothing in it is left out, and a link that leaves the site
+       * opens in a new tab.
        *
        * The processor is named explicitly because Astro 7 deprecates the bare
        * `markdown.remarkPlugins` array. `unified()` keeps the defaults this
@@ -274,6 +276,8 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
        */
       processor: unified({
         remarkPlugins: [
+          // A heading a Google Doc kept after its text was deleted.
+          remarkEmptyHeadings,
           remarkMermaid,
           remarkTableScroll,
           // A link between documents is stored as a permanent link and drawn
