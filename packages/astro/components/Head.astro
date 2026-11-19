@@ -71,16 +71,6 @@ const jsonLd =
 <style is:inline set:html={STARLIGHT_LAYER_ORDER}></style>
 {
   /*
-   * The reader's choice to hide the sidebar, applied before the page paints
-   * (see SiteTitle.astro). The build hashes inline scripts into the policy.
-   */
-}
-<script
-  is:inline
-  set:html={`try{if(localStorage.getItem(${JSON.stringify(SIDEBAR_STATE_KEY)})==='hidden')document.documentElement.dataset.kbSidebar='hidden'}catch{}`}
-/>
-{
-  /*
    * What the page was made from, read back by the build to give every file
    * an access class (ADR-039).
    */
@@ -125,4 +115,16 @@ const jsonLd =
   import '../scripts/mermaid-entry';
   import '../scripts/reading-aids';
 </script>
+{
+  /*
+   * The reader's choice to hide the sidebar, applied before the page paints
+   * (see SiteTitle.astro). The build hashes inline scripts into the policy.
+   * It follows the module script above: Knip reads a self-closed script tag
+   * as running to the next closing tag, and would lose those imports.
+   */
+}
+<script
+  is:inline
+  set:html={`try{if(localStorage.getItem(${JSON.stringify(SIDEBAR_STATE_KEY)})==='hidden')document.documentElement.dataset.kbSidebar='hidden'}catch{}`}
+/>
 {jsonLd && <script type="application/ld+json" set:html={jsonLd} />}
