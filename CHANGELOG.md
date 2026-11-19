@@ -13,6 +13,13 @@ All three packages share a version and are released together.
   they test, so a heading level a document's author skipped no longer fails
   a project's `pnpm verify`.
 
+### Added
+
+- **`pnpm release:check`.** Before a tag, the platform proves the candidate on
+  real deployments: it packs the packages, clones each deployment named,
+  installs the tarballs there and runs that deployment's `pnpm verify`.
+  Nothing is published. See CONTRIBUTING.md.
+
 ### Upgrade note
 
 Bump the packages and the workflow pins. Nothing else changes for a
