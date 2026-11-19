@@ -208,6 +208,8 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
       Search: '@ctcstack/ctcdocs/components/Search.astro',
       // Carets rather than arrows on the previous and next links.
       Pagination: '@ctcstack/ctcdocs/components/Pagination.astro',
+      // A filter above the tree finds a document by its title.
+      Sidebar: '@ctcstack/ctcdocs/components/Sidebar.astro',
       SiteTitle: '@ctcstack/ctcdocs/components/SiteTitle.astro',
       // A private deployment's header and mobile menu offer Sign out.
       SocialIcons: '@ctcstack/ctcdocs/components/SocialIcons.astro',

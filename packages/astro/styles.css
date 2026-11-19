@@ -326,6 +326,11 @@ header.header {
   }
 }
 
+/* What the sidebar filter leaves out (scripts/sidebar-filter.ts). */
+#starlight__sidebar li[hidden] {
+  display: none;
+}
+
 /*
  * The expand/collapse carets sit below their group label rather than sharing
  * its weight: the label is what a reader scans, the caret only reports state.

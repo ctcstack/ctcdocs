@@ -16,6 +16,10 @@ All three packages share a version and are released together.
   header hides and shows the sidebar, and the content takes its room. The
   choice is kept in the reader's browser and applied before the page paints.
   Phones keep Starlight's menu unchanged.
+- **Filter the sidebar.** A field above the tree keeps the documents whose
+  title, or whose folders' names, hold every word typed, and opens the
+  folders that hold them. `/` reaches it from anywhere on the page, Enter
+  opens the first match, and Escape clears it and puts every folder back.
 - **Reading aids for long pages.** The sidebar opens scrolled to the current
   page when it would be out of view; the contents list follows the heading
   being read; a screenshot drawn smaller than its file opens full size on

@@ -1568,3 +1568,66 @@ test('a long page offers a way back to the top', async ({ page }) => {
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   await expect(button).toBeHidden();
 });
+
+test('the sidebar filter keeps the documents whose title or folder matches', async ({
+  page,
+}) => {
+  const document = deepestDocument();
+  await page.goto(`/${document.slug}/`);
+  const sidebar = page.locator('#starlight__sidebar');
+  const field = page.getByRole('searchbox', { name: 'Filter sidebar' });
+  const openBefore = await sidebar
+    .locator('details')
+    .evaluateAll((elements) =>
+      elements.map((element) => (element as HTMLDetailsElement).open),
+    );
+
+  // `/` reaches the field from the page.
+  await page.locator('main').click({ position: { x: 1, y: 1 } });
+  await page.keyboard.press('/');
+  await expect(field).toBeFocused();
+
+  // A word of the document's title and one of its folder's name.
+  const title = await sidebar
+    .locator('a[aria-current="page"] > span')
+    .innerText();
+  const titleWord =
+    title.split(/\s+/u).find((word) => /^\p{L}{4,}$/u.test(word)) ?? title;
+  const folder = document.folderPath?.at(-1) ?? '';
+  const folderWord =
+    folder.split(/\s+/u).find((word) => /^\p{L}{3,}$/u.test(word)) ?? '';
+  await field.fill(`${folderWord} ${titleWord}`.trim());
+
+  const visible = sidebar.locator('a[href]:visible');
+  await expect(visible.first()).toBeVisible();
+  const count = await visible.count();
+  const total = await sidebar.locator('a[href]').count();
+  expect(count).toBeLessThan(total);
+  await expect(sidebar.locator('a[aria-current="page"]')).toBeVisible();
+  const statusLine = page.locator('#kb-sidebar-filter-status');
+  await expect(statusLine).toHaveText(
+    `${count} ${count === 1 ? 'document' : 'documents'}`,
+  );
+  await expectNoAccessibilityViolations(page);
+
+  await field.fill('zzzz-nothing-has-this-title');
+  await expect(visible).toHaveCount(0);
+  await expect(statusLine).toHaveText('No document matches.');
+
+  // Escape clears the field and puts every folder back as it was.
+  await page.keyboard.press('Escape');
+  await expect(field).toHaveValue('');
+  await expect(sidebar.locator('li[hidden]')).toHaveCount(0);
+  const openAfter = await sidebar
+    .locator('details')
+    .evaluateAll((elements) =>
+      elements.map((element) => (element as HTMLDetailsElement).open),
+    );
+  expect(openAfter).toEqual(openBefore);
+
+  // Enter opens the first match.
+  await field.fill(titleWord);
+  const first = await visible.first().getAttribute('href');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(new RegExp(`${first ?? ''}$`, 'u'));
+});
