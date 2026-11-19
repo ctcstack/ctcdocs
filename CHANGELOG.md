@@ -2,6 +2,21 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Changed
+
+- **Sidebar folders start closed.** Every folder of the generated sidebar is
+  collapsed by default; Starlight still opens the folders that hold the
+  current page and remembers what a reader opened during the session.
+
+### Added
+
+- **Hide the sidebar.** On a wide screen a button before the mark in the
+  header hides and shows the sidebar, and the content takes its room. The
+  choice is kept in the reader's browser and applied before the page paints.
+  Phones keep Starlight's menu unchanged.
+
 ## 0.26.0
 
 ### Changed

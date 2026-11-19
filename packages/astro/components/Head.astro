@@ -20,6 +20,7 @@ import { markdownProjectionPath } from '@ctcstack/ctcdocs-core';
  */
 import { STARLIGHT_LAYER_ORDER } from '../lib/layer-order';
 import { siteConfiguration } from '../lib/project';
+import { SIDEBAR_STATE_KEY } from '../lib/sidebar-state';
 import { hasMarkdownProjection } from '../lib/projection';
 import { structuredData, type StructuredPage } from '../lib/structured-data';
 
@@ -68,6 +69,16 @@ const jsonLd =
 
 <Default />
 <style is:inline set:html={STARLIGHT_LAYER_ORDER}></style>
+{
+  /*
+   * The reader's choice to hide the sidebar, applied before the page paints
+   * (see SiteTitle.astro). The build hashes inline scripts into the policy.
+   */
+}
+<script
+  is:inline
+  set:html={`try{if(localStorage.getItem(${JSON.stringify(SIDEBAR_STATE_KEY)})==='hidden')document.documentElement.dataset.kbSidebar='hidden'}catch{}`}
+/>
 {
   /*
    * What the page was made from, read back by the build to give every file

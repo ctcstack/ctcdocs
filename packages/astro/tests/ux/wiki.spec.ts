@@ -1411,3 +1411,59 @@ test('the header shows the mark the project configures, for the theme chosen on 
     await expect(darkIcon).toHaveCount(0);
   }
 });
+
+test('the sidebar opens only the folders that hold the current page', async ({
+  page,
+}) => {
+  const document = deepestDocument();
+  await page.goto(`/${document.slug}/`);
+  const current = page.locator('#starlight__sidebar a[aria-current="page"]');
+  await expect(current).toBeVisible();
+  // Every folder that does not hold the page starts closed.
+  const states = await page
+    .locator('#starlight__sidebar details')
+    .evaluateAll((elements) =>
+      elements
+        .filter((element) => element.querySelector('a[href]') !== null)
+        .filter(
+          (element) =>
+            !element.querySelector('a[aria-current="page"]') &&
+            // The navigation section the platform adds above the corpus.
+            !element.querySelector(':scope > ul > li > a[href="/"]'),
+        )
+        .map((element) => (element as HTMLDetailsElement).open),
+    );
+  expect(states.length).toBeGreaterThan(0);
+  expect(states.every((open) => !open)).toBe(true);
+});
+
+test('a reader can hide the sidebar and the choice holds across pages', async ({
+  page,
+}) => {
+  const document = anyDocument();
+  await page.goto(`/${document.slug}/`);
+  const sidebar = page.locator('#starlight__sidebar');
+  const toggle = page.getByRole('button', { name: 'Hide sidebar' });
+  await expect(sidebar).toBeVisible();
+  const before = await page.locator('main').boundingBox();
+
+  await toggle.click();
+  await expect(sidebar).toBeHidden();
+  const show = page.getByRole('button', { name: 'Show sidebar' });
+  await expect(show).toHaveAttribute('aria-expanded', 'false');
+  const after = await page.locator('main').boundingBox();
+  // The content takes the room the sidebar left.
+  expect(after?.x ?? 0).toBeLessThan(before?.x ?? 0);
+  await expectNoAccessibilityViolations(page);
+
+  await page.reload();
+  await expect(sidebar).toBeHidden();
+  await page.getByRole('button', { name: 'Show sidebar' }).click();
+  await expect(sidebar).toBeVisible();
+  await page.reload();
+  await expect(sidebar).toBeVisible();
+
+  // On a phone the sidebar is Starlight's menu and the button is not drawn.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('.kb-sidebar-toggle')).toBeHidden();
+});

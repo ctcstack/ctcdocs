@@ -311,6 +311,21 @@ header.header {
 }
 
 /*
+ * A reader may hide the sidebar on a wide screen (SiteTitle.astro): the pane
+ * goes and the content takes its place. Below 50em the sidebar is Starlight's
+ * menu, which this leaves alone.
+ */
+@media (min-width: 50em) {
+  :root[data-has-sidebar][data-kb-sidebar='hidden'] {
+    --sl-content-inline-start: 0rem;
+  }
+
+  :root[data-kb-sidebar='hidden'] .sidebar-pane {
+    display: none;
+  }
+}
+
+/*
  * The expand/collapse carets sit below their group label rather than sharing
  * its weight: the label is what a reader scans, the caret only reports state.
  * They return to the label's color on hover and focus, so a control that is
