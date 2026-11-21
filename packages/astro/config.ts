@@ -202,6 +202,9 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
       // Source provenance moved from the footer to under the title.
       EditLink: '@ctcstack/ctcdocs/components/NoEditLink.astro',
       Head: '@ctcstack/ctcdocs/components/Head.astro',
+      // The header keeps theme and account at every width, so the menu's
+      // footer does not repeat them.
+      MobileMenuFooter: '@ctcstack/ctcdocs/components/MobileMenuFooter.astro',
       // A section page draws its listing with folders and documents apart.
       MarkdownContent: '@ctcstack/ctcdocs/components/MarkdownContent.astro',
       PageTitle: '@ctcstack/ctcdocs/components/DocumentHeader.astro',
@@ -212,9 +215,11 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
       // A filter above the tree finds a document by its title.
       Sidebar: '@ctcstack/ctcdocs/components/Sidebar.astro',
       SiteTitle: '@ctcstack/ctcdocs/components/SiteTitle.astro',
-      // A private deployment's header and mobile menu offer Sign out.
+      // Sign out moved to the account menu; the icons stay Starlight's.
       SocialIcons: '@ctcstack/ctcdocs/components/SocialIcons.astro',
       SkipLink: '@ctcstack/ctcdocs/components/SkipLink.astro',
+      // The theme slot holds the theme button and the account menu.
+      ThemeSelect: '@ctcstack/ctcdocs/components/HeaderActions.astro',
     },
     // Source provenance is reported under the title from googleModifiedTime,
     // which is when a person edited the document. Starlight's footer stamp

@@ -1,0 +1,310 @@
+---
+/**
+ * The menu beside the site's name that moves a reader between the
+ * organization's sites, drawn when the project configures `switcher`.
+ *
+ * The name stays the link home; the switcher is a button of its own beside
+ * it, so neither control does two things. It is drawn as a framed control
+ * rather than a bare caret, so it reads as something to press, and until a
+ * reader first opens it a small dot in the accent says there is something new
+ * there. The dot is the reader's: once opened, it is gone for good in that
+ * browser.
+ *
+ * The menu is a list of links, this site first and marked as the current one,
+ * then the others in the configured order. Each opens in the same tab: a
+ * switch, not a side trip.
+ */
+import { siteConfiguration } from '../lib/project';
+
+const { brand, switcher } = siteConfiguration;
+const sites = switcher?.sites ?? [];
+const label = `Switch to another ${brand.name} site`;
+---
+
+{
+  switcher && (
+    <>
+      <button
+        type="button"
+        class="kb-switcher-button"
+        popovertarget="kb-switcher"
+        aria-label={label}
+        title={label}
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 16 16"
+          width="1em"
+          height="1em"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M5 6.25 8 3.25l3 3M5 9.75l3 3 3-3" />
+        </svg>
+        <span class="kb-switcher-new" aria-hidden="true" />
+      </button>
+      <nav id="kb-switcher" class="kb-switcher" popover aria-label={label}>
+        <p class="kb-switcher-heading" translate="no">
+          {brand.name}
+        </p>
+        <ul>
+          <li>
+            <a href="/" aria-current="page">
+              <span class="kb-switcher-mark">
+                {brand.faviconDarkPath ? (
+                  <>
+                    <img class="mark-light" src={brand.faviconPath} alt="" />
+                    <img class="mark-dark" src={brand.faviconDarkPath} alt="" />
+                  </>
+                ) : (
+                  <img src={brand.faviconPath} alt="" />
+                )}
+              </span>
+              <span class="kb-switcher-text">
+                <span class="kb-switcher-name" translate="no">
+                  {brand.siteTitle}
+                </span>
+                {switcher.description && (
+                  <span class="kb-switcher-description">
+                    {switcher.description}
+                  </span>
+                )}
+              </span>
+              <svg
+                class="kb-switcher-check"
+                aria-hidden="true"
+                viewBox="0 0 16 16"
+                width="1em"
+                height="1em"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="m3.5 8.5 3 3 6-7" />
+              </svg>
+            </a>
+          </li>
+          {sites.map((site) => (
+            <li>
+              <a href={site.url}>
+                <span class="kb-switcher-mark">
+                  {site.iconPath === undefined ? (
+                    <span class="kb-switcher-letter" aria-hidden="true">
+                      {[...site.name][0]}
+                    </span>
+                  ) : site.iconDarkPath ? (
+                    <>
+                      <img class="mark-light" src={site.iconPath} alt="" />
+                      <img class="mark-dark" src={site.iconDarkPath} alt="" />
+                    </>
+                  ) : (
+                    <img src={site.iconPath} alt="" />
+                  )}
+                </span>
+                <span class="kb-switcher-text">
+                  <span class="kb-switcher-name" translate="no">
+                    {site.name}
+                  </span>
+                  {site.description && (
+                    <span class="kb-switcher-description">
+                      {site.description}
+                    </span>
+                  )}
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </>
+  )
+}
+
+<script>
+  import { anchorPopover } from '../scripts/header-popover';
+  import { SWITCHER_SEEN_KEY } from '../lib/header-state';
+
+  const button = document.querySelector<HTMLElement>('.kb-switcher-button');
+  const panel = document.getElementById('kb-switcher');
+  if (button && panel) {
+    anchorPopover(button, panel, 'start');
+    let seen = true;
+    try {
+      seen = localStorage.getItem(SWITCHER_SEEN_KEY) !== null;
+    } catch {
+      // Without storage the dot would never go, so it is not shown at all.
+    }
+    if (!seen) {
+      button.dataset.new = '';
+    }
+    panel.addEventListener('toggle', (event) => {
+      if ((event as ToggleEvent).newState !== 'open') {
+        return;
+      }
+      delete button.dataset.new;
+      try {
+        localStorage.setItem(SWITCHER_SEEN_KEY, 'seen');
+      } catch {
+        // The dot is gone for this page either way.
+      }
+    });
+  }
+</script>
+
+<style>
+  @layer starlight.core {
+    .kb-switcher-button {
+      position: relative;
+      display: inline-flex;
+      flex: none;
+      align-items: center;
+      justify-content: center;
+      width: 1.75rem;
+      height: 1.75rem;
+      margin-inline-start: 0.5rem;
+      padding: 0;
+      background: none;
+      border: 1px solid var(--kb-border-strong);
+      border-radius: 0.375rem;
+      color: var(--kb-gray-3);
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    .kb-switcher-button:hover,
+    .kb-switcher-button:focus-visible,
+    /* The browser keeps the expanded state in the accessibility tree, not
+       in an attribute, so the open menu is read from the page itself. */
+    .kb-switcher-button:has(+ .kb-switcher:popover-open) {
+      border-color: var(--kb-accent);
+      color: var(--kb-ink);
+    }
+
+    .kb-switcher-new {
+      display: none;
+      position: absolute;
+      top: -0.1875rem;
+      inset-inline-end: -0.1875rem;
+      width: 0.5rem;
+      height: 0.5rem;
+      background: var(--kb-accent);
+      border: 1px solid var(--kb-ground);
+      border-radius: 50%;
+    }
+
+    .kb-switcher-button[data-new] .kb-switcher-new {
+      display: block;
+    }
+
+    .kb-switcher {
+      position: fixed;
+      inset: auto;
+      width: min(20rem, calc(100vw - 1rem));
+      margin: 0;
+      padding: 0.375rem;
+      background: var(--kb-ground);
+      border: 1px solid var(--kb-border-strong);
+      border-radius: 0.5rem;
+      color: var(--kb-text);
+    }
+
+    .kb-switcher-heading {
+      margin: 0;
+      padding: 0.375rem 0.5rem 0.25rem;
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-xs);
+      font-weight: 500;
+    }
+
+    ul {
+      display: grid;
+      gap: 0.125rem;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    a {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem;
+      border-radius: 0.375rem;
+      color: var(--kb-text);
+      text-decoration: none;
+    }
+
+    a:hover,
+    a:focus-visible {
+      background: var(--kb-surface-hover);
+    }
+
+    /* The hover tone, not the sidebar's current one: the line under the name
+       is gray, and on the darker fill it would fall short of AA. The check
+       says which site this is. */
+    a[aria-current='page'] {
+      background: var(--kb-surface-hover);
+    }
+
+    .kb-switcher-mark {
+      display: inline-flex;
+      flex: none;
+      align-items: center;
+      justify-content: center;
+      width: 1.75rem;
+      height: 1.75rem;
+    }
+
+    .kb-switcher-mark img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .kb-switcher-letter {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      background: var(--kb-surface-sunken);
+      border: 1px solid var(--kb-hairline);
+      border-radius: 0.375rem;
+      color: var(--kb-ink);
+      font-weight: 600;
+    }
+
+    .kb-switcher-text {
+      display: grid;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .kb-switcher-name {
+      color: var(--kb-ink);
+      font-size: var(--kb-text-sm);
+      font-weight: 600;
+    }
+
+    .kb-switcher-description {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-xs);
+      line-height: 1.4;
+    }
+
+    .kb-switcher-check {
+      flex: none;
+      color: var(--kb-text-accent);
+    }
+
+    :global(:root[data-theme='dark']) .mark-light,
+    :global(:root:not([data-theme='dark'])) .mark-dark {
+      display: none;
+    }
+  }
+</style>
