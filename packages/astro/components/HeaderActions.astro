@@ -14,16 +14,19 @@
  *
  * The theme is kept where Starlight keeps it, so its script in the head still
  * applies it before the page paints. A reader who has never chosen follows
- * their system's setting, as with Starlight's own control, until they press
- * the button.
+ * their system's setting, as with Starlight's own control. Pressing the button
+ * to the other theme keeps that choice; pressing it back to the system's theme
+ * forgets it, so the site follows the system again. Whether the button is
+ * pressed is set once the script knows the theme, never guessed in the markup.
  *
  * The address is the Worker's to give (ADR-038): it is read from the reader's
- * session at `ACCESS_READER_ROUTE`, kept for the visit so the next page shows
- * it at once, and dropped on Sign out. Until it arrives, or where nothing
- * answers that route, the button shows a person icon and the menu offers
- * Sign out alone. Signing out of the site does not sign the reader out of
- * Google, and Sign out stays a form, not a link: a link could be followed by
- * a prefetch or a crawler.
+ * session at `ACCESS_READER_ROUTE`, kept for ten minutes of a visit so a page
+ * does not wait for it, then asked for again, so a session that changed hands
+ * without Sign out does not show the old address for long; Sign out drops it.
+ * Until it arrives, or where nothing answers that route, the button shows a
+ * person icon and the menu offers Sign out alone. Signing out of the site
+ * does not sign the reader out of Google, and Sign out stays a form, not a
+ * link: a link could be followed by a prefetch or a crawler.
  */
 import { siteConfiguration } from '../lib/project';
 
@@ -36,7 +39,6 @@ const isPrivate =
     type="button"
     class="kb-theme-toggle"
     aria-label="Dark theme"
-    aria-pressed="false"
     title="Switch theme"
   >
     <svg
@@ -117,7 +119,7 @@ const isPrivate =
   import { ACCESS_READER_ROUTE } from '@ctcstack/ctcdocs-core';
 
   import { initialsOf } from '../lib/initials';
-  import { READER_CACHE_KEY } from '../lib/header-state';
+  import { READER_CACHE_KEY, READER_CACHE_MS } from '../lib/header-state';
   import { anchorPopover } from '../scripts/header-popover';
 
   type Theme = 'light' | 'dark';
@@ -157,9 +159,15 @@ const isPrivate =
   });
   toggle?.addEventListener('click', () => {
     const next: Theme = shown() === 'dark' ? 'light' : 'dark';
+    const system: Theme = systemLight.matches ? 'light' : 'dark';
     show(next);
     try {
-      localStorage.setItem(THEME_KEY, next);
+      // Back to the system's theme is back to following the system.
+      if (next === system) {
+        localStorage.removeItem(THEME_KEY);
+      } else {
+        localStorage.setItem(THEME_KEY, next);
+      }
     } catch {
       // Storage may be unavailable; the choice then lasts for this page.
     }
@@ -187,34 +195,52 @@ const isPrivate =
       }
     };
 
+    let fresh = false;
     try {
-      const cached = sessionStorage.getItem(READER_CACHE_KEY);
-      if (cached) {
-        present(cached);
+      const cached: unknown = JSON.parse(
+        sessionStorage.getItem(READER_CACHE_KEY) ?? 'null',
+      );
+      if (
+        typeof cached === 'object' &&
+        cached !== null &&
+        'email' in cached &&
+        'at' in cached &&
+        typeof cached.email === 'string' &&
+        typeof cached.at === 'number'
+      ) {
+        present(cached.email);
+        fresh = Date.now() - cached.at < READER_CACHE_MS;
       }
     } catch {
-      // Without storage the address waits for the Worker on every page.
+      // Without storage, or with a value it cannot read, the Worker is asked.
     }
 
-    fetch(ACCESS_READER_ROUTE, { credentials: 'same-origin' })
-      .then((response) => (response.ok ? response.json() : undefined))
-      .then((body: unknown) => {
-        const email =
-          typeof body === 'object' && body !== null && 'email' in body
-            ? body.email
-            : undefined;
-        if (typeof email === 'string' && email.length > 0) {
-          present(email);
-          try {
-            sessionStorage.setItem(READER_CACHE_KEY, email);
-          } catch {
-            // Kept for this page only.
+    const ask = (): Promise<void> =>
+      fetch(ACCESS_READER_ROUTE, { credentials: 'same-origin' })
+        .then((response) => (response.ok ? response.json() : undefined))
+        .then((body: unknown) => {
+          const email =
+            typeof body === 'object' && body !== null && 'email' in body
+              ? body.email
+              : undefined;
+          if (typeof email === 'string' && email.length > 0) {
+            present(email);
+            try {
+              sessionStorage.setItem(
+                READER_CACHE_KEY,
+                JSON.stringify({ email, at: Date.now() }),
+              );
+            } catch {
+              // Kept for this page only.
+            }
           }
-        }
-      })
-      .catch(() => {
-        // Nothing answers the route here: the menu offers Sign out alone.
-      });
+        })
+        .catch(() => {
+          // Nothing answers the route here: the menu offers Sign out alone.
+        });
+    if (!fresh) {
+      void ask();
+    }
 
     panel.querySelector('form')?.addEventListener('submit', () => {
       try {
@@ -300,6 +326,7 @@ const isPrivate =
     .kb-account {
       position: fixed;
       inset: auto;
+      overflow-y: auto;
       width: max-content;
       min-width: 13rem;
       max-width: calc(100vw - 1rem);

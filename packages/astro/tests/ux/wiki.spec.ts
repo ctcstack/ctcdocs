@@ -591,9 +591,11 @@ test('the account menu names the reader and signs them out through the Worker', 
     'A public deployment has no session to end.',
   );
   // The Worker answers the address from the reader's session (ADR-038).
-  await page.route(`**${ACCESS_READER_ROUTE}`, (route) =>
-    route.fulfill({ json: { email: 'jane.doe@example.com' } }),
-  );
+  let asked = 0;
+  await page.route(`**${ACCESS_READER_ROUTE}`, (route) => {
+    asked += 1;
+    return route.fulfill({ json: { email: 'jane.doe@example.com' } });
+  });
   await page.goto('/');
 
   const account = page
@@ -626,6 +628,11 @@ test('the account menu names the reader and signs them out through the Worker', 
   }
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
+
+  // The next page shows the address it kept, without asking again.
+  await page.goto(`/${anyDocument().slug}/`);
+  await expect(account).toHaveText('JD');
+  expect(asked).toBe(1);
 });
 
 test('without an answer from the Worker, the account menu still signs out', async ({
@@ -652,6 +659,7 @@ test('without an answer from the Worker, the account menu still signs out', asyn
 test('the theme button switches the theme, and the choice holds across pages', async ({
   page,
 }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
   await page.goto('/');
   const toggle = page
     .locator('header')
@@ -665,6 +673,15 @@ test('the theme button switches the theme, and the choice holds across pages', a
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+
+  // Back to the system's theme, the site follows the system again.
+  await toggle.click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  expect(
+    await page.evaluate(() => localStorage.getItem('starlight-theme')),
+  ).toBeNull();
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 });
 
 test("the switcher offers the organization's other sites beside the name", async ({

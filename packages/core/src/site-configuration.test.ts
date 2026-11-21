@@ -795,6 +795,13 @@ describe('loadSiteConfiguration', () => {
     expect(() => loadSiteConfiguration(writeProject(relative))).toThrow(
       /brand\.faviconDarkPath/u,
     );
+
+    const otherHost = validConfiguration();
+    (otherHost.brand as Record<string, unknown>).faviconDarkPath =
+      '//cdn.example.net/mark.svg';
+    expect(() => loadSiteConfiguration(writeProject(otherHost))).toThrow(
+      /brand\.faviconDarkPath/u,
+    );
   });
 });
 
