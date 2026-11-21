@@ -120,6 +120,13 @@ export const PLATFORM_WORKERS = {
  */
 export const ACCESS_CLASSES_ROUTE = '/_kb/classes';
 
+/**
+ * Where the Worker tells a signed-in person the address they signed in with,
+ * for the header's account menu. Answered `{ "email": "..." }`, and only to a
+ * person: a machine key has no account to show.
+ */
+export const ACCESS_READER_ROUTE = '/_kb/reader';
+
 /** Each platform route as the href a link uses. */
 export const PLATFORM_ROUTE_HREFS = {
   fullIndex: `/${PLATFORM_ROUTES.fullIndex}/`,

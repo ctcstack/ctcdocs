@@ -41,6 +41,31 @@ export interface BrandConfiguration {
   readonly faviconDarkPath?: string;
 }
 
+/** Another site of the same organization, offered by the header's switcher. */
+export interface SwitcherSite {
+  /** Its own name, as its header shows it. */
+  readonly name: string;
+  /** Where it opens: an HTTPS address. */
+  readonly url: string;
+  /** One line on what it is for, under its name. */
+  readonly description?: string;
+  /** Its mark, served from this project's `public/` at a root-relative path. */
+  readonly iconPath?: string;
+  /** The same mark drawn for a dark ground. */
+  readonly iconDarkPath?: string;
+}
+
+/**
+ * The menu beside the site's name that moves a reader between the
+ * organization's sites. Absent, the header offers no switcher.
+ */
+export interface SwitcherConfiguration {
+  /** One line on what this site is for, under its own name in the menu. */
+  readonly description?: string;
+  /** The other sites, in the order the menu lists them. */
+  readonly sites: readonly SwitcherSite[];
+}
+
 export interface HomeConfiguration {
   /**
    * The paragraph under the home page heading: where the documents come from
@@ -345,6 +370,8 @@ export interface SiteConfiguration {
    */
   readonly access?: AccessConfiguration;
   readonly brand: BrandConfiguration;
+  /** The header's menu of the organization's other sites. */
+  readonly switcher?: SwitcherConfiguration;
   readonly deployment: DeploymentConfiguration;
   readonly home: HomeConfiguration;
   readonly navigation: NavigationConfiguration;
@@ -574,6 +601,118 @@ function optionalNumber(
 }
 
 /** Fails on a key the section does not define. */
+function optionalText(
+  source: Record<string, unknown>,
+  key: string,
+  path: string,
+): string | undefined {
+  return source[key] === undefined ? undefined : text(source, key, path);
+}
+
+function optionalRootPath(
+  source: Record<string, unknown>,
+  key: string,
+  path: string,
+): string | undefined {
+  const value = optionalText(source, key, path);
+  if (
+    value !== undefined &&
+    (!value.startsWith('/') || value.startsWith('//'))
+  ) {
+    fail(path, 'must be a site-root-relative path');
+  }
+  return value;
+}
+
+const SWITCHER_SITE_LIMIT = 8;
+
+/**
+ * The switcher's sites. Each opens over HTTPS, and none is this deployment
+ * itself: the menu names this site already, from the brand.
+ */
+function optionalSwitcher(
+  value: unknown,
+  siteTitle: string,
+  ownHosts: ReadonlySet<string>,
+): SwitcherConfiguration | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const source = record(value, 'switcher');
+  knownKeys(source, 'switcher', ['description', 'sites']);
+  const list = source.sites;
+  if (
+    !Array.isArray(list) ||
+    list.length === 0 ||
+    list.length > SWITCHER_SITE_LIMIT
+  ) {
+    fail(
+      'switcher.sites',
+      `must list between 1 and ${SWITCHER_SITE_LIMIT} sites`,
+    );
+  }
+  const names = new Set([siteTitle.toLowerCase()]);
+  const sites = list.map((entry: unknown, index): SwitcherSite => {
+    const path = `switcher.sites[${index}]`;
+    const site = record(entry, path);
+    knownKeys(site, path, [
+      'name',
+      'url',
+      'description',
+      'iconPath',
+      'iconDarkPath',
+    ]);
+    const name = text(site, 'name', `${path}.name`);
+    if (names.has(name.toLowerCase())) {
+      fail(
+        `${path}.name`,
+        'must differ from the site title and every other site',
+      );
+    }
+    names.add(name.toLowerCase());
+    const address = text(site, 'url', `${path}.url`);
+    let url: URL;
+    try {
+      url = new URL(address);
+    } catch {
+      return fail(`${path}.url`, 'must be an absolute URL');
+    }
+    if (url.protocol !== 'https:' || url.username || url.password) {
+      fail(`${path}.url`, 'must be an HTTPS address without credentials');
+    }
+    if (ownHosts.has(url.host)) {
+      fail(`${path}.url`, "must not be one of this deployment's own hosts");
+    }
+    const description = optionalText(
+      site,
+      'description',
+      `${path}.description`,
+    );
+    const iconPath = optionalRootPath(site, 'iconPath', `${path}.iconPath`);
+    const iconDarkPath = optionalRootPath(
+      site,
+      'iconDarkPath',
+      `${path}.iconDarkPath`,
+    );
+    if (iconDarkPath !== undefined && iconPath === undefined) {
+      fail(`${path}.iconDarkPath`, 'needs iconPath, the mark it stands in for');
+    }
+    return {
+      name,
+      url: url.href,
+      ...(description === undefined ? {} : { description }),
+      ...(iconPath === undefined ? {} : { iconPath }),
+      ...(iconDarkPath === undefined ? {} : { iconDarkPath }),
+    };
+  });
+  const description = optionalText(
+    source,
+    'description',
+    'switcher.description',
+  );
+  return { ...(description === undefined ? {} : { description }), sites };
+}
+
 function knownKeys(
   source: Record<string, unknown>,
   path: string,
@@ -859,6 +998,16 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
     workerName,
   };
 
+  const switcher = optionalSwitcher(
+    root.switcher,
+    brand.siteTitle,
+    new Set(
+      Object.values(deployment.environments).map(
+        (environment) => environment.hostname,
+      ),
+    ),
+  );
+
   const publicEnvironment = Object.entries(deployment.environments).find(
     ([, environment]) => environment.visibility === 'public',
   );
@@ -1014,6 +1163,7 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
     ...(insights ? { insights } : {}),
     ...(access ? { access } : {}),
     brand,
+    ...(switcher ? { switcher } : {}),
     deployment,
     home: {
       corpusIndex: optionalFlag(

@@ -1,5 +1,6 @@
 export {
   ACCESS_CLASSES_ROUTE,
+  ACCESS_READER_ROUTE,
   GENERATED_DIRECTORY_ALLOWLIST,
   GENERATED_FILE_ALLOWLIST,
   markdownProjectionPath,
@@ -89,6 +90,8 @@ export type {
   SignInConfiguration,
   SiteConfiguration,
   StaleFolder,
+  SwitcherConfiguration,
+  SwitcherSite,
   SyncConfigurationDefaults,
 } from './site-configuration.js';
 export {
