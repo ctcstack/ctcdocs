@@ -10,6 +10,7 @@ import {
 } from './ownership-markers.js';
 import { PROJECT_LAYOUT } from './project-layout.js';
 import {
+  feedbackHref,
   fetchCharacterLimit,
   loadSiteConfiguration,
   parseSiteConfiguration,
@@ -676,6 +677,46 @@ describe('loadSiteConfiguration', () => {
     const root = writeProject(raw);
 
     expect(() => loadSiteConfiguration(root)).toThrow(/brand\.faviconPath/u);
+  });
+
+  it('offers no feedback link unless one is configured', () => {
+    expect(
+      parseSiteConfiguration(validConfiguration()).feedback,
+    ).toBeUndefined();
+  });
+
+  it('reads the feedback address, with the page placeholder a form encodes', () => {
+    const raw = validConfiguration();
+    raw.feedback = {
+      url: 'https://forms.example.net/f/abc/viewform?usp=pp_url&entry.1=Docs&entry.2=%7Bpage%7D',
+    };
+    const feedback = parseSiteConfiguration(raw).feedback;
+    expect(feedback).toEqual({
+      url: 'https://forms.example.net/f/abc/viewform?usp=pp_url&entry.1=Docs&entry.2={page}',
+    });
+    expect(
+      feedback && feedbackHref(feedback, 'https://docs.example.com/a b/?q=1'),
+    ).toBe(
+      'https://forms.example.net/f/abc/viewform?usp=pp_url&entry.1=Docs&entry.2=https%3A%2F%2Fdocs.example.com%2Fa%20b%2F%3Fq%3D1',
+    );
+    expect(
+      feedbackHref({ url: 'https://forms.example.net/new' }, 'https://x.y/'),
+    ).toBe('https://forms.example.net/new');
+  });
+
+  it.each([
+    ['a plain HTTP address', 'http://forms.example.net/?page={page}'],
+    ['credentials', 'https://a:b@forms.example.net/?page={page}'],
+    ['a relative address', '/feedback/?page={page}'],
+    ['a mistyped placeholder', 'https://forms.example.net/?page={pages}'],
+    ['an unknown key', undefined],
+  ])('rejects a feedback address with %s', (_, url) => {
+    const raw = validConfiguration();
+    raw.feedback =
+      url === undefined
+        ? { url: 'https://a.example.net', label: 'x' }
+        : { url };
+    expect(() => parseSiteConfiguration(raw)).toThrow(/feedback/u);
   });
 
   it('offers no switcher unless one is configured', () => {

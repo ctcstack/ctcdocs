@@ -3,6 +3,7 @@ import {
   ACCESS_CLASSES_ROUTE,
   ACCESS_READER_ROUTE,
   DOCUMENT_FORMAT_BADGES,
+  feedbackHref,
   PLATFORM_ROUTE_HREFS,
 } from '@ctcstack/ctcdocs-core';
 import { expect, test, type Page } from '@playwright/test';
@@ -710,6 +711,9 @@ test("the switcher offers the organization's other sites beside the name", async
   for (const [index, site] of (switcher?.sites ?? []).entries()) {
     const link = links.nth(index + 1);
     await expect(link).toHaveAttribute('href', site.url);
+    // Another site is a link off this one: it opens in a new tab.
+    await expect(link).toHaveAttribute('target', '_blank');
+    await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     await expect(link).toContainText(site.name);
     if (site.description) {
       await expect(link).toContainText(site.description);
@@ -727,6 +731,42 @@ test("the switcher offers the organization's other sites beside the name", async
   await expect(button).not.toHaveAttribute('data-new', '');
   await page.reload();
   await expect(button).not.toHaveAttribute('data-new', '');
+});
+
+test('every page offers to report a problem, with its own address', async ({
+  page,
+}) => {
+  const { feedback, deployment } = siteConfiguration;
+  test.skip(!feedback, 'The project configures no feedback link.');
+
+  for (const path of ['/', `/${anyDocument().slug}/`]) {
+    await page.goto(path);
+    const expected = feedbackHref(
+      feedback ?? { url: '' },
+      new URL(path, deployment.environments.production.url).href,
+    );
+    const link = page.getByRole('link', {
+      name: 'Report a problem or suggest an improvement',
+    });
+    await expect(link).toHaveAttribute('href', expected);
+    await expect(link).toHaveAttribute('target', '_blank');
+    await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+
+    if (deployment.environments.production.visibility === 'private') {
+      await page
+        .locator('header')
+        .getByRole('button', { name: /^Account/u })
+        .click();
+      const item = page
+        .locator('#kb-account')
+        .getByRole('link', { name: /^Report a problem/u });
+      await expect(item).toBeVisible();
+      await expect(item).toHaveAttribute('href', expected);
+      await expect(item).toHaveAttribute('target', '_blank');
+      await page.keyboard.press('Escape');
+    }
+  }
+  await expectNoAccessibilityViolations(page, ['.kb-feedback']);
 });
 
 test('on a phone the header keeps the whole name, the theme and the account', async ({

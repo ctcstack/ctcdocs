@@ -66,6 +66,34 @@ export interface SwitcherConfiguration {
   readonly sites: readonly SwitcherSite[];
 }
 
+/**
+ * Where a reader reports a problem with the site or asks for something it
+ * lacks. Absent, the site offers no such link.
+ */
+export interface FeedbackConfiguration {
+  /**
+   * An HTTPS address, such as a form's pre-filled link. Every `{page}` in it
+   * is replaced with the address of the page the reader is on.
+   */
+  readonly url: string;
+}
+
+/** The placeholder a feedback address takes for the reader's page. */
+const FEEDBACK_PAGE_PLACEHOLDER = '{page}';
+
+/**
+ * The feedback address for one page: the configured address with every
+ * `{page}` replaced by the page's address, encoded as a query value.
+ */
+export function feedbackHref(
+  feedback: FeedbackConfiguration,
+  pageUrl: string,
+): string {
+  return feedback.url
+    .split(FEEDBACK_PAGE_PLACEHOLDER)
+    .join(encodeURIComponent(pageUrl));
+}
+
 export interface HomeConfiguration {
   /**
    * The paragraph under the home page heading: where the documents come from
@@ -372,6 +400,8 @@ export interface SiteConfiguration {
   readonly brand: BrandConfiguration;
   /** The header's menu of the organization's other sites. */
   readonly switcher?: SwitcherConfiguration;
+  /** Where readers report problems and ask for improvements. */
+  readonly feedback?: FeedbackConfiguration;
   readonly deployment: DeploymentConfiguration;
   readonly home: HomeConfiguration;
   readonly navigation: NavigationConfiguration;
@@ -722,6 +752,36 @@ function optionalSwitcher(
   return { ...(description === undefined ? {} : { description }), sites };
 }
 
+/**
+ * The feedback address. A form's pre-filled link encodes the placeholder
+ * typed into it as `%7Bpage%7D`, so that spelling is read as `{page}`. Any
+ * other `{…}` is a typo of it, and refused rather than sent to readers.
+ */
+function optionalFeedback(value: unknown): FeedbackConfiguration | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const source = record(value, 'feedback');
+  knownKeys(source, 'feedback', ['url']);
+  const url = text(source, 'url', 'feedback.url').replace(
+    /%7Bpage%7D/giu,
+    FEEDBACK_PAGE_PLACEHOLDER,
+  );
+  if (/\{(?!page\})[^}]*\}/u.test(url)) {
+    fail('feedback.url', 'may hold no placeholder other than {page}');
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(feedbackHref({ url }, 'https://example.com/page/'));
+  } catch {
+    return fail('feedback.url', 'must be an absolute URL');
+  }
+  if (parsed.protocol !== 'https:' || parsed.username || parsed.password) {
+    fail('feedback.url', 'must be an HTTPS address without credentials');
+  }
+  return { url };
+}
+
 function knownKeys(
   source: Record<string, unknown>,
   path: string,
@@ -1002,6 +1062,7 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
     workerName,
   };
 
+  const feedback = optionalFeedback(root.feedback);
   const switcher = optionalSwitcher(
     root.switcher,
     brand.siteTitle,
@@ -1168,6 +1229,7 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
     ...(access ? { access } : {}),
     brand,
     ...(switcher ? { switcher } : {}),
+    ...(feedback ? { feedback } : {}),
     deployment,
     home: {
       corpusIndex: optionalFlag(

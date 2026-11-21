@@ -1,0 +1,63 @@
+---
+/**
+ * Starlight's footer, then, when the project configures `feedback`, a link to
+ * report a problem with the page or ask for something the site lacks. The
+ * link carries the page's address, and opens in a new tab, as every link that
+ * leaves the site does. It is the same on every page, so search leaves it out.
+ */
+import Default from '@astrojs/starlight/components/Footer.astro';
+
+import { feedbackLinkFor } from '../lib/feedback';
+
+const feedback = feedbackLinkFor(Astro.url.pathname);
+---
+
+<Default />
+{
+  feedback && (
+    <p class="kb-feedback" data-pagefind-ignore>
+      <a href={feedback} target="_blank" rel="noopener noreferrer">
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 16 16"
+          width="1em"
+          height="1em"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M2.75 3.75h10.5v7h-6l-3 2.5v-2.5h-1.5z" />
+        </svg>
+        Report a problem or suggest an improvement
+        <span class="sr-only"> (opens in a new tab)</span>
+      </a>
+    </p>
+  )
+}
+
+<style>
+  @layer starlight.core {
+    .kb-feedback {
+      margin: 2rem 0 0;
+      padding-top: 1rem;
+      border-top: 1px solid var(--kb-hairline);
+      font-size: var(--kb-text-sm);
+    }
+
+    a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5em;
+      color: var(--kb-gray-3);
+      text-decoration: none;
+    }
+
+    a:hover,
+    a:focus-visible {
+      color: var(--kb-ink);
+      text-decoration: underline;
+    }
+  }
+</style>
