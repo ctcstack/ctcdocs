@@ -2,6 +2,37 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Added
+
+- **A switcher between the organization's sites.** A project that lists its
+  other internal sites under the new `switcher` key gets a framed button
+  beside its name in the header. It opens a menu with this site, marked as
+  current, and each other site with its mark and one line on what it is for.
+  Until a reader first opens it, a small dot says it is new. See
+  docs/CONFIGURATION.md.
+- **An account menu.** On a private deployment the header ends with a round
+  button showing the reader's initials. It opens a menu with the address they
+  signed in with and Sign out. The Worker answers that address from the
+  reader's own session at `/_kb/reader`, to a signed-in person only.
+
+### Changed
+
+- **The theme is a button.** Starlight's Dark/Light/Auto select is replaced by
+  a sun-or-moon button that switches between the two themes. A reader who
+  never presses it still follows their system's setting.
+- **The header keeps its controls on a phone.** The theme and account buttons
+  stay in the header at every width, so the sidebar's menu no longer repeats
+  them at its foot. Sign out moved from the header's row into the account
+  menu.
+
+### Upgrade note
+
+Bump the packages and the workflow pins. To offer the switcher, add
+`switcher` to `site.config.json` and put each site's mark in `public/`.
+Nothing else changes for a project.
+
 ## 0.27.2
 
 ### Fixed

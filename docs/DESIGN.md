@@ -462,6 +462,28 @@ format's name stays in the markup for screen readers. Folder labels are
 normalized at the point of use in `astro.config.mjs` (trailing slashes
 stripped), never in the generated sidebar file, which is pipeline-owned.
 
+### Header
+
+The site's mark and name lead, as a link home. Where the project lists the
+organization's other sites, a framed 1.75rem button with a thin up-and-down
+chevron follows the name: the switcher. It is framed in border-strong, not
+drawn as a bare caret, so it reads as a control, and its border turns to the
+accent on hover, on focus and while its menu is open. Until a reader first
+opens it, an 0.5rem dot in the accent sits on its corner — new, and so worth a
+look; once opened, the dot is gone for good in that browser. The menu is a
+hairline box on the ground with an 8px corner, headed by the organization's
+name in the muted ink, listing each site as a row: mark, name at weight 600,
+one muted line under it. The current site is first, on the row-hover fill,
+with an accent check.
+
+The right end holds the theme button — a sun or a moon, the theme on screen,
+in the muted ink until hovered — and, on a private deployment, the account
+button: a 2rem circle on the sunken surface in a border-strong ring, with the
+reader's initials at weight 600, or a person icon until they are known. Its
+menu shows "Signed in as" and the address, a hairline, then Sign out. Both
+menus open under their button, inside the window, and close on Escape or a
+click elsewhere. On a phone the gaps narrow so the full name still fits.
+
 ### Table of Contents Rail
 
 A 1px hairline runs the length of the list. Each link carries a transparent
@@ -483,6 +505,12 @@ caption at 0.875rem muted and title at body size in ink. Border moves to
 border-strong on hover.
 
 ### Named Rules
+
+**The Account Exemption.** The account button is the one round control. A
+circle is the shape every app of the organization gives a person, and keeping
+it lets a reader find their account where they find it everywhere else.
+The switcher's new dot is the only other round shape, and the only accent that
+marks something unvisited rather than a location; nothing else may be round.
 
 **The Accent Focus Rule.** Every interactive element takes the same focus
 treatment: a 2px solid accent outline at 2–3px offset with a 4px corner radius.
