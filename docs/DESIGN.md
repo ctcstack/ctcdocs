@@ -474,15 +474,24 @@ look; once opened, the dot is gone for good in that browser. The menu is a
 hairline box on the ground with an 8px corner, headed by the organization's
 name in the muted ink, listing each site as a row: mark, name at weight 600,
 one muted line under it. The current site is first, on the row-hover fill,
-with an accent check.
+with an accent check; the others open in a new tab.
 
 The right end holds the theme button — a sun or a moon, the theme on screen,
 in the muted ink until hovered — and, on a private deployment, the account
 button: a 2rem circle on the sunken surface in a border-strong ring, with the
 reader's initials at weight 600, or a person icon until they are known. Its
-menu shows "Signed in as" and the address, a hairline, then Sign out. Both
+menu shows "Signed in as" and the address, a hairline, then Report a problem
+(when the project has a feedback address) and Sign out, as plain rows. Both
 menus open under their button, inside the window, and close on Escape or a
 click elsewhere. On a phone the gaps narrow so the full name still fits.
+
+### Feedback Link
+
+Where the project has a feedback address, every page ends, after the
+pagination, with one line above a hairline: a speech-bubble icon and "Report
+a problem or suggest an improvement" in the muted ink at the small size,
+turning to ink and underlined on hover. It opens in a new tab, like every
+link off the site, and says so to screen readers.
 
 ### Table of Contents Rail
 
