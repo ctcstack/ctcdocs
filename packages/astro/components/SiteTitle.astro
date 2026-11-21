@@ -19,6 +19,7 @@
  */
 import { siteConfiguration } from '../lib/project';
 import SiteSwitcher from './SiteSwitcher.astro';
+import ThemedMark from './ThemedMark.astro';
 
 const { siteTitle, siteTitleHref } = Astro.locals.starlightRoute;
 const { faviconPath, faviconDarkPath } = siteConfiguration.brand;
@@ -47,16 +48,7 @@ const { faviconPath, faviconDarkPath } = siteConfiguration.brand;
   </svg>
 </button>
 <a href={siteTitleHref} class="site-title sl-flex">
-  {
-    faviconDarkPath ? (
-      <>
-        <img class="mark-light" src={faviconPath} alt="" />
-        <img class="mark-dark" src={faviconDarkPath} alt="" />
-      </>
-    ) : (
-      <img src={faviconPath} alt="" />
-    )
-  }
+  <ThemedMark light={faviconPath} dark={faviconDarkPath} />
   <span translate="no">{siteTitle}</span>
 </a>
 <SiteSwitcher />
@@ -114,7 +106,7 @@ const { faviconPath, faviconDarkPath } = siteConfiguration.brand;
       white-space: nowrap;
     }
 
-    img {
+    .site-title :global(img) {
       height: calc(var(--kb-nav-height) - 2 * var(--kb-nav-pad-y));
       object-fit: contain;
       width: auto;
@@ -152,12 +144,6 @@ const { faviconPath, faviconDarkPath } = siteConfiguration.brand;
     span {
       overflow: hidden;
       text-overflow: ellipsis;
-    }
-
-    /* Starlight sets the theme on the root before the page paints. */
-    :global(:root[data-theme='dark']) .mark-light,
-    :global(:root:not([data-theme='dark'])) .mark-dark {
-      display: none;
     }
   }
 </style>

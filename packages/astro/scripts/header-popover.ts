@@ -8,7 +8,7 @@
  *
  * What the browser does not do everywhere yet is place a popover beside its
  * button, so this does: under the button, aligned to its start or its end
- * edge, and kept inside the window on a narrow screen.
+ * edge, and kept inside the window on a narrow or a short screen.
  */
 
 const GAP_PX = 6;
@@ -27,7 +27,11 @@ export function anchorPopover(
   const place = (): void => {
     const box = button.getBoundingClientRect();
     const room = document.documentElement.clientWidth;
-    panel.style.top = `${Math.round(box.bottom + GAP_PX)}px`;
+    const top = Math.round(box.bottom + GAP_PX);
+    panel.style.top = `${top}px`;
+    // A long menu on a short window scrolls inside itself rather than
+    // running off the bottom, where nothing could scroll to it.
+    panel.style.maxHeight = `${Math.max(0, window.innerHeight - top - MARGIN_PX)}px`;
     if (align === 'start') {
       panel.style.left = `${Math.round(Math.max(MARGIN_PX, box.left))}px`;
       panel.style.right = 'auto';

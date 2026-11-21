@@ -482,6 +482,32 @@ describe('a deployment anyone may read', () => {
     ).toContain('signIn.workspaceDomains');
   });
 
+  it("refuses a switcher mark that is not in the project's public files", async () => {
+    const root = await createProject();
+    await mkdir(join(root, 'public', 'switcher'), { recursive: true });
+    await writeFile(join(root, 'public', 'switcher', 'status.svg'), '<svg/>');
+    const site = {
+      ...testSiteConfiguration,
+      switcher: {
+        sites: [
+          {
+            name: 'Status',
+            url: 'https://status.example.net/',
+            iconPath: '/switcher/status.svg',
+            iconDarkPath: '/switcher/status-dark.svg',
+          },
+        ],
+      },
+    };
+    const errors = (
+      await validateRepositoryContent(createSyncContext(root, site))
+    ).errors.join('\n');
+    expect(errors).toContain(
+      'switcher.sites[0].iconDarkPath names /switcher/status-dark.svg',
+    );
+    expect(errors).not.toContain('switcher.sites[0].iconPath');
+  });
+
   it('refuses redirects the asset store would apply before the Worker judged a file', async () => {
     const root = await createProject();
     await writeFile(join(root, 'public', '_redirects'), '/x/ /y/ 302\n');

@@ -609,19 +609,28 @@ function optionalText(
   return source[key] === undefined ? undefined : text(source, key, path);
 }
 
+/**
+ * A path from the site root, such as `/favicon.svg`. A protocol-relative
+ * `//host/x` also starts with a slash but names another host, so it is refused.
+ */
+function rootPath(
+  source: Record<string, unknown>,
+  key: string,
+  path: string,
+): string {
+  const value = text(source, key, path);
+  if (!value.startsWith('/') || value.startsWith('//')) {
+    fail(path, 'must be a site-root-relative path');
+  }
+  return value;
+}
+
 function optionalRootPath(
   source: Record<string, unknown>,
   key: string,
   path: string,
 ): string | undefined {
-  const value = optionalText(source, key, path);
-  if (
-    value !== undefined &&
-    (!value.startsWith('/') || value.startsWith('//'))
-  ) {
-    fail(path, 'must be a site-root-relative path');
-  }
-  return value;
+  return source[key] === undefined ? undefined : rootPath(source, key, path);
 }
 
 const SWITCHER_SITE_LIMIT = 8;
@@ -932,17 +941,12 @@ export function parseSiteConfiguration(input: unknown): SiteConfiguration {
   const root = record(input, 'the configuration');
 
   const brandSource = record(root.brand, 'brand');
-  const faviconPath = text(brandSource, 'faviconPath', 'brand.faviconPath');
-  if (!faviconPath.startsWith('/')) {
-    fail('brand.faviconPath', 'must be a site-root-relative path');
-  }
-  const faviconDarkPath =
-    brandSource.faviconDarkPath === undefined
-      ? undefined
-      : text(brandSource, 'faviconDarkPath', 'brand.faviconDarkPath');
-  if (faviconDarkPath !== undefined && !faviconDarkPath.startsWith('/')) {
-    fail('brand.faviconDarkPath', 'must be a site-root-relative path');
-  }
+  const faviconPath = rootPath(brandSource, 'faviconPath', 'brand.faviconPath');
+  const faviconDarkPath = optionalRootPath(
+    brandSource,
+    'faviconDarkPath',
+    'brand.faviconDarkPath',
+  );
   const brand: BrandConfiguration = {
     faviconPath,
     ...(faviconDarkPath === undefined ? {} : { faviconDarkPath }),

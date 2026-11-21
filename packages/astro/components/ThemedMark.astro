@@ -1,0 +1,35 @@
+---
+/**
+ * A mark drawn for the theme on screen: `light`, or `dark` under the dark
+ * theme the reader chose on the site when the mark has a version for a dark
+ * ground. The header's mark and the site switcher's marks use it; the parent
+ * sizes the images.
+ */
+interface Props {
+  light: string;
+  dark?: string | undefined;
+}
+
+const { light, dark } = Astro.props;
+---
+
+{
+  dark ? (
+    <>
+      <img class="kb-mark-light" src={light} alt="" />
+      <img class="kb-mark-dark" src={dark} alt="" />
+    </>
+  ) : (
+    <img src={light} alt="" />
+  )
+}
+
+<style>
+  @layer starlight.core {
+    /* Starlight sets the theme on the root before the page paints. */
+    :global(:root[data-theme='dark']) .kb-mark-light,
+    :global(:root:not([data-theme='dark'])) .kb-mark-dark {
+      display: none;
+    }
+  }
+</style>

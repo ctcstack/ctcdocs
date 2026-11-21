@@ -665,6 +665,23 @@ export async function validateRepositoryContent(
    */
   const visibility = site.deployment.environments.production.visibility;
 
+  // A switcher mark that is not in public/ would ship as a broken image.
+  for (const [index, entry] of (site.switcher?.sites ?? []).entries()) {
+    for (const [key, mark] of [
+      ['iconPath', entry.iconPath],
+      ['iconDarkPath', entry.iconDarkPath],
+    ] as const) {
+      if (
+        mark !== undefined &&
+        !(await pathExists(resolve(repositoryRoot, 'public', `.${mark}`)))
+      ) {
+        errors.push(
+          `${PROJECT_LAYOUT.configurationFile} switcher.sites[${index}].${key} names ${mark}, which is not in public/`,
+        );
+      }
+    }
+  }
+
   const robotsContent = await readFile(
     resolve(repositoryRoot, PROJECT_LAYOUT.robotsFile),
     'utf8',
