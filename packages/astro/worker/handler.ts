@@ -19,6 +19,7 @@ import {
   environmentOf,
   INSIGHTS_ROUTE,
   INSIGHTS_SEARCH_ROUTE,
+  READER_ROUTE,
   STATUS_ROUTE,
   type AccessMapFile,
 } from './access-map.js';
@@ -513,6 +514,25 @@ async function identify(
   return personFrom(snapshot, claims.sub);
 }
 
+/**
+ * The address a person signed in with, read back from their own session. The
+ * directory holds no addresses (ADR-040), so the session is the one place it
+ * is kept; it is answered to that person and never logged.
+ */
+async function sessionEmail(
+  gate: Gate,
+  request: Request,
+): Promise<string | undefined> {
+  const claims = await unseal(
+    gate.session,
+    cookies(request).get(SESSION_COOKIE),
+    { aud: gate.origin, now: gate.now },
+  );
+  return typeof claims?.email === 'string' && claims.email.length > 0
+    ? claims.email
+    : undefined;
+}
+
 export async function handle(
   request: Request,
   context: WorkerContext,
@@ -696,6 +716,15 @@ async function route(
   if (url.pathname === CLASSES_ROUTE) {
     return noStore(
       Response.json({ bundles: readableBundles(map, reader, stale) }),
+    );
+  }
+  if (url.pathname === READER_ROUTE) {
+    // The header's account menu: a person's own address, and nothing else.
+    if (reader.kind !== 'person') {
+      return noStore(new Response('Forbidden', { status: 403 }));
+    }
+    return noStore(
+      Response.json({ email: (await sessionEmail(gate, request)) ?? null }),
     );
   }
   if (url.pathname === STATUS_ROUTE) {

@@ -678,6 +678,104 @@ describe('loadSiteConfiguration', () => {
     expect(() => loadSiteConfiguration(root)).toThrow(/brand\.faviconPath/u);
   });
 
+  it('offers no switcher unless one is configured', () => {
+    expect(
+      parseSiteConfiguration(validConfiguration()).switcher,
+    ).toBeUndefined();
+  });
+
+  it('reads the sites the header switcher offers, in order', () => {
+    const raw = validConfiguration();
+    raw.switcher = {
+      description: 'Handbook and how-tos',
+      sites: [
+        {
+          name: 'Example Status',
+          url: 'https://status.example.com',
+          description: 'Whether every service is up',
+          iconPath: '/switcher/status.svg',
+          iconDarkPath: '/switcher/status-dark.svg',
+        },
+        { name: 'Example CRM', url: 'https://crm.example.com/app/' },
+      ],
+    };
+
+    expect(parseSiteConfiguration(raw).switcher).toEqual({
+      description: 'Handbook and how-tos',
+      sites: [
+        {
+          name: 'Example Status',
+          url: 'https://status.example.com/',
+          description: 'Whether every service is up',
+          iconPath: '/switcher/status.svg',
+          iconDarkPath: '/switcher/status-dark.svg',
+        },
+        { name: 'Example CRM', url: 'https://crm.example.com/app/' },
+      ],
+    });
+  });
+
+  it.each([
+    ['no sites', { sites: [] }, /switcher\.sites/u],
+    ['an unknown key', { sites: [], colour: 'red' }, /switcher/u],
+    [
+      'a plain HTTP address',
+      { sites: [{ name: 'Status', url: 'http://status.example.com' }] },
+      /switcher\.sites\[0\]\.url/u,
+    ],
+    [
+      'an address with credentials',
+      { sites: [{ name: 'Status', url: 'https://a:b@status.example.com' }] },
+      /switcher\.sites\[0\]\.url/u,
+    ],
+    [
+      "this deployment's own host",
+      { sites: [{ name: 'Mirror', url: 'https://docs-dev.example.com/x' }] },
+      /switcher\.sites\[0\]\.url/u,
+    ],
+    [
+      'the site title again',
+      { sites: [{ name: 'example [docs]', url: 'https://a.example.net' }] },
+      /switcher\.sites\[0\]\.name/u,
+    ],
+    [
+      'two sites of one name',
+      {
+        sites: [
+          { name: 'Status', url: 'https://a.example.net' },
+          { name: 'STATUS', url: 'https://b.example.net' },
+        ],
+      },
+      /switcher\.sites\[1\]\.name/u,
+    ],
+    [
+      'a mark at a relative path',
+      {
+        sites: [
+          { name: 'Status', url: 'https://a.example.net', iconPath: 'a.svg' },
+        ],
+      },
+      /switcher\.sites\[0\]\.iconPath/u,
+    ],
+    [
+      'a dark mark with no light one',
+      {
+        sites: [
+          {
+            name: 'Status',
+            url: 'https://a.example.net',
+            iconDarkPath: '/a-dark.svg',
+          },
+        ],
+      },
+      /switcher\.sites\[0\]\.iconDarkPath/u,
+    ],
+  ])('rejects a switcher with %s', (_, switcher, message) => {
+    const raw = validConfiguration();
+    raw.switcher = switcher;
+    expect(() => parseSiteConfiguration(raw)).toThrow(message);
+  });
+
   it('takes an optional mark for a dark ground', () => {
     const plain = validConfiguration();
     expect(

@@ -1,5 +1,6 @@
 import {
   ACCESS_CLASSES_ROUTE,
+  ACCESS_READER_ROUTE,
   ADMINS_CLASS as CORE_ADMINS,
   agentDocumentFormat,
   DOCUMENT_FORMATS,
@@ -14,6 +15,7 @@ import {
   CLASSES_ROUTE,
   MEMBERS_CLASS,
   PERMANENT_LINK_PREFIX,
+  READER_ROUTE,
   type AccessMapFile,
 } from './access-map.js';
 import { handle, SESSION_COOKIE, type WorkerContext } from './handler.js';
@@ -171,6 +173,7 @@ const page = { 'Sec-Fetch-Mode': 'navigate' };
 describe('shared constants', () => {
   it('match the core', () => {
     expect(CLASSES_ROUTE).toBe(ACCESS_CLASSES_ROUTE);
+    expect(READER_ROUTE).toBe(ACCESS_READER_ROUTE);
     expect(MEMBERS_CLASS).toBe(CORE_MEMBERS);
     expect(ADMINS_CLASS).toBe(CORE_ADMINS);
     expect(`${PERMANENT_LINK_PREFIX}a1b2c3/`).toBe(permanentLinkPath('a1b2c3'));
@@ -724,6 +727,25 @@ describe('the gate', () => {
     expect(status.headers.get('Cache-Control')).toBe('no-store');
   });
 
+  it("answers a person their own address, and no one else's", async () => {
+    const member = await sessionCookie('user-member');
+    const own = await handle(get(READER_ROUTE, { Cookie: member }), context());
+    expect(own.status).toBe(200);
+    expect(await own.json()).toEqual({ email: 'user-member@example.com' });
+    expect(own.headers.get('Cache-Control')).toBe('no-store');
+
+    // Signed out, or signed in for another environment: nothing to show.
+    expect((await handle(get(READER_ROUTE), context())).status).toBe(401);
+    const elsewhere = await sessionCookie(
+      'user-member',
+      'https://staging.example.com',
+    );
+    expect(
+      (await handle(get(READER_ROUTE, { Cookie: elsewhere }), context()))
+        .status,
+    ).toBe(401);
+  });
+
   it('gives the status to no machine key, whatever groups it holds', async () => {
     const key = `${MACHINE_KEY_PREFIX}${'B'.repeat(43)}`;
     const digest = await crypto.subtle.digest(
@@ -748,6 +770,15 @@ describe('the gate', () => {
       gate,
     );
     expect(refused.status).toBe(403);
+    // A machine key has no account, so no address to answer.
+    expect(
+      (
+        await handle(
+          get(READER_ROUTE, { Authorization: `Bearer ${key}` }),
+          gate,
+        )
+      ).status,
+    ).toBe(403);
 
     // An admin sees the key as the groups it reads as, without its hash.
     const admin = await sessionCookie('user-admin');

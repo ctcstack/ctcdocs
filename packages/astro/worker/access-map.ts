@@ -17,6 +17,8 @@ export const ADMINS_CLASS = 'admins';
 export const PLATFORM_FILE = 'platform';
 /** Where the Worker lists a reader's search bundles. */
 export const CLASSES_ROUTE = '/_kb/classes';
+/** Where a signed-in person reads the address they signed in with. */
+export const READER_ROUTE = '/_kb/reader';
 /** Where an admin reads the snapshot's age and counts. */
 export const STATUS_ROUTE = '/_kb/status';
 /** Where an admin reads the latest weekly insights report (ADR-051). */
