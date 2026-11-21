@@ -1,0 +1,365 @@
+---
+/**
+ * The right end of the header, the same in every app of the organization: a
+ * button that switches between the light and the dark theme, then, on a
+ * private deployment, the reader's account — a round button with their
+ * initials that opens a menu with the address they signed in with and Sign
+ * out.
+ *
+ * It overrides Starlight's `ThemeSelect`, the slot the header gives the theme
+ * control, so the header keeps Starlight's own layout. Starlight hides that
+ * slot on a narrow screen and offers it again in the sidebar's menu; these
+ * two buttons fit any width, so styles.css keeps them in the header, and
+ * MobileMenuFooter.astro does not draw them a second time.
+ *
+ * The theme is kept where Starlight keeps it, so its script in the head still
+ * applies it before the page paints. A reader who has never chosen follows
+ * their system's setting, as with Starlight's own control, until they press
+ * the button.
+ *
+ * The address is the Worker's to give (ADR-038): it is read from the reader's
+ * session at `ACCESS_READER_ROUTE`, kept for the visit so the next page shows
+ * it at once, and dropped on Sign out. Until it arrives, or where nothing
+ * answers that route, the button shows a person icon and the menu offers
+ * Sign out alone. Signing out of the site does not sign the reader out of
+ * Google, and Sign out stays a form, not a link: a link could be followed by
+ * a prefetch or a crawler.
+ */
+import { siteConfiguration } from '../lib/project';
+
+const isPrivate =
+  siteConfiguration.deployment.environments.production.visibility === 'private';
+---
+
+<div class="kb-header-actions">
+  <button
+    type="button"
+    class="kb-theme-toggle"
+    aria-label="Dark theme"
+    aria-pressed="false"
+    title="Switch theme"
+  >
+    <svg
+      class="kb-theme-sun"
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      width="1em"
+      height="1em"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <circle cx="8" cy="8" r="2.75"></circle>
+      <path
+        d="M8 1.25v1.5M8 13.25v1.5M1.25 8h1.5M13.25 8h1.5M3.23 3.23l1.06 1.06M11.71 11.71l1.06 1.06M3.23 12.77l1.06-1.06M11.71 4.29l1.06-1.06"
+      ></path>
+    </svg>
+    <svg
+      class="kb-theme-moon"
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      width="1em"
+      height="1em"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d="M13.5 9.6A5.75 5.75 0 0 1 6.4 2.5a5.75 5.75 0 1 0 7.1 7.1Z"
+      ></path>
+    </svg>
+  </button>
+  {
+    isPrivate && (
+      <>
+        <button
+          type="button"
+          class="kb-account-button"
+          popovertarget="kb-account"
+          aria-label="Account"
+          title="Account"
+        >
+          <span class="kb-account-initials" aria-hidden="true" />
+          <svg
+            class="kb-account-person"
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            width="1em"
+            height="1em"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="8" cy="5.5" r="2.75" />
+            <path d="M2.75 14c.6-2.6 2.7-4.25 5.25-4.25S12.65 11.4 13.25 14" />
+          </svg>
+        </button>
+        <div id="kb-account" class="kb-account" popover>
+          <div class="kb-account-who" hidden>
+            <p class="kb-account-label">Signed in as</p>
+            <p class="kb-account-email" />
+          </div>
+          <form method="post" action="/auth/sign-out" class="sign-out">
+            <button type="submit">Sign out</button>
+          </form>
+        </div>
+      </>
+    )
+  }
+</div>
+
+<script>
+  import { ACCESS_READER_ROUTE } from '@ctcstack/ctcdocs-core';
+
+  import { initialsOf } from '../lib/initials';
+  import { READER_CACHE_KEY } from '../lib/header-state';
+  import { anchorPopover } from '../scripts/header-popover';
+
+  type Theme = 'light' | 'dark';
+
+  /** Starlight's own key: its script in the head reads it before paint. */
+  const THEME_KEY = 'starlight-theme';
+  const root = document.documentElement;
+  const toggle = document.querySelector<HTMLButtonElement>('.kb-theme-toggle');
+  const systemLight = matchMedia('(prefers-color-scheme: light)');
+
+  const shown = (): Theme =>
+    root.dataset.theme === 'light' ? 'light' : 'dark';
+
+  function chosen(): Theme | undefined {
+    try {
+      const value = localStorage.getItem(THEME_KEY);
+      return value === 'light' || value === 'dark' ? value : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  function show(theme: Theme): void {
+    root.dataset.theme = theme;
+    if (toggle) {
+      toggle.setAttribute('aria-pressed', String(theme === 'dark'));
+      toggle.title =
+        theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+    }
+  }
+
+  show(chosen() ?? (systemLight.matches ? 'light' : 'dark'));
+  systemLight.addEventListener('change', (event) => {
+    if (chosen() === undefined) {
+      show(event.matches ? 'light' : 'dark');
+    }
+  });
+  toggle?.addEventListener('click', () => {
+    const next: Theme = shown() === 'dark' ? 'light' : 'dark';
+    show(next);
+    try {
+      localStorage.setItem(THEME_KEY, next);
+    } catch {
+      // Storage may be unavailable; the choice then lasts for this page.
+    }
+  });
+
+  const account = document.querySelector<HTMLElement>('.kb-account-button');
+  const panel = document.getElementById('kb-account');
+  if (account && panel) {
+    anchorPopover(account, panel, 'end');
+    const who = panel.querySelector<HTMLElement>('.kb-account-who');
+    const address = panel.querySelector<HTMLElement>('.kb-account-email');
+    const initials = account.querySelector<HTMLElement>('.kb-account-initials');
+
+    const present = (email: string): void => {
+      const letters = initialsOf(email);
+      if (initials) {
+        initials.textContent = letters;
+      }
+      account.toggleAttribute('data-initials', letters.length > 0);
+      account.setAttribute('aria-label', `Account: ${email}`);
+      account.title = email;
+      if (address && who) {
+        address.textContent = email;
+        who.hidden = false;
+      }
+    };
+
+    try {
+      const cached = sessionStorage.getItem(READER_CACHE_KEY);
+      if (cached) {
+        present(cached);
+      }
+    } catch {
+      // Without storage the address waits for the Worker on every page.
+    }
+
+    fetch(ACCESS_READER_ROUTE, { credentials: 'same-origin' })
+      .then((response) => (response.ok ? response.json() : undefined))
+      .then((body: unknown) => {
+        const email =
+          typeof body === 'object' && body !== null && 'email' in body
+            ? body.email
+            : undefined;
+        if (typeof email === 'string' && email.length > 0) {
+          present(email);
+          try {
+            sessionStorage.setItem(READER_CACHE_KEY, email);
+          } catch {
+            // Kept for this page only.
+          }
+        }
+      })
+      .catch(() => {
+        // Nothing answers the route here: the menu offers Sign out alone.
+      });
+
+    panel.querySelector('form')?.addEventListener('submit', () => {
+      try {
+        sessionStorage.removeItem(READER_CACHE_KEY);
+      } catch {
+        // Nothing was kept.
+      }
+    });
+  }
+</script>
+
+<style>
+  @layer starlight.core {
+    .kb-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .kb-theme-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      padding: 0;
+      background: none;
+      border: 0;
+      border-radius: 0.375rem;
+      color: var(--kb-gray-3);
+      cursor: pointer;
+      font-size: 1.125rem;
+    }
+
+    .kb-theme-toggle:hover,
+    .kb-theme-toggle:focus-visible {
+      background: var(--kb-surface-hover);
+      color: var(--kb-ink);
+    }
+
+    /* The icon names the theme on screen; the head script sets it first. */
+    :global(:root[data-theme='dark']) .kb-theme-sun,
+    :global(:root:not([data-theme='dark'])) .kb-theme-moon {
+      display: none;
+    }
+
+    /* The one round control: the shape every app gives a person. */
+    .kb-account-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      padding: 0;
+      background: var(--kb-surface-sunken);
+      border: 1px solid var(--kb-border-strong);
+      border-radius: 50%;
+      color: var(--kb-ink);
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .kb-account-button:hover,
+    .kb-account-button:focus-visible,
+    /* The browser keeps the expanded state in the accessibility tree, not
+       in an attribute, so the open menu is read from the page itself. */
+    .kb-account-button:has(+ .kb-account:popover-open) {
+      border-color: var(--kb-accent);
+    }
+
+    .kb-account-person {
+      font-size: 1rem;
+      color: var(--kb-gray-3);
+    }
+
+    .kb-account-button[data-initials] .kb-account-person,
+    .kb-account-button:not([data-initials]) .kb-account-initials {
+      display: none;
+    }
+
+    .kb-account {
+      position: fixed;
+      inset: auto;
+      width: max-content;
+      min-width: 13rem;
+      max-width: calc(100vw - 1rem);
+      margin: 0;
+      padding: 0.375rem;
+      background: var(--kb-ground);
+      border: 1px solid var(--kb-border-strong);
+      border-radius: 0.5rem;
+      color: var(--kb-text);
+    }
+
+    .kb-account-who {
+      padding: 0.5rem 0.625rem 0.625rem;
+      margin-bottom: 0.375rem;
+      border-bottom: 1px solid var(--kb-hairline);
+    }
+
+    .kb-account-who[hidden] {
+      display: none;
+    }
+
+    .kb-account-label,
+    .kb-account-email {
+      margin: 0;
+    }
+
+    .kb-account-label {
+      color: var(--kb-gray-3);
+      font-size: var(--kb-text-xs);
+    }
+
+    .kb-account-email {
+      color: var(--kb-ink);
+      font-size: var(--kb-text-sm);
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+
+    .sign-out {
+      display: flex;
+      margin: 0;
+    }
+
+    .sign-out button {
+      flex: 1;
+      padding: 0.5rem 0.625rem;
+      background: none;
+      border: 0;
+      border-radius: 0.375rem;
+      color: var(--kb-text);
+      cursor: pointer;
+      font: inherit;
+      font-size: var(--kb-text-sm);
+      text-align: start;
+    }
+
+    .sign-out button:hover,
+    .sign-out button:focus-visible {
+      background: var(--kb-surface-hover);
+      color: var(--kb-ink);
+    }
+  }
+</style>

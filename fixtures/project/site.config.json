@@ -43,6 +43,22 @@
     "faviconPath": "/favicon.svg",
     "faviconDarkPath": "/favicon-dark.svg"
   },
+  "switcher": {
+    "description": "Handbook, guides and reference",
+    "sites": [
+      {
+        "name": "Example Status",
+        "url": "https://status.example.com/",
+        "description": "Whether every service is up",
+        "iconPath": "/switcher/status.svg"
+      },
+      {
+        "name": "Example CRM",
+        "url": "https://crm.example.com/",
+        "description": "Clients, deals and invoices"
+      }
+    ]
+  },
   "deployment": {
     "workerName": "example-docs",
     "environments": {

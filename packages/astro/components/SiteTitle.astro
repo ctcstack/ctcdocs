@@ -13,8 +13,12 @@
  * before the page paints, so a hidden sidebar does not flash on navigation.
  * On a narrow screen the sidebar is Starlight's menu and the button is not
  * drawn.
+ *
+ * After the name, a project that lists its organization's other sites gets
+ * the switcher between them (SiteSwitcher.astro).
  */
 import { siteConfiguration } from '../lib/project';
+import SiteSwitcher from './SiteSwitcher.astro';
 
 const { siteTitle, siteTitleHref } = Astro.locals.starlightRoute;
 const { faviconPath, faviconDarkPath } = siteConfiguration.brand;
@@ -55,6 +59,7 @@ const { faviconPath, faviconDarkPath } = siteConfiguration.brand;
   }
   <span translate="no">{siteTitle}</span>
 </a>
+<SiteSwitcher />
 
 <script>
   import { SIDEBAR_SHOWN_EVENT, SIDEBAR_STATE_KEY } from '../lib/sidebar-state';

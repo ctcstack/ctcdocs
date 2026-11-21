@@ -1,6 +1,7 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import {
   ACCESS_CLASSES_ROUTE,
+  ACCESS_READER_ROUTE,
   DOCUMENT_FORMAT_BADGES,
   PLATFORM_ROUTE_HREFS,
 } from '@ctcstack/ctcdocs-core';
@@ -110,6 +111,21 @@ async function expectNoAccessibilityViolations(
   expect(results.violations).toEqual([]);
 }
 
+/**
+ * Shows the page in one theme with the header's theme button, which switches
+ * between the two: pressed only when the page shows the other one.
+ */
+async function chooseTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
+  const root = page.locator('html');
+  if ((await root.getAttribute('data-theme')) !== theme) {
+    await page
+      .locator('header')
+      .getByRole('button', { name: 'Dark theme' })
+      .click();
+  }
+  await expect(root).toHaveAttribute('data-theme', theme);
+}
+
 test('home page is accessible and search is keyboard operable', async ({
   page,
 }) => {
@@ -163,10 +179,9 @@ test('home page is accessible and search is keyboard operable', async ({
   const projection = page.locator('.agents-pattern').getByRole('link');
   await expect(projection).toHaveAttribute('href', /\/index\.md$/);
 
-  const theme = page.getByRole('combobox', { name: 'Select theme' });
-  await theme.selectOption({ label: 'Light' });
+  await chooseTheme(page, 'light');
   await expectNoAccessibilityViolations(page);
-  await theme.selectOption({ label: 'Dark' });
+  await chooseTheme(page, 'dark');
   await expectNoAccessibilityViolations(page);
 
   // Scoped to the header: the home page carries a second, larger search
@@ -435,10 +450,9 @@ test('a section page tells its folders from its documents', async ({
     /^(Empty|1 document|\d+ documents)$/u,
   );
 
-  const theme = page.getByRole('combobox', { name: 'Select theme' });
-  await theme.selectOption({ label: 'Light' });
+  await chooseTheme(page, 'light');
   await expectNoAccessibilityViolations(page);
-  await theme.selectOption({ label: 'Dark' });
+  await chooseTheme(page, 'dark');
   await expectNoAccessibilityViolations(page);
 
   await folderLink.click();
@@ -568,7 +582,7 @@ test('generated images are served from the protected asset route', async ({
   expect(asset.headers()['content-type']).toMatch(/^image\//u);
 });
 
-test('a private deployment offers Sign out as a form the Worker accepts', async ({
+test('the account menu names the reader and signs them out through the Worker', async ({
   page,
 }) => {
   test.skip(
@@ -576,11 +590,158 @@ test('a private deployment offers Sign out as a form the Worker accepts', async 
       'private',
     'A public deployment has no session to end.',
   );
+  // The Worker answers the address from the reader's session (ADR-038).
+  await page.route(`**${ACCESS_READER_ROUTE}`, (route) =>
+    route.fulfill({ json: { email: 'jane.doe@example.com' } }),
+  );
   await page.goto('/');
-  const form = page.locator('header form.sign-out');
+
+  const account = page
+    .locator('header')
+    .getByRole('button', { name: 'Account: jane.doe@example.com' });
+  await expect(account).toHaveText('JD');
+  await account.click();
+
+  const menu = page.locator('#kb-account');
+  await expect(menu).toBeVisible();
+  await expect(menu).toContainText('jane.doe@example.com');
+  const form = menu.locator('form.sign-out');
   await expect(form).toHaveAttribute('method', 'post');
   await expect(form).toHaveAttribute('action', '/auth/sign-out');
   await expect(form.getByRole('button', { name: 'Sign out' })).toBeVisible();
+
+  // The menu sits under its button, inside the window.
+  const button = await account.boundingBox();
+  const panel = await menu.boundingBox();
+  expect(panel && button && panel.y >= button.y + button.height).toBe(true);
+  expect(
+    panel && panel.x + panel.width <= (page.viewportSize()?.width ?? 0),
+  ).toBe(true);
+
+  for (const theme of ['light', 'dark'] as const) {
+    await page.keyboard.press('Escape');
+    await chooseTheme(page, theme);
+    await account.click();
+    await expectNoAccessibilityViolations(page, ['header', '#kb-account']);
+  }
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+});
+
+test('without an answer from the Worker, the account menu still signs out', async ({
+  page,
+}) => {
+  test.skip(
+    siteConfiguration.deployment.environments.production.visibility !==
+      'private',
+    'A public deployment has no session to end.',
+  );
+  await page.route(`**${ACCESS_READER_ROUTE}`, (route) =>
+    route.fulfill({ status: 404, body: 'Not found' }),
+  );
+  await page.goto('/');
+  const account = page
+    .locator('header')
+    .getByRole('button', { name: 'Account', exact: true });
+  await account.click();
+  const menu = page.locator('#kb-account');
+  await expect(menu.getByRole('button', { name: 'Sign out' })).toBeVisible();
+  await expect(menu.getByText('Signed in as')).toBeHidden();
+});
+
+test('the theme button switches the theme, and the choice holds across pages', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const toggle = page
+    .locator('header')
+    .getByRole('button', { name: 'Dark theme' });
+  await chooseTheme(page, 'light');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await toggle.click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+});
+
+test("the switcher offers the organization's other sites beside the name", async ({
+  page,
+}) => {
+  const { switcher, brand } = siteConfiguration;
+  test.skip(!switcher, 'The project configures no switcher.');
+
+  await page.goto('/');
+  const button = page
+    .locator('header')
+    .getByRole('button', { name: `Switch to another ${brand.name} site` });
+  // New to this reader, so it says so; once opened, it no longer does.
+  await expect(button).toHaveAttribute('data-new', '');
+
+  await button.focus();
+  await page.keyboard.press('Enter');
+  const menu = page.getByRole('navigation', {
+    name: `Switch to another ${brand.name} site`,
+  });
+  await expect(menu).toBeVisible();
+  const links = menu.getByRole('link');
+  await expect(links).toHaveCount(1 + (switcher?.sites.length ?? 0));
+  await expect(links.first()).toHaveAttribute('aria-current', 'page');
+  await expect(links.first()).toContainText(brand.siteTitle);
+  for (const [index, site] of (switcher?.sites ?? []).entries()) {
+    const link = links.nth(index + 1);
+    await expect(link).toHaveAttribute('href', site.url);
+    await expect(link).toContainText(site.name);
+    if (site.description) {
+      await expect(link).toContainText(site.description);
+    }
+  }
+
+  for (const theme of ['light', 'dark'] as const) {
+    await page.keyboard.press('Escape');
+    await chooseTheme(page, theme);
+    await button.click();
+    await expectNoAccessibilityViolations(page, ['header', '#kb-switcher']);
+  }
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  await expect(button).not.toHaveAttribute('data-new', '');
+  await page.reload();
+  await expect(button).not.toHaveAttribute('data-new', '');
+});
+
+test('on a phone the header keeps the whole name, the theme and the account', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  for (const path of ['/', `/${anyDocument().slug}/`]) {
+    await page.goto(path);
+    const header = page.locator('header');
+    await expect(
+      header.getByRole('button', { name: 'Dark theme' }),
+    ).toBeVisible();
+    if (
+      siteConfiguration.deployment.environments.production.visibility ===
+      'private'
+    ) {
+      await expect(
+        header.getByRole('button', { name: /^Account/u }),
+      ).toBeVisible();
+    }
+    const name = header.locator('.site-title span');
+    expect(
+      await name.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth,
+      ),
+    ).toBe(true);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+  }
 });
 
 test('crawler defenses are present in the built site', async ({
@@ -679,10 +840,9 @@ test('the content health page links each issue to its document', async ({
       page.locator('content-health a[href*="/edit#heading="]').first(),
     ).toBeAttached();
   }
-  const theme = page.getByRole('combobox', { name: 'Select theme' });
-  await theme.selectOption({ label: 'Light' });
+  await chooseTheme(page, 'light');
   await expectNoAccessibilityViolations(page);
-  await theme.selectOption({ label: 'Dark' });
+  await chooseTheme(page, 'dark');
   await expectNoAccessibilityViolations(page);
 
   // Narrowing to one section leaves only that section's files, and the
@@ -836,10 +996,9 @@ test('the access review shows who may read each folder, and reads as a group', a
     await page.locator('access-review .review-attention-list li').count(),
   ).toBeGreaterThanOrEqual(shape.findings);
 
-  const theme = page.getByRole('combobox', { name: 'Select theme' });
-  await theme.selectOption({ label: 'Light' });
+  await chooseTheme(page, 'light');
   await expectNoAccessibilityViolations(page);
-  await theme.selectOption({ label: 'Dark' });
+  await chooseTheme(page, 'dark');
   await expectNoAccessibilityViolations(page);
 
   // Reading as a group marks every folder it cannot open, and the address
@@ -995,10 +1154,9 @@ test('the access review lays what holds now over the rules', async ({
   );
   await page.getByLabel('Find a document or folder').fill('');
 
-  const theme = page.getByRole('combobox', { name: 'Select theme' });
-  await theme.selectOption({ label: 'Light' });
+  await chooseTheme(page, 'light');
   await expectNoAccessibilityViolations(page);
-  await theme.selectOption({ label: 'Dark' });
+  await chooseTheme(page, 'dark');
   await expectNoAccessibilityViolations(page);
 });
 
@@ -1066,10 +1224,9 @@ test('the content health page shows admins what people could not find', async ({
   ).toHaveAttribute('href', '/d/abcdef/');
   await expect(section).toContainText('Returned 12×, read 0×');
 
-  const theme = page.getByRole('combobox', { name: 'Select theme' });
-  await theme.selectOption({ label: 'Light' });
+  await chooseTheme(page, 'light');
   await expectNoAccessibilityViolations(page);
-  await theme.selectOption({ label: 'Dark' });
+  await chooseTheme(page, 'dark');
   await expectNoAccessibilityViolations(page);
 });
 

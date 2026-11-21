@@ -543,35 +543,32 @@ header.header {
 }
 
 /*
- * Starlight hides the header's theme control below `md` and offers the mobile
- * one from the sidebar's menu footer. The splash layout renders no sidebar, so
- * on a phone the entry page of a light/dark wiki would have no way to switch.
+ * Starlight hides the header's right group below `md` and offers its controls
+ * again from the sidebar's menu footer. The theme and account buttons fit any
+ * width (components/HeaderActions.astro), so they stay in the header on every
+ * page, the splash entry page included, and the menu footer does not repeat
+ * them (components/MobileMenuFooter.astro).
  */
-.page:not(:has(#starlight__sidebar)) .right-group {
+header .right-group {
   display: flex;
 }
 
-/*
- * Restoring that control cost the wordmark: at 375px the select's own label
- * text pushed the site title into an ellipsis on the one page that introduces
- * the product. On narrow viewports the control keeps its icon and
- * caret and drops the text; its accessible name is a visually hidden label, so
- * nothing is lost to a screen reader, and the options stay legible when open.
- */
+/* On a phone the name needs the room more than the buttons need air. */
 @media (max-width: 30rem) {
-  /* Starlight sets this width in an inline style attribute, so overriding it
-     from a stylesheet needs the extra weight. */
-  .page:not(:has(#starlight__sidebar)) starlight-theme-select label {
-    --sl-select-width: 3.25em !important;
+  header.header div.header {
+    gap: 0.5rem;
   }
 
-  .page:not(:has(#starlight__sidebar)) starlight-theme-select select {
-    color: transparent;
+  header .right-group,
+  header .kb-header-actions {
+    gap: 0.25rem;
   }
+}
 
-  .page:not(:has(#starlight__sidebar)) starlight-theme-select option {
-    color: var(--kb-ink);
-  }
+/* Starlight divides the social icons from the rest; with none, it divides
+   nothing. */
+header .right-group .social-icons:not(:has(a)) {
+  display: none;
 }
 
 /* ------------------------------------------------- table of contents rail */
