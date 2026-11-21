@@ -67,6 +67,7 @@ export type {
 export { accessFindings } from './access-findings.js';
 export type { AccessFinding } from './access-findings.js';
 export {
+  feedbackHref,
   fetchCharacterLimit,
   INSIGHTS_DEFAULTS,
   loadSiteConfiguration,
@@ -81,6 +82,7 @@ export type {
   DeploymentEnvironmentConfiguration,
   DeploymentEnvironmentConfigurations,
   DeploymentVisibility,
+  FeedbackConfiguration,
   HomeConfiguration,
   InsightsConfiguration,
   McpConfiguration,

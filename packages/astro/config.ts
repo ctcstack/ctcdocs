@@ -201,6 +201,8 @@ export function ctcdocsConfig(options: CtcdocsConfigOptions): AstroUserConfig {
     components: {
       // Source provenance moved from the footer to under the title.
       EditLink: '@ctcstack/ctcdocs/components/NoEditLink.astro',
+      // The footer offers the project's feedback link on every page.
+      Footer: '@ctcstack/ctcdocs/components/Footer.astro',
       Head: '@ctcstack/ctcdocs/components/Head.astro',
       // The header keeps theme and account at every width, so the menu's
       // footer does not repeat them.

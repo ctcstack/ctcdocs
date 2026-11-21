@@ -3,8 +3,9 @@
  * The right end of the header, the same in every app of the organization: a
  * button that switches between the light and the dark theme, then, on a
  * private deployment, the reader's account — a round button with their
- * initials that opens a menu with the address they signed in with and Sign
- * out.
+ * initials that opens a menu with the address they signed in with, Report a
+ * problem when the project configures `feedback` (in a new tab, with the
+ * page's address), and Sign out.
  *
  * It overrides Starlight's `ThemeSelect`, the slot the header gives the theme
  * control, so the header keeps Starlight's own layout. Starlight hides that
@@ -28,8 +29,10 @@
  * does not sign the reader out of Google, and Sign out stays a form, not a
  * link: a link could be followed by a prefetch or a crawler.
  */
+import { feedbackLinkFor } from '../lib/feedback';
 import { siteConfiguration } from '../lib/project';
 
+const feedback = feedbackLinkFor(Astro.url.pathname);
 const isPrivate =
   siteConfiguration.deployment.environments.production.visibility === 'private';
 ---
@@ -106,6 +109,17 @@ const isPrivate =
             <p class="kb-account-label">Signed in as</p>
             <p class="kb-account-email" />
           </div>
+          {feedback && (
+            <a
+              class="kb-account-item"
+              href={feedback}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Report a problem
+              <span class="sr-only"> (opens in a new tab)</span>
+            </a>
+          )}
           <form method="post" action="/auth/sign-out" class="sign-out">
             <button type="submit">Sign out</button>
           </form>
@@ -368,6 +382,21 @@ const isPrivate =
     .sign-out {
       display: flex;
       margin: 0;
+    }
+
+    .kb-account-item {
+      display: block;
+      padding: 0.5rem 0.625rem;
+      border-radius: 0.375rem;
+      color: var(--kb-text);
+      font-size: var(--kb-text-sm);
+      text-decoration: none;
+    }
+
+    .kb-account-item:hover,
+    .kb-account-item:focus-visible {
+      background: var(--kb-surface-hover);
+      color: var(--kb-ink);
     }
 
     .sign-out button {

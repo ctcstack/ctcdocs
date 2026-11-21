@@ -11,8 +11,8 @@
  * browser.
  *
  * The menu is a list of links, this site first and marked as the current one,
- * then the others in the configured order. Each opens in the same tab: a
- * switch, not a side trip.
+ * then the others in the configured order. Each other site opens in a new
+ * tab, as every link that leaves the site does.
  */
 import { siteConfiguration } from '../lib/project';
 import ThemedMark from './ThemedMark.astro';
@@ -88,7 +88,7 @@ const label = `Switch to another ${brand.name} site`;
           </li>
           {sites.map((site) => (
             <li>
-              <a href={site.url}>
+              <a href={site.url} target="_blank" rel="noopener noreferrer">
                 <span class="kb-switcher-mark">
                   {site.iconPath === undefined ? (
                     <span class="kb-switcher-letter" aria-hidden="true">
@@ -111,6 +111,7 @@ const label = `Switch to another ${brand.name} site`;
                     </span>
                   )}
                 </span>
+                <span class="sr-only"> (opens in a new tab)</span>
               </a>
             </li>
           ))}

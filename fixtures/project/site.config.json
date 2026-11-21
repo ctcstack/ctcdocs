@@ -59,6 +59,9 @@
       }
     ]
   },
+  "feedback": {
+    "url": "https://forms.example.com/report?product=Example%20Docs&page=%7Bpage%7D"
+  },
   "deployment": {
     "workerName": "example-docs",
     "environments": {
