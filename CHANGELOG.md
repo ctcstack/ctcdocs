@@ -10,12 +10,18 @@ All three packages share a version and are released together.
   other internal sites under the new `switcher` key gets a framed button
   beside its name in the header. It opens a menu with this site, marked as
   current, and each other site with its mark and one line on what it is for.
-  Until a reader first opens it, a small dot says it is new. See
+  The other sites open in a new tab, as every link off the site does. Until
+  a reader first opens it, a small dot says it is new. See
   docs/CONFIGURATION.md.
 - **An account menu.** On a private deployment the header ends with a round
   button showing the reader's initials. It opens a menu with the address they
   signed in with and Sign out. The Worker answers that address from the
   reader's own session at `/_kb/reader`, to a signed-in person only.
+- **A link to report a problem.** A project that sets `feedback.url`, such as
+  a form's pre-filled link, gets "Report a problem or suggest an
+  improvement" at the foot of every page and "Report a problem" in the
+  account menu. Both open in a new tab. Every `{page}` in the address becomes
+  the address of the page the reader is on, so the form arrives filled in.
 
 ### Changed
 
@@ -30,8 +36,9 @@ All three packages share a version and are released together.
 ### Upgrade note
 
 Bump the packages and the workflow pins. To offer the switcher, add
-`switcher` to `site.config.json` and put each site's mark in `public/`.
-Nothing else changes for a project.
+`switcher` to `site.config.json` and put each site's mark in `public/`. To
+offer the feedback link, add `feedback.url`. Nothing else changes for a
+project.
 
 ## 0.27.2
 

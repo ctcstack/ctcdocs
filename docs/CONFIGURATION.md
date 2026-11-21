@@ -29,6 +29,9 @@ name of its own; they read this file. The rationale is recorded in
       }
     ]
   },
+  "feedback": {
+    "url": "https://forms.example.com/report?product=Example%20Docs&page={page}"
+  },
   "deployment": {
     "workerName": "example-docs",
     "environments": {
@@ -75,6 +78,7 @@ name of its own; they read this file. The rationale is recorded in
 | `brand.faviconPath`                    | The `<link rel="icon">` target and an asset the access smoke test probes. The build renders it as `/icon-192.png` and `/favicon.ico`; these and the favicon are served before sign-in and named by the MCP server (ADR-052). |
 | `brand.faviconDarkPath`                | Optional. The same mark drawn for a dark ground: the header shows it under the site's dark theme, and a browser with a dark interface shows it in the tab.                                                                   |
 | `switcher`                             | Optional. The menu beside the site's name that moves a reader to the organization's other sites. See [Moving between the organization's sites](#moving-between-the-organizations-sites).                                     |
+| `feedback`                             | Optional. The address of "Report a problem" at the foot of every page and in the account menu. See [Where readers report a problem](#where-readers-report-a-problem).                                                        |
 | `deployment.workerName`                | The Worker `wrangler.jsonc` must declare; environments deploy as `<name>-<environment>`.                                                                                                                                     |
 | `deployment.environments.*`            | Canonical site URL, Wrangler custom domains, deployment summaries, smoke-test defaults.                                                                                                                                      |
 | `deployment.environments.*.visibility` | Who may read that environment: `private` (default) or `public`. See below.                                                                                                                                                   |
@@ -159,19 +163,41 @@ The menu is headed by `brand.name` and lists this site first, with its mark,
 `sites` in order. Each site needs `name` and an HTTPS `url`, and may have a
 one-line `description` and a mark served from this project's `public/`,
 `iconPath`, with `iconDarkPath` for a dark ground. A site without a mark is
-shown by its first letter. Links open in the same tab.
+shown by its first letter. The other sites open in a new tab, as every link
+off the site does.
 
 Between one and eight sites; a name may not repeat another or the site title,
 and no site may be one of this deployment's own hosts. Without `switcher`, the
 header has none. The other sites are not this platform's to change: each needs
 its own link back.
 
+## Where readers report a problem
+
+A project can give its readers one place to report a problem with the site or
+ask for something it lacks, such as a form:
+
+```json
+"feedback": {
+  "url": "https://forms.example.com/report?product=Example%20Docs&page={page}"
+}
+```
+
+Every page then ends with **Report a problem or suggest an improvement**,
+and the account menu of a private deployment offers **Report a problem**.
+Both open `url` in a new tab, with every `{page}` replaced by the canonical
+address of the page the reader is on, encoded as a query value; the address
+is written into the page when it is built. A form's pre-filled link encodes
+a typed `{page}` as `%7Bpage%7D`, and that spelling is read the same way.
+
+`url` must be an HTTPS address without credentials, and may hold no
+placeholder but `{page}`. Without `feedback`, the site offers no such link.
+
 ## The header's right end
 
 The header ends with a button that switches between the light and the dark
 theme, and, on a private deployment, the reader's account: a round button with
-their initials that opens a menu with the address they signed in with and
-**Sign out**. Both stay in the header at every width. The address comes from
+their initials that opens a menu with the address they signed in with,
+**Report a problem** when `feedback` is set, and **Sign out**. Both stay in the header at every width. The address comes from
 the reader's own session through `/_kb/reader`, which the Worker answers to a
 signed-in person only, `{ "email": "..." }`, with `no-store`; where nothing
 answers it, the menu offers Sign out alone. Nothing here is configured.
@@ -445,6 +471,8 @@ than reaching a deployment:
 - `switcher`, when set, must list between one and eight sites, each with a
   distinct name and an HTTPS address that is not one of the deployment's own
   hosts, and marks at root-relative paths;
+- `feedback.url`, when set, must be an HTTPS address without credentials
+  holding no placeholder but `{page}`;
 - `sync.defaultLocale` must be at least two characters;
 - `deployment.workerName` must be a name Cloudflare accepts;
 - `sync.generatedBy` must not contain `--` or `<`, which would terminate the
