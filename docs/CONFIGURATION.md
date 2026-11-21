@@ -18,6 +18,17 @@ name of its own; they read this file. The rationale is recorded in
     "siteDescription": "Internal Example documentation",
     "faviconPath": "/favicon.svg"
   },
+  "switcher": {
+    "description": "Handbook, guides and reference",
+    "sites": [
+      {
+        "name": "Example Status",
+        "url": "https://status.example.com/",
+        "description": "Whether every service is up",
+        "iconPath": "/switcher/status.svg"
+      }
+    ]
+  },
   "deployment": {
     "workerName": "example-docs",
     "environments": {
@@ -63,6 +74,7 @@ name of its own; they read this file. The rationale is recorded in
 | `brand.siteDescription`                | Site-wide meta description and the home page's own description.                                                                                                                                                              |
 | `brand.faviconPath`                    | The `<link rel="icon">` target and an asset the access smoke test probes. The build renders it as `/icon-192.png` and `/favicon.ico`; these and the favicon are served before sign-in and named by the MCP server (ADR-052). |
 | `brand.faviconDarkPath`                | Optional. The same mark drawn for a dark ground: the header shows it under the site's dark theme, and a browser with a dark interface shows it in the tab.                                                                   |
+| `switcher`                             | Optional. The menu beside the site's name that moves a reader to the organization's other sites. See [Moving between the organization's sites](#moving-between-the-organizations-sites).                                     |
 | `deployment.workerName`                | The Worker `wrangler.jsonc` must declare; environments deploy as `<name>-<environment>`.                                                                                                                                     |
 | `deployment.environments.*`            | Canonical site URL, Wrangler custom domains, deployment summaries, smoke-test defaults.                                                                                                                                      |
 | `deployment.environments.*.visibility` | Who may read that environment: `private` (default) or `public`. See below.                                                                                                                                                   |
@@ -121,6 +133,48 @@ an agent decodes every non-ASCII title wrongly. The access smoke test checks
 both after a deployment. See [ADR-033](ADR/033-publish-llms-txt-indexes.md).
 
 See [ADR-016](ADR/016-deployment-visibility.md).
+
+## Moving between the organization's sites
+
+An organization with more than one internal site can give each a switcher
+beside its name in the header, so a reader moves between them in one click:
+
+```json
+"switcher": {
+  "description": "Handbook, guides and reference",
+  "sites": [
+    {
+      "name": "Example Status",
+      "url": "https://status.example.com/",
+      "description": "Whether every service is up",
+      "iconPath": "/switcher/status.svg",
+      "iconDarkPath": "/switcher/status-dark.svg"
+    }
+  ]
+}
+```
+
+The menu is headed by `brand.name` and lists this site first, with its mark,
+`brand.siteTitle` and `description`, marked as the current one; then each of
+`sites` in order. Each site needs `name` and an HTTPS `url`, and may have a
+one-line `description` and a mark served from this project's `public/`,
+`iconPath`, with `iconDarkPath` for a dark ground. A site without a mark is
+shown by its first letter. Links open in the same tab.
+
+Between one and eight sites; a name may not repeat another or the site title,
+and no site may be one of this deployment's own hosts. Without `switcher`, the
+header has none. The other sites are not this platform's to change: each needs
+its own link back.
+
+## The header's right end
+
+The header ends with a button that switches between the light and the dark
+theme, and, on a private deployment, the reader's account: a round button with
+their initials that opens a menu with the address they signed in with and
+**Sign out**. Both stay in the header at every width. The address comes from
+the reader's own session through `/_kb/reader`, which the Worker answers to a
+signed-in person only, `{ "email": "..." }`, with `no-store`; where nothing
+answers it, the menu offers Sign out alone. Nothing here is configured.
 
 ## Signing in
 
@@ -388,6 +442,9 @@ than reaching a deployment:
 - every environment URL must be a bare HTTPS origin — no credentials, path, or
   query — and no two may be equal;
 - `brand.faviconPath`, and `brand.faviconDarkPath` when set, must be root-relative paths beginning with `/`;
+- `switcher`, when set, must list between one and eight sites, each with a
+  distinct name and an HTTPS address that is not one of the deployment's own
+  hosts, and marks at root-relative paths;
 - `sync.defaultLocale` must be at least two characters;
 - `deployment.workerName` must be a name Cloudflare accepts;
 - `sync.generatedBy` must not contain `--` or `<`, which would terminate the
