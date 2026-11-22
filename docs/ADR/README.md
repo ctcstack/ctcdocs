@@ -98,5 +98,7 @@ Rejected
   accepted.
 - ADR-054: content health leaves alone files kept on purpose. Proposed;
   amends ADR-025 and ADR-049.
+- ADR-055: the secret scan reads generated Markdown as plain text too.
+  Proposed; amends ADR-018.
 
 Create a new ADR by copying `000-template.md`.

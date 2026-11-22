@@ -41,8 +41,11 @@ marker. A project that has never synchronized passes it and says so.
 
 `scan:generated-diff` is the one the sync workflow runs before it commits. It
 scans every generated file the run added or changed with gitleaks, using the
-project's `.gitleaks.toml` and `.gitleaksignore`, and fails on a finding. The
-log names the rule, the file, the line and the Google file ID, never the value.
+project's `.gitleaks.toml` and `.gitleaksignore`, and fails on a finding. Each
+generated Markdown file is scanned a second time as plain text, with the same
+paths and line numbers, so Markdown syntax cannot hide a value from the rules.
+The log names the rule, the file, the line and the Google file ID, never the
+value, and marks a finding only the plain text shows with `view=plain-text`.
 It runs the `gitleaks` on `PATH`, or the binary `CTCDOCS_GITLEAKS_BINARY`
 names.
 
