@@ -163,12 +163,15 @@ function fakeScanner(
   return { scanner, calls };
 }
 
-function onlyCall(calls: readonly ScannerCall[]): ScannerCall {
-  const [call, ...rest] = calls;
-  if (call === undefined || rest.length > 0) {
-    throw new Error(`Expected one scanner run, saw ${calls.length}.`);
+/** The two runs over Markdown: the files as written, then their plain text. */
+function bothCalls(
+  calls: readonly ScannerCall[],
+): [files: ScannerCall, plainText: ScannerCall] {
+  const [files, plainText, ...rest] = calls;
+  if (files === undefined || plainText === undefined || rest.length > 0) {
+    throw new Error(`Expected two scanner runs, saw ${calls.length}.`);
   }
-  return call;
+  return [files, plainText];
 }
 
 afterEach(async () => {
@@ -186,14 +189,80 @@ describe('the generated diff secret scan', () => {
 
     await expect(scanGeneratedDiff(root, {}, scanner)).resolves.toBe(2);
 
-    const call = onlyCall(calls);
-    expect(call.binary).toBe('gitleaks');
-    expect(call.files).toEqual([ADDED, SETUP]);
-    expect(call.contents[SETUP]).toBe('# Setup\n\nChanged.\n');
-    expect(call.arguments_).toContain(
+    const [files, plainText] = bothCalls(calls);
+    expect(files.binary).toBe('gitleaks');
+    expect(files.files).toEqual([ADDED, SETUP]);
+    expect(files.contents[SETUP]).toBe('# Setup\n\nChanged.\n');
+    expect(files.arguments_).toContain(
       join(root, PROJECT_LAYOUT.gitleaksConfigurationFile),
     );
-    expect(existsSync(call.workingDirectory)).toBe(false);
+    expect(plainText.files).toEqual([ADDED, SETUP]);
+    expect(plainText.contents[SETUP]).toBe('Setup\n\nChanged.\n');
+    expect(plainText.arguments_).toContain(
+      join(root, PROJECT_LAYOUT.gitleaksConfigurationFile),
+    );
+    expect(plainText.workingDirectory).not.toBe(files.workingDirectory);
+    for (const call of calls) {
+      expect(existsSync(call.workingDirectory)).toBe(false);
+    }
+  });
+
+  it('scans the plain text of Markdown only', async () => {
+    const root = await createProject();
+    await git(root, 'checkout', '--quiet', '--', '.');
+    await rm(join(root, ADDED));
+    await write(root, 'src/data/generated/sidebar.json', '{}\n');
+    const { scanner, calls } = fakeScanner(0, []);
+
+    await expect(scanGeneratedDiff(root, {}, scanner)).resolves.toBe(1);
+    expect(calls.map((call) => call.files)).toEqual([
+      ['src/data/generated/sidebar.json'],
+    ]);
+  });
+
+  it('reports a finding only the plain text shows, and says so', async () => {
+    const root = await createProject();
+    await writeManifest(root);
+    let run = 0;
+    const scanner: SecretScanner = async (_binary, arguments_) => {
+      run += 1;
+      const reportFile = arguments_[arguments_.indexOf('--report-path') + 1];
+      const report =
+        run === 1
+          ? [finding(SETUP, 3)]
+          : [finding(SETUP, 3), finding(ADDED, 1)];
+      await writeFile(reportFile ?? '', JSON.stringify(report));
+      return GITLEAKS_FINDINGS_EXIT_CODE;
+    };
+
+    const error = await scanGeneratedDiff(root, {}, scanner).catch(
+      (caught: unknown) => caught,
+    );
+
+    expect(run).toBe(2);
+    expect(error).toBeInstanceOf(SecretFindingsError);
+    expect((error as SecretFindingsError).findings).toEqual([
+      `rule=generic-api-key path=${SETUP} line=3 fileId=doc-setup`,
+      `rule=generic-api-key path=${ADDED} line=1 view=plain-text`,
+    ]);
+  });
+
+  it('fails when only the plain text shows a secret', async () => {
+    const root = await createProject();
+    let run = 0;
+    const scanner: SecretScanner = async (_binary, arguments_) => {
+      run += 1;
+      const reportFile = arguments_[arguments_.indexOf('--report-path') + 1];
+      await writeFile(
+        reportFile ?? '',
+        JSON.stringify(run === 1 ? [] : [finding(SETUP, 3)]),
+      );
+      return run === 1 ? 0 : GITLEAKS_FINDINGS_EXIT_CODE;
+    };
+
+    await expect(scanGeneratedDiff(root, {}, scanner)).rejects.toBeInstanceOf(
+      SecretFindingsError,
+    );
   });
 
   it('runs the scanner the workflow installed', async () => {
@@ -206,7 +275,9 @@ describe('the generated diff secret scan', () => {
       scanner,
     );
 
-    expect(onlyCall(calls).binary).toBe('/runner/temp/gitleaks');
+    for (const call of bothCalls(calls)) {
+      expect(call.binary).toBe('/runner/temp/gitleaks');
+    }
   });
 
   it('reports each finding by rule, path, line and Google file, never by value', async () => {
@@ -228,7 +299,9 @@ describe('the generated diff secret scan', () => {
     ]);
     expect(JSON.stringify(error)).not.toContain(DOCUMENT_TEXT);
     expect((error as Error).message).not.toContain(DOCUMENT_TEXT);
-    expect(existsSync(onlyCall(calls).workingDirectory)).toBe(false);
+    for (const call of bothCalls(calls)) {
+      expect(existsSync(call.workingDirectory)).toBe(false);
+    }
   });
 
   it('fails on findings even when the exit status did not announce them', async () => {
@@ -321,6 +394,31 @@ describe('the generated diff secret scan', () => {
       'not a regular file',
     );
   });
+
+  /*
+   * Against the real scanner, when one is installed: a value Markdown hides
+   * from the generic rule is found in the plain text. The value is synthetic.
+   */
+  it.runIf(process.env.CTCDOCS_GITLEAKS_BINARY)(
+    'finds with gitleaks a value only the plain text exposes',
+    async () => {
+      const root = await createProject();
+      await write(
+        root,
+        ADDED,
+        '# Added\n\n0 0 \\* \\* \\* /usr/bin/curl -fsS "<https://leads.example.test/api/restore.php?token=XRbTqLmV7cWd>" > /dev/null\n',
+      );
+
+      const error = await scanGeneratedDiff(root, process.env).catch(
+        (caught: unknown) => caught,
+      );
+
+      expect(error).toBeInstanceOf(SecretFindingsError);
+      expect((error as SecretFindingsError).findings).toEqual([
+        `rule=generic-api-key path=${ADDED} line=3 view=plain-text`,
+      ]);
+    },
+  );
 
   it('reports a scanner that cannot be started', async () => {
     const root = await createProject();

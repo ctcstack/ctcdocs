@@ -2,6 +2,16 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Changed
+
+- **The secret scan reads Markdown as plain text too.** `scan:generated-diff`
+  scans each generated Markdown file a second time as plain text, with the same
+  paths and line numbers, so a value hidden from gitleaks by emphasis, escapes,
+  autolinks or URL query strings is found before commit. A finding only the
+  plain text shows is logged with `view=plain-text` (ADR-055).
+
 ## 0.28.0
 
 ### Added
