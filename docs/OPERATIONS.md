@@ -1010,7 +1010,9 @@ starts no other workflow, so the project's CI never scans it. The sync therefore
 scans every generated file the run added or changed before it commits. It uses
 the gitleaks release the CI gate runs, and the project's own `.gitleaks.toml` and
 `.gitleaksignore`. The decision is recorded in
-[ADR-018](ADR/018-secret-scan-before-sync-commit.md).
+[ADR-018](ADR/018-secret-scan-before-sync-commit.md). The extra rules that catch
+credentials typed into document prose, and how a project adopts them, are in
+[Secret scanning](SECRET_SCANNING.md).
 
 A finding fails the run at the `secret-scan` stage. Nothing is committed or
 pushed, so `main` and the deployment keep the last good output, and every other

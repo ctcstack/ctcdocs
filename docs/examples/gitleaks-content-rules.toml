@@ -1,0 +1,158 @@
+# Extra gitleaks rules for credentials written in document prose.
+#
+# Paste everything below this header into the project's `.gitleaks.toml`,
+# after `[extend] useDefault = true` and after the project's own
+# `[[allowlists]]`. Keep `useDefault = true`: these rules add to gitleaks'
+# default rules, they do not replace them. How to adopt them, and what the
+# history scan reports afterwards, is in docs/SECRET_SCANNING.md.
+#
+# Why they exist. gitleaks' default rules know vendor key formats and one
+# `generic-api-key` rule written for code: a keyword, then `=` or `:`, then a
+# quoted or terminated value of high entropy. A person typing a credential into
+# a Google Doc writes "API Key - <value>" in bold, a value alone after a bold
+# label, a token inside a link, or a share link to a password manager. The sync
+# writes that prose as Markdown, and the default rules miss it.
+#
+# Tested with gitleaks 8.30.1, the release the sync and the CI gate run, on the
+# raw Markdown the converter writes and on its plain-text view (emphasis and
+# escapes removed, each link URL and each URL query parameter as a separate
+# `name=value` token).
+#
+# Notes for anyone changing these rules:
+#
+# - Go RE2 syntax: no look-ahead or back-references.
+# - `keywords` are a case-insensitive prefilter; a rule runs only on text that
+#   contains one of them.
+# - `entropy` is measured on the secret group. A threshold of 3.0 also sets a
+#   floor of eight distinct characters, which is what keeps short words and
+#   numbers out of the labelled rules.
+# - gitleaks combines a rule's allowlist `regexes` into one expression. Scope a
+#   case-insensitive flag as `(?i:...)`; a leading `(?i)` would also make every
+#   entry after it case-insensitive.
+# - Never add `paths` to these allowlists. `ctcdocs-sync validate` and the
+#   sync's scan refuse a path exemption that covers generated files.
+
+# A label such as "API Key", "Secret Key", "Token" or "Password", a separator
+# (":", " - ", an en or em dash, or a table cell border), and a value that
+# contains a digit. Bold, italic and code markers around either side are
+# allowed. Catches "- **API Key - 3f9c…**", "Access token: **ghx7…**" and
+# "| API key | 3f9c… |".
+[[rules]]
+id = "ctcdocs-labelled-credential"
+description = "A credential label in prose or a table, a separator, and a value that contains a digit"
+regex = '''(?i)\b(?:api[ _-]?(?:key|secret|token)|access[ _-]?(?:key|token)|secret[ _-]?key|client[ _-]?secret|auth(?:entication|orization)?[ _-]?token|bearer[ _-]?token|webhook[ _-]?secret|private[ _-]?key|license[ _-]?key|app[ _-]?password|token|secret|password|passwd|passphrase)[*_\x60]{0,2}(?:[ \t]*[:|]|[ \t]+[-\x{2013}\x{2014}])[ \t*_\x60'"]*([A-Za-z0-9][A-Za-z0-9._~+/=!@#$%^&-]*[0-9][A-Za-z0-9._~+/=!@#$%^&-]*)(?:[^A-Za-z0-9._~+/=!@#$%^&-]|$)'''
+secretGroup = 1
+entropy = 3.0
+keywords = ["key", "token", "secret", "password", "passwd", "passphrase"]
+[[rules.allowlists]]
+description = "Placeholders and code"
+regexes = [
+  '''(?i:[._-](?:token|key|secret|password)$)''',
+  '''(?i:^(?:x{4,}|your[-_.]?\w*)$)''',
+]
+stopwords = ["example", "dummy", "sample", "placeholder", "redacted", "changeme"]
+
+# The same labels, then a single value without digits that ends the line, such
+# as an all-lowercase key after "**API Key:**". A value with a digit is the rule
+# above's. Single words, dotted names, camelCase identifiers, code ending in a
+# comma, URLs and placeholders are allowed.
+[[rules]]
+id = "ctcdocs-labelled-credential-line-end"
+description = "A credential label in prose, a separator, and a single value without digits that ends the line"
+regex = '''(?i)\b(?:api[ _-]?(?:key|secret|token)|access[ _-]?(?:key|token)|secret[ _-]?key|client[ _-]?secret|auth(?:entication|orization)?[ _-]?token|bearer[ _-]?token|webhook[ _-]?secret|private[ _-]?key|license[ _-]?key|app[ _-]?password|token|secret|password|passwd|passphrase)[*_]{0,2}(?:[ \t]*:|[ \t]+[-\x{2013}\x{2014}])[ \t*_\x60'"]*([^\s*_\x60'"<>0-9]{8,})[ \t*_\x60'"]*(?:\r?\n|$)'''
+secretGroup = 1
+entropy = 3.0
+keywords = ["key", "token", "secret", "password", "passwd", "passphrase"]
+[[rules.allowlists]]
+description = "Words and placeholders, not values"
+regexes = [
+  '''^[A-Z][a-z]+[.,;:!?)]*$''',
+  '''^[a-z]+(?:[-.][a-z]+)+[.,;:!?)]*$''',
+  '''(?i:^https?:)''',
+  '''[{}$]''',
+  '''[,;]$''',
+  '''^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+$''',
+  '''^[a-z]+(?:[A-Z][a-z]*)+$''',
+  '''(?i:^(?:x{4,}|\*{4,}|redacted|placeholder|changeme|example\w*|your[-_.]?\w*)$)''',
+]
+
+# "API Pin", "PIN code" or "Passcode", a separator, and four to twelve digits.
+# A PIN is short and all digits, so no other rule can see it; the label is
+# required.
+[[rules]]
+id = "ctcdocs-pin"
+description = "A PIN or passcode written as a labelled number"
+regex = '''(?i)\b(?:api[ _-]?)?(?:pin(?:[ _-]?code)?|passcode)[*_]{0,2}(?:[ \t]*:|[ \t]+[-\x{2013}\x{2014}])[ \t*_\x60'"]*([0-9]{4,12})(?:[^0-9A-Za-z]|$)'''
+secretGroup = 1
+keywords = ["pin", "passcode"]
+
+# A user:password pair handed to PHP cURL (`CURLOPT_USERPWD`, with or without
+# the converter's escaped underscore) or to `curl -u` / `--user`. Shell
+# variables and placeholders are allowed.
+[[rules]]
+id = "ctcdocs-basic-auth-in-command"
+description = "A user:password pair passed to curl or PHP cURL"
+regex = '''(?i)(?:CURLOPT\\?_USERPWD\s*,\s*["']|(?:^|[\s"'])(?:-u|--user)[ \t]+["']?)[ \t]*([^\s"':]+:[^\s"']+?)[ \t]*(?:["']|\s|$)'''
+secretGroup = 1
+keywords = ["userpwd", "-u ", "--user"]
+[[rules.allowlists]]
+description = "Variables and placeholders"
+regexes = [
+  '''\$''',
+  '''[<>{}]''',
+  '''(?i:^(?:user(?:name)?|api|email):(?:pass(?:word)?|token|key|x+)$)''',
+]
+
+# A URL query parameter named like a credential (token, access_token, api_key,
+# key, secret, API_ID, password, sig, …), in a link, an autolink or bare text,
+# and the separate `name=value` token of the plain-text view. The converter's
+# escaped underscore (`API\_ID`) is accepted. The value needs eight or more
+# characters and an entropy of 3.0, which leaves out `page=2` or `sort=asc`.
+[[rules]]
+id = "ctcdocs-credential-url-parameter"
+description = "A credential-named URL query parameter, raw or as a separate name=value token"
+regex = '''(?i)(?:^|[^A-Za-z0-9\\_])((?:access|auth|api|app|client|session|refresh|private|secret)?(?:\\?[_-])?(?:token|key|secret)|api(?:\\?[_-])?id|pass(?:word|wd)?|pwd|sig(?:nature)?)=([A-Za-z0-9._~%+/-]{8,})(?:[^A-Za-z0-9._~%+/-]|$)'''
+secretGroup = 2
+entropy = 3.0
+keywords = ["token=", "key=", "secret=", "id=", "pass", "pwd=", "sig"]
+[[rules.allowlists]]
+description = "Placeholders"
+regexes = ['''(?i:^(?:x{4,}|your[-_.]?\w*|example\w*|placeholder|redacted)$)''']
+
+# A share link to one secret: 1Password, Bitwarden Send, One-Time Secret,
+# Password Pusher, Privnote. Whoever holds the link can open the secret until
+# it expires, so a link in a published page is the secret itself.
+[[rules]]
+id = "ctcdocs-secret-share-link"
+description = "A link to a shared secret in a password manager or one-time secret service"
+regex = '''(?i)https?://(?:share\.1password\.com/s#[A-Za-z0-9_-]{16,}|send\.bitwarden\.com/#[A-Za-z0-9_/-]{16,}|(?:www\.)?onetimesecret\.com/secret/[A-Za-z0-9]{8,}|(?:www\.)?pwpush\.com/p/[A-Za-z0-9_-]{8,}|(?:www\.)?privnote\.com/[A-Za-z0-9]{6,}#[A-Za-z0-9]{6,})'''
+keywords = ["1password.com/s#", "bitwarden.com/#", "onetimesecret.com/secret", "pwpush.com/p/", "privnote.com/"]
+
+# A Zapier catch hook or a Make (formerly Integromat) webhook. Neither needs
+# any other credential: the URL alone triggers the automation.
+[[rules]]
+id = "ctcdocs-automation-webhook"
+description = "A Zapier or Make webhook URL; whoever holds it can trigger the automation"
+regex = '''(?i)https?://(?:hooks\.zapier\.com/hooks/catch/[0-9]+/[A-Za-z0-9]+|hook\.(?:[a-z0-9]+\.)?(?:make|integromat)\.com/[A-Za-z0-9]{16,})'''
+keywords = ["hooks.zapier.com", "make.com/", "integromat.com/"]
+
+# A Cloudflare Turnstile key. Site keys are public once embedded in a page, but
+# secret keys carry the same prefix, and a document cannot tell which is which.
+[[rules]]
+id = "ctcdocs-cloudflare-turnstile-key"
+description = "A Cloudflare Turnstile key; secret keys share the site keys' prefix"
+regex = '''\b(0x4AAAAAAA[A-Za-z0-9_-]{10,})'''
+secretGroup = 1
+keywords = ["0x4aaaaaaa"]
+
+# A hexadecimal run of ten or more characters straight after "API key",
+# "secret key", "token" or "password", with no separator, possibly cut short
+# with "..." or "…". Even a prefix narrows a key down, and the full value is
+# often elsewhere in the same document.
+[[rules]]
+id = "ctcdocs-labelled-hex-value"
+description = "A hexadecimal value, possibly truncated, right after a credential word"
+regex = '''(?i)\b(?:api[ _-]?key|access[ _-]?key|secret(?:[ _-]?key)?|token|password)[ \t]+(?:is[ \t]+)?[*_\x60]{0,2}([0-9a-f]{10,})(?:\.\.\.|\x{2026}|[^0-9a-z]|$)'''
+secretGroup = 1
+entropy = 3.0
+keywords = ["key", "secret", "token", "password"]
