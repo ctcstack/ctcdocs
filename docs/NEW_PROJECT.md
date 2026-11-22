@@ -126,6 +126,10 @@ repository or a chat.
    src/styles/brand.css
    ```
 
+   Then add the rules for credentials typed into documents to the end of
+   `.gitleaks.toml`, as [SECRET_SCANNING.md](SECRET_SCANNING.md#adding-the-rules-to-a-project)
+   describes.
+
    Add one line to the end of `.prettierignore`:
 
    ```text

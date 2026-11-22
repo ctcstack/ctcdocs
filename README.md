@@ -139,6 +139,7 @@ In the order a new deployment needs them:
 | [Cloudflare setup](docs/CLOUDFLARE_SETUP.md)             | The Workers, their secrets, custom domains, and the response headers           |
 | [Deployment](docs/DEPLOYMENT.md)                         | Environments, secrets, and the workflows that publish a commit                 |
 | [Operations](docs/OPERATIONS.md)                         | Running it: scheduled sync, rollback, and what to do when something fails      |
+| [Secret scanning](docs/SECRET_SCANNING.md)               | The extra rules for credentials typed into documents, and how to adopt them    |
 | [Design](docs/DESIGN.md)                                 | The reader interface, and the accessibility budget any visual change must meet |
 | [Decisions](docs/ADR/README.md)                          | Why it is built this way, and what was rejected                                |
 
