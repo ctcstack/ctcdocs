@@ -1,9 +1,9 @@
 # ADR-056: A secret scan finding holds back its document, not the run
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-23
 - Owners: CTCDocs maintainers
-- Supersedes, once accepted: ADR-018 in part: the clause that the whole run
+- Supersedes: ADR-018 in part: the clause that the whole run
   fails, not the one document. The scan before the commit stays, and still
   stops the run for a finding no document is held back for.
 

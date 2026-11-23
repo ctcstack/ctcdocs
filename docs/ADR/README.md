@@ -41,6 +41,7 @@ Rejected
 - ADR-016: who may read a deployment is configuration.
 - ADR-017: the full index becomes a page.
 - ADR-018: a sync run scans what it commits, and a finding stops it.
+  Superseded in part by ADR-056.
 - ADR-019: folders before documents, and a section page that tells them apart.
 - ADR-020: a Drive name is written in one alphabet.
 - ADR-021: addresses may follow Drive names.
@@ -101,6 +102,6 @@ Rejected
 - ADR-055: the secret scan reads generated Markdown as plain text too.
   Proposed; amends ADR-018.
 - ADR-056: a secret scan finding holds back its document, not the run.
-  Proposed; supersedes ADR-018 in part once accepted.
+  Supersedes ADR-018 in part.
 
 Create a new ADR by copying `000-template.md`.
