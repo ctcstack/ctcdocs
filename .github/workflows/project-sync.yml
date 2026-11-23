@@ -180,6 +180,9 @@ jobs:
           GOOGLE_ROOT_FOLDER_ID: ${{ vars.GOOGLE_ROOT_FOLDER_ID }}
           GOOGLE_IGNORED_FOLDER_IDS: ${{ vars.GOOGLE_IGNORED_FOLDER_IDS }}
           SYNC_FULL: ${{ inputs.full }}
+          # With the scanner, a document whose new text has a secret scan
+          # finding is held back and the rest is published (ADR-056).
+          CTCDOCS_GITLEAKS_BINARY: ${{ runner.temp }}/gitleaks
         run: |
           set -euo pipefail
 
@@ -257,6 +260,9 @@ jobs:
       # .gitleaks.toml and .gitleaksignore, and a finding fails the run before
       # anything is committed. The log names the rule, the file and the line,
       # never the value. See docs/ADR/018-secret-scan-before-sync-commit.md.
+      # The sync step has already held back each document with a finding in
+      # its own text (ADR-056); what reaches this step is a finding no single
+      # document owns.
       - name: Scan the generated diff for secrets
         id: secret_scan
         if: steps.changes.outputs.changed == 'true'

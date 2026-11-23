@@ -214,8 +214,8 @@ const onDomain = (hostname: string, domain: string) =>
  * `resourcekey` and Dropbox's `rlkey` on a file shared by link, OneDrive's
  * `authkey`, the `pwd` of a Zoom meeting link, and the spreadsheet ID an old
  * Google Sheets address carries as `key`. Written apart, they would match the
- * default generic rule, which never matched them in the Markdown, and stop a
- * sync over a link the internal site is meant to carry. A Google Maps `key`,
+ * default generic rule, which never matched them in the Markdown, and hold
+ * back a document over a link the internal site is meant to carry. A Google Maps `key`,
  * which is an API key, is not among them.
  */
 function isShareLinkParameter(url: URL, name: string): boolean {

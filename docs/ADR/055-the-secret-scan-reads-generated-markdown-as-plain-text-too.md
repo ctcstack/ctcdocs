@@ -45,8 +45,8 @@ second scan reads a view in which the Markdown no longer shapes the text.
   old Google Sheets address, which is the spreadsheet ID. A document pastes
   such a link for colleagues to open, the site is for the same team, and the
   scan of the Markdown never matched these values; written apart, they would
-  match the default generic rule and stop syncs that passed before over a
-  value nobody typed. Each is left out only on its own service's host, so a
+  match the default generic rule and stop syncs that passed before, or since
+  ADR-056 hold back the document, over a value nobody typed. Each is left out only on its own service's host, so a
   Maps API key, or a `pwd` on any other site, is still scanned.
 - **Same paths, same line numbers.** The view has the file's line count, and
   every piece of text stays on its line: a link's URL on the line that holds

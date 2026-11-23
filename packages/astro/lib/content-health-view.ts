@@ -90,6 +90,7 @@ const PRIORITY_BY_CODE: Readonly<Record<string, Priority>> = {
   'export-too-large': 'fix-now',
   'download-restricted': 'fix-now',
   'content-rejected': 'fix-now',
+  'secret-found': 'fix-now',
   // It may show what was meant to stay out of the documentation.
   'image-crop-not-applied': 'fix-now',
   'image-removed': 'fix-now',

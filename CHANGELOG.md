@@ -18,6 +18,17 @@ All three packages share a version and are released together.
 
 ### Changed
 
+- **A secret scan finding holds back its document, not the sync.** The sync
+  scans each document it exports before writing anything, with the scanner
+  and configuration the scan before the commit uses. A document whose new
+  text has a finding keeps its published version, or stays off the site if
+  it is new, and the rest of the corpus is published. The sync report, the
+  job summary and content health list it under the new reason `secret-found`,
+  with the rule and line, never the value. It is tried again on every run.
+  A finding in a file no document owns, a targeted run, or a run without the
+  scanner still stops the sync before the commit (ADR-056). The sync workflow
+  now passes `CTCDOCS_GITLEAKS_BINARY` to the sync step; a project that calls
+  its own workflow should do the same.
 - **The secret scan reads Markdown as plain text too.** `scan:generated-diff`
   scans each generated Markdown file a second time as plain text, with the same
   paths and line numbers, so a value hidden from gitleaks by emphasis, escapes,
@@ -25,7 +36,7 @@ All three packages share a version and are released together.
   finding only the plain text shows is logged with `view=plain-text`
   (ADR-055). Links copied from Drive, Dropbox, OneDrive, Zoom or an old Google
   Sheets address keep their access parameter out of the plain text, so they
-  do not stop a sync. Projects should still expect the first syncs after the
+  hold nothing back. Projects should still expect the first syncs after the
   upgrade to report values the Markdown used to hide, in documents edited
   since.
 

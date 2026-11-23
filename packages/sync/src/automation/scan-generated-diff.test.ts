@@ -18,6 +18,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { createEmptyManifest } from '../manifest.js';
 import {
+  createDocumentSecretScan,
   scanGeneratedDiff,
   type SecretScanner,
 } from './scan-generated-diff.js';
@@ -467,4 +468,85 @@ describe('the generated diff secret scan', () => {
       scanGeneratedDiff(root, { CTCDOCS_GITLEAKS_BINARY: process.execPath }),
     ).rejects.toThrow('exited with status 1');
   });
+});
+
+describe('the scan of the documents a sync pass exported (ADR-056)', () => {
+  const given = (path: string, content: string) => ({
+    path,
+    content: () => Promise.resolve(content),
+  });
+  const binary = { CTCDOCS_GITLEAKS_BINARY: '/scanner/gitleaks' };
+
+  it('is off without the scanner the workflow installs', async () => {
+    const root = await createProject();
+
+    expect(createDocumentSecretScan(root, {})).toBeUndefined();
+  });
+
+  it('scans the files it is given under their paths, and their plain text', async () => {
+    const root = await createProject();
+    const { scanner, calls } = fakeScanner(GITLEAKS_FINDINGS_EXIT_CODE, [
+      finding(ADDED, 3),
+    ]);
+    const scan = createDocumentSecretScan(root, binary, scanner);
+
+    const findings = await scan?.([given(ADDED, '**Key:** x\n')]);
+
+    const [files, plainText] = bothCalls(calls);
+    expect(files.files).toEqual([ADDED]);
+    expect(files.contents[ADDED]).toBe('**Key:** x\n');
+    expect(plainText.contents[ADDED]).toBe('Key: x\n');
+    expect(files.binary).toBe('/scanner/gitleaks');
+    expect(findings).toEqual([
+      { ruleId: 'generic-api-key', path: ADDED, line: 3, plainTextOnly: false },
+    ]);
+  });
+
+  it('runs no scanner for a pass with nothing new', async () => {
+    const root = await createProject();
+    const { scanner, calls } = fakeScanner(0, []);
+
+    await expect(
+      createDocumentSecretScan(root, binary, scanner)?.([]),
+    ).resolves.toEqual([]);
+    expect(calls).toEqual([]);
+  });
+
+  it('fails closed as the scan before the commit does', async () => {
+    const root = await createProject();
+    await rm(join(root, PROJECT_LAYOUT.gitleaksConfigurationFile));
+    const { scanner } = fakeScanner(0, []);
+
+    await expect(
+      createDocumentSecretScan(root, binary, scanner)?.([given(ADDED, 'x')]),
+    ).rejects.toBeInstanceOf(SecretScanError);
+  });
+
+  const realScanner = it.runIf(process.env.CTCDOCS_GITLEAKS_BINARY);
+
+  realScanner(
+    'finds with gitleaks the value a document would publish',
+    async () => {
+      const root = await createProject();
+      const token = ['XRbTq', 'LmV7cWd'].join('');
+      const scan = createDocumentSecretScan(root, process.env);
+
+      await expect(
+        scan?.([
+          given(
+            ADDED,
+            `# Added\n\n<https://leads.example.test/api/restore.php?token=${token}>\n`,
+          ),
+          given(SETUP, '# Setup\n\nNothing here.\n'),
+        ]),
+      ).resolves.toEqual([
+        {
+          ruleId: 'generic-api-key',
+          path: ADDED,
+          line: 3,
+          plainTextOnly: true,
+        },
+      ]);
+    },
+  );
 });
