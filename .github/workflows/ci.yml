@@ -68,8 +68,35 @@ jobs:
 
       # Playwright belongs to the fixture project, the way it belongs to a real
       # one, so the browser is installed from there rather than from the root.
+      # The suite runs headless, which Playwright serves with Chromium's headless
+      # shell, so the full browser is not downloaded. The browser itself comes
+      # from Playwright's CDN in a few seconds. `--with-deps` is not used: the
+      # runner image already has every library the shell links against, and the
+      # apt run it started took from 19 seconds to six minutes, fetching fonts
+      # and package upgrades the suite does not need (the site serves its own
+      # typefaces). An image that lacks a library is caught by asking the
+      # dynamic linker, and the dependencies are then installed after all, so a
+      # change of image costs time rather than a failed run. Browsers are not
+      # cached: Playwright advises against it, since a restore takes about as
+      # long as the download.
       - name: Install Chromium for the browser suite
-        run: pnpm --filter ctcdocs-fixture-project exec playwright install --with-deps chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          pnpm --filter ctcdocs-fixture-project exec playwright install --only-shell chromium
+
+          shell_binary="$(find "${HOME}/.cache/ms-playwright" -type f -name chrome-headless-shell -print -quit)"
+          if [[ -z "${shell_binary}" ]]; then
+            echo "::error::Playwright reported success but no Chromium headless shell was found."
+            exit 1
+          fi
+
+          libraries="$(ldd "${shell_binary}")"
+          if grep -q 'not found' <<< "${libraries}"; then
+            echo "::warning::This runner image lacks libraries Chromium needs; installing them."
+            pnpm --filter ctcdocs-fixture-project exec playwright install-deps chromium
+          fi
 
       # Formatting, lint, types, unit and fixture tests, then the whole gate a
       # project runs — corpus regeneration, build, content validation, Wrangler
