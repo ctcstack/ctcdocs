@@ -1,9 +1,9 @@
 # ADR-018: A sync run scans what it commits, and a finding stops it
 
 - Status: Accepted; superseded in part by
-  [ADR-056](056-a-secret-scan-finding-holds-back-its-document-not-the-run.md)
-  once that is accepted: a finding a sync pass can trace to one document holds
-  back that document, not the run
+  [ADR-056](056-a-secret-scan-finding-holds-back-its-document-not-the-run.md):
+  a finding a sync pass can trace to one document holds back that document,
+  not the run
 - Date: 2026-09-23
 - Owners: CTCDocs maintainers
 - Supersedes: none
