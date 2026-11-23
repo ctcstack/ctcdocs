@@ -30,6 +30,9 @@ All three packages share a version and are released together.
   scanner still stops the sync before the commit (ADR-056). The sync workflow
   now passes `CTCDOCS_GITLEAKS_BINARY` to the sync step; a project that calls
   its own workflow should do the same.
+- **Scanner downloads are retried.** The sync, project CI and platform CI
+  workflows retry the gitleaks, actionlint and zizmor downloads three times on
+  a transient network error instead of failing the run.
 - **The secret scan reads Markdown as plain text too.** `scan:generated-diff`
   scans each generated Markdown file a second time as plain text, with the same
   paths and line numbers, so a value hidden from gitleaks by emphasis, escapes,
