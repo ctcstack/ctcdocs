@@ -179,6 +179,34 @@ describe('content health priorities', () => {
     expect(priorityOf('file-name-spaces', 'note')).toBe('tidy-up');
   });
 
+  it('puts a document held back for a secret first, under "Fix now" (ADR-056)', () => {
+    const held = {
+      ...unpublishedItem('k', 'secret-found', 'out-of-date'),
+      detail: 'generic-api-key at line 12',
+    };
+    const view = buildHealthView(undefined, {
+      ...state,
+      reasons: [
+        ...state.reasons,
+        {
+          code: 'secret-found',
+          title: 'The document holds what looks like a password or key',
+          action: 'Remove it, and change it if real',
+          instruction: 'Remove it.',
+        },
+      ],
+      unpublished: [...state.unpublished, held],
+    });
+
+    expect(view.tiers[0]?.level.id).toBe('fix-now');
+    const group = tier(view, 'fix-now')?.groups.find(
+      (candidate) => candidate.code === 'secret-found',
+    );
+    expect(group?.entries).toEqual([
+      expect.objectContaining({ kind: 'unpublished', item: held }),
+    ]);
+  });
+
   it('ranks an unknown check by its severity, and anything else as an improvement', () => {
     expect(priorityOf('a-new-fix', 'fix')).toBe('fix-now');
     expect(priorityOf('a-new-convention', 'convention')).toBe('proposal');
