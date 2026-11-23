@@ -16,7 +16,10 @@ import { formatTitleReport } from './titles/format-title-report.js';
 import { titleReportSchema, type TitleReport } from './titles/title-report.js';
 import { GeneratedDiffValidationError } from './automation/generated-diff.js';
 import { notifySyncFailure } from './automation/notify-failure.js';
-import { scanGeneratedDiff } from './automation/scan-generated-diff.js';
+import {
+  createDocumentSecretScan,
+  scanGeneratedDiff,
+} from './automation/scan-generated-diff.js';
 import {
   SecretFindingsError,
   SecretScanError,
@@ -275,6 +278,7 @@ async function main(): Promise<void> {
     return;
   }
   const dryRun = options.dryRun || configuration.SYNC_DRY_RUN;
+  const secretScan = createDocumentSecretScan(repositoryRoot);
   const result = await runBasicMarkdownSync(
     context,
     configuration,
@@ -287,6 +291,7 @@ async function main(): Promise<void> {
         ? { reseedSlugFileId: options.reseedSlugFileId }
         : {}),
     },
+    secretScan ? { secretScan } : {},
   );
 
   if (options.json) {

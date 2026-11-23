@@ -1,14 +1,14 @@
 import { spawn } from 'node:child_process';
 import {
-  copyFile,
   lstat,
   mkdir,
   mkdtemp,
   readFile,
   rm,
+  writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, extname, join, resolve } from 'node:path';
 
 import {
   normalizeRepositoryPath,
@@ -16,12 +16,14 @@ import {
 } from '@ctcstack/ctcdocs-core';
 
 import { gitleaksExemptPatterns } from '../gitleaks-configuration.js';
+import { plainTextView } from './plain-text-view.js';
 import {
   createGoogleFileIdResolver,
   describeSecretFinding,
   GITLEAKS_FINDINGS_EXIT_CODE,
   gitleaksArguments,
   parseGitleaksReport,
+  type SecretFinding,
   SecretFindingsError,
   SecretScanError,
 } from './secret-scan.js';
@@ -161,6 +163,205 @@ async function loadGoogleFileIdResolver(
   }
 }
 
+/** Generated Markdown, the files that get a plain-text view as well. */
+const MARKDOWN_EXTENSIONS = new Set(['.md', '.mdx']);
+
+/**
+ * Runs the scanner over one snapshot and returns what it found. A run that did
+ * not complete, or whose report contradicts its exit status, rejects with
+ * `SecretScanError`.
+ */
+async function scanSnapshot(
+  snapshot: string,
+  reportFile: string,
+  configurationFile: string,
+  repositoryRoot: string,
+  environment: Record<string, string | undefined>,
+  scanner: SecretScanner,
+): Promise<SecretFinding[]> {
+  const status = await scanner(
+    environment.CTCDOCS_GITLEAKS_BINARY || 'gitleaks',
+    gitleaksArguments({
+      configurationFile,
+      ignoreDirectory: repositoryRoot,
+      reportFile,
+    }),
+    snapshot,
+  );
+  if (status !== 0 && status !== GITLEAKS_FINDINGS_EXIT_CODE) {
+    throw new SecretScanError(
+      `The secret scanner exited with status ${status} without completing the scan.`,
+    );
+  }
+
+  let report: string;
+  try {
+    report = await readFile(reportFile, 'utf8');
+  } catch {
+    throw new SecretScanError('The secret scanner wrote no report.');
+  }
+  const findings = parseGitleaksReport(report);
+  if (findings.length === 0 && status !== 0) {
+    throw new SecretScanError(
+      'The secret scanner reported findings its report does not list.',
+    );
+  }
+  return findings;
+}
+
+const findingKey = (finding: SecretFinding) =>
+  `${finding.path}\0${finding.ruleId}\0${finding.line}`;
+
+/** A file to scan, under its repository path. */
+interface ScanFile {
+  readonly path: string;
+  readonly content: () => Promise<string | Uint8Array>;
+}
+
+/** A finding, and whether only the plain-text view of Markdown shows it. */
+export interface ScanFinding extends SecretFinding {
+  readonly plainTextOnly: boolean;
+}
+
+/**
+ * Scans files with the project's configuration, from a snapshot under their
+ * repository paths, and generated Markdown a second time as plain text (see
+ * `plainTextView`), from a second snapshot with the same paths and line
+ * numbers. A finding at a place both views report is listed once. Resolves
+ * with every finding, sorted; a scan that could not be trusted rejects with
+ * `SecretScanError`. The snapshots and the reports are removed either way.
+ */
+async function scanFiles(
+  files: readonly ScanFile[],
+  configurationFile: string,
+  repositoryRoot: string,
+  environment: Record<string, string | undefined>,
+  scanner: SecretScanner,
+): Promise<ScanFinding[]> {
+  const workspace = await mkdtemp(join(tmpdir(), 'ctcdocs-secret-scan-'));
+  try {
+    const snapshot = join(workspace, 'snapshot');
+    const plainSnapshot = join(workspace, 'plain-text');
+    let markdownFiles = 0;
+    for (const file of files) {
+      const content = await file.content();
+      const target = join(snapshot, file.path);
+      await mkdir(dirname(target), { recursive: true });
+      await writeFile(target, content);
+      if (MARKDOWN_EXTENSIONS.has(extname(file.path).toLowerCase())) {
+        const plainTarget = join(plainSnapshot, file.path);
+        await mkdir(dirname(plainTarget), { recursive: true });
+        await writeFile(
+          plainTarget,
+          plainTextView(
+            typeof content === 'string'
+              ? content
+              : new TextDecoder().decode(content),
+          ),
+        );
+        markdownFiles += 1;
+      }
+    }
+
+    const findings = await scanSnapshot(
+      snapshot,
+      join(workspace, 'report.json'),
+      configurationFile,
+      repositoryRoot,
+      environment,
+      scanner,
+    );
+    const plainFindings =
+      markdownFiles === 0
+        ? []
+        : await scanSnapshot(
+            plainSnapshot,
+            join(workspace, 'plain-text-report.json'),
+            configurationFile,
+            repositoryRoot,
+            environment,
+            scanner,
+          );
+
+    // One line can match twice in the plain text, once in a URL and once in
+    // its parameter; a place is reported once.
+    const seen = new Set(findings.map(findingKey));
+    const plainOnly = plainFindings.filter((finding) => {
+      const key = findingKey(finding);
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+    return [
+      ...findings.map((finding) => ({ ...finding, plainTextOnly: false })),
+      ...plainOnly.map((finding) => ({ ...finding, plainTextOnly: true })),
+    ];
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+}
+
+/** A finding as a log line, never the value. */
+function describeScanFinding(
+  finding: ScanFinding,
+  googleFileId: string | undefined,
+): string {
+  const line = describeSecretFinding(finding, googleFileId);
+  return finding.plainTextOnly ? `${line} view=plain-text` : line;
+}
+
+/**
+ * Scans the files of the documents a sync pass exported, before anything is
+ * written, so that a document with a finding can be held back on its own
+ * (ADR-056). The files are given under the repository paths they would be
+ * written to, and scanned with the project's own configuration, so a finding
+ * and its fingerprint are the ones `scanGeneratedDiff` would report for them.
+ */
+export type DocumentSecretScan = (
+  files: readonly ScanFile[],
+) => Promise<ScanFinding[]>;
+
+/**
+ * The scan a sync run makes of each pass's documents, when the run has the
+ * scanner: `CTCDOCS_GITLEAKS_BINARY` names it, as the sync workflow does. A
+ * run without it, such as one on an editor's machine, holds nothing back for
+ * a secret, and the scan before the commit still stops it. With the scanner,
+ * it fails closed as that scan does: a missing configuration, an exemption
+ * that covers a file, or a scan that cannot be trusted rejects.
+ */
+export function createDocumentSecretScan(
+  repositoryRoot: string,
+  environment: Record<string, string | undefined> = process.env,
+  scanner: SecretScanner = spawnScanner,
+): DocumentSecretScan | undefined {
+  if (!environment.CTCDOCS_GITLEAKS_BINARY) {
+    return undefined;
+  }
+  const configurationFile = resolve(
+    repositoryRoot,
+    PROJECT_LAYOUT.gitleaksConfigurationFile,
+  );
+  return async (files) => {
+    if (files.length === 0) {
+      return [];
+    }
+    const configuration = await readConfiguration(configurationFile);
+    assertNothingExempt(
+      files.map((file) => file.path),
+      configuration,
+    );
+    return scanFiles(
+      files,
+      configurationFile,
+      repositoryRoot,
+      environment,
+      scanner,
+    );
+  };
+}
+
 /**
  * Scans every file a sync run changed for secrets, before the run commits it.
  *
@@ -168,10 +369,17 @@ async function loadGoogleFileIdResolver(
  * triggers no other workflow, so the project's CI never scans it. The files are
  * copied to a snapshot under their repository paths and scanned there with the
  * project's own `.gitleaks.toml` and `.gitleaksignore` — the configuration the
- * CI gate reads, so an allowlist entry means the same thing to both. Resolves
- * with the number of files scanned; a finding rejects with
+ * CI gate reads, so an allowlist entry means the same thing to both.
+ *
+ * Generated Markdown is scanned a second time as plain text (see
+ * `plainTextView`), from a second snapshot with the same paths and line
+ * numbers, so a value hidden from the scanner's rules by Markdown syntax is
+ * found and an ignore entry covers both views alike. A finding only the plain
+ * text shows is reported with `view=plain-text`.
+ *
+ * Resolves with the number of files scanned; a finding rejects with
  * `SecretFindingsError`, and a scan that could not be trusted with
- * `SecretScanError`. The snapshot and the report are removed either way.
+ * `SecretScanError`. The snapshots and the reports are removed either way.
  */
 export async function scanGeneratedDiff(
   repositoryRoot: string,
@@ -190,55 +398,25 @@ export async function scanGeneratedDiff(
     return 0;
   }
 
-  const workspace = await mkdtemp(join(tmpdir(), 'ctcdocs-secret-scan-'));
-  try {
-    const snapshot = join(workspace, 'snapshot');
-    for (const path of files) {
-      const target = join(snapshot, path);
-      await mkdir(dirname(target), { recursive: true });
-      await copyFile(resolve(repositoryRoot, path), target);
-    }
-
-    const reportFile = join(workspace, 'report.json');
-    const status = await scanner(
-      environment.CTCDOCS_GITLEAKS_BINARY || 'gitleaks',
-      gitleaksArguments({
-        configurationFile,
-        ignoreDirectory: repositoryRoot,
-        reportFile,
-      }),
-      snapshot,
-    );
-    if (status !== 0 && status !== GITLEAKS_FINDINGS_EXIT_CODE) {
-      throw new SecretScanError(
-        `The secret scanner exited with status ${status} without completing the scan.`,
-      );
-    }
-
-    let report: string;
-    try {
-      report = await readFile(reportFile, 'utf8');
-    } catch {
-      throw new SecretScanError('The secret scanner wrote no report.');
-    }
-    const findings = parseGitleaksReport(report);
-    if (findings.length === 0) {
-      if (status !== 0) {
-        throw new SecretScanError(
-          'The secret scanner reported findings its report does not list.',
-        );
-      }
-      console.log(`Generated diff secret scan passed (${files.length} files).`);
-      return files.length;
-    }
-
-    const googleFileId = await loadGoogleFileIdResolver(repositoryRoot);
-    throw new SecretFindingsError(
-      findings.map((finding) =>
-        describeSecretFinding(finding, googleFileId(finding.path)),
-      ),
-    );
-  } finally {
-    await rm(workspace, { recursive: true, force: true });
+  const findings = await scanFiles(
+    files.map((path) => ({
+      path,
+      content: () => readFile(resolve(repositoryRoot, path)),
+    })),
+    configurationFile,
+    repositoryRoot,
+    environment,
+    scanner,
+  );
+  if (findings.length === 0) {
+    console.log(`Generated diff secret scan passed (${files.length} files).`);
+    return files.length;
   }
+
+  const googleFileId = await loadGoogleFileIdResolver(repositoryRoot);
+  throw new SecretFindingsError(
+    findings.map((finding) =>
+      describeScanFinding(finding, googleFileId(finding.path)),
+    ),
+  );
 }

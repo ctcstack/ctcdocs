@@ -185,6 +185,7 @@ const EXPORT_FAILURES: ReadonlySet<UnpublishedReasonCode> = new Set([
   'export-too-large',
   'download-restricted',
   'content-rejected',
+  'secret-found',
 ]);
 
 /**

@@ -2,6 +2,50 @@
 
 All three packages share a version and are released together.
 
+## Unreleased
+
+### Added
+
+- **Secret-scan rules for credentials typed into documents.**
+  `docs/examples/gitleaks-content-rules.toml` holds tested gitleaks rules for
+  the shapes people write in prose: labelled keys, tokens, passwords and PINs,
+  basic auth given to curl, passwords in connection strings, credential-named
+  URL parameters, secret share links, Zapier and Make webhooks, Turnstile keys
+  and truncated hex keys. Every
+  project should add them to its `.gitleaks.toml`;
+  [Secret scanning](docs/SECRET_SCANNING.md) says how. Once they are in, the
+  CI history scan reports values earlier syncs committed: rotate those first,
+  then record their fingerprints.
+
+### Changed
+
+- **A secret scan finding holds back its document, not the sync.** The sync
+  scans each document it exports before writing anything, with the scanner
+  and configuration the scan before the commit uses. A document whose new
+  text has a finding keeps its published version, or stays off the site if
+  it is new, and the rest of the corpus is published. The sync report, the
+  job summary and content health list it under the new reason `secret-found`,
+  with the rule and line, never the value. It is tried again on every run.
+  A finding in a file no document owns, a targeted run, or a run without the
+  scanner still stops the sync before the commit (ADR-056). The sync workflow
+  now passes `CTCDOCS_GITLEAKS_BINARY` to the sync step; a project that calls
+  its own workflow should do the same.
+- **Scanner downloads are retried.** The sync, project CI and platform CI
+  workflows retry the gitleaks, actionlint and zizmor downloads three times on
+  a transient network error instead of failing the run.
+- **The secret scan reads Markdown as plain text too.** `scan:generated-diff`
+  scans each generated Markdown file a second time as plain text, with the same
+  paths and line numbers, so a value hidden from gitleaks by emphasis, escapes,
+  autolinks, table cells or URL query strings is found before commit. A
+  finding only the plain text shows is logged with `view=plain-text`
+  (ADR-055). Links copied from Drive, Dropbox, OneDrive, Zoom or an old Google
+  Sheets address keep their access parameter out of the plain text, so they
+  hold nothing back. The view also writes the parameters after a `#` and a
+  password inside a URL, such as a database connection string, which
+  gitleaks' default rules missed in any form. Projects should still expect
+  the first syncs after the upgrade to hold back documents for values the
+  Markdown used to hide, in documents edited since.
+
 ## 0.28.0
 
 ### Added

@@ -8,6 +8,7 @@ const SYNC_PHASES = [
   'inventory',
   'plan',
   'export',
+  'secret-scan',
   'assemble',
   'validate',
   'write',

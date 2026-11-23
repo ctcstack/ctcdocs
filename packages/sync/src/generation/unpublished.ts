@@ -37,6 +37,7 @@ export type UnpublishedReasonCode =
   | 'export-too-large'
   | 'download-restricted'
   | 'content-rejected'
+  | 'secret-found'
   | 'readers-widened'
   | 'pdf-no-text'
   | 'pdf-over-site-limit'
@@ -111,6 +112,13 @@ export const UNPUBLISHED_REASONS: readonly UnpublishedReason[] = [
     action: 'Remove the part named',
     instruction:
       'Conversion stopped on content it cannot publish safely, named under the document. Remove or replace that part of the document.',
+  },
+  {
+    code: 'secret-found',
+    title: 'The document holds what looks like a password or key',
+    action: 'Remove it, and change it if real',
+    instruction:
+      "The secret scan found what looks like a password, token or key at the place named under the document, counted in lines of the page the site would publish. Remove it from the document and keep it in a password manager. If it is real, change it: everyone who can open the document has seen it. If it is not a secret, ask whoever maintains the site to allow it in the scanner's configuration. Until then the site keeps the version it had, or leaves a new document out.",
   },
   {
     code: 'readers-widened',

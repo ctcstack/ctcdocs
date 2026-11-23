@@ -1010,11 +1010,29 @@ starts no other workflow, so the project's CI never scans it. The sync therefore
 scans every generated file the run added or changed before it commits. It uses
 the gitleaks release the CI gate runs, and the project's own `.gitleaks.toml` and
 `.gitleaksignore`. The decision is recorded in
-[ADR-018](ADR/018-secret-scan-before-sync-commit.md).
+[ADR-018](ADR/018-secret-scan-before-sync-commit.md). The extra rules that catch
+credentials typed into document prose, and how a project adopts them, are in
+[Secret scanning](SECRET_SCANNING.md).
 
-A finding fails the run at the `secret-scan` stage. Nothing is committed or
-pushed, so `main` and the deployment keep the last good output, and every other
-document's update waits with it. Each finding is one line:
+A finding in a document's new text holds back that document, and the rest of
+the corpus is published
+([ADR-056](ADR/056-a-secret-scan-finding-holds-back-its-document-not-the-run.md)).
+The sync scans each document it exported before it writes anything, and a
+document with a finding keeps the version the site has, or stays off the site
+if it is new. The run succeeds. The sync report, the job summary and content
+health, under "Fix now", list the document as "The document holds what looks
+like a password or key", with the rule and the line of the generated page,
+such as `generic-api-key at line 12`. It is exported and scanned again on every
+run, and published on the first one that finds nothing. Steps 1 to 3 below
+apply to it as well; there is no failed run to rerun, only the next sync.
+
+What the scan of the documents cannot hold back stops the run at the
+`secret-scan` stage: a finding in a file no single document owns — the
+sidebar, a folder's section page, the redirect map, the data files — or one in
+a targeted run (`--file`), or one in a run without the scanner, which holds
+nothing back. Nothing is committed or pushed, so `main` and the deployment
+keep the last good output, and every other document's update waits with it.
+Each finding is one line:
 
 ```text
 ERROR [SECRET_SCAN]: rule=<gitleaks rule ID> path=<generated file> line=<line> fileId=<Google file ID>

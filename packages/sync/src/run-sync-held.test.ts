@@ -2,12 +2,13 @@
  * A document that cannot be published for a reason of its own is held back,
  * and the rest of the corpus is published without it (ADR-026).
  */
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { createDocumentSecretScan } from './automation/scan-generated-diff.js';
 import { parseSyncConfiguration } from './config.js';
 import type { SyncReport } from './generation/sync-report.js';
 import { StaticGoogleAccessTokenProvider } from './google/auth.js';
@@ -914,6 +915,7 @@ describe('phase timings', () => {
       'inventory',
       'plan',
       'export',
+      'secret-scan',
       'assemble',
       'validate',
       'write',
@@ -933,5 +935,370 @@ describe('phase timings', () => {
       'utf8',
     );
     expect(manifest).not.toContain('milliseconds');
+  });
+});
+
+describe('documents held back for a secret scan finding (ADR-056)', () => {
+  /*
+   * A stand-in for the scanner: it reports the marker wherever it is, on the
+   * line it is on. The real scanner is exercised in scan-generated-diff.
+   */
+  const MARKER = 'stand-in-secret';
+  function scannerOf(scanned: string[][] = []) {
+    return async (
+      files: readonly {
+        path: string;
+        content: () => Promise<string | Uint8Array>;
+      }[],
+    ) => {
+      scanned.push(files.map((file) => file.path));
+      const findings = [];
+      for (const file of files) {
+        const content = await file.content();
+        const text =
+          typeof content === 'string'
+            ? content
+            : new TextDecoder().decode(content);
+        const index = text
+          .split('\n')
+          .findIndex((line) => line.includes(MARKER));
+        if (index >= 0) {
+          findings.push({
+            ruleId: 'generic-api-key',
+            path: file.path,
+            line: index + 1,
+            plainTextOnly: false,
+          });
+        }
+      }
+      return findings;
+    };
+  }
+
+  it('publishes the rest and leaves out a new document with a finding', async () => {
+    const root = await repository();
+    const scanned: string[][] = [];
+    const result = await runBasicMarkdownSync(
+      testSyncContext(root),
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: false },
+      {
+        inventoryResult: inventoryOf([
+          document('doc-alpha', 'Alpha'),
+          document('doc-keys', 'Keys'),
+        ]),
+        markdownExporter: exporterOf({
+          'doc-keys': `Intro.\n\nKey: ${MARKER}\n`,
+        }),
+        now: () => new Date(firstTimestamp),
+        secretScan: scannerOf(scanned),
+      },
+    );
+
+    expect(result.report.summary).toMatchObject({ added: 1, notPublished: 1 });
+    expect(result.report.unpublished).toEqual([
+      expect.objectContaining({
+        id: 'doc-keys',
+        status: 'not-published',
+        reason: 'secret-found',
+        detail: expect.stringMatching(/^generic-api-key at line \d+$/),
+      }),
+    ]);
+    const manifest = await readJson<SyncManifest>(
+      root,
+      'data/sync-manifest.json',
+    );
+    expect(Object.keys(manifest.documents)).toEqual(['doc-alpha']);
+    expect(manifest.held).toBeUndefined();
+    expect(
+      await exists(resolve(root, 'src/content/docs/_generated/doc-keys.md')),
+    ).toBe(false);
+    // Both documents were scanned, then only the one published.
+    expect(scanned).toEqual([
+      [
+        'src/content/docs/_generated/doc-alpha.md',
+        'src/content/docs/_generated/doc-keys.md',
+      ].sort(),
+      ['src/content/docs/_generated/doc-alpha.md'],
+    ]);
+  });
+
+  it('keeps the published version of a document that gains a finding', async () => {
+    const root = await repository();
+    const context = testSyncContext(root);
+    await runBasicMarkdownSync(
+      context,
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: false },
+      {
+        inventoryResult: inventoryOf([
+          document('doc-alpha', 'Alpha'),
+          document('doc-beta', 'Beta'),
+        ]),
+        markdownExporter: exporterOf({}),
+        now: () => new Date(firstTimestamp),
+        secretScan: scannerOf(),
+      },
+    );
+    const publishedPath = resolve(
+      root,
+      'src/content/docs/_generated/doc-beta.md',
+    );
+    const published = await readFile(publishedPath, 'utf8');
+
+    const result = await runBasicMarkdownSync(
+      context,
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: false },
+      {
+        inventoryResult: inventoryOf([
+          document('doc-alpha', 'Alpha', 'team', secondTimestamp),
+          document('doc-beta', 'Beta', 'team', secondTimestamp),
+        ]),
+        markdownExporter: exporterOf({
+          'doc-alpha': 'Alpha, edited.\n',
+          'doc-beta': `Password: ${MARKER}\n`,
+        }),
+        now: () => new Date(secondTimestamp),
+        secretScan: scannerOf(),
+      },
+    );
+
+    expect(result.report.summary).toMatchObject({ changed: 1, outOfDate: 1 });
+    expect(result.report.unpublished).toEqual([
+      expect.objectContaining({
+        id: 'doc-beta',
+        status: 'out-of-date',
+        reason: 'secret-found',
+        publishedVersion: firstTimestamp,
+      }),
+    ]);
+    await expect(readFile(publishedPath, 'utf8')).resolves.toBe(published);
+    await expect(
+      readFile(
+        resolve(root, 'src/content/docs/_generated/doc-alpha.md'),
+        'utf8',
+      ),
+    ).resolves.toContain('Alpha, edited.');
+  });
+
+  it('tries a held document again on the next run, and publishes it once clean', async () => {
+    const root = await repository();
+    const context = testSyncContext(root);
+    const inventory = inventoryOf([document('doc-keys', 'Keys')]);
+    await runBasicMarkdownSync(
+      context,
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: false },
+      {
+        inventoryResult: inventory,
+        markdownExporter: exporterOf({ 'doc-keys': `Key: ${MARKER}\n` }),
+        now: () => new Date(firstTimestamp),
+        secretScan: scannerOf(),
+      },
+    );
+
+    // Drive reports the same version: an allowlist entry in the project, not
+    // an edit, can be what clears it, so it is exported and scanned again.
+    const calls: string[] = [];
+    const result = await runBasicMarkdownSync(
+      context,
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: false },
+      {
+        inventoryResult: inventory,
+        markdownExporter: exporterOf({ 'doc-keys': 'Clean now.\n' }, calls),
+        now: () => new Date(secondTimestamp),
+        secretScan: scannerOf(),
+      },
+    );
+
+    expect(calls).toContain('doc-keys');
+    expect(result.report.unpublished).toEqual([]);
+    expect(result.report.summary).toMatchObject({ added: 1 });
+  });
+
+  it('names the first places of many findings and counts the rest', async () => {
+    const root = await repository();
+    const rows = Array.from(
+      { length: 8 },
+      (_, index) => `User ${index}: ${MARKER}`,
+    );
+    const result = await runBasicMarkdownSync(
+      testSyncContext(root),
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: false },
+      {
+        inventoryResult: inventoryOf([document('doc-logins', 'Logins')]),
+        markdownExporter: exporterOf({
+          'doc-logins': `${rows.join('\n\n')}\n`,
+        }),
+        now: () => new Date(firstTimestamp),
+        secretScan: (files) =>
+          Promise.resolve(
+            files.flatMap((file) =>
+              Array.from({ length: 8 }, (_, index) => ({
+                ruleId: 'generic-api-key',
+                path: file.path,
+                line: 10 + index,
+                plainTextOnly: false,
+              })),
+            ),
+          ),
+      },
+    );
+
+    expect(result.report.unpublished[0]?.detail).toBe(
+      [10, 11, 12, 13, 14]
+        .map((line) => `generic-api-key at line ${line}`)
+        .concat('3 more')
+        .join(', '),
+    );
+  });
+
+  it('scans only output that would change', async () => {
+    const root = await repository();
+    const context = testSyncContext(root);
+    const inventory = inventoryOf([document('doc-alpha', 'Alpha')]);
+    await runBasicMarkdownSync(
+      context,
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: false },
+      {
+        inventoryResult: inventory,
+        markdownExporter: exporterOf({}),
+        now: () => new Date(firstTimestamp),
+      },
+    );
+
+    const scanned: string[][] = [];
+    await runBasicMarkdownSync(
+      context,
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: true },
+      {
+        inventoryResult: inventory,
+        markdownExporter: exporterOf({}),
+        now: () => new Date(secondTimestamp),
+        secretScan: scannerOf(scanned),
+      },
+    );
+
+    expect(scanned).toEqual([[]]);
+  });
+
+  it('leaves a targeted run to the scan before the commit', async () => {
+    const root = await repository();
+    const context = testSyncContext(root);
+    const inventory = inventoryOf([document('doc-keys', 'Keys')]);
+    await runBasicMarkdownSync(
+      context,
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: false },
+      {
+        inventoryResult: inventory,
+        markdownExporter: exporterOf({}),
+        now: () => new Date(firstTimestamp),
+      },
+    );
+
+    const scanned: string[][] = [];
+    await runBasicMarkdownSync(
+      context,
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: false, fileId: 'doc-keys' },
+      {
+        inventoryResult: inventory,
+        markdownExporter: exporterOf({ 'doc-keys': `Key: ${MARKER}\n` }),
+        now: () => new Date(secondTimestamp),
+        secretScan: scannerOf(scanned),
+      },
+    );
+
+    expect(scanned).toEqual([]);
+  });
+
+  it.runIf(process.env.CTCDOCS_GITLEAKS_BINARY)(
+    'holds back the document gitleaks finds a value in',
+    async () => {
+      const root = await repository();
+      await writeFile(
+        resolve(root, '.gitleaks.toml'),
+        '[extend]\nuseDefault = true\n',
+      );
+      // Synthetic, and assembled so that this file does not match.
+      const token = ['XRbTq', 'LmV7cWd'].join('');
+      const secretScan = createDocumentSecretScan(root, process.env);
+      if (!secretScan) {
+        throw new Error('The scanner is installed, so the scan is on.');
+      }
+      const result = await runBasicMarkdownSync(
+        testSyncContext(root),
+        configuration,
+        tokenProvider,
+        { dryRun: false, full: false },
+        {
+          inventoryResult: inventoryOf([
+            document('doc-alpha', 'Alpha'),
+            document('doc-cron', 'Cron'),
+          ]),
+          markdownExporter: exporterOf({
+            'doc-cron': `Nightly:\n\n<https://leads.example.test/api/restore.php?token=${token}>\n`,
+          }),
+          now: () => new Date(firstTimestamp),
+          secretScan,
+        },
+      );
+
+      expect(result.report.unpublished).toEqual([
+        expect.objectContaining({
+          id: 'doc-cron',
+          reason: 'secret-found',
+          detail: expect.stringMatching(/^generic-api-key at line \d+$/),
+        }),
+      ]);
+      expect(JSON.stringify(result.report)).not.toContain(token);
+      const manifest = await readJson<SyncManifest>(
+        root,
+        'data/sync-manifest.json',
+      );
+      expect(Object.keys(manifest.documents)).toEqual(['doc-alpha']);
+    },
+  );
+
+  it('fails closed when the scan reports a file it was not given', async () => {
+    const root = await repository();
+    await expect(
+      runBasicMarkdownSync(
+        testSyncContext(root),
+        configuration,
+        tokenProvider,
+        { dryRun: false, full: false },
+        {
+          inventoryResult: inventoryOf([document('doc-alpha', 'Alpha')]),
+          markdownExporter: exporterOf({}),
+          now: () => new Date(firstTimestamp),
+          secretScan: () =>
+            Promise.resolve([
+              {
+                ruleId: 'generic-api-key',
+                path: 'data/sidebar.json',
+                line: 1,
+                plainTextOnly: false,
+              },
+            ]),
+        },
+      ),
+    ).rejects.toThrow('The secret scanner reported a file it was not given.');
   });
 });

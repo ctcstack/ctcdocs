@@ -126,10 +126,29 @@ jobs:
             fi
           fi
 
+      # The release and checksum match the workflow-security job. With it, the
+      # sync's secret-scan tests also run against the real scanner, not only a
+      # stand-in.
+      - name: Install the checksummed secret scanner
+        shell: bash
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          set -euo pipefail
+
+          curl --fail --silent --show-error --location --retry 3 --retry-connrefused \
+            --output "${RUNNER_TEMP}/gitleaks.tar.gz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  ${RUNNER_TEMP}/gitleaks.tar.gz" | sha256sum --check
+          tar --extract --gzip --file "${RUNNER_TEMP}/gitleaks.tar.gz" --directory "${RUNNER_TEMP}" gitleaks
+
       # Formatting, lint, types, unit and fixture tests, then the whole gate a
       # project runs — corpus regeneration, build, content validation, Wrangler
       # dry run, search and accessibility — against fixtures/project.
       - name: Run the canonical verification gate
+        env:
+          CTCDOCS_GITLEAKS_BINARY: ${{ runner.temp }}/gitleaks
         run: pnpm verify
 
       # Build output is produced by `prepack` and belongs in the published
@@ -187,19 +206,19 @@ jobs:
         run: |
           set -euo pipefail
 
-          curl --fail --silent --show-error --location \
+          curl --fail --silent --show-error --location --retry 3 --retry-connrefused \
             --output "${RUNNER_TEMP}/actionlint.tar.gz" \
             "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
           echo "${ACTIONLINT_SHA256}  ${RUNNER_TEMP}/actionlint.tar.gz" | sha256sum --check
           tar --extract --gzip --file "${RUNNER_TEMP}/actionlint.tar.gz" --directory "${RUNNER_TEMP}" actionlint
 
-          curl --fail --silent --show-error --location \
+          curl --fail --silent --show-error --location --retry 3 --retry-connrefused \
             --output "${RUNNER_TEMP}/gitleaks.tar.gz" \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           echo "${GITLEAKS_SHA256}  ${RUNNER_TEMP}/gitleaks.tar.gz" | sha256sum --check
           tar --extract --gzip --file "${RUNNER_TEMP}/gitleaks.tar.gz" --directory "${RUNNER_TEMP}" gitleaks
 
-          curl --fail --silent --show-error --location \
+          curl --fail --silent --show-error --location --retry 3 --retry-connrefused \
             --output "${RUNNER_TEMP}/zizmor.tar.gz" \
             "https://github.com/woodruffw/zizmor/releases/download/v${ZIZMOR_VERSION}/zizmor-x86_64-unknown-linux-gnu.tar.gz"
           echo "${ZIZMOR_SHA256}  ${RUNNER_TEMP}/zizmor.tar.gz" | sha256sum --check
