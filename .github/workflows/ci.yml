@@ -82,7 +82,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          curl --fail --silent --show-error --location \
+          curl --fail --silent --show-error --location --retry 3 --retry-connrefused \
             --output "${RUNNER_TEMP}/gitleaks.tar.gz" \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           echo "${GITLEAKS_SHA256}  ${RUNNER_TEMP}/gitleaks.tar.gz" | sha256sum --check
@@ -151,19 +151,19 @@ jobs:
         run: |
           set -euo pipefail
 
-          curl --fail --silent --show-error --location \
+          curl --fail --silent --show-error --location --retry 3 --retry-connrefused \
             --output "${RUNNER_TEMP}/actionlint.tar.gz" \
             "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
           echo "${ACTIONLINT_SHA256}  ${RUNNER_TEMP}/actionlint.tar.gz" | sha256sum --check
           tar --extract --gzip --file "${RUNNER_TEMP}/actionlint.tar.gz" --directory "${RUNNER_TEMP}" actionlint
 
-          curl --fail --silent --show-error --location \
+          curl --fail --silent --show-error --location --retry 3 --retry-connrefused \
             --output "${RUNNER_TEMP}/gitleaks.tar.gz" \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           echo "${GITLEAKS_SHA256}  ${RUNNER_TEMP}/gitleaks.tar.gz" | sha256sum --check
           tar --extract --gzip --file "${RUNNER_TEMP}/gitleaks.tar.gz" --directory "${RUNNER_TEMP}" gitleaks
 
-          curl --fail --silent --show-error --location \
+          curl --fail --silent --show-error --location --retry 3 --retry-connrefused \
             --output "${RUNNER_TEMP}/zizmor.tar.gz" \
             "https://github.com/woodruffw/zizmor/releases/download/v${ZIZMOR_VERSION}/zizmor-x86_64-unknown-linux-gnu.tar.gz"
           echo "${ZIZMOR_SHA256}  ${RUNNER_TEMP}/zizmor.tar.gz" | sha256sum --check
