@@ -110,7 +110,9 @@ a document should link to the vault entry, not to a share of it.
    open a pull request. CI runs the same scans.
 
 From then on a sync run that changes a document holding one of these shapes
-stops at the `secret-scan` stage and commits nothing, like any other finding.
+holds back that document and publishes the rest, like any other finding in a
+document's text
+([ADR-056](ADR/056-a-secret-scan-finding-holds-back-its-document-not-the-run.md)).
 
 When a new platform release changes the example file, replace the block in the
 project's configuration with the new one, and run steps 2 to 4 again.
