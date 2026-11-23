@@ -396,17 +396,22 @@ describe('the generated diff secret scan', () => {
   });
 
   /*
-   * Against the real scanner, when one is installed: a value Markdown hides
-   * from the generic rule is found in the plain text. The value is synthetic.
+   * Against the real scanner, when one is installed (this repository's CI
+   * installs the pinned release): a value Markdown hides from the generic rule
+   * is found in the plain text, and the resource key of a Drive link is not.
+   * The values are synthetic, and assembled so that this file does not match.
    */
-  it.runIf(process.env.CTCDOCS_GITLEAKS_BINARY)(
+  const realScanner = it.runIf(process.env.CTCDOCS_GITLEAKS_BINARY);
+
+  realScanner(
     'finds with gitleaks a value only the plain text exposes',
     async () => {
       const root = await createProject();
+      const token = ['XRbTq', 'LmV7cWd'].join('');
       await write(
         root,
         ADDED,
-        '# Added\n\n0 0 \\* \\* \\* /usr/bin/curl -fsS "<https://leads.example.test/api/restore.php?token=XRbTqLmV7cWd>" > /dev/null\n',
+        `# Added\n\n0 0 \\* \\* \\* /usr/bin/curl -fsS "<https://leads.example.test/api/restore.php?token=${token}>" > /dev/null\n`,
       );
 
       const error = await scanGeneratedDiff(root, process.env).catch(
@@ -417,6 +422,23 @@ describe('the generated diff secret scan', () => {
       expect((error as SecretFindingsError).findings).toEqual([
         `rule=generic-api-key path=${ADDED} line=3 view=plain-text`,
       ]);
+    },
+  );
+
+  realScanner(
+    'passes with gitleaks a Drive link to a file shared by link',
+    async () => {
+      const root = await createProject();
+      const resourceKey = ['0-Xy7Qw2Er9', 'Ty4Ui1Op3As'].join('');
+      await write(
+        root,
+        ADDED,
+        `# Added\n\nSee [the file](https://drive.google.com/file/d/abc/view?resourcekey=${resourceKey}) here.\n`,
+      );
+
+      await expect(
+        scanGeneratedDiff(root, process.env),
+      ).resolves.toBeGreaterThan(0);
     },
   );
 

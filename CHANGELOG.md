@@ -4,13 +4,26 @@ All three packages share a version and are released together.
 
 ## Unreleased
 
+### Added
+
+- **Secret-scan rules for credentials typed into documents.**
+  `docs/examples/gitleaks-content-rules.toml` holds tested gitleaks rules for
+  the shapes people write in prose: labelled keys, tokens, passwords and PINs,
+  basic auth given to curl, credential-named URL parameters, secret share
+  links, Zapier and Make webhooks, Turnstile keys and truncated hex keys. Every
+  project should add them to its `.gitleaks.toml`;
+  [Secret scanning](docs/SECRET_SCANNING.md) says how. Once they are in, the
+  CI history scan reports values earlier syncs committed: rotate those first,
+  then record their fingerprints.
+
 ### Changed
 
 - **The secret scan reads Markdown as plain text too.** `scan:generated-diff`
   scans each generated Markdown file a second time as plain text, with the same
   paths and line numbers, so a value hidden from gitleaks by emphasis, escapes,
-  autolinks or URL query strings is found before commit. A finding only the
-  plain text shows is logged with `view=plain-text` (ADR-055).
+  autolinks, table cells or URL query strings is found before commit. A
+  finding only the plain text shows is logged with `view=plain-text`
+  (ADR-055).
 
 ## 0.28.0
 

@@ -34,11 +34,19 @@ second scan reads a view in which the Markdown no longer shapes the text.
 
 - **The view is made with the Markdown parser the sync already uses**
   (`remark-parse` with `remark-gfm`), and HTML inside it with `htmlparser2`.
-  Text and code are written as they read, with emphasis gone. Every URL is
-  written on its own, followed by each query parameter as `name=value`, after
-  the converter's punctuation escapes are undone.
+  Text and code are written as they read, with emphasis gone and table cells
+  kept apart by `|`. Every URL is written on its own, followed by each query
+  parameter as `name=value`, after the converter's punctuation escapes are
+  undone. The `resourcekey` that Drive writes into the address of a file
+  shared by link is left out of a Google URL: it is part of the address Google
+  hands out, which the document already publishes as a link, and the scan of
+  the Markdown never matched it, so writing it apart would stop syncs that
+  passed before over a value nobody typed.
 - **Same paths, same line numbers.** The view has the file's line count, and
-  every piece of text stays on its line. A finding in the view has the
+  every piece of text stays on its line: a link's URL on the line that holds
+  it when the link text wraps, an HTML attribute on its own line, and HTML
+  inside a list item or a quote on its lines although the parser strips the
+  container's indent from it. A finding in the view has the
   fingerprint the file would give, so a `.gitleaksignore` entry covers both
   scans alike, and the gate's rules, configuration and pin are unchanged.
 - **The view never leaves the scan.** It is written to the scan's temporary
