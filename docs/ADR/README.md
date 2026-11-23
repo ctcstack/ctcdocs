@@ -100,5 +100,7 @@ Rejected
   amends ADR-025 and ADR-049.
 - ADR-055: the secret scan reads generated Markdown as plain text too.
   Proposed; amends ADR-018.
+- ADR-056: a secret scan finding holds back its document, not the run.
+  Proposed; supersedes ADR-018 in part once accepted.
 
 Create a new ADR by copying `000-template.md`.

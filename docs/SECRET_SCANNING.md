@@ -4,7 +4,10 @@ Every project scans for secrets twice with the same configuration: the sync
 scans each file a run changed before it commits it
 ([ADR-018](ADR/018-secret-scan-before-sync-commit.md)), and the project's CI
 scans the working tree and the history. Both read the project's
-`.gitleaks.toml` and `.gitleaksignore`.
+`.gitleaks.toml` and `.gitleaksignore`. A finding in one document's text holds
+back that document and lets the rest of the sync through
+([ADR-056](ADR/056-a-secret-scan-finding-holds-back-its-document-not-the-run.md));
+[Operations](OPERATIONS.md#secret-scan-findings) says what to do with one.
 
 The configuration a new project copies from the fixture extends gitleaks'
 default rules and adds nothing. Those rules know vendor key formats and one
@@ -55,8 +58,8 @@ A link copied from Zoom (`pwd`), OneDrive (`authkey`) or an old Google Sheets
 address (`key`, the spreadsheet ID) passes `ctcdocs-credential-url-parameter`,
 and the sync's plain-text view leaves those parameters out, together with
 Drive's `resourcekey` and Dropbox's `rlkey`. They are part of the address the
-service hands out for colleagues to open, and stopping a sync over them would
-cost more than it protects on an internal site. The exception is made per
+service hands out for colleagues to open, and holding a document back over
+them would cost more than it protects on an internal site. The exception is made per
 service and per parameter: a `pwd` on any other host is still a finding. That
 rule's allowlist reads the whole line, so it checks nothing else on a line
 holding such a link; the other rules still do.

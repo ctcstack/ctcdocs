@@ -24,6 +24,11 @@ import {
   IMAGE_FILE_EXTENSIONS,
   UnsafeAssetError,
 } from './assets/validate-asset.js';
+import type {
+  DocumentSecretScan,
+  ScanFinding,
+} from './automation/scan-generated-diff.js';
+import { SecretScanError } from './automation/secret-scan.js';
 import type { SyncContext } from './project-context.js';
 import type { SyncConfiguration } from './config.js';
 import {
@@ -197,6 +202,12 @@ export interface RunSyncDependencies extends InventoryRunDependencies {
   now?: () => Date;
   /** Milliseconds from a monotonic origin, for the run's phase timings. */
   clock?: () => number;
+  /**
+   * Scans what each pass would write, so a document with a secret scan
+   * finding is held back on its own (ADR-056). Without it, nothing is held
+   * for a secret, and the scan before the commit stops the run instead.
+   */
+  secretScan?: DocumentSecretScan;
 }
 
 /** A page a run added, changed or removed. */
@@ -977,6 +988,7 @@ interface ResolvedRun {
   /** Downloads a PDF, up to the most the sync reads. */
   downloader: { downloadFile(fileId: string): Promise<Uint8Array> };
   timer: PhaseTimer;
+  secretScan?: DocumentSecretScan;
 }
 
 /** A document's page before its frontmatter and record are written. */
@@ -1103,6 +1115,9 @@ export async function runBasicMarkdownSync(
         ),
       },
       downloader: { downloadFile: (fileId) => downloadFile(fileId) },
+      ...(dependencies.secretScan
+        ? { secretScan: dependencies.secretScan }
+        : {}),
     },
     new Map(
       nameIssues.map((issue) => [
@@ -1113,6 +1128,95 @@ export async function runBasicMarkdownSync(
         },
       ]),
     ),
+  );
+}
+
+/** The bytes at a repository path, or `undefined` when there is no file. */
+async function readGenerated(
+  repositoryRoot: string,
+  path: string,
+): Promise<Uint8Array | undefined> {
+  try {
+    return await readFile(resolve(repositoryRoot, path));
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+const sameBytes = (left: Uint8Array, right: Uint8Array) =>
+  left.length === right.length &&
+  left.every((byte, index) => byte === right[index]);
+
+/** Where a finding is, as the sync report says it: never the value. */
+function findingPlace(finding: ScanFinding, markdownPath: string): string {
+  const where =
+    finding.path === markdownPath
+      ? `line ${finding.line}`
+      : `line ${finding.line} of ${posix.basename(finding.path)}`;
+  return `${finding.ruleId} at ${where}`;
+}
+
+/**
+ * The exported documents whose new output has a secret scan finding, each
+ * with where the scanner found it.
+ *
+ * Only what the pass would add or change is scanned, the way the scan before
+ * the commit reads only the changed files: a value already published is the
+ * gate's history scan to report (ADR-018), and a document exported again to
+ * the same bytes is not held back for it.
+ */
+async function documentsWithSecrets(
+  repositoryRoot: string,
+  exportedDocuments: ReadonlyArray<{
+    fileId: string;
+    content: string;
+    record: SyncedDocumentRecord;
+    assets: readonly ExistingAsset[];
+  }>,
+  secretScan: DocumentSecretScan,
+): Promise<Map<string, HeldDocument>> {
+  const encoder = new TextEncoder();
+  const owners = new Map<string, { fileId: string; markdownPath: string }>();
+  const files: { path: string; content: () => Promise<Uint8Array> }[] = [];
+  for (const exported of exportedDocuments) {
+    const markdownPath = exported.record.generatedMarkdownPath;
+    for (const [path, bytes] of [
+      [markdownPath, encoder.encode(exported.content)] as const,
+      ...exported.assets.map(
+        (asset) => [asset.repositoryPath, asset.bytes] as const,
+      ),
+    ]) {
+      const current = await readGenerated(repositoryRoot, path);
+      if (current !== undefined && sameBytes(current, bytes)) {
+        continue;
+      }
+      owners.set(path, { fileId: exported.fileId, markdownPath });
+      files.push({ path, content: () => Promise.resolve(bytes) });
+    }
+  }
+
+  const places = new Map<string, string[]>();
+  for (const finding of await secretScan(files)) {
+    const owner = owners.get(finding.path);
+    if (!owner) {
+      throw new SecretScanError(
+        'The secret scanner reported a file it was not given.',
+      );
+    }
+    const list = places.get(owner.fileId) ?? [];
+    list.push(findingPlace(finding, owner.markdownPath));
+    places.set(owner.fileId, list);
+  }
+  return new Map(
+    [...places]
+      .sort(([left], [right]) => compareText(left, right))
+      .map(([fileId, list]) => [
+        fileId,
+        { reason: 'secret-found', detail: [...new Set(list)].join(', ') },
+      ]),
   );
 }
 
@@ -1965,6 +2069,29 @@ async function synchronize(
       run,
       new Map([...held, ...failures]),
     );
+  }
+  /*
+   * A document whose new output has a secret scan finding is held back like
+   * one that cannot be exported (ADR-056). A targeted run was asked for that
+   * document, so the scan before the commit stops it instead.
+   */
+  if (run.secretScan && !targetedFileId) {
+    const scanStart = timer.now();
+    const secrets = await documentsWithSecrets(
+      repositoryRoot,
+      exportedDocuments,
+      run.secretScan,
+    );
+    timer.since('secret-scan', scanStart);
+    if (secrets.size > 0) {
+      return synchronize(
+        context,
+        configuration,
+        options,
+        run,
+        new Map([...held, ...secrets]),
+      );
+    }
   }
   const assembleStart = timer.now();
   const exportedById = new Map(
