@@ -49,6 +49,18 @@ scanners that guard it. To test a change to the rules, write look-alikes of your
 own in a scratch directory outside any repository, and scan it with
 `gitleaks dir --config <the edited file>`.
 
+### What they do not count as a credential
+
+A link copied from Zoom (`pwd`), OneDrive (`authkey`) or an old Google Sheets
+address (`key`, the spreadsheet ID) passes `ctcdocs-credential-url-parameter`,
+and the sync's plain-text view leaves those parameters out, together with
+Drive's `resourcekey` and Dropbox's `rlkey`. They are part of the address the
+service hands out for colleagues to open, and stopping a sync over them would
+cost more than it protects on an internal site. The exception is made per
+service and per parameter: a `pwd` on any other host is still a finding. That
+rule's allowlist reads the whole line, so it checks nothing else on a line
+holding such a link; the other rules still do.
+
 ### What they do not catch
 
 - A value on its own line, with no label, link or recognisable prefix. Nothing

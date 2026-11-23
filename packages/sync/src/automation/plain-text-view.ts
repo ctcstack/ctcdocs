@@ -202,18 +202,45 @@ function removePunctuationEscapes(text: string): string {
   return result;
 }
 
-/**
- * Query parameters Google writes into its own links, left out of the view.
- *
- * Drive adds `resourcekey` to the address of a file shared by link. It is part
- * of the address Google hands out, which the document already publishes as a
- * link, not a credential someone typed; written apart, it would match the
- * default generic rule, which never matched it in the Markdown.
- */
-const GOOGLE_LINK_PARAMETERS = new Set(['resourcekey']);
+const onDomain = (hostname: string, domain: string) =>
+  hostname === domain || hostname.endsWith(`.${domain}`);
 
-const isGoogleHost = (hostname: string) =>
-  hostname === 'google.com' || hostname.endsWith('.google.com');
+/**
+ * Query parameters that are part of an address a file host or a meeting
+ * service hands out, left out of the view.
+ *
+ * Each belongs to a link someone copied from the service and pasted into a
+ * document for colleagues to open, not to a credential they typed: Drive's
+ * `resourcekey` and Dropbox's `rlkey` on a file shared by link, OneDrive's
+ * `authkey`, the `pwd` of a Zoom meeting link, and the spreadsheet ID an old
+ * Google Sheets address carries as `key`. Written apart, they would match the
+ * default generic rule, which never matched them in the Markdown, and stop a
+ * sync over a link the internal site is meant to carry. A Google Maps `key`,
+ * which is an API key, is not among them.
+ */
+function isShareLinkParameter(url: URL, name: string): boolean {
+  const { hostname, pathname } = url;
+  switch (name.toLowerCase()) {
+    case 'resourcekey':
+      return onDomain(hostname, 'google.com');
+    case 'key':
+      return (
+        onDomain(hostname, 'spreadsheets.google.com') ||
+        (onDomain(hostname, 'docs.google.com') &&
+          pathname.startsWith('/spreadsheet/'))
+      );
+    case 'rlkey':
+      return onDomain(hostname, 'dropbox.com');
+    case 'authkey':
+      return (
+        onDomain(hostname, 'onedrive.live.com') || onDomain(hostname, '1drv.ms')
+      );
+    case 'pwd':
+      return onDomain(hostname, 'zoom.us');
+    default:
+      return false;
+  }
+}
 
 /** A URL, then each query parameter as `name=value`, decoded. */
 export function urlTokens(url: string): string[] {
@@ -225,11 +252,9 @@ export function urlTokens(url: string): string[] {
     return [unescaped];
   }
 
-  const skipped = isGoogleHost(parsed.hostname)
-    ? [...parsed.searchParams.keys()].filter((name) =>
-        GOOGLE_LINK_PARAMETERS.has(name.toLowerCase()),
-      )
-    : [];
+  const skipped = [...new Set(parsed.searchParams.keys())].filter((name) =>
+    isShareLinkParameter(parsed, name),
+  );
   let shown = unescaped;
   if (skipped.length > 0) {
     for (const name of skipped) {

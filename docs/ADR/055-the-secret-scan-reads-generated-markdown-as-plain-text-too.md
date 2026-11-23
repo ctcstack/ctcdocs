@@ -37,11 +37,17 @@ second scan reads a view in which the Markdown no longer shapes the text.
   Text and code are written as they read, with emphasis gone and table cells
   kept apart by `|`. Every URL is written on its own, followed by each query
   parameter as `name=value`, after the converter's punctuation escapes are
-  undone. The `resourcekey` that Drive writes into the address of a file
-  shared by link is left out of a Google URL: it is part of the address Google
-  hands out, which the document already publishes as a link, and the scan of
-  the Markdown never matched it, so writing it apart would stop syncs that
-  passed before over a value nobody typed.
+  undone.
+- **A link copied from a file host or Zoom is not a credential.** The
+  parameters a service puts into the address it hands out are left out of the
+  view: Drive's `resourcekey` and Dropbox's `rlkey` on a file shared by link,
+  OneDrive's `authkey`, the `pwd` of a Zoom meeting link, and the `key` of an
+  old Google Sheets address, which is the spreadsheet ID. A document pastes
+  such a link for colleagues to open, the site is for the same team, and the
+  scan of the Markdown never matched these values; written apart, they would
+  match the default generic rule and stop syncs that passed before over a
+  value nobody typed. Each is left out only on its own service's host, so a
+  Maps API key, or a `pwd` on any other site, is still scanned.
 - **Same paths, same line numbers.** The view has the file's line count, and
   every piece of text stays on its line: a link's URL on the line that holds
   it when the link text wraps, an HTML attribute on its own line, and HTML

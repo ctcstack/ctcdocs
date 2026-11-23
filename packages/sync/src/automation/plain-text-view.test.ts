@@ -178,17 +178,33 @@ describe('the plain-text view of generated Markdown', () => {
     expect(lines[2]).toBe('next');
   });
 
-  it('leaves out the resource key Drive writes into its own links', () => {
-    const resourceKey = part('0-Xy7Qw2Er9', 'Ty4Ui1Op3As');
-    const drive = `https://drive.google.com/file/d/abc/view?resourcekey=${resourceKey}&usp=sharing`;
+  describe('the parameters of a link copied from a file host or Zoom', () => {
+    const value = part('0-Xy7Qw2Er9', 'Ty4Ui1Op3As');
 
-    expect(urlTokens(drive)).toEqual([
-      'https://drive.google.com/file/d/abc/view?usp=sharing',
-      'usp=sharing',
-    ]);
-    expect(
-      urlTokens(`https://example.test/view?resourcekey=${resourceKey}`),
-    ).toContain(`resourcekey=${resourceKey}`);
+    it.each([
+      ['Drive', 'https://drive.google.com/file/d/abc/view', 'resourcekey'],
+      ['Dropbox', 'https://www.dropbox.com/scl/fi/abc/plan.pdf', 'rlkey'],
+      ['OneDrive', 'https://onedrive.live.com/redir', 'authkey'],
+      ['OneDrive short link', 'https://1drv.ms/x/s', 'authkey'],
+      ['Zoom', 'https://us02web.zoom.us/j/81234567890', 'pwd'],
+      ['old Google Sheets', 'https://docs.google.com/spreadsheet/ccc', 'key'],
+      ['older Google Sheets', 'https://spreadsheets.google.com/ccc', 'key'],
+    ])('leaves out the %s one', (_service, address, name) => {
+      expect(urlTokens(`${address}?${name}=${value}&usp=sharing`)).toEqual([
+        `${address}?usp=sharing`,
+        'usp=sharing',
+      ]);
+    });
+
+    it.each([
+      ['on another host', 'https://example.test/view?resourcekey='],
+      ['as a Maps API key', 'https://www.google.com/maps/embed/v1/place?key='],
+      ['on a page of another service', 'https://example.test/j/1?pwd='],
+    ])('keeps a parameter of the same name %s', (_case, prefix) => {
+      expect(urlTokens(`${prefix}${value}`)).toContain(
+        `${prefix.slice(prefix.lastIndexOf('?') + 1)}${value}`,
+      );
+    });
   });
 
   it('decodes entities in HTML text', () => {
