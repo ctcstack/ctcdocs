@@ -109,6 +109,11 @@ repository or a chat.
    pnpm exec playwright install chromium
    ```
 
+   The platform's CI and deployment workflows install only Chromium's headless
+   shell, which is what the browser suite runs in. A test of your own that
+   needs the full browser, through a `channel` or `headless: false`, fails
+   there.
+
 5. Copy these files from
    [`fixtures/project/`](https://github.com/ctcstack/ctcdocs/tree/main/fixtures/project)
    in the platform repository into yours, unchanged:
