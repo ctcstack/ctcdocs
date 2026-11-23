@@ -22,20 +22,22 @@ Every project should add them.
 
 Each shape is caught both in the Markdown the converter writes (bold and italic
 markers, escaped underscores, links and autolinks) and in a plain-text view of
-it with that markup removed, table cells kept apart by `|`, and each URL
-query parameter as a separate `name=value` token.
+it with that markup removed, table cells kept apart by `|`, each URL query
+parameter and each parameter after a `#` as a separate `name=value` token, and
+a password inside a URL (`postgres://user:password@host`) as
+`password: value`, which gitleaks' default rules then find too.
 
-| Rule                                   | What it catches                                                                                                                                                                                                 |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ctcdocs-labelled-credential`          | A label such as "API Key", "Secret Key", "Access token" or "Password", then a colon, a spaced hyphen, an en or em dash or a table cell border, then a value containing a digit — a 64-character hex key in bold |
-| `ctcdocs-labelled-credential-line-end` | The same labels followed by a value with no digits that ends the line — an all-lowercase key after a bold "API Key:" label                                                                                      |
-| `ctcdocs-pin`                          | "API Pin", "PIN code" or "Passcode" followed by four to twelve digits                                                                                                                                           |
-| `ctcdocs-basic-auth-in-command`        | A `user:password` pair given to PHP's `CURLOPT_USERPWD` or to `curl -u`                                                                                                                                         |
-| `ctcdocs-credential-url-parameter`     | A URL parameter named like a credential — `token`, `access_token`, `api_key`, `key`, `secret`, `API_ID`, `password`, `sig` — in a link, an autolink, a cron line or bare text                                   |
-| `ctcdocs-secret-share-link`            | A share link to a single secret in 1Password, Bitwarden Send, One-Time Secret, Password Pusher or Privnote                                                                                                      |
-| `ctcdocs-automation-webhook`           | A Zapier catch hook or a Make webhook URL                                                                                                                                                                       |
-| `ctcdocs-cloudflare-turnstile-key`     | A Cloudflare Turnstile key; site keys and secret keys share the prefix                                                                                                                                          |
-| `ctcdocs-labelled-hex-value`           | A hex run of ten or more characters straight after "API key", "secret key", "token" or "password", even cut short with an ellipsis                                                                              |
+| Rule                                   | What it catches                                                                                                                                                                                                                |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ctcdocs-labelled-credential`          | A label such as "API Key", "Secret Key", "Access token", "Password", "Pass" or "Pwd", then a colon, a spaced hyphen, an en or em dash or a table cell border, then a value containing a digit — a 64-character hex key in bold |
+| `ctcdocs-labelled-credential-line-end` | The same labels followed by a value with no digits that ends the line — an all-lowercase key after a bold "API Key:" label                                                                                                     |
+| `ctcdocs-pin`                          | "API Pin", "PIN code" or "Passcode" followed by four to twelve digits                                                                                                                                                          |
+| `ctcdocs-basic-auth-in-command`        | A `user:password` pair given to PHP's `CURLOPT_USERPWD` or to `curl -u`                                                                                                                                                        |
+| `ctcdocs-credential-url-parameter`     | A URL parameter named like a credential — `token`, `access_token`, `api_key`, `key`, `secret`, `API_ID`, `password`, `sig` — in a link, an autolink, a cron line or bare text                                                  |
+| `ctcdocs-secret-share-link`            | A share link to a single secret in 1Password, Bitwarden Send, One-Time Secret, Password Pusher or Privnote                                                                                                                     |
+| `ctcdocs-automation-webhook`           | A Zapier catch hook or a Make webhook URL                                                                                                                                                                                      |
+| `ctcdocs-cloudflare-turnstile-key`     | A Cloudflare Turnstile key; site keys and secret keys share the prefix                                                                                                                                                         |
+| `ctcdocs-labelled-hex-value`           | A hex run of ten or more characters straight after "API key", "secret key", "token" or "password", even cut short with an ellipsis                                                                                             |
 
 They were tested with gitleaks 8.30.1, the release the sync and the CI gate
 pin, against synthetic look-alikes of each shape and against ordinary

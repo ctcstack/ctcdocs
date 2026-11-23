@@ -36,9 +36,11 @@ All three packages share a version and are released together.
   finding only the plain text shows is logged with `view=plain-text`
   (ADR-055). Links copied from Drive, Dropbox, OneDrive, Zoom or an old Google
   Sheets address keep their access parameter out of the plain text, so they
-  hold nothing back. Projects should still expect the first syncs after the
-  upgrade to report values the Markdown used to hide, in documents edited
-  since.
+  hold nothing back. The view also writes the parameters after a `#` and a
+  password inside a URL, such as a database connection string, which
+  gitleaks' default rules missed in any form. Projects should still expect
+  the first syncs after the upgrade to hold back documents for values the
+  Markdown used to hide, in documents edited since.
 
 ## 0.28.0
 
