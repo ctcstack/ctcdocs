@@ -39,8 +39,8 @@ second scan reads a view in which the Markdown no longer shapes the text.
   parameter as `name=value`, after the converter's punctuation escapes are
   undone; then the parameters of a fragment written like a query, where an
   OAuth redirect carries its token; then a password the URL itself carries,
-  as in a database connection string, as `password: value`. A link's or an
-  image's title is written after its URL.
+  as in a database connection string, as `password: value`. A link's URL and
+  title are written after its text, so the text runs on unbroken.
 - **A link copied from a file host or Zoom is not a credential.** The
   parameters a service puts into the address it hands out are left out of the
   view: Drive's `resourcekey` and Dropbox's `rlkey` on a file shared by link,

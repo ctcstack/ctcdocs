@@ -72,12 +72,9 @@ export function plainTextView(markdown: string): string {
         case 'html':
           putHtml(node.value, start.line, put, putUrl);
           break;
-        // An inline link or image ends with its destination, so the URL is
-        // on the node's last line even when the text before it wraps.
-        case 'link':
-          putUrl(end.line, node.url);
-          putTitle(end.line, node.title);
-          break;
+        // An inline image ends with its destination, so the URL is on the
+        // node's last line even when the text before it wraps. A link's URL
+        // is written after its text, below.
         case 'image':
           putUrl(end.line, node.url);
           putTitle(end.line, node.title);
@@ -99,7 +96,19 @@ export function plainTextView(markdown: string): string {
       node.children.length === 1 &&
       node.children[0]?.type === 'text' &&
       node.children[0].value === node.url;
+    /*
+     * A link's URL follows its text, so the text runs on from what precedes
+     * it: `Password: [value](…)`, or an address GFM reads as an email link
+     * inside a connection string, `user:value@host`, stays one run of text.
+     */
+    const writeLinkUrl = () => {
+      if (node.type === 'link' && end !== undefined) {
+        putUrl(end.line, node.url);
+        putTitle(end.line, node.title);
+      }
+    };
     if (!('children' in node) || autolink) {
+      writeLinkUrl();
       return;
     }
     node.children.forEach((child, index) => {
@@ -110,6 +119,7 @@ export function plainTextView(markdown: string): string {
       }
       visit(child);
     });
+    writeLinkUrl();
   };
   visit(unified().use(remarkParse).use(remarkGfm).parse(markdown));
 
