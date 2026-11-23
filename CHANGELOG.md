@@ -2,7 +2,7 @@
 
 All three packages share a version and are released together.
 
-## Unreleased
+## 0.29.0
 
 ### Added
 
@@ -11,9 +11,8 @@ All three packages share a version and are released together.
   the shapes people write in prose: labelled keys, tokens, passwords and PINs,
   basic auth given to curl, passwords in connection strings, credential-named
   URL parameters, secret share links, Zapier and Make webhooks, Turnstile keys
-  and truncated hex keys. Every
-  project should add them to its `.gitleaks.toml`;
-  [Secret scanning](docs/SECRET_SCANNING.md) says how. Once they are in, the
+  and truncated hex keys. Every project should add them to its
+  `.gitleaks.toml`; [Secret scanning](docs/SECRET_SCANNING.md) says how. Once they are in, the
   CI history scan reports values earlier syncs committed: rotate those first,
   then record their fingerprints.
 
@@ -30,6 +29,13 @@ All three packages share a version and are released together.
   scanner still stops the sync before the commit (ADR-056). The sync workflow
   now passes `CTCDOCS_GITLEAKS_BINARY` to the sync step; a project that calls
   its own workflow should do the same.
+- **The browser suite installs Chromium's headless shell, without apt.** The
+  project CI, deploy and release workflows download only the headless shell
+  Playwright launches for a headless suite, and install system packages only
+  when the dynamic linker reports a missing library. The step took from 25 s
+  to several minutes, nearly all of it apt; it now takes seconds. A project
+  test that needs the full browser fails in those workflows
+  ([New project](docs/NEW_PROJECT.md)).
 - **Scanner downloads are retried.** The sync, project CI and platform CI
   workflows retry the gitleaks, actionlint and zizmor downloads three times on
   a transient network error instead of failing the run.
