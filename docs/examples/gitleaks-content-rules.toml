@@ -15,8 +15,8 @@
 #
 # Tested with gitleaks 8.30.1, the release the sync and the CI gate run, on the
 # raw Markdown the converter writes and on its plain-text view (emphasis and
-# escapes removed, each link URL and each URL query parameter as a separate
-# `name=value` token).
+# escapes removed, table cells kept apart by " | ", each link URL and each URL
+# query parameter as a separate `name=value` token).
 #
 # Notes for anyone changing these rules:
 #
@@ -55,7 +55,9 @@ stopwords = ["example", "dummy", "sample", "placeholder", "redacted", "changeme"
 # The same labels, then a single value without digits that ends the line, such
 # as an all-lowercase key after "**API Key:**". A value with a digit is the rule
 # above's. Single words, dotted names, camelCase identifiers, code ending in a
-# comma, URLs and placeholders are allowed.
+# comma, URLs and placeholders are allowed. A word in one case is allowed up to
+# fifteen letters ("Password: configurable"), so an all-lowercase or
+# all-uppercase key is caught from sixteen.
 [[rules]]
 id = "ctcdocs-labelled-credential-line-end"
 description = "A credential label in prose, a separator, and a single value without digits that ends the line"
@@ -67,6 +69,7 @@ keywords = ["key", "token", "secret", "password", "passwd", "passphrase"]
 description = "Words and placeholders, not values"
 regexes = [
   '''^[A-Z][a-z]+[.,;:!?)]*$''',
+  '''^(?:[a-z]{8,15}|[A-Z]{8,15})[.,;:!?)]*$''',
   '''^[a-z]+(?:[-.][a-z]+)+[.,;:!?)]*$''',
   '''(?i:^https?:)''',
   '''[{}$]''',

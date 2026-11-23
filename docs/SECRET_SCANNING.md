@@ -19,8 +19,8 @@ Every project should add them.
 
 Each shape is caught both in the Markdown the converter writes (bold and italic
 markers, escaped underscores, links and autolinks) and in a plain-text view of
-it with that markup removed and each URL query parameter as a separate
-`name=value` token.
+it with that markup removed, table cells kept apart by `|`, and each URL
+query parameter as a separate `name=value` token.
 
 | Rule                                   | What it catches                                                                                                                                                                                                 |
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -42,8 +42,7 @@ and after a bold label, version numbers and dates after a label, placeholders
 such as `<YOUR_API_KEY>`, `xxxx` and `********`, GitHub Actions expressions,
 shell variables passed to `curl -u`, TypeScript object literals, and ordinary
 URLs with `page`, `sort`, `id` or `v` parameters. The rules report nothing in
-the platform's fixture project or in this repository's tracked files and
-history.
+the platform's fixture project or in this repository's tracked files.
 
 The samples are not kept in this repository, since they would trip the
 scanners that guard it. To test a change to the rules, write look-alikes of your
@@ -57,8 +56,10 @@ own in a scratch directory outside any repository, and scan it with
 - A label and its value split across lines, cells of different rows, or a
   heading and the paragraph under it.
 - A short value: a value with digits needs eight distinct characters, one
-  without digits needs eight characters and must end the line. A PIN is caught
-  only after a PIN or passcode label.
+  without digits needs eight characters and must end the line, and a value of
+  letters in one case needs sixteen, so that a word such as "configurable" after
+  a label is not taken for a key. A PIN is caught only after a PIN or passcode
+  label.
 - A secret in an image, a scanned PDF page, or a spreadsheet cell whose header
   is in another row.
 - A credential in a URL's user part (`https://user:pass@host`), unless the

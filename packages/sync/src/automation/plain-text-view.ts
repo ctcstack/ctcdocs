@@ -4,6 +4,8 @@ import remarkGfm from 'remark-gfm';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 
+type Put = (line: number, text: string, apart: boolean) => void;
+
 /**
  * A plain-text view of generated Markdown, for the secret scanner only.
  *
@@ -16,41 +18,27 @@ import { unified } from 'unified';
  * The view keeps the file's line count, and every piece of text stays on the
  * line it came from, so a finding in the view has the line number, and the
  * fingerprint, it would have in the file. Literal text, code and HTML text are
- * written as they read; every URL is written on its own, followed by each of
- * its query parameters as `name=value`. The view is never committed or
- * published: it exists in the scan's temporary snapshot and nowhere else.
+ * written as they read, with table cells kept apart by ` | `; every URL is
+ * written on its own, followed by each of its query parameters as
+ * `name=value`. The view is never committed or published: it exists in the
+ * scan's temporary snapshot and nowhere else.
  */
 export function plainTextView(markdown: string): string {
-  const lineStarts = [0];
-  for (let index = 0; index < markdown.length; index += 1) {
-    if (markdown[index] === '\n') {
-      lineStarts.push(index + 1);
-    }
-  }
-  const lines: string[] = lineStarts.map(() => '');
+  const lineOf = lineLocator(markdown);
+  const lines: string[] = Array.from(
+    { length: lineOf(markdown.length) },
+    () => '',
+  );
 
   /* Text on a line runs on; a URL is set apart so its end is a word's end. */
-  const put = (line: number, text: string, apart: boolean) => {
+  const put: Put = (line, text, apart) => {
     const index = Math.min(Math.max(line, 1), lines.length) - 1;
     lines[index] += apart ? ` ${text} ` : text;
   };
-  const putLines = (firstLine: number, text: string) => {
+  const putLines = (firstLine: number, text: string, apart = false) => {
     text.split('\n').forEach((part, offset) => {
-      put(firstLine + offset, part, false);
+      put(firstLine + offset, part, apart);
     });
-  };
-  const lineOfOffset = (offset: number): number => {
-    let low = 0;
-    let high = lineStarts.length - 1;
-    while (low < high) {
-      const middle = Math.ceil((low + high) / 2);
-      if ((lineStarts[middle] ?? 0) <= offset) {
-        low = middle;
-      } else {
-        high = middle - 1;
-      }
-    }
-    return low + 1;
   };
   const putUrl = (line: number, url: string) => {
     for (const token of urlTokens(url)) {
@@ -76,17 +64,21 @@ export function plainTextView(markdown: string): string {
           break;
         }
         case 'html':
-          putHtml(node.value, start.offset ?? 0, lineOfOffset, put, putUrl);
+          putHtml(node.value, start.line, put, putUrl);
           break;
+        // An inline link or image ends with its destination, so the URL is
+        // on the node's last line even when the text before it wraps.
         case 'link':
-        case 'definition':
-          putUrl(start.line, node.url);
+          putUrl(end.line, node.url);
           break;
         case 'image':
-          putUrl(start.line, node.url);
+          putUrl(end.line, node.url);
           if (node.alt) {
-            put(start.line, node.alt, true);
+            putLines(start.line, node.alt, true);
           }
+          break;
+        case 'definition':
+          putUrl(start.line, node.url);
           break;
         default:
           break;
@@ -98,36 +90,84 @@ export function plainTextView(markdown: string): string {
       node.children.length === 1 &&
       node.children[0]?.type === 'text' &&
       node.children[0].value === node.url;
-    if ('children' in node && !autolink) {
-      for (const child of node.children) {
-        visit(child);
-      }
+    if (!('children' in node) || autolink) {
+      return;
     }
+    node.children.forEach((child, index) => {
+      // Cells of a row read as columns, not as one word.
+      const cellLine = child.position?.start.line;
+      if (child.type === 'tableCell' && index > 0 && cellLine !== undefined) {
+        put(cellLine, '|', true);
+      }
+      visit(child);
+    });
   };
   visit(unified().use(remarkParse).use(remarkGfm).parse(markdown));
 
   return lines.map((line) => line.trimEnd()).join('\n');
 }
 
-/** HTML in Markdown: its text and its link targets, on the lines they occupy. */
+/**
+ * The 1-based line of an offset in `text`, counting `\n` only, as gitleaks
+ * does.
+ */
+function lineLocator(text: string): (offset: number) => number {
+  const lineStarts = [0];
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] === '\n') {
+      lineStarts.push(index + 1);
+    }
+  }
+  return (offset) => {
+    let low = 0;
+    let high = lineStarts.length - 1;
+    while (low < high) {
+      const middle = Math.ceil((low + high) / 2);
+      if ((lineStarts[middle] ?? 0) <= offset) {
+        low = middle;
+      } else {
+        high = middle - 1;
+      }
+    }
+    return low + 1;
+  };
+}
+
+/**
+ * HTML in Markdown: its text and its link targets, on the lines they occupy.
+ *
+ * Lines are counted within the node's own value from the node's first line.
+ * The value of HTML inside a list item or a quote has the container's indent
+ * or `>` removed, so an offset in the value is not an offset in the file, but
+ * its line breaks are the file's.
+ */
 function putHtml(
   html: string,
-  startOffset: number,
-  lineOfOffset: (offset: number) => number,
-  put: (line: number, text: string, apart: boolean) => void,
+  firstLine: number,
+  put: Put,
   putUrl: (line: number, url: string) => void,
 ): void {
+  const lineOf = lineLocator(html);
+  const lineAt = (index: number) => firstLine + lineOf(index) - 1;
   const parser: Parser = new Parser(
     {
       ontext(text) {
-        const line = lineOfOffset(startOffset + parser.startIndex);
+        const line = lineAt(parser.startIndex);
+        // A character reference such as `&#10;` arrives decoded on its own;
+        // only line breaks written in the source move text to the next line.
+        const source = html.slice(parser.startIndex, parser.endIndex + 1);
+        if (!source.includes('\n')) {
+          put(line, text.replaceAll('\n', ' '), false);
+          return;
+        }
         text.split('\n').forEach((part, offset) => {
           put(line + offset, part, false);
         });
       },
       onattribute(name, value) {
         if (name === 'href' || name === 'src') {
-          putUrl(lineOfOffset(startOffset + parser.startIndex), value);
+          // The attribute's own position, which may be below its tag's start.
+          putUrl(lineAt(parser.startIndex), value);
         }
       },
     },
@@ -162,16 +202,43 @@ function removePunctuationEscapes(text: string): string {
   return result;
 }
 
+/**
+ * Query parameters Google writes into its own links, left out of the view.
+ *
+ * Drive adds `resourcekey` to the address of a file shared by link. It is part
+ * of the address Google hands out, which the document already publishes as a
+ * link, not a credential someone typed; written apart, it would match the
+ * default generic rule, which never matched it in the Markdown.
+ */
+const GOOGLE_LINK_PARAMETERS = new Set(['resourcekey']);
+
+const isGoogleHost = (hostname: string) =>
+  hostname === 'google.com' || hostname.endsWith('.google.com');
+
 /** A URL, then each query parameter as `name=value`, decoded. */
 export function urlTokens(url: string): string[] {
   const unescaped = removePunctuationEscapes(url);
-  const tokens = [unescaped];
   let parsed: URL;
   try {
     parsed = new URL(unescaped);
   } catch {
-    return tokens;
+    return [unescaped];
   }
+
+  const skipped = isGoogleHost(parsed.hostname)
+    ? [...parsed.searchParams.keys()].filter((name) =>
+        GOOGLE_LINK_PARAMETERS.has(name.toLowerCase()),
+      )
+    : [];
+  let shown = unescaped;
+  if (skipped.length > 0) {
+    for (const name of skipped) {
+      parsed.searchParams.delete(name);
+    }
+    shown = parsed.href;
+  }
+
+  const tokens = [shown];
   for (const [name, value] of parsed.searchParams) {
     tokens.push(`${name}=${value}`);
   }

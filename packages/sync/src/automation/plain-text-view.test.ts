@@ -100,6 +100,97 @@ describe('the plain-text view of generated Markdown', () => {
     expect(lines[22]).toContain('diagram');
   });
 
+  it('keeps HTML inside a list item on its lines, despite the indent', () => {
+    const markdown = [
+      '- item',
+      '',
+      '  <table>',
+      '  <tr>',
+      '  <td>a</td>',
+      '  </tr>',
+      '  <tr>',
+      '  <td>b</td>',
+      '  </tr>',
+      '  <tr>',
+      `  <td>Token: ${CELL_TOKEN}</td>`,
+      '  </tr>',
+      '  </table>',
+      '',
+    ].join('\n');
+
+    const lines = plainTextView(markdown).split('\n');
+
+    expect(lines[10]).toBe(`Token: ${CELL_TOKEN}`);
+    expect(lines[4]).toBe('a');
+    expect(lines[7]).toBe('b');
+  });
+
+  it('keeps HTML inside a quote on its lines', () => {
+    const markdown = [
+      '> <div>',
+      '> one',
+      '> two',
+      `> Token: ${CELL_TOKEN}`,
+      '> </div>',
+      '',
+    ].join('\n');
+
+    expect(plainTextView(markdown).split('\n')[3]).toBe(`Token: ${CELL_TOKEN}`);
+  });
+
+  it('writes a link’s URL on the line it is on when the text wraps', () => {
+    const lines = plainTextView(
+      `Text [a link that\nwraps](https://example.test/?token=${TOKEN}) end.\n`,
+    ).split('\n');
+
+    expect(lines[0]).not.toContain(TOKEN);
+    expect(lines[1]).toContain(` token=${TOKEN} `);
+  });
+
+  it('writes an attribute’s URL on the attribute’s line', () => {
+    const lines = plainTextView(
+      `<a\n  class="x"\n  href="https://example.test/?secret=${LINK_SECRET}">link</a>\n`,
+    ).split('\n');
+
+    expect(lines[0]).not.toContain(LINK_SECRET);
+    expect(lines[2]).toContain(` secret=${LINK_SECRET} `);
+  });
+
+  it('keeps table cells apart', () => {
+    const view = plainTextView(
+      `| Name | Value |\n| --- | --- |\n| Password | ${CELL_TOKEN} |\n`,
+    );
+
+    expect(view.split('\n')).toEqual([
+      'Name | Value',
+      '',
+      `Password | ${CELL_TOKEN}`,
+      '',
+    ]);
+  });
+
+  it('keeps a decoded line break on the line of its reference', () => {
+    const lines = plainTextView(
+      `<p>one&#10;Token: ${CELL_TOKEN}</p>\n\nnext\n`,
+    ).split('\n');
+
+    expect(lines[0]).toBe(`one Token: ${CELL_TOKEN}`);
+    expect(lines[2]).toBe('next');
+  });
+
+  it('leaves out the resource key Drive writes into its own links', () => {
+    const resourceKey = part('0-Xy7Qw2Er9', 'Ty4Ui1Op3As');
+    const drive = `https://drive.google.com/file/d/abc/view?resourcekey=${resourceKey}&usp=sharing`;
+
+    expect(urlTokens(drive)).toEqual([
+      'https://drive.google.com/file/d/abc/view?usp=sharing',
+      'usp=sharing',
+    ]);
+    expect(
+      urlTokens(`https://example.test/view?resourcekey=${resourceKey}`),
+    ).toContain(`resourcekey=${resourceKey}`);
+  });
+
   it('decodes entities in HTML text', () => {
     expect(plainTextView(`<p>key&#61;${CELL_TOKEN}</p>\n`)).toContain(
       `key=${CELL_TOKEN}`,
