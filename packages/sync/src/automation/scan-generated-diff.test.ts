@@ -426,14 +426,21 @@ describe('the generated diff secret scan', () => {
   );
 
   realScanner(
-    'passes with gitleaks a Drive link to a file shared by link',
+    'passes with gitleaks links copied from file hosts and Zoom',
     async () => {
       const root = await createProject();
-      const resourceKey = ['0-Xy7Qw2Er9', 'Ty4Ui1Op3As'].join('');
+      const value = ['0-Xy7Qw2Er9', 'Ty4Ui1Op3As'].join('');
+      const links = [
+        `https://drive.google.com/file/d/abc/view?resourcekey=${value}`,
+        `https://www.dropbox.com/scl/fi/abc/plan.pdf?rlkey=${value}&dl=0`,
+        `https://onedrive.live.com/redir?resid=abc&authkey=${value}`,
+        `https://us02web.zoom.us/j/81234567890?pwd=${value}`,
+        `https://docs.google.com/spreadsheet/ccc?key=${value}&usp=sharing`,
+      ];
       await write(
         root,
         ADDED,
-        `# Added\n\nSee [the file](https://drive.google.com/file/d/abc/view?resourcekey=${resourceKey}) here.\n`,
+        `# Added\n\n${links.map((link) => `- [Link](${link})`).join('\n')}\n`,
       );
 
       await expect(

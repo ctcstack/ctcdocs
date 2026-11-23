@@ -23,7 +23,11 @@ All three packages share a version and are released together.
   paths and line numbers, so a value hidden from gitleaks by emphasis, escapes,
   autolinks, table cells or URL query strings is found before commit. A
   finding only the plain text shows is logged with `view=plain-text`
-  (ADR-055).
+  (ADR-055). Links copied from Drive, Dropbox, OneDrive, Zoom or an old Google
+  Sheets address keep their access parameter out of the plain text, so they
+  do not stop a sync. Projects should still expect the first syncs after the
+  upgrade to report values the Markdown used to hide, in documents edited
+  since.
 
 ## 0.28.0
 

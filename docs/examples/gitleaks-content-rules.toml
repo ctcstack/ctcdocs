@@ -111,6 +111,11 @@ regexes = [
 # and the separate `name=value` token of the plain-text view. The converter's
 # escaped underscore (`API\_ID`) is accepted. The value needs eight or more
 # characters and an entropy of 3.0, which leaves out `page=2` or `sort=asc`.
+# A link copied from Zoom (`pwd`), OneDrive (`authkey`) or an old Google Sheets
+# address (`key`, the spreadsheet ID) is allowed: it is an address the service
+# hands out for colleagues to open, and the sync's plain-text view leaves those
+# parameters out too. The allowlist reads the whole line, so this rule checks
+# nothing else on a line holding such a link; the other rules still do.
 [[rules]]
 id = "ctcdocs-credential-url-parameter"
 description = "A credential-named URL query parameter, raw or as a separate name=value token"
@@ -121,6 +126,14 @@ keywords = ["token=", "key=", "secret=", "id=", "pass", "pwd=", "sig"]
 [[rules.allowlists]]
 description = "Placeholders"
 regexes = ['''(?i:^(?:x{4,}|your[-_.]?\w*|example\w*|placeholder|redacted)$)''']
+[[rules.allowlists]]
+description = "Links copied from Zoom, OneDrive and old Google Sheets"
+regexTarget = "line"
+regexes = [
+  '''(?i:zoom\.us/[^\s)>"']*[?&]pwd=)''',
+  '''(?i:(?:onedrive\.live\.com|1drv\.ms)/[^\s)>"']*[?&]authkey=)''',
+  '''(?i:(?:spreadsheets\.google\.com/|docs\.google\.com/spreadsheet/)[^\s)>"']*[?&]key=)''',
+]
 
 # A share link to one secret: 1Password, Bitwarden Send, One-Time Secret,
 # Password Pusher, Privnote. Whoever holds the link can open the secret until
