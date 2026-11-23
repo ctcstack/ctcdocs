@@ -90,8 +90,50 @@ jobs:
 
       # Playwright belongs to the fixture project, the way it belongs to a real
       # one, so the browser is installed from there rather than from the root.
+      # Only the headless shell, and no apt run unless a library is missing:
+      # the same step in ci.yml explains why. Keep the copies identical;
+      # packages/sync/src/automation/browser-install.test.ts checks them.
       - name: Install Chromium for the browser suite
-        run: pnpm --filter ctcdocs-fixture-project exec playwright install --with-deps chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          pnpm --filter ctcdocs-fixture-project exec playwright install --only-shell chromium
+
+          # Prints, one per line, each library that the headless shell or a library it
+          # ships cannot find. Every executable and shared library in the shell's
+          # directory is asked of the dynamic linker with that directory on the library
+          # path, which is what Playwright's own host check does.
+          missing_libraries() {
+            local browsers="${PLAYWRIGHT_BROWSERS_PATH:-${HOME}/.cache/ms-playwright}"
+            local -a shells files
+            mapfile -t shells < <(find "${browsers}" -mindepth 1 -maxdepth 1 -type d -name 'chromium_headless_shell-*')
+            if [[ "${#shells[@]}" -ne 1 ]]; then
+              echo "::error::Expected one Chromium headless shell in ${browsers}; found ${#shells[@]}." >&2
+              return 1
+            fi
+            mapfile -t files < <(find "${shells[0]}" -type f \( -perm -u+x -o -name '*.so' -o -name '*.so.*' \))
+            if [[ "${#files[@]}" -eq 0 ]]; then
+              echo "::error::The Chromium headless shell in ${shells[0]} has no executable." >&2
+              return 1
+            fi
+            local library_path file
+            library_path="$(find "${shells[0]}" -type d | paste -sd ':')"
+            for file in "${files[@]}"; do
+              LD_LIBRARY_PATH="${library_path}" ldd "${file}" 2>/dev/null || true
+            done | awk '/=> not found/ { print $1 }' | sort -u
+          }
+
+          missing="$(missing_libraries)"
+          if [[ -n "${missing}" ]]; then
+            echo "::warning::This runner image lacks libraries Chromium needs (${missing//$'\n'/, }); installing them."
+            pnpm --filter ctcdocs-fixture-project exec playwright install-deps chromium
+            missing="$(missing_libraries)"
+            if [[ -n "${missing}" ]]; then
+              echo "::error::Chromium still cannot find ${missing//$'\n'/, } after its dependencies were installed."
+              exit 1
+            fi
+          fi
 
       # Nothing is published that the gate has not passed.
       - name: Run the canonical verification gate
