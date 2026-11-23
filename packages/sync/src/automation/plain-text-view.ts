@@ -19,9 +19,9 @@ type Put = (line: number, text: string, apart: boolean) => void;
  * line it came from, so a finding in the view has the line number, and the
  * fingerprint, it would have in the file. Literal text, code and HTML text are
  * written as they read, with table cells kept apart by ` | `; every URL is
- * written on its own, followed by each of its query parameters as
- * `name=value`. The view is never committed or published: it exists in the
- * scan's temporary snapshot and nowhere else.
+ * written on its own, followed by the tokens `urlTokens` makes of it, and a
+ * link's title after it. The view is never committed or published: it exists
+ * in the scan's temporary snapshot and nowhere else.
  */
 export function plainTextView(markdown: string): string {
   const lineOf = lineLocator(markdown);
@@ -43,6 +43,12 @@ export function plainTextView(markdown: string): string {
   const putUrl = (line: number, url: string) => {
     for (const token of urlTokens(url)) {
       put(line, token, true);
+    }
+  };
+  /* A title is written last, after its destination, so it ends the node. */
+  const putTitle = (lastLine: number, title: string | null | undefined) => {
+    if (title) {
+      putLines(lastLine - (title.split('\n').length - 1), title, true);
     }
   };
 
@@ -70,15 +76,18 @@ export function plainTextView(markdown: string): string {
         // on the node's last line even when the text before it wraps.
         case 'link':
           putUrl(end.line, node.url);
+          putTitle(end.line, node.title);
           break;
         case 'image':
           putUrl(end.line, node.url);
+          putTitle(end.line, node.title);
           if (node.alt) {
             putLines(start.line, node.alt, true);
           }
           break;
         case 'definition':
           putUrl(start.line, node.url);
+          putTitle(end.line, node.title);
           break;
         default:
           break;
@@ -202,6 +211,15 @@ function removePunctuationEscapes(text: string): string {
   return result;
 }
 
+/** A percent-encoded part of a URL, as typed; as it is if it does not decode. */
+function decodeComponent(text: string): string {
+  try {
+    return decodeURIComponent(text);
+  } catch {
+    return text;
+  }
+}
+
 const onDomain = (hostname: string, domain: string) =>
   hostname === domain || hostname.endsWith(`.${domain}`);
 
@@ -242,7 +260,12 @@ function isShareLinkParameter(url: URL, name: string): boolean {
   }
 }
 
-/** A URL, then each query parameter as `name=value`, decoded. */
+/**
+ * A URL, then each query parameter as `name=value`, decoded; then the
+ * parameters of a fragment written like a query, which is where an OAuth
+ * redirect carries its token; then a password in the URL itself, as in a
+ * database connection string, as `password: value`.
+ */
 export function urlTokens(url: string): string[] {
   const unescaped = removePunctuationEscapes(url);
   let parsed: URL;
@@ -266,6 +289,15 @@ export function urlTokens(url: string): string[] {
   const tokens = [shown];
   for (const [name, value] of parsed.searchParams) {
     tokens.push(`${name}=${value}`);
+  }
+  const fragment = parsed.hash.slice(1);
+  if (fragment.includes('=')) {
+    for (const [name, value] of new URLSearchParams(fragment)) {
+      tokens.push(`${name}=${value}`);
+    }
+  }
+  if (parsed.password) {
+    tokens.push(`password: ${decodeComponent(parsed.password)}`);
   }
   return tokens;
 }

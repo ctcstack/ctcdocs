@@ -35,15 +35,15 @@
 # A label such as "API Key", "Secret Key", "Token" or "Password", a separator
 # (":", " - ", an en or em dash, or a table cell border), and a value that
 # contains a digit. Bold, italic and code markers around either side are
-# allowed. Catches "- **API Key - 3f9c…**", "Access token: **ghx7…**" and
-# "| API key | 3f9c… |".
+# allowed. Catches "- **API Key - 3f9c…**", "Access token: **ghx7…**",
+# "| API key | 3f9c… |" and the short labels in "Login: admin / Pass: 7hQ…".
 [[rules]]
 id = "ctcdocs-labelled-credential"
 description = "A credential label in prose or a table, a separator, and a value that contains a digit"
-regex = '''(?i)\b(?:api[ _-]?(?:key|secret|token)|access[ _-]?(?:key|token)|secret[ _-]?key|client[ _-]?secret|auth(?:entication|orization)?[ _-]?token|bearer[ _-]?token|webhook[ _-]?secret|private[ _-]?key|license[ _-]?key|app[ _-]?password|token|secret|password|passwd|passphrase)[*_\x60]{0,2}(?:[ \t]*[:|]|[ \t]+[-\x{2013}\x{2014}])[ \t*_\x60'"]*([A-Za-z0-9][A-Za-z0-9._~+/=!@#$%^&-]*[0-9][A-Za-z0-9._~+/=!@#$%^&-]*)(?:[^A-Za-z0-9._~+/=!@#$%^&-]|$)'''
+regex = '''(?i)\b(?:api[ _-]?(?:key|secret|token)|access[ _-]?(?:key|token)|secret[ _-]?key|client[ _-]?secret|auth(?:entication|orization)?[ _-]?token|bearer[ _-]?token|webhook[ _-]?secret|private[ _-]?key|license[ _-]?key|app[ _-]?password|token|secret|password|passwd|passphrase|pass|pwd)[*_\x60]{0,2}(?:[ \t]*[:|]|[ \t]+[-\x{2013}\x{2014}])[ \t*_\x60'"]*([A-Za-z0-9][A-Za-z0-9._~+/=!@#$%^&-]*[0-9][A-Za-z0-9._~+/=!@#$%^&-]*)(?:[^A-Za-z0-9._~+/=!@#$%^&-]|$)'''
 secretGroup = 1
 entropy = 3.0
-keywords = ["key", "token", "secret", "password", "passwd", "passphrase"]
+keywords = ["key", "token", "secret", "pass", "pwd"]
 [[rules.allowlists]]
 description = "Placeholders and code"
 regexes = [

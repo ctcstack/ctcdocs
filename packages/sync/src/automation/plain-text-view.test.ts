@@ -207,6 +207,49 @@ describe('the plain-text view of generated Markdown', () => {
     });
   });
 
+  it('writes a password the URL itself carries', () => {
+    expect(
+      urlTokens(
+        `postgres://admin:${part('p%40ss', 'W0rd9')}@db.example.test/app`,
+      ),
+    ).toContain(`password: ${part('p@ss', 'W0rd9')}`);
+    expect(urlTokens('https://user@example.test/')).toEqual([
+      'https://user@example.test/',
+    ]);
+  });
+
+  it('writes the parameters of a fragment written like a query', () => {
+    expect(
+      urlTokens(`https://app.example.test/cb#state=x&access_token=${TOKEN}`),
+    ).toEqual([
+      `https://app.example.test/cb#state=x&access_token=${TOKEN}`,
+      'state=x',
+      `access_token=${TOKEN}`,
+    ]);
+    expect(urlTokens('https://example.test/page#section-2')).toEqual([
+      'https://example.test/page#section-2',
+    ]);
+  });
+
+  it('writes the title of a link, an image and a definition', () => {
+    const lines = plainTextView(
+      [
+        `[a](https://example.test/ "token=${TOKEN}")`,
+        '',
+        `![b](https://example.test/b.png "sig=${SIGNATURE}")`,
+        '',
+        '[ref]: https://example.test/',
+        `  "secret=${LINK_SECRET}"`,
+        '',
+      ].join('\n'),
+    ).split('\n');
+
+    expect(lines[0]).toContain(` token=${TOKEN} `);
+    expect(lines[2]).toContain(` sig=${SIGNATURE} `);
+    expect(lines[4]).not.toContain(LINK_SECRET);
+    expect(lines[5]).toBe(` secret=${LINK_SECRET}`);
+  });
+
   it('decodes entities in HTML text', () => {
     expect(plainTextView(`<p>key&#61;${CELL_TOKEN}</p>\n`)).toContain(
       `key=${CELL_TOKEN}`,

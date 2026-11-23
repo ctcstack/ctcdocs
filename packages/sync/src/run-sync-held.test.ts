@@ -1123,6 +1123,45 @@ describe('documents held back for a secret scan finding (ADR-056)', () => {
     expect(result.report.summary).toMatchObject({ added: 1 });
   });
 
+  it('names the first places of many findings and counts the rest', async () => {
+    const root = await repository();
+    const rows = Array.from(
+      { length: 8 },
+      (_, index) => `User ${index}: ${MARKER}`,
+    );
+    const result = await runBasicMarkdownSync(
+      testSyncContext(root),
+      configuration,
+      tokenProvider,
+      { dryRun: false, full: false },
+      {
+        inventoryResult: inventoryOf([document('doc-logins', 'Logins')]),
+        markdownExporter: exporterOf({
+          'doc-logins': `${rows.join('\n\n')}\n`,
+        }),
+        now: () => new Date(firstTimestamp),
+        secretScan: (files) =>
+          Promise.resolve(
+            files.flatMap((file) =>
+              Array.from({ length: 8 }, (_, index) => ({
+                ruleId: 'generic-api-key',
+                path: file.path,
+                line: 10 + index,
+                plainTextOnly: false,
+              })),
+            ),
+          ),
+      },
+    );
+
+    expect(result.report.unpublished[0]?.detail).toBe(
+      [10, 11, 12, 13, 14]
+        .map((line) => `generic-api-key at line ${line}`)
+        .concat('3 more')
+        .join(', '),
+    );
+  });
+
   it('scans only output that would change', async () => {
     const root = await repository();
     const context = testSyncContext(root);

@@ -1215,9 +1215,23 @@ async function documentsWithSecrets(
       .sort(([left], [right]) => compareText(left, right))
       .map(([fileId, list]) => [
         fileId,
-        { reason: 'secret-found', detail: [...new Set(list)].join(', ') },
+        { reason: 'secret-found', detail: describePlaces(list) },
       ]),
   );
+}
+
+/** Places a report names before it counts the rest, as `3 more`. */
+const PLACES_NAMED = 5;
+
+/**
+ * Where a document's findings are, short enough for a table row: a table
+ * with a column of passwords would otherwise list every row.
+ */
+function describePlaces(places: readonly string[]): string {
+  const unique = [...new Set(places)];
+  const named = unique.slice(0, PLACES_NAMED);
+  const rest = unique.length - named.length;
+  return [...named, ...(rest > 0 ? [`${rest} more`] : [])].join(', ');
 }
 
 /**
