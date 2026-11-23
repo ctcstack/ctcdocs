@@ -106,6 +106,27 @@ regexes = [
   '''(?i:^(?:user(?:name)?|api|email):(?:pass(?:word)?|token|key|x+)$)''',
 ]
 
+# A password inside a URL, as in a database or message broker connection
+# string: `postgres://user:password@host`, `redis://:password@host`. gitleaks'
+# default rules have no rule for it, in any form, so a connection string
+# pasted into a document passes the history scan without this one. The sync's
+# plain-text view also writes the password as `password: value`. Variables,
+# placeholders and a password written as the word are allowed.
+[[rules]]
+id = "ctcdocs-password-in-url"
+description = "A password inside a URL, as in a connection string"
+regex = '''(?i)\b[a-z][a-z0-9+.-]{1,20}://[^\s:/?#@'"<>\x60]{0,64}:([^\s/?#@'"<>\x60]{6,128})@[a-z0-9\[][a-z0-9.:\[\]-]*'''
+secretGroup = 1
+entropy = 3.0
+keywords = ["://"]
+[[rules.allowlists]]
+description = "Variables and placeholders"
+regexes = [
+  '''[$%{}]''',
+  '''(?i:^(?:x+|\*+|pass(?:word|wd)?|pwd|secret|your[-_.]?\w*)$)''',
+]
+stopwords = ["example", "dummy", "sample", "placeholder", "redacted", "changeme"]
+
 # A URL query parameter named like a credential (token, access_token, api_key,
 # key, secret, API_ID, password, sig, …), in a link, an autolink or bare text,
 # and the separate `name=value` token of the plain-text view. The converter's

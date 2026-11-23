@@ -207,6 +207,22 @@ describe('the plain-text view of generated Markdown', () => {
     });
   });
 
+  it('writes a link’s URL after its text, so the text runs on', () => {
+    const lines = plainTextView(
+      [
+        `Password: [${CELL_TOKEN}](https://example.test/)`,
+        '',
+        `Cache: redis://:${CELL_TOKEN}@cache.example.test:6379`,
+        '',
+      ].join('\n'),
+    ).split('\n');
+
+    expect(lines[0]).toContain(`Password: ${CELL_TOKEN} `);
+    expect(lines[2]).toContain(
+      `Cache: redis://:${CELL_TOKEN}@cache.example.test`,
+    );
+  });
+
   it('writes a password the URL itself carries', () => {
     expect(
       urlTokens(
@@ -244,7 +260,7 @@ describe('the plain-text view of generated Markdown', () => {
       ].join('\n'),
     ).split('\n');
 
-    expect(lines[0]).toContain(` token=${TOKEN} `);
+    expect(lines[0]).toContain(` token=${TOKEN}`);
     expect(lines[2]).toContain(` sig=${SIGNATURE} `);
     expect(lines[4]).not.toContain(LINK_SECRET);
     expect(lines[5]).toBe(` secret=${LINK_SECRET}`);

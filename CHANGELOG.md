@@ -9,8 +9,9 @@ All three packages share a version and are released together.
 - **Secret-scan rules for credentials typed into documents.**
   `docs/examples/gitleaks-content-rules.toml` holds tested gitleaks rules for
   the shapes people write in prose: labelled keys, tokens, passwords and PINs,
-  basic auth given to curl, credential-named URL parameters, secret share
-  links, Zapier and Make webhooks, Turnstile keys and truncated hex keys. Every
+  basic auth given to curl, passwords in connection strings, credential-named
+  URL parameters, secret share links, Zapier and Make webhooks, Turnstile keys
+  and truncated hex keys. Every
   project should add them to its `.gitleaks.toml`;
   [Secret scanning](docs/SECRET_SCANNING.md) says how. Once they are in, the
   CI history scan reports values earlier syncs committed: rotate those first,
