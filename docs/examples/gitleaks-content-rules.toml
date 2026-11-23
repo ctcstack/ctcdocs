@@ -90,8 +90,9 @@ secretGroup = 1
 keywords = ["pin", "passcode"]
 
 # A user:password pair handed to PHP cURL (`CURLOPT_USERPWD`, with or without
-# the converter's escaped underscore) or to `curl -u` / `--user`. Shell
-# variables and placeholders are allowed.
+# the converter's escaped underscore) or to `curl -u` / `--user`. A password
+# that is wholly a shell variable or a placeholder is allowed; one that merely
+# contains `$` or a brace is not.
 [[rules]]
 id = "ctcdocs-basic-auth-in-command"
 description = "A user:password pair passed to curl or PHP cURL"
@@ -101,8 +102,7 @@ keywords = ["userpwd", "-u ", "--user"]
 [[rules.allowlists]]
 description = "Variables and placeholders"
 regexes = [
-  '''\$''',
-  '''[<>{}]''',
+  '''(?:^|:)(?:\$\{?\w+\}?|\$\(\w+\)|%\w+%|\{\{.*\}\}|\{\w+\}|<[^>]*>)$''',
   '''(?i:^(?:user(?:name)?|api|email):(?:pass(?:word)?|token|key|x+)$)''',
 ]
 
@@ -110,8 +110,10 @@ regexes = [
 # string: `postgres://user:password@host`, `redis://:password@host`. gitleaks'
 # default rules have no rule for it, in any form, so a connection string
 # pasted into a document passes the history scan without this one. The sync's
-# plain-text view also writes the password as `password: value`. Variables,
-# placeholders and a password written as the word are allowed.
+# plain-text view also writes the password as `password: value`. A password
+# that is wholly a variable or a template (`${DB_PASSWORD}`, `%(password)s`,
+# `{{ password }}`) or the word itself is allowed; one that merely contains
+# `$`, `%` or a brace, as a percent-encoded password does, is not.
 [[rules]]
 id = "ctcdocs-password-in-url"
 description = "A password inside a URL, as in a connection string"
@@ -122,7 +124,7 @@ keywords = ["://"]
 [[rules.allowlists]]
 description = "Variables and placeholders"
 regexes = [
-  '''[$%{}]''',
+  '''^(?:\$\{?\w+\}?|\$\(\w+\)|%\(\w+\)s|%\w+%|\{\{.*\}\}|\{\w+\})$''',
   '''(?i:^(?:x+|\*+|pass(?:word|wd)?|pwd|secret|your[-_.]?\w*)$)''',
 ]
 stopwords = ["example", "dummy", "sample", "placeholder", "redacted", "changeme"]
